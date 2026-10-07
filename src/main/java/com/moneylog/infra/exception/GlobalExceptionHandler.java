@@ -81,6 +81,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.NOT_FOUND, ex.code(), ex.getMessage(), request);
     }
 
+    /** Mesmo 422 e {@code detail} de sempre, mais {@code position} e {@code cause} estruturados (contrato 2.10.0). */
+    @ExceptionHandler(com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException.class)
+    ResponseEntity<Object> handleImportApplyFailed(
+            com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException ex, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.UNPROCESSABLE_ENTITY, ex.code(), ex.getMessage(), request);
+        problem.setProperty("position", ex.position());
+        problem.setProperty("cause", ex.causeCode());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(problem);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     ResponseEntity<Object> handleBusinessRule(BusinessRuleException ex, HttpServletRequest request) {
         return respond(HttpStatus.UNPROCESSABLE_ENTITY, ex.code(), ex.getMessage(), request);

@@ -119,12 +119,12 @@ class ErrorCodeConformanceQaIT {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-QA-09: ACCOUNT_CURRENCY_NOT_SUPPORTED (422) não está na lista do contrato e o schema Money só admite BRL (esperado 400)")
-    @DisplayName("BUG-QA-09: moeda diferente de BRL: status e code coerentes com o contrato")
+    @DisplayName("BUG-QA-09: moeda diferente de BRL: 422 ACCOUNT_CURRENCY_NOT_SUPPORTED, como o contrato lista (Money.currency aceita só BRL, mas o 422 de domínio é o documentado)")
     void moedaForaDoContrato() throws Exception {
         probe("conta moeda USD", HttpMethod.POST, "/v1/accounts", acct("ok", "CHECKING", "1.00", "2026-10-01").replace("BRL", "USD"), a);
         String v = seen.get("conta moeda USD");
-        assertThat(v).as("o contrato declara Money.currency enum [BRL]: moeda inválida deveria ser 400 VALIDATION_FAILED").startsWith("400");
+        assertThat(v).as("o contrato lista ACCOUNT_CURRENCY_NOT_SUPPORTED entre os 422 de domínio").startsWith("422");
+        assertThat(v).endsWith("ACCOUNT_CURRENCY_NOT_SUPPORTED");
         assertThat(documented(v.substring(v.indexOf(' ') + 1), documentedCodes())).isTrue();
     }
 

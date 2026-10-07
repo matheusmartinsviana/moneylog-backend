@@ -62,10 +62,10 @@ class MigrationUpgradeQaIT {
 
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
-            assertThat(result.migrationsExecuted).isEqualTo(21); // V7.00 a V7.03 e V8.00 (Etapas 7 e 8) + 2.00 a 2.06 (2.05 índices B5 e 2.06 teto da sessão B7), 3.01, 3.02 (índices da Etapa 3), 4.00 a 4.02 (Etapa 4), 5.00 (metas, Etapa 5) e 6.00, 6.01, 6.02 (notas, unaccent e chave de nome dos wikilinks, Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(22); // V7.00 a V7.03, V8.00 e V8.01 (Etapas 7 e 8, FK composta do lote) + 2.00 a 2.06 (2.05 índices B5 e 2.06 teto da sessão B7), 3.01, 3.02 (índices da Etapa 3), 4.00 a 4.02 (Etapa 4), 5.00 (metas, Etapa 5) e 6.00, 6.01, 6.02 (notas, unaccent e chave de nome dos wikilinks, Etapa 6)
             assertThat(result.success).isTrue();
             List<String> versions = jdbc.queryForList("select version from flyway_schema_history where version is not null order by installed_rank", String.class);
-            assertThat(versions).containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02", "7.00", "7.01", "7.02", "7.03", "8.00");
+            assertThat(versions).containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02", "7.00", "7.01", "7.02", "7.03", "8.00", "8.01");
             assertThat(all.validateWithResult().validationSuccessful).as("checksums").isTrue();
             assertThat(all.migrate().migrationsExecuted).as("re-execução é no-op").isZero();
 
@@ -120,6 +120,46 @@ class MigrationUpgradeQaIT {
                     .hasMessageContaining("uq_transaction_revisions_transaction_revision");
             assertThatThrownBy(() -> jdbc.update(sqlRev, UUID.randomUUID(), ua, tx, 0, NOW, NOW, NOW))
                     .hasMessageContaining("ck_transaction_revisions_revision");
+        }
+    }
+
+    @Test
+    @DisplayName("V8.01 (BUG-QA-10) aplica sobre banco com lote e movimentação importada; dados intactos e FK composta vale")
+    void deveAplicarV801ComDadosImportados() {
+        try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
+            pg.start();
+            DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
+            Flyway upTo800 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("8.00").load();
+            upTo800.migrate();
+
+            JdbcTemplate jdbc = new JdbcTemplate(ds);
+            UUID ua = UUID.randomUUID();
+            UUID ub = UUID.randomUUID();
+            UUID acc = UUID.randomUUID();
+            UUID batchA = UUID.randomUUID();
+            UUID batchB = UUID.randomUUID();
+            UUID tx = UUID.randomUUID();
+            jdbc.update("insert into users (id,email,created_at,updated_at) values (?,?,?,?)", ua, "a@x.com", NOW, NOW);
+            jdbc.update("insert into users (id,email,created_at,updated_at) values (?,?,?,?)", ub, "b@x.com", NOW, NOW);
+            jdbc.update("insert into accounts (id,user_id,name,type,opening_balance_cents,currency,opening_date,status,created_at,updated_at) "
+                    + "values (?,?,'Conta','CHECKING',1000,'BRL','2026-10-01','ACTIVE',?,?)", acc, ua, NOW, NOW);
+            String sqlBatch = "insert into import_batches (id,user_id,account_id,format,file_sha256,status,created_at,updated_at) values (?,?,?,'CSV',?,'APPLIED',?,?)";
+            jdbc.update(sqlBatch, batchA, ua, acc, "a".repeat(64), NOW, NOW);
+            String sqlTx = "insert into transactions (id,user_id,type,status,amount_cents,currency,transaction_date,description,payment_method,account_id,source,import_batch_id,created_at,updated_at) "
+                    + "values (?,?,'EXPENSE','ACTIVE',500,'BRL','2026-10-02','x','PIX',?,'IMPORT',?,?,?)";
+            jdbc.update(sqlTx, tx, ua, acc, batchA, NOW, NOW);
+
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            assertThat(all.migrate().success).isTrue();
+
+            assertThat(jdbc.queryForObject("select import_batch_id from transactions where id = ?", UUID.class, tx)).isEqualTo(batchA);
+            assertThat(jdbc.queryForObject("select count(*) from pg_constraint where conname = 'fk_transactions_import_batch'", Integer.class)).isZero();
+            jdbc.update("insert into accounts (id,user_id,name,type,opening_balance_cents,currency,opening_date,status,created_at,updated_at) "
+                    + "values (?,?,'Conta','CHECKING',0,'BRL','2026-10-01','ACTIVE',?,?)", UUID.randomUUID(), ub, NOW, NOW);
+            UUID accB = jdbc.queryForObject("select id from accounts where user_id = ?", UUID.class, ub);
+            jdbc.update(sqlBatch, batchB, ub, accB, "b".repeat(64), NOW, NOW);
+            assertThatThrownBy(() -> jdbc.update(sqlTx, UUID.randomUUID(), ua, acc, batchB, NOW, NOW))
+                    .hasMessageContaining("fk_transactions_import_batch_id_user");
         }
     }
 }

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.9.0
+  version: 2.10.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -4413,6 +4413,13 @@ components:
           description: Só em `VALIDATION_FAILED`.
           items:
             $ref: '#/components/schemas/FieldError'
+        position:
+          type: integer
+          description: 'Só em `IMPORT_APPLY_FAILED` (2.10.0): posição (1 = primeira) da linha do lote que falhou.'
+        cause:
+          type: string
+          pattern: '^[A-Z][A-Z0-9_]*$'
+          description: 'Só em `IMPORT_APPLY_FAILED` (2.10.0): `code` da recusa da linha (ex.: `IMPORT_LINE_ALREADY_RECORDED`, `IMPORT_TRANSFER_LEG_ALREADY_RECORDED`). Código aberto; o front trata os desconhecidos como genéricos.'
     FieldError:
       type: object
       required: [field, code, message]

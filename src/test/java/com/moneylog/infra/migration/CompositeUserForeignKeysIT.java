@@ -53,6 +53,7 @@ class CompositeUserForeignKeysIT {
             new String[] {"fk_transactions_refund_of_id_user", "FOREIGN KEY (refund_of_id, user_id) REFERENCES transactions(id, user_id)"},
             new String[] {"fk_transaction_installments_transaction_id_user", "FOREIGN KEY (transaction_id, user_id) REFERENCES transactions(id, user_id)"},
             new String[] {"fk_transaction_installments_invoice_id_user", "FOREIGN KEY (invoice_id, user_id) REFERENCES credit_card_invoices(id, user_id)"},
+            new String[] {"fk_transactions_import_batch_id_user", "FOREIGN KEY (import_batch_id, user_id) REFERENCES import_batches(id, user_id)"},
             new String[] {"fk_ledger_postings_transaction_id_user", "FOREIGN KEY (transaction_id, user_id) REFERENCES transactions(id, user_id)"},
             new String[] {"fk_ledger_postings_installment_id_user", "FOREIGN KEY (installment_id, user_id) REFERENCES transaction_installments(id, user_id)"});
 
@@ -61,7 +62,7 @@ class CompositeUserForeignKeysIT {
             "fk_credit_cards_default_account", "fk_credit_card_invoices_card", "fk_debts_person", "fk_debts_origin_transaction",
             "fk_transactions_account", "fk_transactions_counterpart_account", "fk_transactions_card", "fk_transactions_category",
             "fk_transactions_invoice", "fk_transactions_debt", "fk_transactions_refund_of", "fk_installments_transaction",
-            "fk_installments_invoice", "fk_ledger_postings_transaction", "fk_ledger_postings_installment");
+            "fk_installments_invoice", "fk_transactions_import_batch", "fk_ledger_postings_transaction", "fk_ledger_postings_installment");
 
     private static final long A = 1;
     private static final long B = 2;
@@ -89,7 +90,7 @@ class CompositeUserForeignKeysIT {
         for (String[] fk : COMPOSITE_FKS) {
             assertThat(constraintDef(fk[0])).as(fk[0]).isEqualTo(fk[1]);
         }
-        assertThat(COMPOSITE_FKS).hasSize(15);
+        assertThat(COMPOSITE_FKS).hasSize(16);
     }
 
     @Test
@@ -103,9 +104,7 @@ class CompositeUserForeignKeysIT {
         List<String> simples = jdbc.queryForList("""
                 SELECT conname || ' -> ' || confrelid::regclass::text FROM pg_constraint
                 WHERE contype = 'f' AND array_length(conkey, 1) = 1 AND confrelid::regclass::text <> 'users'""", String.class);
-        // Exceção conhecida (BUG-QA-10, V7.00): transactions.import_batch_id -> import_batches(id) é FK simples, sem user_id.
-        // Quando virar composta (import_batches já tem uq_import_batches_id_user), remover a exceção.
-        assertThat(simples).containsExactly("fk_transactions_import_batch -> import_batches");
+        assertThat(simples).isEmpty();
         // a regra de faturas do cartão (V1.03) já era composta e continua
         assertThat(constraintDef("fk_credit_card_billing_rules_card"))
                 .isEqualTo("FOREIGN KEY (card_id, user_id) REFERENCES credit_cards(id, user_id)");
@@ -233,7 +232,34 @@ class CompositeUserForeignKeysIT {
         });
     }
 
+    @Test
+    @DisplayName("BUG-QA-10: movimentação importada do usuário A apontando para lote do usuário B é recusada; para o próprio lote é aceita")
+    void deveRecusarMovimentacaoComLoteDeOutroUsuario() {
+        inRollback(() -> {
+            seed(A);
+            seed(B);
+            insertBatch(A, id(A, 200));
+            insertBatch(B, id(B, 200));
+            assertViolation(() -> insertImported(A, id(A, 201), id(B, 200)), "fk_transactions_import_batch_id_user");
+            assertThatCode(() -> insertImported(A, id(A, 202), id(A, 200))).doesNotThrowAnyException();
+        });
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    private void insertBatch(long user, UUID id) {
+        jdbc.update("""
+                INSERT INTO import_batches (id, user_id, account_id, format, file_sha256, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'CSV', ?, 'APPLIED', ?, ?)""", id, uid(user), this.id(user, 1), "a".repeat(64), NOW, NOW);
+    }
+
+    private void insertImported(long user, UUID id, UUID batchId) {
+        jdbc.update("""
+                INSERT INTO transactions (id, user_id, type, status, amount_cents, currency, transaction_date, payment_method,
+                    account_id, source, import_batch_id, created_at, updated_at)
+                VALUES (?, ?, 'EXPENSE', 'ACTIVE', 10000, 'BRL', ?, 'PIX', ?, 'IMPORT', ?, ?, ?)""",
+                id, uid(user), DAY, this.id(user, 1), batchId, NOW, NOW);
+    }
 
     private static UUID id(long user, long n) {
         return new UUID(user, n);
