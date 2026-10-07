@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.11.0
+  version: 2.12.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -7409,7 +7409,7 @@ components:
           maxLength: 500
     GoalUpdate:
       type: object
-      required: [name, target, priority, version]
+      required: [name, target, version]
       additionalProperties: false
       properties:
         name:
@@ -7423,6 +7423,7 @@ components:
           format: date
         priority:
           $ref: '#/components/schemas/GoalPriority'
+          description: Opcional (alinhado ao `GoalInput`); ausente mantém a prioridade atual da meta.
         description:
           type: [string, 'null']
           maxLength: 500
