@@ -1,0 +1,33 @@
+# Perfil de produção (T175). Nenhum segredo aqui: tudo vem do ambiente ou de arquivos montados (Docker secrets / SSM).
+spring:
+  config:
+    # Segredos por arquivo (Docker secrets, ADR-005): cada arquivo de SECRETS_DIR vira uma propriedade com o NOME DO ARQUIVO
+    # (ex.: /run/secrets/JWT_SECRET resolve ${JWT_SECRET}). O valor nunca é impresso. Pasta ausente = ignora (usa variáveis de ambiente).
+    import: "optional:configtree:${SECRETS_DIR:/run/secrets}/"
+
+# Logs estruturados (JSON, formato ECS): sem texto livre com dado do usuário. Segredos nunca entram em log (testado).
+logging:
+  structured:
+    format:
+      console: ecs
+
+# Documentação viva fora de produção: /v3/api-docs e /swagger-ui respondem 404.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+management:
+  endpoint:
+    health:
+      # /actuator/health/liveness e /actuator/health/readiness para o healthcheck do container e do ALB.
+      probes:
+        enabled: true
+      show-details: never
+      show-components: never
+
+moneylog:
+  auth:
+    # Sempre true em produção (CookieSecurityGuard recusa o contrário fora do perfil dev).
+    cookie-secure: true

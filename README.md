@@ -90,3 +90,8 @@ Schema: `src/main/resources/db/migration/V1.00`–`V1.08` (editáveis até o pri
 - `POST /v1/imports` (CSV/OFX, até 5 MB e 5.000 linhas) só **prepara** o lote; nada vira movimentação até `POST /v1/imports/{id}/apply`, que usa os mesmos handlers da criação manual. O arquivo bruto não é guardado. Amostras de teste ficam nos próprios testes (`CsvStatementParserTest`, `OfxStatementParserTest`).
 - O job de notificações (`moneylog.notifications.job.*`) roda a cada 15 min em `America/Sao_Paulo` e é idempotente (índice único). Nos ITs fica desligado.
 - **Push preparado e desligado**: `moneylog.push.enabled=false`. Para ligar: `MONEYLOG_PUSH_VAPID_PUBLIC`, `MONEYLOG_PUSH_VAPID_PRIVATE`, `MONEYLOG_PUSH_VAPID_SUBJECT` (ver `.env.example`), HTTPS real e PWA instalada. Detalhes em `docs/adrs/ADR-012-notificacoes-e-push.md`.
+
+## Produção, imagem Docker e backup (Etapa 9)
+- Imagem: `docker build -t moneylog-backend:local backend/` (multi-stage, JRE 21 alpine, usuário não-root, `SPRING_PROFILES_ACTIVE=prod`). Subir com `docker compose -f docker-compose.prod.yml --env-file .env up --build` (precisa de `MONEYLOG_TRUSTED_PROXIES`; local: `172.16.0.0/12`).
+- Perfil `prod` (`application-prod.yaml`): logs JSON (ECS), swagger e api-docs desligados, probes `liveness`/`readiness`, cookie `Secure`. Segredos por arquivo: cada arquivo de `SECRETS_DIR` (padrão `/run/secrets`) com o nome da variável (ex.: `JWT_SECRET`).
+- Backup: `docs/operacao/backup.md`. Deploy na AWS (preparado, não executado): `docs/operacao/deploy-aws.md` e `docs/adrs/ADR-005-topologia-aws-e-banco.md`.
