@@ -1,0 +1,141 @@
+# Configuração base. Nenhum segredo aqui: tudo vem de variáveis de ambiente (veja .env.example na raiz).
+spring:
+  application:
+    name: moneylog
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      auto-commit: false
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+  jpa:
+    open-in-view: false
+    hibernate:
+      # O schema só muda por migração Flyway (BE 05).
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  servlet:
+    multipart:
+      # Importação do vault (T112, S-162): o caso de uso confere os 20 MB e responde 422 VAULT_IMPORT_TOO_LARGE; o teto do container fica logo acima.
+      max-file-size: 21MB
+      max-request-size: 22MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: UTC
+    deserialization:
+      # o contrato declara additionalProperties: false nos corpos de entrada: campo desconhecido é 400 (BUG-E2E-02)
+      fail-on-unknown-properties: true
+      # S-207: em dinheiro, `installments: 2.5` não pode virar 2 em silêncio; número com parte fracionária em campo
+      # inteiro é 400 VALIDATION_FAILED (INVALID_FORMAT)
+      accept-float-as-int: false
+
+# Documentação viva (springdoc): desligada por padrão, ligada só no perfil dev (application-dev.yaml).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+  paths-to-match: /v1/**
+
+server:
+  tomcat:
+    # Upload acima do teto do vault (T112): o Tomcat engole até 30 MB do corpo restante para o cliente receber o 422 em vez de um reset da conexão.
+    max-swallow-size: 30MB
+  error:
+    include-message: never
+    include-stacktrace: never
+
+logging:
+  level:
+    # Busca global (S-287): o termo `q` é dado do usuário e não vai para log. Estes dois loggers do Spring imprimem em DEBUG a URL com a query
+    # string ("Securing GET /v1/search?q=...", "GET \"/v1/search?q=...\""), então ficam em INFO mesmo que alguém suba o nível da raiz.
+    org.springframework.security.web.FilterChainProxy: INFO
+    org.springframework.web.servlet.DispatcherServlet: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Só o health fica exposto (BE 06).
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+      # Sem grupos liveness/readiness por enquanto: a resposta fica só {"status":"UP"}.
+      # Ligar na etapa de deploy, se a topologia (ADR-005) precisar de probes separados.
+      probes:
+        enabled: false
+
+moneylog:
+  # Fuso usado para "hoje" e para a competência (S-1).
+  zone: America/Sao_Paulo
+  security:
+    # No mínimo 32 bytes: com menos o app não sobe (ADR-003).
+    jwt-secret: ${JWT_SECRET}
+    # Origens do front (CSRF do refresh e do logout), separadas por vírgula. Sem CORS: mesmo domínio em produção.
+    allowed-origins: ${MONEYLOG_ALLOWED_ORIGINS}
+    # CIDRs dos proxies de confiança (CloudFront/ALB). Vazio = ignora X-Forwarded-For (S-86).
+    trusted-proxies: ${MONEYLOG_TRUSTED_PROXIES:}
+  auth:
+    access-token-ttl: PT15M
+    refresh-ttl: P30D
+    # Tolerância na detecção de reuso do refresh (S-83).
+    reuse-grace: PT30S
+    # Sempre true. false só com o perfil dev e origens localhost (S-85, plano B).
+    cookie-secure: true
+    max-login-failures: 5
+    login-window: PT15M
+    # Teto absoluto da sessão: nenhuma família de refresh vive além de login + 90 dias, por mais que rotacione (B7).
+    max-session-age: P90D
+    # Refresh expirado fica na tabela por este tempo e depois é apagado (B7).
+    refresh-retention: P7D
+  export:
+    # Teto de movimentações do backup e do CSV (S-260): acima dele, 422 EXPORT_TOO_LARGE. Medido: 50.000 = backup de 57 MB e heap +121 MB.
+    max-transactions: 200000
+    rate-limit:
+      # Pedidos de exportação por usuário na janela (em memória, como o login); acima, 429 TOO_MANY_ATTEMPTS com Retry-After.
+      max-requests: 6
+      window: PT1M
+  search:
+    # Busca global (S-287): pedidos por usuário por minuto (a busca roda a cada pausa de digitação) e teto de tempo de cada grupo de consulta.
+    rate-limit:
+      max-requests: 120
+      window: PT1M
+    timeout: PT3S
+  owner:
+    email: ${MONEYLOG_OWNER_EMAIL}
+    # Hash BCrypt direto (entre aspas simples no .env) ou arquivo com o hash (evita o problema do "$").
+    password-hash: ${MONEYLOG_OWNER_PASSWORD_HASH:}
+    password-hash-file: ${MONEYLOG_OWNER_PASSWORD_HASH_FILE:}
+  ai:
+    provider: ${AI_PROVIDER:none}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:}
+    # Opcionais (S-185/S-186). A chave só existe no ambiente do servidor, nunca no front.
+    base-url: ${AI_BASE_URL:}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+    daily-call-limit: ${AI_DAILY_CALL_LIMIT:50}
+    monthly-token-budget: ${AI_MONTHLY_TOKEN_BUDGET:500000}
+    payload-retention-days: ${AI_PAYLOAD_RETENTION_DAYS:90}
+  notifications:
+    job:
+      # Gera as notificações do dia a cada 15 min em America/Sao_Paulo; idempotente (índice único), uma instância (ADR-001).
+      enabled: true
+      cron: "0 */15 * * * *"
+  push:
+    # Push PREPARADO e DESLIGADO (S-173): a central dentro do app é o canal garantido. Ligar exige HTTPS real, chaves VAPID e PWA instalada.
+    # Com enabled=true e sem as três variáveis abaixo o app não sobe (como o JWT_SECRET).
+    enabled: false
+    vapid-public: ${MONEYLOG_PUSH_VAPID_PUBLIC:}
+    vapid-private: ${MONEYLOG_PUSH_VAPID_PRIVATE:}
+    vapid-subject: ${MONEYLOG_PUSH_VAPID_SUBJECT:}
+    # Valores financeiros no payload do push: desligado por padrão (a notificação sai sem valores).
+    include-amounts: false
+    ttl-seconds: 86400

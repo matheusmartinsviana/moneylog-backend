@@ -1,0 +1,30 @@
+# Perfil dos testes de integração (*IT). O datasource vem do Testcontainers (@ServiceConnection),
+# com a mesma imagem do docker-compose.yml. Nada de H2.
+# Os valores abaixo existem só para os testes (não são segredos reais).
+spring:
+  jpa:
+    show-sql: false
+
+moneylog:
+  notifications:
+    job:
+      # os ITs chamam os casos de uso direto; o agendador não roda por baixo deles
+      enabled: false
+  security:
+    # No mínimo 32 bytes (T22b CA9).
+    jwt-secret: it-only-jwt-secret-with-at-least-32-bytes-0123456789
+    allowed-origins: https://app.moneylog.test,https://localhost:4200
+    trusted-proxies: ""
+  export:
+    rate-limit:
+      # os ITs exportam muitas vezes por usuário; o limite tem teste próprio (ExportLimitsIT), que o reduz
+      max-requests: 100000
+  owner:
+    email: owner@moneylog.com
+    # BCrypt (custo 10) de "senha-forte-123".
+    password-hash: '$2y$10$gNmLDyeHDZs73ARf5G3FUeDlMce4ALfLmVEFPpSrTbGERe5xcTIXS'
+
+# O mesmo teto do application.yaml para o servlet de despacho do MockMvc (a subclasse tem outro nome de logger): o SearchLogIT sobe a raiz a DEBUG.
+logging:
+  level:
+    org.springframework.test.web.servlet.TestDispatcherServlet: INFO

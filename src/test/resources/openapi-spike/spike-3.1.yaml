@@ -1,0 +1,76 @@
+openapi: 3.1.0
+info:
+  title: spike
+  version: 0.0.1
+paths:
+  /v1/things:
+    post:
+      operationId: createThing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingInput'
+      responses:
+        '201':
+          description: criado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+components:
+  schemas:
+    Money:
+      type: object
+      required: [amount, currency]
+      additionalProperties: false
+      properties:
+        amount:
+          type: string
+          pattern: '^-?\d+\.\d{2}$'
+        currency:
+          type: string
+          enum: [BRL]
+    Expense:
+      type: object
+      required: [type, amount]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: EXPENSE
+        amount:
+          type: string
+    Transfer:
+      type: object
+      required: [type, toAccountId]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          const: TRANSFER
+        toAccountId:
+          type: string
+          format: uuid
+    ThingInput:
+      oneOf:
+        - $ref: '#/components/schemas/Expense'
+        - $ref: '#/components/schemas/Transfer'
+      discriminator:
+        propertyName: type
+        mapping:
+          EXPENSE: '#/components/schemas/Expense'
+          TRANSFER: '#/components/schemas/Transfer'
+    Thing:
+      type: object
+      required: [id, price, note]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        note:
+          type: [string, 'null']
+        price:
+          $ref: '#/components/schemas/Money'
+          description: irmão do $ref (permitido no 3.1)

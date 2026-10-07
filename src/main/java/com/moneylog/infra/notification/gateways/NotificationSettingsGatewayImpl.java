@@ -1,0 +1,67 @@
+package com.moneylog.infra.notification.gateways;
+
+import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+
+import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
+import com.moneylog.core.notification.domain.NotificationKind;
+import com.moneylog.core.notification.domain.NotificationSettings;
+import com.moneylog.core.notification.domain.QuietHours;
+import com.moneylog.core.notification.domain.SummaryFrequency;
+
+/** Configurações de notificação (uma linha por usuário), com travamento otimista por {@code version}. */
+public class NotificationSettingsGatewayImpl implements NotificationSettingsGateway {
+
+    private final JdbcTemplate jdbc;
+
+    public NotificationSettingsGatewayImpl(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public Optional<NotificationSettings> find(UUID userId) {
+        return jdbc.query("SELECT summary_enabled, summary_time, summary_frequency, disabled_kinds, quiet_from, quiet_to, push_enabled, display_name, "
+                        + "version FROM notification_settings WHERE user_id = ?", (rs, i) -> {
+            Map<NotificationKind, Boolean> kinds = new EnumMap<>(NotificationKind.class);
+            Arrays.stream(rs.getString("disabled_kinds").split(",")).filter(s -> !s.isBlank())
+                    .forEach(s -> kinds.put(NotificationKind.valueOf(s), false));
+            return NotificationSettings.restore(userId, rs.getBoolean("summary_enabled"), rs.getObject("summary_time", LocalTime.class),
+                    SummaryFrequency.valueOf(rs.getString("summary_frequency")), kinds,
+                    new QuietHours(rs.getObject("quiet_from", LocalTime.class), rs.getObject("quiet_to", LocalTime.class)), rs.getBoolean("push_enabled"),
+                    rs.getString("display_name"), rs.getLong("version"));
+        }, userId).stream().findFirst();
+    }
+
+    @Override
+    public Optional<NotificationSettings> save(NotificationSettings s, long expectedVersion) {
+        String disabled = s.kinds().entrySet().stream().filter(e -> !e.getValue()).map(e -> e.getKey().name()).sorted()
+                .collect(Collectors.joining(","));
+        int changed;
+        if (expectedVersion == 0) {
+            changed = jdbc.update("""
+                    INSERT INTO notification_settings (user_id, summary_enabled, summary_time, summary_frequency, disabled_kinds, quiet_from, quiet_to,
+                        push_enabled, display_name, version, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, now())
+                    ON CONFLICT (user_id) DO NOTHING""", s.userId(), s.summaryEnabled(), time(s.summaryTime()), s.summaryFrequency().name(), disabled,
+                    time(s.quietHours().from()), time(s.quietHours().to()), s.pushEnabled(), s.displayName());
+        } else {
+            changed = jdbc.update("""
+                    UPDATE notification_settings SET summary_enabled = ?, summary_time = ?, summary_frequency = ?, disabled_kinds = ?, quiet_from = ?,
+                        quiet_to = ?, push_enabled = ?, display_name = ?, version = version + 1, updated_at = now()
+                    WHERE user_id = ? AND version = ?""", s.summaryEnabled(), time(s.summaryTime()), s.summaryFrequency().name(), disabled,
+                    time(s.quietHours().from()), time(s.quietHours().to()), s.pushEnabled(), s.displayName(), s.userId(), expectedVersion);
+        }
+        return changed == 0 ? Optional.empty() : find(s.userId());
+    }
+
+    private static LocalTime time(LocalTime time) {
+        return time;
+    }
+}
