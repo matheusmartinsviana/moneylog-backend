@@ -112,7 +112,9 @@ public class SearchGatewayImpl implements SearchGateway {
                 timeout.execute();
             }
             List<T> rows = query.run(connection);
-            connection.releaseSavepoint(savepoint);
+            // Consulta só de leitura: voltar ao savepoint desfaz o set_config local e devolve o teto original; senão o teto
+            // (ex.: 1 ms) continuaria valendo para o COMMIT e o cancelaria (QueryTimeoutException -> 500).
+            connection.rollback(savepoint);
             return new Outcome<>(rows, false);
         } catch (SQLException e) {
             if (QUERY_CANCELED.equals(e.getSQLState())) {

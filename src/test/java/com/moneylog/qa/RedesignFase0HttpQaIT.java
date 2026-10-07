@@ -154,7 +154,6 @@ class RedesignFase0HttpQaIT {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("BUG-QA-06: GET /v1/search?q=segredo|x (caractere cru que o Tomcat recusa) grava a URL inteira, com o termo, no log da aplicação (Tomcat, 'Invalid character found in the request target')")
     @DisplayName("BUG-QA-06: o termo não vai ao log do container")
     void termoNaoVazaNoLogDoTomcat() throws Exception {
         UUID id = UUID.randomUUID();

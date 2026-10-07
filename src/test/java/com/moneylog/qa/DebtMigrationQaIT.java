@@ -87,7 +87,7 @@ class DebtMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(7); // V4.00 a V4.02, V5.00 e V6.00, V6.01, V6.02
+            assertThat(result.migrationsExecuted).isEqualTo(12); // V4.00 a V4.02, V5.00 e V6.00, V6.01, V6.02, V7.00 a V7.03 e V8.00 (Etapas 7 e 8)
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 

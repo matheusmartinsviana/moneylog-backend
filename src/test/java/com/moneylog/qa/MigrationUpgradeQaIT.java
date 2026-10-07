@@ -62,10 +62,10 @@ class MigrationUpgradeQaIT {
 
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
-            assertThat(result.migrationsExecuted).isEqualTo(16); // 2.00 a 2.06 (2.05 índices B5 e 2.06 teto da sessão B7), 3.01, 3.02 (índices da Etapa 3), 4.00 a 4.02 (Etapa 4), 5.00 (metas, Etapa 5) e 6.00, 6.01, 6.02 (notas, unaccent e chave de nome dos wikilinks, Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(21); // V7.00 a V7.03 e V8.00 (Etapas 7 e 8) + 2.00 a 2.06 (2.05 índices B5 e 2.06 teto da sessão B7), 3.01, 3.02 (índices da Etapa 3), 4.00 a 4.02 (Etapa 4), 5.00 (metas, Etapa 5) e 6.00, 6.01, 6.02 (notas, unaccent e chave de nome dos wikilinks, Etapa 6)
             assertThat(result.success).isTrue();
             List<String> versions = jdbc.queryForList("select version from flyway_schema_history where version is not null order by installed_rank", String.class);
-            assertThat(versions).containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02");
+            assertThat(versions).containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02", "7.00", "7.01", "7.02", "7.03", "8.00");
             assertThat(all.validateWithResult().validationSuccessful).as("checksums").isTrue();
             assertThat(all.migrate().migrationsExecuted).as("re-execução é no-op").isZero();
 

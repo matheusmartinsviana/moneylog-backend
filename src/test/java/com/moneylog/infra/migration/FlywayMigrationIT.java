@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 
@@ -100,10 +101,21 @@ class FlywayMigrationIT {
                         + " AND table_name <> 'flyway_schema_history'", String.class);
         assertThat(tables).contains("users", "categories", "accounts", "credit_cards", "credit_card_billing_rules",
                 "credit_card_invoices", "persons", "debts", "transactions", "transaction_installments", "ledger_postings");
+        // Etapas 7 e 8: tabelas de preferência/mapeamento têm user_id como chave (sem id nem created_at) e as de registro
+        // imutável (notificações, assinaturas push, prévias e análises de IA, regras aprendidas) não têm updated_at.
+        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings");
+        Set<String> noTimestamps = Set.of("import_lines"); // filhas do lote: nascem e morrem com ele
+        Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules");
         for (String table : tables) {
-            assertThat(column(table, "id")).as(table + ".id").isEqualTo("uuid|NO|null");
-            assertThat(column(table, "created_at")).as(table + ".created_at").startsWith("timestamp with time zone|NO");
-            assertThat(column(table, "updated_at")).as(table + ".updated_at").startsWith("timestamp with time zone|NO");
+            if (!keyedByUser.contains(table)) {
+                assertThat(column(table, "id")).as(table + ".id").isEqualTo("uuid|NO|null");
+            }
+            if (!keyedByUser.contains(table) && !noTimestamps.contains(table)) {
+                assertThat(column(table, "created_at")).as(table + ".created_at").startsWith("timestamp with time zone|NO");
+            }
+            if (!appendOnly.contains(table) && !noTimestamps.contains(table)) {
+                assertThat(column(table, "updated_at")).as(table + ".updated_at").startsWith("timestamp with time zone|NO");
+            }
             if (!table.equals("users")) {
                 assertThat(column(table, "user_id")).as(table + ".user_id").startsWith("uuid|NO");
             }
@@ -583,12 +595,17 @@ class FlywayMigrationIT {
 
     private UUID insertImported(UUID id, String status, String dedupKey) {
         boolean voided = status.equals("VOIDED");
+        UUID batch = UUID.randomUUID();
+        // V7.00: transactions.import_batch_id tem FK para import_batches
+        jdbc.update("""
+                INSERT INTO import_batches (id, user_id, account_id, format, file_sha256, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'CSV', ?, 'APPLIED', ?, ?)""", batch, USER, ACCOUNT, KEY, NOW, NOW);
         jdbc.update("""
                 INSERT INTO transactions (id, user_id, type, status, amount_cents, currency, transaction_date, payment_method,
                     account_id, category_id, source, import_batch_id, dedup_key, original_dedup_key, void_reason, voided_at,
                     created_at, updated_at)
                 VALUES (?, ?, 'EXPENSE', ?, 850, 'BRL', ?, 'DEBIT', ?, ?, 'IMPORT', ?, ?, ?, ?, ?, ?, ?)""",
-                id, USER, status, DAY, ACCOUNT, CATEGORY, UUID.randomUUID(), dedupKey, KEY, voided ? "motivo" : null,
+                id, USER, status, DAY, ACCOUNT, CATEGORY, batch, dedupKey, KEY, voided ? "motivo" : null,
                 voided ? NOW : null, NOW, NOW);
         return id;
     }

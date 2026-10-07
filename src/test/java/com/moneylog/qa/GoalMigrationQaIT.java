@@ -79,9 +79,9 @@ class GoalMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(4); // V5.00 (metas) e V6.00, V6.01, V6.02 (notas, Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(9); // V7.00 a V7.03 e V8.00 (Etapas 7 e 8) + V5.00 (metas) e V6.00, V6.01, V6.02 (notas, Etapa 6)
             assertThat(all.info().applied()).extracting(i -> i.getVersion().getVersion()).contains("5.00");
-            assertThat(all.info().current().getVersion().getVersion()).isEqualTo("6.02");
+            assertThat(all.info().current().getVersion().getVersion()).isEqualTo("8.00");
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 
