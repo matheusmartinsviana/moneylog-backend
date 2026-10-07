@@ -134,8 +134,8 @@ public class TransactionDetailsAssembler {
         if (linked.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Person> people = persons.findByIds(userId, linked.stream().map(Debt::personId).distinct().toList());
-        return linked.stream().map(debt -> DebtSummary.of(debt, people.get(debt.personId()), time.today())).toList();
+        Map<UUID, Person> people = persons.findByIds(userId, linked.stream().map(Debt::personId).filter(java.util.Objects::nonNull).distinct().toList());
+        return linked.stream().map(debt -> DebtSummary.of(debt, debt.personId() == null ? null : people.get(debt.personId()), time.today())).toList();
     }
 
     private static Flags debtFlags(Transaction transaction, java.util.Collection<Account> touched, boolean hasActiveRefunds,
@@ -171,7 +171,7 @@ public class TransactionDetailsAssembler {
             }
         }
         Map<UUID, Person> people = persons == null || records.debts().isEmpty() ? Map.of()
-                : persons.findByIds(userId, records.debts().stream().map(Debt::personId).distinct().toList());
+                : persons.findByIds(userId, records.debts().stream().map(Debt::personId).filter(java.util.Objects::nonNull).distinct().toList());
         List<TransactionDetails> details = new ArrayList<>();
         for (Persisted<Transaction> persisted : items) {
             Transaction transaction = persisted.value();
@@ -204,7 +204,7 @@ public class TransactionDetailsAssembler {
             if (flags == null && !linked.isEmpty()) {
                 flags = debtFlags(transaction, touched.values(), hasActiveRefunds, linked);
             }
-            List<DebtSummary> summaries = linked.stream().map(debt -> DebtSummary.of(debt, people.get(debt.personId()), time.today())).toList();
+            List<DebtSummary> summaries = linked.stream().map(debt -> DebtSummary.of(debt, debt.personId() == null ? null : people.get(debt.personId()), time.today())).toList();
             details.add(new TransactionDetails(transaction, persisted.createdAt(), persisted.updatedAt(), account, counterpart, category,
                     original == null ? null : original.description(),
                     TransactionImpactCalculator.of(transaction, touched, today(), commitment),

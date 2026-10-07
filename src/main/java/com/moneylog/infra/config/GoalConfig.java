@@ -6,6 +6,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
+import com.moneylog.core.finance.app.goals.usecase.AnchorDebtPayoffBaselineUseCase;
+import com.moneylog.core.finance.app.goals.usecase.AnchorDebtPayoffBaselineUseCaseImpl;
 import com.moneylog.core.finance.app.goals.usecase.ArchiveGoalUseCase;
 import com.moneylog.core.finance.app.goals.usecase.ArchiveGoalUseCaseImpl;
 import com.moneylog.core.finance.app.goals.usecase.CreateGoalUseCase;
@@ -64,6 +66,13 @@ public class GoalConfig {
                                               PlatformTransactionManager tm) {
         return TransactionalProxies.required(ReserveOnGoalUseCase.class,
                 new ReserveOnGoalUseCaseImpl(goals, accounts, records, idempotency, ids, time), tm);
+    }
+
+    @Bean
+    AnchorDebtPayoffBaselineUseCase anchorDebtPayoffBaselineUseCase(GoalGateway goals, FinancialRecordsGateway records, TimeProvider time,
+                                                                    PlatformTransactionManager tm) {
+        return TransactionalProxies.required(AnchorDebtPayoffBaselineUseCase.class,
+                new AnchorDebtPayoffBaselineUseCaseImpl(goals, records, time), tm);
     }
 
     @Bean

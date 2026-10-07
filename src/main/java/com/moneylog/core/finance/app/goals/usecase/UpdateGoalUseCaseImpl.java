@@ -30,7 +30,7 @@ public class UpdateGoalUseCaseImpl implements UpdateGoalUseCase {
             throw new VersionConflictException(c.version(), current.version());
         }
         Goal goal = current.value();
-        goal.update(c.name(), c.target(), c.deadline(),
+        goal.update(c.name(), c.target() == null && goal.isDebtPayoff() ? goal.target() : c.target(), c.deadline(),
                 c.priority() == null ? goal.priority() : c.priority(), c.description());
         Versioned<Goal> saved = goals.save(goal);
         return GoalViews.of(saved, records.load(c.userId()), time.today());

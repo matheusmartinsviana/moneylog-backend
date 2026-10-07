@@ -51,6 +51,74 @@ public final class CardTransactions {
     }
 
     /**
+     * Compra parcelada <b>em andamento</b> (ADR-013, P5/P7): o usuário informa o valor de cada parcela, o total de parcelas e quantas
+     * faltam pagar (a próxima a vencer inclusive: "parcela 3 de 10" = faltam 8). Grava só as parcelas restantes
+     * ({@code total−restantes+1..total}) na fatura da {@code firstInvoiceDate} e nas seguintes; <b>não cria consumo retroativo</b>:
+     * sem categoria, cada parcela é {@code CARD −p / EQUITY +p} (consumo 0, dívida +p, como a dívida reconhecida sem movimentação);
+     * com categoria, {@code EXPENSE(cat) +p / CARD −p} só na competência de cada parcela (que não pode ser anterior à de hoje).
+     * A fatura da próxima parcela não pode estar paga ({@code ONGOING_FIRST_INVOICE_NOT_PAYABLE}); não há lançamento tardio
+     * silencioso em fatura paga.
+     */
+    public static Transaction ongoingPurchase(TransactionHeader header, Money installmentAmount, int totalInstallments,
+                                              int remainingInstallments, CreditCard card, Category category, InvoiceChain chain,
+                                              LocalDate today) {
+        TransactionHeader.required(header, "header");
+        TransactionHeader.required(installmentAmount, "installmentAmount");
+        if (remainingInstallments < 1 || remainingInstallments > totalInstallments) {
+            throw new com.moneylog.core.card.exception.CardExceptions.OngoingInvalidCountException(totalInstallments, remainingInstallments);
+        }
+        Money amount = installmentAmount.times(remainingInstallments);
+        AccountTransactions.requireHeaderAndAmount(header, installmentAmount);
+        AccountTransactions.requireHeaderAndAmount(header, amount);
+        requireUsableCard(header, installmentAmount, card);
+        requireChain(card, chain, today);
+        InstallmentPlan.validateCount(totalInstallments);
+        if (category != null) {
+            AccountTransactions.requireCategory(header, category, CategoryKind.EXPENSE);
+            if (com.moneylog.core.sk.time.Competence.from(header.date()).isBefore(com.moneylog.core.sk.time.Competence.from(today))) {
+                throw new com.moneylog.core.card.exception.CardExceptions.OngoingCategoryRetroactiveException();
+            }
+        }
+        var firstPeriod = chain.calendar().periodFor(header.date());
+        if (chain.statusOf(firstPeriod.closingDate(), today) == com.moneylog.core.card.domain.InvoiceStatus.PAID) {
+            throw new com.moneylog.core.card.exception.CardExceptions.OngoingFirstInvoiceNotPayableException(firstPeriod.closingDate());
+        }
+        List<Allocation> allocations = InvoiceAllocator.forInstallments(header.date(), remainingInstallments, chain, today);
+        List<TransactionInstallment> plan = InstallmentPlan.generateOngoing(header.id(), installmentAmount, totalInstallments,
+                remainingInstallments, header.date(), allocations);
+        BookRef counterpart = category == null ? BookRef.equity() : category.book();
+        // sem categoria a contrapartida é EQUITY: o CARD fica negativo (dívida) e o EQUITY positivo, como no reconhecimento de dívida
+        List<LedgerEntry> entries = new ArrayList<>();
+        for (TransactionInstallment installment : plan) {
+            entries.addAll(LedgerEntry.activeGroup(PostingSource.installment(header.id(), installment.id()), List.of(
+                    new Posting(counterpart, installment.amount(), installment.effectiveDate()),
+                    new Posting(card.book(), installment.amount().negate(), installment.effectiveDate()))));
+        }
+        return Transaction.builder(header, TransactionType.CARD_PURCHASE, amount)
+                .card(card.id()).category(category == null ? null : category.id()).installments(plan).entries(entries).build();
+    }
+
+    /**
+     * Edição da compra em andamento sem categoria (contrapartida EQUITY): só descrição e observação mudam; os lançamentos e as
+     * parcelas ficam como estão. Com categoria, a edição é a da compra comum ({@link #editPurchaseDetails}).
+     */
+    public static Transaction editOngoingDetails(Transaction current, TransactionHeader newHeader) {
+        java.util.Objects.requireNonNull(current, "current");
+        AccountTransactions.requireHeaderAndAmount(newHeader, current.amount());
+        if (current.type() != TransactionType.CARD_PURCHASE || !current.isActive() || current.categoryId() != null) {
+            throw new com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException(
+                    "só uma compra em andamento ativa e sem categoria tem esta edição.");
+        }
+        if (!current.id().equals(newHeader.id()) || !current.date().equals(newHeader.date())) {
+            throw new com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException(
+                    "o id e a data da compra não mudam.");
+        }
+        Transaction replacement = Transaction.builder(newHeader, TransactionType.CARD_PURCHASE, current.amount())
+                .card(current.cardId()).installments(current.installments()).entries(current.entries()).build();
+        return TransactionEditing.replace(current, replacement, null);
+    }
+
+    /**
      * Pagamento de fatura: {@code CARD +X / ACCOUNT −X}, nenhum posting de {@code EXPENSE} (PR 01 caso 3). Valor livre
      * &gt; 0 em fatura {@code OPEN}/{@code CLOSED}/{@code OVERDUE} (S-15, S-16); o excedente vira crédito transportado.
      */

@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import com.moneylog.core.finance.app.goals.GoalDetails;
+import com.moneylog.core.goal.domain.GoalKind;
 import com.moneylog.core.goal.domain.GoalPriority;
 import com.moneylog.core.sk.money.Money;
 
@@ -18,7 +19,18 @@ public interface CreateGoalUseCase {
      */
     GoalDetails handle(CreateGoalCommand command);
 
+    /**
+     * @param kind   {@code null} = {@code SAVINGS} (clientes antigos não mudam). Em {@code DEBT_PAYOFF} o {@code target} é ignorado
+     *               (sem alvo; a baseline vem de "cadastrei tudo") e o nome padrão é "Quitar todas as dívidas"; só uma ativa por usuário
+     *               ({@code DEBT_PAYOFF_GOAL_EXISTS})
+     */
     record CreateGoalCommand(UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority, String description,
-                             UUID idempotencyKey) {
+                             UUID idempotencyKey, GoalKind kind) {
+
+        /** Meta de guardar dinheiro ({@code SAVINGS}). */
+        public CreateGoalCommand(UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority, String description,
+                                 UUID idempotencyKey) {
+            this(userId, name, target, deadline, priority, description, idempotencyKey, null);
+        }
     }
 }

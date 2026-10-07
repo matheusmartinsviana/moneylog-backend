@@ -17,6 +17,7 @@ import com.moneylog.core.sk.persistence.Versioned;
  * Dívida como a API mostra (D2 §4.6): o agregado, a pessoa, a data de cada quitação e as ações que o estado permite
  * ({@code cancelable}, {@code voidable} e o motivo de não poder estornar o registro).
  *
+ * @param person       a pessoa; {@code null} na dívida com credor livre ({@code Debt.creditorName()}, "outras dívidas")
  * @param categoryName nome da categoria da dívida que nasceu de consumo; {@code null} nas demais
  */
 public record DebtView(Versioned<Debt> stored, Person person, String categoryName, List<SettlementView> settlements, boolean overdue,

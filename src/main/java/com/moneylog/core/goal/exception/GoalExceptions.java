@@ -91,6 +91,34 @@ public final class GoalExceptions {
         }
     }
 
+    /** Reservar numa meta de quitar dívidas (ela não tem reservas). */
+    public static class GoalKindNotReservableException extends BusinessRuleException {
+        public GoalKindNotReservableException() {
+            super("GOAL_KIND_NOT_RESERVABLE", "A meta de quitar dívidas não recebe reservas: o progresso vem do total de dívidas.");
+        }
+    }
+
+    /** Já existe uma meta de quitar dívidas ativa (P8: uma por usuário). */
+    public static class DebtPayoffGoalExistsException extends BusinessRuleException {
+        public DebtPayoffGoalExistsException() {
+            super("DEBT_PAYOFF_GOAL_EXISTS", "Você já tem uma meta de quitar dívidas ativa; arquive-a para criar outra.");
+        }
+    }
+
+    /** Confirmar "cadastrei tudo" com total de dívidas zero: não há o que quitar. */
+    public static class DebtPayoffNothingToBaselineException extends BusinessRuleException {
+        public DebtPayoffNothingToBaselineException() {
+            super("DEBT_PAYOFF_NOTHING_TO_BASELINE", "Não há dívidas cadastradas para ancorar a meta; cadastre o que você deve primeiro.");
+        }
+    }
+
+    /** A operação só vale para a meta de quitar dívidas (ex.: baseline numa meta de guardar dinheiro). */
+    public static class GoalKindMismatchException extends BusinessRuleException {
+        public GoalKindMismatchException(String expected) {
+            super("GOAL_KIND_MISMATCH", "Esta operação só vale para meta do tipo " + expected + ".");
+        }
+    }
+
     /** Estado gravado de uma meta inconsistente ao reidratar: vira 500 (invariante interna). */
     public static class GoalStateInconsistentException extends DomainException {
         public GoalStateInconsistentException(String reason) {

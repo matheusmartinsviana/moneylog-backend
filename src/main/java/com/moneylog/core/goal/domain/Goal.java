@@ -1,6 +1,7 @@
 package com.moneylog.core.goal.domain;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
@@ -54,17 +55,34 @@ public final class Goal {
     private GoalPriority priority;
     private String description;
     private boolean archived;
+    private final GoalKind kind;
+    /** Total de dívidas fixado em "cadastrei tudo" (só {@code DEBT_PAYOFF}); {@code null} enquanto a meta está "montando". */
+    private Money baseline;
+    private Instant baselineAt;
     private final List<GoalReservation> reservations = new ArrayList<>();
 
     private Goal(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority, String description,
-                 boolean archived) {
+                 boolean archived, GoalKind kind, Money baseline, Instant baselineAt) {
         this.id = Objects.requireNonNull(id, "id");
         if (userId == null) {
             throw new GoalFieldRequiredException("userId");
         }
         this.userId = userId;
         this.name = requireName(name);
-        this.target = requireTarget(target);
+        this.kind = Objects.requireNonNull(kind, "kind");
+        if (kind == GoalKind.DEBT_PAYOFF) {
+            this.target = baseline == null ? Money.zero(CurrencyCode.BRL) : requireTarget(baseline);
+            if ((baseline == null) != (baselineAt == null) || (baseline != null && !baseline.equals(target))) {
+                throw new GoalStateInconsistentException("baseline, baselineAt e alvo da meta de quitar dívidas não batem.");
+            }
+            this.baseline = baseline;
+            this.baselineAt = baselineAt;
+        } else {
+            if (baseline != null || baselineAt != null) {
+                throw new GoalStateInconsistentException("só a meta de quitar dívidas tem baseline.");
+            }
+            this.target = requireTarget(target);
+        }
         this.deadline = FinancialDates.requireInWindow(deadline, "deadline");
         if (priority == null) {
             throw new GoalFieldRequiredException("priority");
@@ -76,13 +94,30 @@ public final class Goal {
 
     public static Goal create(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
                               String description) {
-        return new Goal(id, userId, name, target, deadline, priority, description, false);
+        return new Goal(id, userId, name, target, deadline, priority, description, false, GoalKind.SAVINGS, null, null);
+    }
+
+    /**
+     * Meta "quitar todas as dívidas" (ADR-013): sem alvo e sem reservas; fica "montando" (sem baseline) até {@link #anchorBaseline}. O
+     * progresso e o restante vêm do total de dívidas, que o chamador informa.
+     */
+    public static Goal createDebtPayoff(UUID id, UUID userId, String name, LocalDate deadline, GoalPriority priority, String description) {
+        return new Goal(id, userId, name, null, deadline, priority, description, false, GoalKind.DEBT_PAYOFF, null, null);
     }
 
     /** Reidratação: recusa reserva de outra meta e valor zero (dado gravado corrompido vira 500). */
     public static Goal restore(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
                                String description, boolean archived, List<GoalReservation> stored) {
-        Goal goal = new Goal(id, userId, name, target, deadline, priority, description, archived);
+        return restore(id, userId, name, target, deadline, priority, description, archived, GoalKind.SAVINGS, null, null, stored);
+    }
+
+    /** Reidratação com o tipo e a baseline (meta de quitar dívidas). */
+    @SuppressWarnings("java:S107")
+    public static Goal restore(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
+                               String description, boolean archived, GoalKind kind, Money baseline, Instant baselineAt,
+                               List<GoalReservation> stored) {
+        Goal goal = new Goal(id, userId, name, kind == GoalKind.DEBT_PAYOFF ? baseline : target, deadline, priority, description, archived,
+                kind, baseline, baselineAt);
         for (GoalReservation reservation : stored) {
             if (!id.equals(reservation.goalId())) {
                 throw new GoalStateInconsistentException("reserva " + reservation.id() + " de outra meta.");
@@ -97,9 +132,10 @@ public final class Goal {
     /** Edita os dados da meta (não as reservas). Meta arquivada não é editada. */
     public void update(String newName, Money newTarget, LocalDate newDeadline, GoalPriority newPriority, String newDescription) {
         ensureNotArchived();
-        Goal valid = new Goal(id, userId, newName, newTarget, newDeadline, newPriority, newDescription, false);
+        Goal valid = new Goal(id, userId, newName, kind == GoalKind.DEBT_PAYOFF ? baseline : newTarget, newDeadline, newPriority,
+                newDescription, false, kind, baseline, baselineAt);
         this.name = valid.name;
-        this.target = valid.target;
+        this.target = valid.target; // na meta de quitar dívidas o alvo é a baseline: o campo do corpo é ignorado
         this.deadline = valid.deadline;
         this.priority = valid.priority;
         this.description = valid.description;
@@ -113,6 +149,9 @@ public final class Goal {
      */
     public GoalReservation reserve(UUID reservationId, ReserveAllocation allocation, LocalDate date, String note, Instant now) {
         ensureNotArchived();
+        if (kind == GoalKind.DEBT_PAYOFF) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindNotReservableException();
+        }
         GoalReservation reservation = new GoalReservation(reservationId, id, allocation.accountId(), allocation.amount(), date, note, now);
         if (reservation.isRelease()) {
             ensureReleaseCovered(reservation);
@@ -190,6 +229,85 @@ public final class Goal {
         long months = ChronoUnit.MONTHS.between(YearMonth.from(today), YearMonth.from(deadline)) + 1;
         long missing = target.subtract(current(today)).cents();
         return Money.ofCents(Math.ceilDiv(missing, months), CurrencyCode.BRL);
+    }
+
+    // ------------------------------------------------------------------ quitar dívidas (ADR-013)
+
+    public GoalKind kind() {
+        return kind;
+    }
+
+    public boolean isDebtPayoff() {
+        return kind == GoalKind.DEBT_PAYOFF;
+    }
+
+    /** "Cadastrei tudo": a baseline está fixada. Antes disso a meta está "montando" e não tem percentual. */
+    public boolean isBaselineSet() {
+        return baseline != null;
+    }
+
+    /** Total de dívidas fixado em "cadastrei tudo"; {@code null} enquanto "montando". */
+    public Money baseline() {
+        return baseline;
+    }
+
+    public Instant baselineAt() {
+        return baselineAt;
+    }
+
+    /**
+     * Fixa (ou re-ancora, P8) a baseline com o total atual de dívidas. Total zero é recusado: não há o que quitar e a meta nunca vira
+     * "conquistada" sem ter tido dívida. O alvo passa a ser a baseline.
+     */
+    public void anchorBaseline(Money totalDebt, Instant now) {
+        if (kind != GoalKind.DEBT_PAYOFF) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindMismatchException(GoalKind.DEBT_PAYOFF.name());
+        }
+        ensureNotArchived();
+        if (totalDebt == null || !totalDebt.isPositive()) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.DebtPayoffNothingToBaselineException();
+        }
+        this.baseline = AmountLimit.ensureWithinLimit(totalDebt, "baseline");
+        this.baselineAt = Objects.requireNonNull(now, "now");
+        this.target = this.baseline;
+    }
+
+    /**
+     * Progresso da meta de quitar dívidas: {@code current = max(0, baseline − total)}, {@code ratio = current / baseline} (0..1, nunca
+     * negativo quando a dívida cresce). Sem baseline: tudo zero e razão {@code 0.0000}.
+     */
+    public GoalProgress payoffProgress(Money totalDebt) {
+        Money zero = Money.zero(CurrencyCode.BRL);
+        if (baseline == null) {
+            return new GoalProgress(zero, zero, BigDecimal.ZERO.setScale(GoalProgress.RATIO_SCALE));
+        }
+        Money paid = baseline.subtract(totalDebt);
+        return GoalProgress.of(paid.isNegative() ? zero : paid, baseline);
+    }
+
+    /** O total de dívidas passou da baseline: apareceu dívida nova depois de "cadastrei tudo" (nada é re-ancorado sozinho). */
+    public boolean grewSinceBaseline(Money totalDebt) {
+        return baseline != null && totalDebt.isGreaterThan(baseline);
+    }
+
+    /** {@code ACHIEVED} só com baseline e total zerado; total zero sem baseline nunca é conquista. */
+    public GoalStatus payoffStatus(Money totalDebt) {
+        if (archived) {
+            return GoalStatus.ARCHIVED;
+        }
+        return baseline != null && totalDebt.isZero() ? GoalStatus.ACHIEVED : GoalStatus.ACTIVE;
+    }
+
+    /** Estimativa por mês para quitar o restante até o prazo (como S-156); sem prazo ou prazo vencido, {@code null}. */
+    public Money payoffMonthlyNeeded(Money totalDebt, LocalDate today) {
+        if (baseline != null && totalDebt.isZero()) {
+            return Money.zero(CurrencyCode.BRL);
+        }
+        if (deadline == null || deadline.isBefore(today)) {
+            return null;
+        }
+        long months = ChronoUnit.MONTHS.between(YearMonth.from(today), YearMonth.from(deadline)) + 1;
+        return Money.ofCents(Math.ceilDiv(totalDebt.cents(), months), CurrencyCode.BRL);
     }
 
     /** Reservado líquido da meta na conta até {@code asOf}; meta arquivada não reserva nada. */

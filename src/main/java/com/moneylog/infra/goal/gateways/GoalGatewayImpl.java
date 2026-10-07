@@ -37,7 +37,8 @@ public class GoalGatewayImpl implements GoalGateway {
         if (entity == null) {
             entity = GoalRepositoryMapper.toEntity(goal, now);
         } else {
-            entity.apply(goal.name(), goal.target().cents(), goal.deadline(), goal.priority(), goal.description(), goal.isArchived(), now);
+            entity.apply(goal.name(), goal.target().cents(), goal.deadline(), goal.priority(), goal.description(), goal.isArchived(),
+                    goal.baseline() == null ? null : goal.baseline().cents(), goal.baselineAt(), now);
         }
         GoalEntity saved = goals.saveAndFlush(entity);
         List<GoalReservationEntity> stored = reservations.findByUserIdAndGoalIdIn(goal.userId(), List.of(goal.id()));

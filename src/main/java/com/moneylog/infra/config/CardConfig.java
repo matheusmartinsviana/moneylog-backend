@@ -13,6 +13,12 @@ import com.moneylog.core.finance.app.cards.usecase.ChangeCardBillingDaysUseCase;
 import com.moneylog.core.finance.app.cards.usecase.ChangeCardBillingDaysUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.CreateCardUseCase;
 import com.moneylog.core.finance.app.cards.usecase.CreateCardUseCaseImpl;
+import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.finance.app.cards.usecase.CreateOngoingInstallmentsUseCase;
+import com.moneylog.core.finance.app.cards.usecase.CreateOngoingInstallmentsUseCaseImpl;
+import com.moneylog.core.finance.app.cards.usecase.PreviewOngoingInstallmentsUseCase;
+import com.moneylog.core.finance.app.cards.usecase.PreviewOngoingInstallmentsUseCaseImpl;
+import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.finance.app.cards.usecase.GetCardUseCase;
 import com.moneylog.core.finance.app.cards.usecase.GetCardUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.GetFutureInstallmentsUseCase;
@@ -113,6 +119,23 @@ public class CardConfig {
                                                           TimeProvider time, PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(PreviewCardPurchaseUseCase.class,
                 new PreviewCardPurchaseUseCaseImpl(cards, records, ids, time), tm);
+    }
+
+    @Bean
+    CreateOngoingInstallmentsUseCase createOngoingInstallmentsUseCase(CardGateway cards, CategoryGateway categories,
+                                                                      TransactionGateway transactions, LedgerWriteGateway ledger,
+                                                                      TransactionDetailsAssembler assembler, IdGenerator ids,
+                                                                      TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(CreateOngoingInstallmentsUseCase.class,
+                new CreateOngoingInstallmentsUseCaseImpl(cards, categories, transactions, ledger, assembler, ids, time), tm);
+    }
+
+    @Bean
+    PreviewOngoingInstallmentsUseCase previewOngoingInstallmentsUseCase(CardGateway cards, CategoryGateway categories,
+                                                                        FinancialRecordsGateway records, IdGenerator ids,
+                                                                        TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.snapshotReadOnly(PreviewOngoingInstallmentsUseCase.class,
+                new PreviewOngoingInstallmentsUseCaseImpl(cards, categories, records, ids, time), tm);
     }
 
     @Bean

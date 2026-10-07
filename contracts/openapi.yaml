@@ -1,12 +1,19 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.12.0
+  version: 2.13.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
+
+    ## Visão total de dívidas (2.13.0, só acréscimos compatíveis; ADR-013, `docs/planos/2026-10-14-visao-total-de-dividas.md`)
+    `GET /v1/debts/overview` (quanto o usuário ainda deve, custo fixo ao lado, comparação e cronograma), compra parcelada em andamento
+    (`POST /v1/cards/{id}/ongoing-installments` e `/preview`), meta `DEBT_PAYOFF` (`Goal.kind`, `POST /v1/goals/{id}/baseline`) e dívida com
+    credor livre (`DebtInput.creditorName`, sem `Person`). Acréscimos em schemas existentes: `Goal.kind`, `baselineSet`, `baseline`,
+    `baselineAt`, `grewSinceBaseline` (meta sem `kind` = `SAVINGS`); `Debt.creditorName` e `DebtSummary.creditorName` (com `person` nulo
+    nessa dívida); `TransactionSource.ONGOING`. Nenhum campo ou rota existente mudou de significado.
 
     **Versão do OpenAPI: 3.1.0** (spike S-84: o `swagger-request-validator` 3.0.0 valida `oneOf` + `discriminator`,
     `type: [string, "null"]` e `$ref` com irmãos).
@@ -33,12 +40,12 @@ info:
     ## Códigos de erro (`Problem.code`)
     | Status | `code` |
     |---|---|
-    | 400 | `VALIDATION_FAILED` (com `errors[]`), `SUMMARY_MONTH_INVALID` (mês do resumo fora do formato `AAAA-MM` ou da janela 2000-01 a 2100-12), `REPORT_PERIOD_INVALID` (`period` ausente ou fora de `D7`, `D30`, `M3`, `M12`), `REPORT_MONTH_INVALID` (`month` dos relatórios fora do formato `AAAA-MM` ou da janela), `SEARCH_QUERY_INVALID` (`q` fora de 2 a 100 caracteres ou com caractere de controle) |
+    | 400 | `VALIDATION_FAILED` (com `errors[]`; inclui `months` de `GET /v1/debts/overview` fora de 1..36), `SUMMARY_MONTH_INVALID` (mês do resumo fora do formato `AAAA-MM` ou da janela 2000-01 a 2100-12), `REPORT_PERIOD_INVALID` (`period` ausente ou fora de `D7`, `D30`, `M3`, `M12`), `REPORT_MONTH_INVALID` (`month` dos relatórios fora do formato `AAAA-MM` ou da janela), `SEARCH_QUERY_INVALID` (`q` fora de 2 a 100 caracteres ou com caractere de controle) |
     | 401 | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `REFRESH_INVALID` |
     | 403 | `ORIGIN_NOT_ALLOWED` |
     | 404 | `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND` |
     | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro) |
-    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
+    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
     | 404, 405, 406, 415 (rota ou mídia que o servidor não atende) | `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`): login, as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
     | 500 | `INTERNAL_ERROR` |
@@ -1060,6 +1067,85 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /v1/cards/{id}/ongoing-installments:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Cards]
+      operationId: createOngoingInstallments
+      summary: Cadastra uma compra parcelada que já estava em andamento
+      description: |
+        Para o que já está parcelado antes do app ("parcela 3 de 10": faltam 8, a próxima inclusive). Grava **só as parcelas que faltam**
+        (numeradas `totalInstallments − remainingInstallments + 1 .. totalInstallments`, cada uma com `installmentAmount`) na fatura que
+        contém `firstInvoiceDate` e nas seguintes. **Não cria consumo retroativo** (P5): sem `categoryId` cada parcela é `CARD −p / EQUITY +p`
+        (consumo 0 em todos os meses, dívida +p, patrimônio −p); com `categoryId` é `EXPENSE(cat) +p / CARD −p` só na competência de cada
+        parcela (e a competência da próxima parcela não pode ser anterior ao mês atual: `422 ONGOING_CATEGORY_RETROACTIVE`). A compra entra
+        na fatura, no limite e em `GET /v1/debts/overview` pelos mesmos caminhos de leitura de qualquer compra parcelada; estorno, cancelar
+        parcelas restantes e `future-installments` funcionam como nas demais. Edição: só descrição (e categoria, se a compra tem categoria).
+        Corrigir valor ou quantidade = estornar e recriar. **Sem idempotência no MVP**: repetir o mesmo `POST` cria outra compra.
+        A origem é `ONGOING` (`Transaction.source`). `201` devolve a compra (`CARD_PURCHASE`) com `Location` para `/v1/transactions/{id}`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OngoingInstallmentsRequest'
+      responses:
+        '201':
+          description: Compra criada.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/cards/{id}/ongoing-installments/preview:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Cards]
+      operationId: previewOngoingInstallments
+      summary: Prévia da compra parcelada em andamento (não grava nada)
+      description: |
+        Monta a compra pelo **mesmo caminho de código** da criação e a descarta: parcelas (número, valor, competência, fatura alvo), o total
+        que passa a ser devido (`remaining`), o vencimento da primeira e da última, o limite depois e os avisos. O front não soma parcelas:
+        exibe `remaining` e `lastDueDate`. Os mesmos erros da criação.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OngoingInstallmentsRequest'
+      responses:
+        '200':
+          description: A prévia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OngoingPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /v1/cards/{id}/billing-change-preview:
     parameters:
       - $ref: '#/components/parameters/IdPath'
@@ -1529,6 +1615,56 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   # ---------------------------------------------------------------- Debts (Etapa 4)
+  /v1/debts/overview:
+    get:
+      tags: [Debts]
+      operationId: getDebtOverview
+      summary: Visão total de dívidas (cartões + pessoas + outras), custo fixo, comparação e cronograma
+      description: |
+        Quanto o usuário **ainda deve**, calculado só pelo backend a partir do **estado** (faturas e dívidas), nunca somando movimentos:
+        compra → parcela → fatura → pagamento não conta em dobro (PR 01). `total = parts.cards + parts.people + parts.other`.
+
+        - **Cartões**: Σ `outstanding` de todas as faturas não pagas (aberta, fechada, vencida **e futura**), líquido do crédito transportado
+          (decisão P2). Por cartão vale a identidade `total = Σ plans.remaining + otherCharges + adjustment`, com `adjustment ≤ 0`
+          (pagamento parcial, crédito transportado, reembolso em fatura não paga). `plans` são as compras parceladas (2x ou mais) com
+          parcelas não canceladas em faturas não pagas; `otherCharges` são as compras à vista (1x) em fatura não paga.
+        - **Pessoas / outras**: Σ `outstanding` das dívidas `PAYABLE` `OPEN`/`PARTIALLY_SETTLED`, inclusive sem `expectedDate`. Com pessoa vai em
+          `people`; com credor livre (`creditorName`, sem `Person`) vai em `other`. `RECEIVABLE`, perdoada, estornada ou quitada nunca entra; o
+          que as pessoas devem ao usuário vai em `receivablesInfo` (informativo, fora do total).
+        - **Custo fixo** (`fixedCosts`, estimativa mensal das recorrências de despesa) **nunca soma no total**: fluxo mensal x saldo devedor.
+        - **Renda** (`income`): `RECURRING_ESTIMATE` (receita recorrente mensal); se for 0, `LAST_FULL_MONTH` (receita do mês anterior); senão
+          `NONE` (`monthly` nulo). Sem renda, as razões de `comparison` são `null` com `reason: NO_INCOME` (sem divisão por zero).
+        - **Cronograma** (`schedule`): o cronograma **contratual** ("se pagar tudo no vencimento"), não uma previsão. Um ponto por mês, do mês
+          de hoje por `months` meses, pelo vencimento da fatura e pela `expectedDate` da dívida. Fatura vencida e dívida atrasada ficam em
+          `overdue`; dívida sem data em `undated`; o que passa do horizonte em `beyondHorizon`. Identidade:
+          `overdue + Σ points.total + undated + beyondHorizon = total`. `remainingAfter` = `total − overdue − Σ points` até o mês (o vencido é
+          considerado pago no 1º mês). `payoffCompetence` é o mês do último vencimento, ou `null` com `payoffReason` (`UNDATED_DEBTS`,
+          `BEYOND_HORIZON`); também `null`, sem motivo, quando o total é 0.
+        - `hasRecords`: existe ao menos um cartão ou uma dívida cadastrados. Com `total = 0.00` e `hasRecords = false` a tela é "nada
+          cadastrado", nunca "livre de dívidas".
+      parameters:
+        - name: months
+          in: query
+          description: Horizonte do cronograma em meses, de 1 a 36 (padrão 12). Fora disso, `400 VALIDATION_FAILED`.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 36
+            default: 12
+      responses:
+        '200':
+          description: A visão.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DebtOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /v1/debts:
     get:
       tags: [Debts]
@@ -2236,6 +2372,35 @@ paths:
                 $ref: '#/components/schemas/Goal'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/baseline:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Goals]
+      operationId: anchorGoalBaseline
+      summary: '"Cadastrei tudo": fixa a baseline da meta de quitar dívidas'
+      description: |
+        Só para `kind = DEBT_PAYOFF`. Grava `baseline` = total de dívidas de hoje (o mesmo de `GET /v1/debts/overview`) e `baselineAt`;
+        `target` passa a ser a baseline. Pode ser repetido (re-ancorar) e é sempre ação explícita: nada muda sozinho quando aparece dívida
+        nova (`grewSinceBaseline`). Total 0 → `422 DEBT_PAYOFF_NOTHING_TO_BASELINE`. Meta de guardar dinheiro → `422 GOAL_KIND_MISMATCH`.
+      responses:
+        '200':
+          description: Meta atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -4551,8 +4716,8 @@ components:
       enum: [ACTIVE, VOIDED]
     TransactionSource:
       type: string
-      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4).
-      enum: [MANUAL, IMPORT, RECURRENCE]
+      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4). `ONGOING` (2.13.0) é a compra parcelada cadastrada já em andamento.
+      enum: [MANUAL, IMPORT, RECURRENCE, ONGOING]
     EntryLens:
       type: string
       enum: [CONSUMPTION, INCOME]
@@ -6372,6 +6537,55 @@ components:
           description: Uma entrada por fatura `FUTURE` com parcela, em ordem de fechamento.
           items:
             $ref: '#/components/schemas/FutureInstallmentsInvoice'
+    OngoingInstallmentsRequest:
+      type: object
+      required: [description, installmentAmount, totalInstallments, remainingInstallments]
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+        installmentAmount:
+          $ref: '#/components/schemas/AmountInput'
+          description: Valor de **cada** parcela.
+        totalInstallments:
+          type: integer
+          minimum: 2
+          maximum: 36
+        remainingInstallments:
+          type: integer
+          minimum: 1
+          maximum: 36
+          description: Quantas faltam pagar, a próxima inclusive ("parcela 3 de 10" = 8). Acima de `totalInstallments` → `422 ONGOING_INVALID_COUNT`.
+        firstInvoiceDate:
+          type: [string, 'null']
+          format: date
+          description: Data dentro do ciclo da fatura da próxima parcela. Ausente = hoje (fatura corrente). Fatura paga → `422 ONGOING_FIRST_INVOICE_NOT_PAYABLE`.
+        categoryId:
+          type: [string, 'null']
+          format: uuid
+          description: Ausente = sem categoria (consumo 0 em todos os meses). Com categoria, cada parcela vira consumo só na competência dela.
+    OngoingPreview:
+      type: object
+      required: [remainingInstallments, installmentAmount, remaining, firstDueDate, lastDueDate, purchase]
+      additionalProperties: false
+      properties:
+        remainingInstallments:
+          type: integer
+        installmentAmount:
+          $ref: '#/components/schemas/Money'
+        remaining:
+          $ref: '#/components/schemas/Money'
+          description: Σ das parcelas que faltam; o que passa a ser devido.
+        firstDueDate:
+          type: string
+          format: date
+        lastDueDate:
+          type: string
+          format: date
+        purchase:
+          $ref: '#/components/schemas/PurchasePreview'
     PurchasePreviewRequest:
       type: object
       required: [amount, installments, date]
@@ -6726,14 +6940,20 @@ components:
     DebtSummary:
       type: object
       description: Dívida resumida (dentro de `Transaction.debt`, `Transaction.shares` e `PersonDetail.debts`).
-      required: [id, person, direction, status, principal, settled, outstanding, date, expectedDate, overdue, description]
+      required: [id, person, creditorName, direction, status, principal, settled, outstanding, date, expectedDate, overdue, description]
       additionalProperties: false
       properties:
         id:
           type: string
           format: uuid
         person:
-          $ref: '#/components/schemas/PersonRef'
+          description: Nulo na dívida com credor livre (`creditorName`).
+          oneOf:
+            - $ref: '#/components/schemas/PersonRef'
+            - type: 'null'
+        creditorName:
+          type: [string, 'null']
+          description: Credor livre das "outras dívidas" (2.13.0); `null` quando há `person`.
         direction:
           $ref: '#/components/schemas/DebtDirection'
         status:
@@ -6779,6 +6999,7 @@ components:
       required:
         - id
         - person
+        - creditorName
         - direction
         - origin
         - originTransactionId
@@ -6806,7 +7027,13 @@ components:
           type: string
           format: uuid
         person:
-          $ref: '#/components/schemas/PersonRef'
+          description: Nulo na dívida com credor livre (`creditorName`, "outras dívidas").
+          oneOf:
+            - $ref: '#/components/schemas/PersonRef'
+            - type: 'null'
+        creditorName:
+          type: [string, 'null']
+          description: Credor livre (banco, loja, financiamento) das "outras dívidas" (2.13.0); `null` quando há `person`.
         direction:
           $ref: '#/components/schemas/DebtDirection'
         origin:
@@ -6871,13 +7098,21 @@ components:
           format: date-time
     DebtInput:
       type: object
-      description: Dívida sem movimentação (`WITHOUT_MOVEMENT`).
-      required: [personId, direction, principal, date]
+      description: |
+        Dívida sem movimentação (`WITHOUT_MOVEMENT`). Informe `personId` **ou** `creditorName` (2.13.0, "outras dívidas": banco, loja,
+        financiamento, sem `Person`): os dois juntos, nenhum dos dois, `creditorName` em `RECEIVABLE` ou `categoryId` com `creditorName` são
+        `422 DEBT_CREDITOR_INVALID`. A dívida com credor livre também é reconhecida contra `EQUITY` (consumo 0) e vai em `other` de
+        `GET /v1/debts/overview`.
+      required: [direction, principal, date]
       additionalProperties: false
       properties:
         personId:
           type: string
           format: uuid
+        creditorName:
+          type: string
+          minLength: 1
+          maxLength: 100
         direction:
           $ref: '#/components/schemas/DebtDirection'
         principal:
@@ -6923,6 +7158,269 @@ components:
         reason:
           type: [string, 'null']
           maxLength: 500
+    DebtOverviewPlan:
+      type: object
+      description: Compra parcelada (2x ou mais) com parcelas não canceladas em faturas não pagas.
+      required: [purchaseId, description, ongoing, installmentAmount, totalInstallments, remainingInstallments, nextInstallmentNumber, remaining, nextDueDate, lastDueDate]
+      additionalProperties: false
+      properties:
+        purchaseId:
+          type: string
+          format: uuid
+        description:
+          type: [string, 'null']
+        ongoing:
+          type: boolean
+          description: Cadastrada já em andamento (`Transaction.source = ONGOING`).
+        installmentAmount:
+          $ref: '#/components/schemas/Money'
+          description: Valor da próxima parcela.
+        totalInstallments:
+          type: integer
+        remainingInstallments:
+          type: integer
+          description: Parcelas ainda não pagas e não canceladas.
+        nextInstallmentNumber:
+          type: integer
+        remaining:
+          $ref: '#/components/schemas/Money'
+          description: Σ das parcelas ainda não pagas e não canceladas.
+        nextDueDate:
+          type: string
+          format: date
+        lastDueDate:
+          type: string
+          format: date
+    DebtOverviewCardItem:
+      type: object
+      description: |
+        Um cartão. Identidade: `total = Σ plans[].remaining + otherCharges + adjustment`, com `adjustment ≤ 0` (0 sem pagamento
+        parcial, crédito transportado nem reembolso em fatura não paga). `total = invoiced + future`.
+      required: [card, total, invoiced, future, otherCharges, adjustment, plans]
+      additionalProperties: false
+      properties:
+        card:
+          type: object
+          required: [id, name]
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+        total:
+          $ref: '#/components/schemas/Money'
+        invoiced:
+          $ref: '#/components/schemas/Money'
+          description: Faturas aberta, fechada e vencida.
+        future:
+          $ref: '#/components/schemas/Money'
+          description: Faturas futuras.
+        otherCharges:
+          $ref: '#/components/schemas/Money'
+          description: Compras à vista (1x) em fatura não paga.
+        adjustment:
+          $ref: '#/components/schemas/Money'
+          description: Pagamento parcial, crédito transportado e reembolso (≤ 0).
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebtOverviewPlan'
+    DebtOverviewDebtItem:
+      type: object
+      required: [debtId, person, creditorName, description, outstanding, expectedDate, overdue]
+      additionalProperties: false
+      properties:
+        debtId:
+          type: string
+          format: uuid
+        person:
+          description: Nulo na dívida com credor livre.
+          oneOf:
+            - $ref: '#/components/schemas/PersonRef'
+            - type: 'null'
+        creditorName:
+          type: string
+          description: Nome da pessoa ou do credor livre.
+        description:
+          type: [string, 'null']
+        outstanding:
+          $ref: '#/components/schemas/Money'
+        expectedDate:
+          type: [string, 'null']
+          format: date
+        overdue:
+          type: boolean
+    DebtOverviewGroup:
+      type: object
+      required: [total, items]
+      additionalProperties: false
+      properties:
+        total:
+          $ref: '#/components/schemas/Money'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebtOverviewDebtItem'
+    DebtOverviewPoint:
+      type: object
+      required: [competence, cards, people, other, total, remainingAfter]
+      additionalProperties: false
+      properties:
+        competence:
+          $ref: '#/components/schemas/Competence'
+        cards:
+          $ref: '#/components/schemas/Money'
+        people:
+          $ref: '#/components/schemas/Money'
+        other:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+        remainingAfter:
+          $ref: '#/components/schemas/Money'
+    DebtOverview:
+      type: object
+      description: Veja `GET /v1/debts/overview`. Tudo calculado pelo backend; o front só exibe.
+      required: [asOf, total, parts, cards, people, other, receivablesInfo, hasRecords, fixedCosts, income, liquidity, comparison, schedule, payoffGoal]
+      additionalProperties: false
+      properties:
+        asOf:
+          type: string
+          format: date
+        total:
+          $ref: '#/components/schemas/Money'
+        parts:
+          type: object
+          required: [cards, people, other]
+          additionalProperties: false
+          properties:
+            cards:
+              $ref: '#/components/schemas/Money'
+            people:
+              $ref: '#/components/schemas/Money'
+            other:
+              $ref: '#/components/schemas/Money'
+        cards:
+          type: object
+          required: [total, invoiced, future, items]
+          additionalProperties: false
+          properties:
+            total:
+              $ref: '#/components/schemas/Money'
+            invoiced:
+              $ref: '#/components/schemas/Money'
+            future:
+              $ref: '#/components/schemas/Money'
+            items:
+              type: array
+              description: Cartões com saldo devedor ou compras parceladas pendentes (cartão sem nada a pagar não aparece).
+              items:
+                $ref: '#/components/schemas/DebtOverviewCardItem'
+        people:
+          $ref: '#/components/schemas/DebtOverviewGroup'
+        other:
+          $ref: '#/components/schemas/DebtOverviewGroup'
+        receivablesInfo:
+          $ref: '#/components/schemas/Money'
+          description: O que as pessoas devem ao usuário. Informativo, fora do total.
+        hasRecords:
+          type: boolean
+        fixedCosts:
+          type: object
+          description: Custo fixo mensal estimado (recorrências de despesa ativas e não encerradas). Nunca soma no total.
+          required: [monthly, estimate]
+          additionalProperties: false
+          properties:
+            monthly:
+              $ref: '#/components/schemas/Money'
+            estimate:
+              type: boolean
+        income:
+          type: object
+          required: [monthly, source]
+          additionalProperties: false
+          properties:
+            monthly:
+              description: Nulo com `source = NONE`.
+              oneOf:
+                - $ref: '#/components/schemas/Money'
+                - type: 'null'
+            source:
+              type: string
+              enum: [RECURRING_ESTIMATE, LAST_FULL_MONTH, NONE]
+        liquidity:
+          type: object
+          required: [inAccounts, available]
+          additionalProperties: false
+          properties:
+            inAccounts:
+              $ref: '#/components/schemas/Money'
+            available:
+              $ref: '#/components/schemas/Money'
+        comparison:
+          type: object
+          required: [debtToIncome, fixedCostToIncome, debtMinusInAccounts, reason]
+          additionalProperties: false
+          properties:
+            debtToIncome:
+              description: '`total` ÷ renda mensal (4 casas, pode passar de 1); nulo com `reason = NO_INCOME`.'
+              oneOf:
+                - $ref: '#/components/schemas/Ratio'
+                - type: 'null'
+            fixedCostToIncome:
+              oneOf:
+                - $ref: '#/components/schemas/Ratio'
+                - type: 'null'
+            debtMinusInAccounts:
+              $ref: '#/components/schemas/Money'
+              description: '`total` − em contas (pode ser negativo: o saldo cobre a dívida).'
+            reason:
+              type: [string, 'null']
+              enum: [NO_INCOME, null]
+        schedule:
+          type: object
+          description: 'Cronograma contratual. Identidade: `overdue + Σ points.total + undated + beyondHorizon = total`.'
+          required: [months, points, overdue, undated, beyondHorizon, payoffCompetence, payoffReason]
+          additionalProperties: false
+          properties:
+            months:
+              type: integer
+            points:
+              type: array
+              items:
+                $ref: '#/components/schemas/DebtOverviewPoint'
+            overdue:
+              $ref: '#/components/schemas/Money'
+            undated:
+              $ref: '#/components/schemas/Money'
+            beyondHorizon:
+              $ref: '#/components/schemas/Money'
+            payoffCompetence:
+              oneOf:
+                - $ref: '#/components/schemas/Competence'
+                - type: 'null'
+            payoffReason:
+              type: [string, 'null']
+              enum: [UNDATED_DEBTS, BEYOND_HORIZON, null]
+        payoffGoal:
+          description: A meta `DEBT_PAYOFF` ativa, se houver (o progresso sai do mesmo total).
+          oneOf:
+            - type: object
+              required: [goalId, baselineSet, progress, remaining]
+              additionalProperties: false
+              properties:
+                goalId:
+                  type: string
+                  format: uuid
+                baselineSet:
+                  type: boolean
+                progress:
+                  $ref: '#/components/schemas/Ratio'
+                remaining:
+                  $ref: '#/components/schemas/Money'
+            - type: 'null'
     DebtSlice:
       allOf:
         - $ref: '#/components/schemas/SliceBase'
@@ -7387,11 +7885,22 @@ components:
       description: Razão decimal com sempre 4 casas, calculada pelo backend (`0.4250` = 42,5%). O front só formata.
       pattern: '^-?\d+\.\d{4}$'
       examples: ['0.4250']
+    GoalKind:
+      type: string
+      description: |
+        `SAVINGS` (padrão; a meta de guardar dinheiro por reserva lógica) ou `DEBT_PAYOFF` (2.13.0, "quitar todas as dívidas": sem reservas,
+        progresso vindo do total de dívidas em relação à `baseline`). Não entra em `balances.reserved` nem em `uncovered`.
+      enum: [SAVINGS, DEBT_PAYOFF]
     GoalInput:
       type: object
-      required: [name, target]
+      description: |
+        `kind` ausente = `SAVINGS`: `name` e `target` obrigatórios. `kind = DEBT_PAYOFF`: `target` é ignorado (sem alvo), `name` é opcional
+        (padrão "Quitar todas as dívidas"), `deadline` e `priority` opcionais; só uma meta `DEBT_PAYOFF` ativa por usuário
+        (`422 DEBT_PAYOFF_GOAL_EXISTS`). A meta nasce "montando" (`baselineSet = false`, `progress` `0.0000`) até `POST /v1/goals/{id}/baseline`.
       additionalProperties: false
       properties:
+        kind:
+          $ref: '#/components/schemas/GoalKind'
         name:
           type: string
           minLength: 1
@@ -7480,6 +7989,7 @@ components:
         reservado que saldo (S-148; só avisa). Tudo calculado pelo backend.
       required:
         - id
+        - kind
         - name
         - target
         - current
@@ -7492,6 +8002,10 @@ components:
         - monthlyNeeded
         - uncovered
         - reservations
+        - baselineSet
+        - baseline
+        - baselineAt
+        - grewSinceBaseline
         - version
         - createdAt
         - updatedAt
@@ -7500,16 +8014,22 @@ components:
         id:
           type: string
           format: uuid
+        kind:
+          $ref: '#/components/schemas/GoalKind'
         name:
           type: string
         target:
           $ref: '#/components/schemas/Money'
+          description: Em `DEBT_PAYOFF`, a `baseline` (0,00 enquanto "montando").
         current:
           $ref: '#/components/schemas/Money'
+          description: Em `DEBT_PAYOFF`, `max(0, baseline − remaining)` (quanto já foi quitado).
         progress:
           $ref: '#/components/schemas/Ratio'
+          description: Em `DEBT_PAYOFF`, `current / baseline` limitado a 0..1 (`0.0000` sem baseline); dívida nova nunca deixa negativo.
         remaining:
           $ref: '#/components/schemas/Money'
+          description: Em `DEBT_PAYOFF`, o total de dívidas hoje (o mesmo de `GET /v1/debts/overview`), mesmo acima da baseline.
         status:
           $ref: '#/components/schemas/GoalStatus'
         deadline:
@@ -7528,9 +8048,25 @@ components:
           type: boolean
         reservations:
           type: array
-          description: Todas as reservas, da mais recente para a mais antiga.
+          description: Todas as reservas, da mais recente para a mais antiga (sempre vazio em `DEBT_PAYOFF`).
           items:
             $ref: '#/components/schemas/GoalReservation'
+        baselineSet:
+          type: boolean
+          description: '`DEBT_PAYOFF`: "cadastrei tudo" foi confirmado. `false` = "montando" (sem percentual). Sempre `false` em `SAVINGS`.'
+        baseline:
+          description: Total de dívidas fixado em "cadastrei tudo"; `null` em `SAVINGS` e enquanto "montando".
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        baselineAt:
+          type: [string, 'null']
+          format: date-time
+        grewSinceBaseline:
+          type: boolean
+          description: |
+            `DEBT_PAYOFF`: o total de dívidas passou da baseline (dívida nova depois de ancorar). Nada é re-ancorado sozinho; o aviso é
+            da UI e re-ancorar é `POST /v1/goals/{id}/baseline`. `ACHIEVED` só com baseline e total 0,00; total 0 sem baseline não é conquista.
         version:
           type: integer
           format: int64
@@ -7542,6 +8078,7 @@ components:
           format: date-time
       examples:
         - id: 5b0f6c3e-7e0a-4f6b-9d57-0e8f3a1c2b10
+          kind: SAVINGS
           name: Reserva de emergência
           target: { amount: '20000.00', currency: BRL }
           current: { amount: '8500.00', currency: BRL }
@@ -7560,6 +8097,10 @@ components:
               date: '2026-10-10'
               note: null
               createdAt: '2026-10-10T13:00:00Z'
+          baselineSet: false
+          baseline: null
+          baselineAt: null
+          grewSinceBaseline: false
           version: 1
           createdAt: '2026-10-10T12:00:00Z'
           updatedAt: '2026-10-10T13:00:00Z'
@@ -8168,6 +8709,7 @@ components:
       required:
         - id
         - personId
+        - creditorName
         - direction
         - origin
         - principal
@@ -8186,8 +8728,11 @@ components:
           type: string
           format: uuid
         personId:
-          type: string
+          type: [string, 'null']
           format: uuid
+          description: Nulo na dívida com credor livre.
+        creditorName:
+          type: [string, 'null']
         direction:
           $ref: '#/components/schemas/DebtDirection'
         origin:

@@ -4,5 +4,7 @@ package com.moneylog.core.transaction.domain;
 public enum TransactionSource {
     MANUAL,
     IMPORT,
-    RECURRENCE
+    RECURRENCE,
+    /** Compra parcelada em andamento (ADR-013): só as parcelas restantes, sem consumo retroativo. */
+    ONGOING
 }

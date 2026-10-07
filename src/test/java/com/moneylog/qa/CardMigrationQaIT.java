@@ -58,7 +58,7 @@ class CardMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(15); // V7.00 a V7.03, V8.00 e V8.01 (Etapas 7 e 8) + V3.01 e V3.02 (Etapa 3), V4.00 a V4.02 (Etapa 4), V5.00 (Etapa 5) e V6.00, V6.01, V6.02 (Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(18); // V8.02 a V8.04 (visão de dívidas), V7.00 a V7.03, V8.00 e V8.01 (Etapas 7 e 8) + V3.01 e V3.02 (Etapa 3), V4.00 a V4.02 (Etapa 4), V5.00 (Etapa 5) e V6.00, V6.01, V6.02 (Etapa 6)
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 

@@ -52,6 +52,9 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
                 return replay(command, existing);
             }
         }
+        if (command.creditorName() != null || command.personId() == null) {
+            return createWithFreeCreditor(command, debtId);
+        }
         // arquivar a pessoa e criar dívida para ela se serializam
         people.lockForUpdate(command.userId(), command.personId());
         Person person = people.findById(command.userId(), command.personId()).map(Versioned::value)
@@ -60,6 +63,27 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
                 .orElseThrow(() -> new CategoryNotFoundException(command.categoryId()));
         Debt debt = Debt.withoutMovement(debtId, command.userId(), person, command.direction(), command.principal(), command.date(),
                 command.expectedDate(), command.description(), category);
+        Versioned<Debt> saved = debts.insert(debt);
+        ledger.append(command.userId(), debt.entries());
+        return DebtViews.one(people, debts, categories, command.userId(), saved, time.today());
+    }
+
+    /** "Outra dívida" (P1): credor livre, sem pessoa e sem categoria; contra EQUITY como a dívida sem movimentação. */
+    private DebtView createWithFreeCreditor(CreateDebtCommand command, UUID debtId) {
+        if (command.personId() != null) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("informe a pessoa ou o nome do credor, não os dois.");
+        }
+        if (command.creditorName() == null || command.creditorName().isBlank()) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("informe a pessoa ou o nome do credor.");
+        }
+        if (command.direction() != com.moneylog.core.debt.domain.DebtDirection.PAYABLE) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("o credor livre só existe em dívida que você deve (PAYABLE).");
+        }
+        if (command.categoryId() != null) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("a dívida com credor livre não tem categoria.");
+        }
+        Debt debt = Debt.withoutMovementToCreditor(debtId, command.userId(), command.creditorName(), command.principal(), command.date(),
+                command.expectedDate(), command.description());
         Versioned<Debt> saved = debts.insert(debt);
         ledger.append(command.userId(), debt.entries());
         return DebtViews.one(people, debts, categories, command.userId(), saved, time.today());
@@ -80,7 +104,7 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
 
     /** Hash do comando canônico (o dono não entra: a chave é por usuário). */
     private static String hashOf(CreateDebtCommand c) {
-        return IdempotentClaim.hash("personId=" + c.personId() + ";direction=" + c.direction() + ";principal=" + c.principal().toPlainString()
+        return IdempotentClaim.hash("personId=" + c.personId() + ";creditor=" + (c.creditorName() == null ? "-" : c.creditorName().strip()) + ";direction=" + c.direction() + ";principal=" + c.principal().toPlainString()
                 + ";date=" + c.date() + ";expectedDate=" + (c.expectedDate() == null ? "-" : c.expectedDate())
                 + ";description=" + (c.description() == null ? "-" : c.description().strip()) + ";categoryId="
                 + (c.categoryId() == null ? "-" : c.categoryId()) + ";");

@@ -19,7 +19,7 @@ public final class DebtRequests {
     private DebtRequests() {
     }
 
-    public record DebtInput(@NotNull UUID personId, @NotNull DebtDirection direction,
+    public record DebtInput(UUID personId, @Size(max = 100) @NoControlChars String creditorName, @NotNull DebtDirection direction,
                             @NotNull @Pattern(regexp = AMOUNT_PATTERN) String principal, @NotNull @DateInWindow LocalDate date,
                             @DateInWindow LocalDate expectedDate, @Size(max = 200) @NoControlChars String description,
                             UUID categoryId) {

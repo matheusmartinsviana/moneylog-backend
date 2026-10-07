@@ -8,6 +8,9 @@ import com.moneylog.core.finance.app.dashboard.usecase.GetDashboardSummaryUseCas
 import com.moneylog.core.finance.app.dashboard.usecase.GetDashboardSummaryUseCaseImpl;
 import com.moneylog.core.finance.app.dashboard.usecase.GetUpcomingUseCase;
 import com.moneylog.core.finance.app.dashboard.usecase.GetUpcomingUseCaseImpl;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.finance.app.debts.usecase.GetDebtOverviewUseCase;
+import com.moneylog.core.finance.app.debts.usecase.GetDebtOverviewUseCaseImpl;
 import com.moneylog.core.finance.app.gateways.CommitmentSourcesGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -36,5 +39,12 @@ public class DashboardConfig {
     GetUpcomingUseCase getUpcomingUseCase(FinancialRecordsGateway records, CommitmentSourcesGateway sources, TimeProvider time,
                                           PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(GetUpcomingUseCase.class, new GetUpcomingUseCaseImpl(records, sources, time), tm);
+    }
+
+    @Bean
+    GetDebtOverviewUseCase getDebtOverviewUseCase(FinancialRecordsGateway records, CommitmentSourcesGateway sources, PersonGateway people,
+                                                  TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.snapshotReadOnly(GetDebtOverviewUseCase.class,
+                new GetDebtOverviewUseCaseImpl(records, sources, people, time), tm);
     }
 }

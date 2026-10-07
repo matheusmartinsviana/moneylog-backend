@@ -41,6 +41,10 @@ public record TransactionOrigin(TransactionSource source, UUID importBatchId, De
         return new TransactionOrigin(TransactionSource.IMPORT, importBatchId, effectiveKey, originalKey, null, null);
     }
 
+    public static TransactionOrigin ongoing() {
+        return new TransactionOrigin(TransactionSource.ONGOING, null, null, null, null, null);
+    }
+
     public static TransactionOrigin recurrence(UUID recurrenceId, LocalDate occurrenceDate) {
         return new TransactionOrigin(TransactionSource.RECURRENCE, null, null, null, recurrenceId, occurrenceDate);
     }

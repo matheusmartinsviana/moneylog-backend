@@ -52,10 +52,14 @@ public final class Debt {
     public static final int TEXT_MAX_LENGTH = 500;
     /** Coluna {@code debts.description} (VARCHAR(200)). */
     public static final int DESCRIPTION_MAX_LENGTH = 200;
+    /** Coluna {@code debts.creditor_name} (VARCHAR(100)). */
+    public static final int CREDITOR_NAME_MAX_LENGTH = 100;
 
     private final UUID id;
     private final UUID userId;
     private final UUID personId;
+    /** Credor livre das "outras dívidas" (P1, ADR-013): banco, loja, financiamento; só em {@code PAYABLE}, no lugar da pessoa. */
+    private final String creditorName;
     private final DebtDirection direction;
     private final DebtOrigin origin;
     private final Money principal;
@@ -70,14 +74,30 @@ public final class Debt {
     private LocalDate closureDate;
     private String closureReason;
 
-    private Debt(UUID id, UUID userId, Person person, DebtDirection direction, DebtOrigin origin, Money principal,
+    private Debt(UUID id, UUID userId, Person person, String creditorName, DebtDirection direction, DebtOrigin origin, Money principal,
                  String description, LocalDate date, LocalDate expectedDate, UUID originTransactionId, UUID categoryId) {
         this.id = required(id, "id");
         this.userId = required(userId, "userId");
-        required(person, "person");
-        person.ensureBelongsTo(userId);
-        person.ensureCanReceiveDebts();
-        this.personId = person.id();
+        if (person == null && creditorName == null) {
+            required(person, "person");
+        }
+        if (person == null) {
+            this.creditorName = requireCreditor(creditorName);
+            if (direction != DebtDirection.PAYABLE) {
+                throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException(
+                        "o credor livre só existe em dívida que você deve (PAYABLE).");
+            }
+            this.personId = null;
+        } else {
+            if (creditorName != null) {
+                throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException(
+                        "informe a pessoa ou o nome do credor, não os dois.");
+            }
+            person.ensureBelongsTo(userId);
+            person.ensureCanReceiveDebts();
+            this.creditorName = null;
+            this.personId = person.id();
+        }
         this.direction = required(direction, "direction");
         this.origin = origin;
         if (principal == null || !principal.isPositive() || !CurrencyCode.BRL.equals(principal.currency())) {
@@ -97,6 +117,7 @@ public final class Debt {
         this.id = s.id();
         this.userId = s.userId();
         this.personId = s.personId();
+        this.creditorName = s.creditorName();
         this.direction = s.direction();
         this.origin = s.origin();
         this.principal = s.principal();
@@ -117,15 +138,25 @@ public final class Debt {
      */
     public static Debt withMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
                                     LocalDate date, LocalDate expectedDate, String description, UUID originTransactionId) {
-        return new Debt(id, userId, person, direction, DebtOrigin.WITH_MOVEMENT, principal, description, date, expectedDate,
+        return new Debt(id, userId, person, null, direction, DebtOrigin.WITH_MOVEMENT, principal, description, date, expectedDate,
                 required(originTransactionId, "originTransactionId"), null);
     }
 
     /** Dívida sem movimentação ("eu devo 200 ao Pedro"): {@code PAYABLE −X / EQUITY +X} na data da dívida. */
     public static Debt withoutMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
                                        LocalDate date, LocalDate expectedDate, String description) {
-        return new Debt(id, userId, person, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
+        return new Debt(id, userId, person, null, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
                 null, null);
+    }
+
+    /**
+     * "Outra dívida" (P1, ADR-013): {@code PAYABLE} com credor livre (banco, loja, financiamento), sem {@link Person}. Reconhecida contra
+     * {@code EQUITY} como a dívida com pessoa ({@code PAYABLE −X / EQUITY +X}): sem caixa e sem consumo. Quitação e perdão são os de sempre.
+     */
+    public static Debt withoutMovementToCreditor(UUID id, UUID userId, String creditorName, Money principal, LocalDate date,
+                                                 LocalDate expectedDate, String description) {
+        return new Debt(id, userId, null, creditorName, DebtDirection.PAYABLE, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date,
+                expectedDate, null, null);
     }
 
     /**
@@ -144,7 +175,7 @@ public final class Debt {
         category.ensureBelongsTo(userId);
         category.ensureCanReceiveTransactions();
         category.ensureKind(CategoryKind.EXPENSE);
-        return new Debt(id, userId, person, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
+        return new Debt(id, userId, person, null, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
                 null, category.id());
     }
 
@@ -170,16 +201,21 @@ public final class Debt {
     /** Estado persistido (o inverso de {@link #restore}); quitações e lançamentos saem por {@link #settlements()} e {@link #entries()}. */
     public DebtState state() {
         return new DebtState(id, userId, personId, direction, origin, principal, description, date, expectedDate,
-                originTransactionId, closure, closureDate, closureReason, categoryId);
+                originTransactionId, closure, closureDate, closureReason, categoryId, creditorName);
     }
 
     private static Debt validated(DebtState s, List<DebtSettlement> settlements, List<LedgerEntry> entries) {
         Objects.requireNonNull(s, "state");
         Objects.requireNonNull(settlements, "settlements");
         Objects.requireNonNull(entries, "entries");
-        if (s.id() == null || s.userId() == null || s.personId() == null || s.direction() == null || s.origin() == null
-                || s.date() == null) {
-            throw inconsistent("id, dono, pessoa, direção, origem e data são obrigatórios.");
+        if (s.id() == null || s.userId() == null || s.direction() == null || s.origin() == null || s.date() == null) {
+            throw inconsistent("id, dono, direção, origem e data são obrigatórios.");
+        }
+        if ((s.personId() == null) == (s.creditorName() == null || s.creditorName().isBlank())) {
+            throw inconsistent("id, dono, pessoa ou credor livre (exatamente um), direção, origem e data são obrigatórios.");
+        }
+        if (s.personId() == null && s.direction() != DebtDirection.PAYABLE) {
+            throw inconsistent("o credor livre só existe em dívida PAYABLE.");
         }
         if (s.principal() == null || !s.principal().isPositive() || !CurrencyCode.BRL.equals(s.principal().currency())) {
             throw inconsistent("principal inválido: " + s.principal() + ".");
@@ -411,8 +447,14 @@ public final class Debt {
         return userId;
     }
 
+    /** Pessoa devedora/credora; {@code null} na dívida com credor livre ({@link #creditorName()}). */
     public UUID personId() {
         return personId;
+    }
+
+    /** Credor livre das "outras dívidas"; {@code null} quando há pessoa. */
+    public String creditorName() {
+        return creditorName;
     }
 
     public DebtDirection direction() {
@@ -506,6 +548,18 @@ public final class Debt {
         String trimmed = description.strip();
         if (trimmed.length() > DESCRIPTION_MAX_LENGTH) {
             throw new DebtDescriptionTooLongException(DESCRIPTION_MAX_LENGTH);
+        }
+        return trimmed;
+    }
+
+    private static String requireCreditor(String name) {
+        if (name == null || name.isBlank()) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("informe a pessoa ou o nome do credor.");
+        }
+        String trimmed = name.strip();
+        if (trimmed.length() > CREDITOR_NAME_MAX_LENGTH) {
+            throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException(
+                    "o nome do credor pode ter no máximo " + CREDITOR_NAME_MAX_LENGTH + " caracteres.");
         }
         return trimmed;
     }

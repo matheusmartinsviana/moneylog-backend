@@ -77,7 +77,7 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
 
     public record DebtItem(UUID id, UUID personId, DebtDirection direction, DebtOrigin origin, Money principal, String description,
                            LocalDate date, LocalDate expectedDate, UUID originTransactionId, UUID categoryId, DebtClosure closure,
-                           LocalDate closureDate, String closureReason, List<SettlementItem> settlements) {
+                           LocalDate closureDate, String closureReason, List<SettlementItem> settlements, String creditorName) {
     }
 
     public record PersonItem(UUID id, String name, String notes, boolean archived) {
@@ -136,7 +136,7 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
     private static DebtItem debt(Debt d) {
         return new DebtItem(d.id(), d.personId(), d.direction(), d.origin(), d.principal(), d.description(), d.date(), d.expectedDate(),
                 d.originTransactionId(), d.categoryId(), d.closure(), d.closureDate(), d.closureReason(),
-                d.settlements().stream().map(x -> new SettlementItem(x.transactionId(), x.amount(), x.active())).toList());
+                d.settlements().stream().map(x -> new SettlementItem(x.transactionId(), x.amount(), x.active())).toList(), d.creditorName());
     }
 
     private static PersonItem person(Person p) {

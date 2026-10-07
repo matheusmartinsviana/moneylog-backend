@@ -27,6 +27,10 @@ public class UnarchiveGoalUseCaseImpl implements UnarchiveGoalUseCase {
         Versioned<Goal> current = goals.findById(command.userId(), command.goalId())
                 .orElseThrow(() -> new GoalNotFoundException(command.goalId()));
         Goal goal = current.value();
+        if (goal.isDebtPayoff() && goals.findAll(command.userId()).stream().map(Versioned::value)
+                .anyMatch(g -> g.isDebtPayoff() && !g.isArchived() && !g.id().equals(goal.id()))) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.DebtPayoffGoalExistsException();
+        }
         goal.unarchive();
         Versioned<Goal> saved = goals.save(goal);
         return GoalViews.of(saved, records.load(command.userId()), time.today());

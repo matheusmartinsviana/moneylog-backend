@@ -71,7 +71,8 @@ public class DebtController {
                                                @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
                                                @Valid @RequestBody DebtInput body) {
         DebtView created = create.handle(new CreateDebtCommand(userId, body.personId(), body.direction(),
-                Money.of(body.principal(), CurrencyCode.BRL), body.date(), body.expectedDate(), body.description(), body.categoryId(), idempotencyKey));
+                Money.of(body.principal(), CurrencyCode.BRL), body.date(), body.expectedDate(), body.description(), body.categoryId(), idempotencyKey,
+                body.creditorName()));
         return ResponseEntity.created(URI.create("/v1/debts/" + created.debt().id())).body(DebtResponse.of(created));
     }
 

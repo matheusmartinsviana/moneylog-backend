@@ -19,9 +19,26 @@ import com.moneylog.core.sk.money.Money;
  * @param monthlyNeeded estimativa (S-156); {@code null} sem prazo ou com prazo vencido
  * @param uncovered     alguma conta com reserva desta meta tem mais reservado que saldo (S-148); só sinaliza
  * @param reservations  todas as reservas (inclusive as futuras), da mais recente para a mais antiga
+ * @param payoff        só na meta {@code DEBT_PAYOFF} (ADR-013): baseline, "cresceu desde a baseline" e o restante (= total de dívidas
+ *                      hoje); {@code null} na meta de guardar dinheiro
  */
 public record GoalDetails(Goal goal, long version, Instant createdAt, Instant updatedAt, LocalDate asOf, GoalProgress progress,
-                          GoalStatus status, Money monthlyNeeded, boolean uncovered, List<ReservationView> reservations) {
+                          GoalStatus status, Money monthlyNeeded, boolean uncovered, List<ReservationView> reservations,
+                          PayoffInfo payoff) {
+
+    /** Meta de guardar dinheiro (sem dados de quitação). */
+    public GoalDetails(Goal goal, long version, Instant createdAt, Instant updatedAt, LocalDate asOf, GoalProgress progress,
+                       GoalStatus status, Money monthlyNeeded, boolean uncovered, List<ReservationView> reservations) {
+        this(goal, version, createdAt, updatedAt, asOf, progress, status, monthlyNeeded, uncovered, reservations, null);
+    }
+
+    /**
+     * @param baselineSet       "cadastrei tudo" foi confirmado; antes disso a meta está "montando" e não tem percentual
+     * @param grewSinceBaseline o total de dívidas passou da baseline (dívida nova depois de ancorar); nada é re-ancorado sozinho
+     * @param remaining         o total de dívidas hoje (o que falta quitar)
+     */
+    public record PayoffInfo(boolean baselineSet, Money baseline, Instant baselineAt, boolean grewSinceBaseline, Money remaining) {
+    }
 
     public GoalDetails {
         Objects.requireNonNull(goal, "goal");

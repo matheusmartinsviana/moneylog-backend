@@ -103,6 +103,13 @@ public final class DebtExceptions {
         }
     }
 
+    /** Dívida com credor livre ("outras dívidas", P1): informe a pessoa ou o nome do credor, nunca os dois, e só em PAYABLE. */
+    public static class DebtCreditorInvalidException extends BusinessRuleException {
+        public DebtCreditorInvalidException(String reason) {
+            super("DEBT_CREDITOR_INVALID", "Credor da dívida inválido: " + reason);
+        }
+    }
+
     /** Estado gravado de uma dívida inconsistente ao reidratar ({@code Debt.restore}): dado corrompido, vira 500. */
     public static class DebtStateInconsistentException extends DomainException {
         public DebtStateInconsistentException(String reason) {

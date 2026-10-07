@@ -53,6 +53,31 @@ public final class InstallmentPlan {
     }
 
     /**
+     * Parcelas de uma compra em andamento (ADR-013): só as {@code remaining} últimas, numeradas {@code (total−remaining+1)..total},
+     * cada uma com o valor informado (sem {@code allocate}). A 1ª da lista é a próxima a vencer e a data efetiva dela é
+     * {@code firstDate}; as seguintes, +1 mês cada.
+     */
+    public static List<TransactionInstallment> generateOngoing(UUID transactionId, Money installmentAmount, int total, int remaining,
+                                                               LocalDate firstDate, List<InvoiceAllocator.Allocation> allocations) {
+        validateCount(total);
+        if (remaining < 1 || remaining > total) {
+            throw new com.moneylog.core.card.exception.CardExceptions.OngoingInvalidCountException(total, remaining);
+        }
+        if (allocations.size() != remaining) {
+            throw new InvalidInstallmentException("uma alocação por parcela (" + allocations.size() + " para " + remaining + ").");
+        }
+        int firstNumber = total - remaining + 1;
+        List<TransactionInstallment> installments = new ArrayList<>(remaining);
+        for (int i = 0; i < remaining; i++) {
+            InvoiceAllocator.Allocation allocation = allocations.get(i);
+            installments.add(new TransactionInstallment(TransactionInstallment.idFor(transactionId, firstNumber + i), transactionId,
+                    firstNumber + i, total, installmentAmount, firstDate.plusMonths(i), allocation.invoice().closingDate(),
+                    allocation.lateEntry(), null));
+        }
+        return List.copyOf(installments);
+    }
+
+    /**
      * Cancelamento das parcelas restantes (D1 §2.5.2): as parcelas em faturas {@code FUTURE}/{@code OPEN} viram
      * {@code CANCELED}; as de faturas fechadas não mudam.
      */

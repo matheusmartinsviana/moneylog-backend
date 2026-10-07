@@ -170,4 +170,28 @@ public final class CardExceptions {
             super("CARD_INVALID_INSTALLMENT", "Parcela inválida: " + reason);
         }
     }
+
+    /** Compra parcelada em andamento com contagem incoerente (restantes acima do total). */
+    public static class OngoingInvalidCountException extends BusinessRuleException {
+        public OngoingInvalidCountException(int total, int remaining) {
+            super("ONGOING_INVALID_COUNT", "As parcelas que faltam (" + remaining + ") não podem passar do total de parcelas (" + total + ").");
+        }
+    }
+
+    /** A fatura da próxima parcela já está paga: a compra em andamento não pode cair nela. */
+    public static class OngoingFirstInvoiceNotPayableException extends BusinessRuleException {
+        public OngoingFirstInvoiceNotPayableException(java.time.LocalDate closingDate) {
+            super("ONGOING_FIRST_INVOICE_NOT_PAYABLE",
+                    "A fatura que fecha em " + closingDate + " já está paga; escolha a fatura corrente ou uma futura para a próxima parcela.");
+        }
+    }
+
+    /** Com categoria, a compra em andamento geraria consumo em mês passado (P5): a competência da primeira parcela não pode ser anterior à de hoje. */
+    public static class OngoingCategoryRetroactiveException extends BusinessRuleException {
+        public OngoingCategoryRetroactiveException() {
+            super("ONGOING_CATEGORY_RETROACTIVE",
+                    "Com categoria, a próxima parcela não pode cair em mês anterior ao atual (não se cria consumo no passado); "
+                            + "use a fatura corrente ou uma futura, ou cadastre sem categoria.");
+        }
+    }
 }

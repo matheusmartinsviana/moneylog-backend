@@ -3,6 +3,7 @@ package com.moneylog.infra.goal.controller;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import com.moneylog.core.goal.domain.GoalKind;
 import com.moneylog.core.goal.domain.GoalPriority;
 import com.moneylog.infra.web.validation.DateInWindow;
 import com.moneylog.infra.web.validation.NoControlChars;
@@ -23,10 +24,13 @@ public final class GoalRequests {
     private GoalRequests() {
     }
 
-    public record GoalInput(@NotBlank @Size(max = 100) @NoControlChars String name,
-                            @NotNull @Pattern(regexp = AMOUNT_PATTERN) String target, @DateInWindow LocalDate deadline,
-                            GoalPriority priority,
-                            @Size(max = 500) @NoControlChars(allowLineBreaks = true) String description) {
+    /**
+     * {@code kind} ausente = {@code SAVINGS}. Em {@code DEBT_PAYOFF} o {@code target} é ignorado e o {@code name} é opcional
+     * (padrão "Quitar todas as dívidas"); em {@code SAVINGS} os dois são obrigatórios (conferido no controller).
+     */
+    public record GoalInput(@Size(max = 100) @NoControlChars String name, @Pattern(regexp = AMOUNT_PATTERN) String target,
+                            @DateInWindow LocalDate deadline, GoalPriority priority,
+                            @Size(max = 500) @NoControlChars(allowLineBreaks = true) String description, GoalKind kind) {
     }
 
     public record GoalUpdate(@NotBlank @Size(max = 100) @NoControlChars String name,

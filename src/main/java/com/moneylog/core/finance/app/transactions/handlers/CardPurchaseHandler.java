@@ -80,6 +80,14 @@ public class CardPurchaseHandler implements TransactionTypeHandler<CardPurchase>
                     + "estorne a compra (se nenhuma parcela estiver em fatura fechada) e lance de novo, ou cancele as parcelas restantes "
                     + "e registre um reembolso.");
         }
+        if (current.categoryId() == null) {
+            // compra em andamento sem categoria (contrapartida EQUITY, ADR-013): só descrição e observação mudam
+            if (c.categoryId() != null) {
+                throw new TransactionNotEditableException("a compra parcelada em andamento sem categoria não ganha categoria depois "
+                        + "(isso criaria consumo retroativo); estorne e cadastre de novo com a categoria.");
+            }
+            return CardTransactions.editOngoingDetails(current, support.header(c.common(), current.id(), current.origin()));
+        }
         Category category = support.category(c.userId(), c.categoryId(), current, CategoryKind.EXPENSE);
         return CardTransactions.editPurchaseDetails(current, support.header(c.common(), current.id(), current.origin()), category,
                 activeRefunds);

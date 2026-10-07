@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.moneylog.core.goal.domain.GoalKind;
 import com.moneylog.core.goal.domain.GoalPriority;
 
 import jakarta.persistence.Column;
@@ -52,6 +53,18 @@ public class GoalEntity {
     @Column(nullable = false)
     private boolean archived;
 
+    /** V8.03: tipo da meta; {@code SAVINGS} nas existentes. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16, updatable = false)
+    private GoalKind kind = GoalKind.SAVINGS;
+
+    /** V8.03: total de dívidas fixado em "cadastrei tudo" (só {@code DEBT_PAYOFF}). */
+    @Column(name = "baseline_cents")
+    private Long baselineCents;
+
+    @Column(name = "baseline_at")
+    private Instant baselineAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -66,7 +79,10 @@ public class GoalEntity {
 
     @SuppressWarnings("java:S107")
     public GoalEntity(UUID id, UUID userId, String name, long targetCents, String currency, LocalDate deadline, GoalPriority priority,
-                      String description, boolean archived, Instant now) {
+                      String description, boolean archived, GoalKind kind, Long baselineCents, Instant baselineAt, Instant now) {
+        this.kind = kind;
+        this.baselineCents = baselineCents;
+        this.baselineAt = baselineAt;
         this.id = id;
         this.userId = userId;
         this.name = name;
@@ -83,7 +99,9 @@ public class GoalEntity {
     /** Aplica o estado do domínio. {@code updatedAt} sempre avança, então a versão sobe a cada gravação (também ao reservar). */
     @SuppressWarnings("java:S107")
     public void apply(String newName, long newTargetCents, LocalDate newDeadline, GoalPriority newPriority, String newDescription,
-                      boolean newArchived, Instant now) {
+                      boolean newArchived, Long newBaselineCents, Instant newBaselineAt, Instant now) {
+        this.baselineCents = newBaselineCents;
+        this.baselineAt = newBaselineAt;
         this.name = newName;
         this.targetCents = newTargetCents;
         this.deadline = newDeadline;
@@ -123,6 +141,18 @@ public class GoalEntity {
 
     public String getDescription() {
         return description;
+    }
+
+    public GoalKind getKind() {
+        return kind;
+    }
+
+    public Long getBaselineCents() {
+        return baselineCents;
+    }
+
+    public Instant getBaselineAt() {
+        return baselineAt;
     }
 
     public boolean isArchived() {

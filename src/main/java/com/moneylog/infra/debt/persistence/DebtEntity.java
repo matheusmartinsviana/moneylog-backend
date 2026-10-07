@@ -34,8 +34,12 @@ public class DebtEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(name = "person_id", nullable = false, updatable = false)
+    @Column(name = "person_id", updatable = false)
     private UUID personId;
+
+    /** Credor livre das "outras dívidas" (V8.04); {@code null} quando há pessoa. */
+    @Column(name = "creditor_name", length = 100, updatable = false)
+    private String creditorName;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16, updatable = false)
@@ -93,7 +97,7 @@ public class DebtEntity {
     @SuppressWarnings("java:S107")
     public DebtEntity(UUID id, UUID userId, UUID personId, DebtDirection direction, DebtOrigin origin, long principalCents,
                       String currency, String description, LocalDate debtDate, LocalDate expectedDate, UUID originTransactionId,
-                      DebtClosure closure, LocalDate closureDate, String closureReason, UUID categoryId, Instant now) {
+                      DebtClosure closure, LocalDate closureDate, String closureReason, UUID categoryId, String creditorName, Instant now) {
         this.id = id;
         this.userId = userId;
         this.personId = personId;
@@ -109,6 +113,7 @@ public class DebtEntity {
         this.closureDate = closureDate;
         this.closureReason = closureReason;
         this.categoryId = categoryId;
+        this.creditorName = creditorName;
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -134,6 +139,10 @@ public class DebtEntity {
 
     public UUID getPersonId() {
         return personId;
+    }
+
+    public String getCreditorName() {
+        return creditorName;
     }
 
     public DebtDirection getDirection() {

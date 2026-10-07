@@ -13,7 +13,7 @@ import com.moneylog.core.debt.domain.DebtStatus;
 import com.moneylog.core.sk.money.Money;
 
 /** {@code Debt} do contrato (D2 §4.6). */
-public record DebtResponse(UUID id, PersonRefResponse person, DebtDirection direction, DebtOrigin origin, UUID originTransactionId,
+public record DebtResponse(UUID id, PersonRefResponse person, String creditorName, DebtDirection direction, DebtOrigin origin, UUID originTransactionId,
                            Money principal, Money settled, Money outstanding, DebtStatus status, LocalDate date, LocalDate expectedDate,
                            boolean overdue, String description, CategoryRef category, LocalDate closureDate, String closureReason,
                            List<Settlement> settlements, boolean cancelable, boolean voidable, DebtView.VoidBlockedBy voidBlockedBy,
@@ -27,7 +27,8 @@ public record DebtResponse(UUID id, PersonRefResponse person, DebtDirection dire
 
     public static DebtResponse of(DebtView view) {
         Debt d = view.debt();
-        return new DebtResponse(d.id(), new PersonRefResponse(view.person().id(), view.person().name()), d.direction(), d.origin(),
+        return new DebtResponse(d.id(), view.person() == null ? null : new PersonRefResponse(view.person().id(), view.person().name()),
+                d.creditorName(), d.direction(), d.origin(),
                 d.originTransactionId(), d.principal(), d.settled(), d.outstanding(), d.status(), d.date(), d.expectedDate(),
                 view.overdue(), d.description(), d.categoryId() == null ? null : new CategoryRef(d.categoryId(), view.categoryName()),
                 d.closureDate(), d.closureReason(),

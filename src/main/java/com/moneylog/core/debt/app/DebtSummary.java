@@ -15,7 +15,7 @@ public record DebtSummary(UUID id, UUID personId, String personName, DebtDirecti
                           String description) {
 
     public static DebtSummary of(Debt debt, Person person, LocalDate today) {
-        return new DebtSummary(debt.id(), person.id(), person.name(), debt.direction(), debt.status(), debt.principal(), debt.settled(),
+        return new DebtSummary(debt.id(), person == null ? null : person.id(), person == null ? debt.creditorName() : person.name(), debt.direction(), debt.status(), debt.principal(), debt.settled(),
                 debt.outstanding(), debt.date(), debt.expectedDate(), debt.isOverdue(today), debt.description());
     }
 }

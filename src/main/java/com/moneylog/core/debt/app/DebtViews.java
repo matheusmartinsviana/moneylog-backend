@@ -26,7 +26,7 @@ public final class DebtViews {
         if (items.isEmpty()) {
             return List.of();
         }
-        Map<UUID, Person> persons = people.findByIds(userId, items.stream().map(d -> d.value().personId()).distinct().toList());
+        Map<UUID, Person> persons = people.findByIds(userId, items.stream().map(d -> d.value().personId()).filter(java.util.Objects::nonNull).distinct().toList());
         List<UUID> settlementIds = items.stream().flatMap(d -> d.value().settlements().stream()).map(s -> s.transactionId()).toList();
         Map<UUID, LocalDate> dates = debts.settlementDates(userId, settlementIds);
         Map<UUID, String> categoryNames = new HashMap<>();
@@ -38,8 +38,8 @@ public final class DebtViews {
         }
         return items.stream().map(item -> {
             Debt debt = item.value();
-            Person person = persons.get(debt.personId());
-            if (person == null) {
+            Person person = debt.personId() == null ? null : persons.get(debt.personId());
+            if (person == null && debt.personId() != null) {
                 throw new PersonNotFoundException(debt.personId());
             }
             return DebtView.of(item, person, categoryNames.get(debt.categoryId()), dates, today);

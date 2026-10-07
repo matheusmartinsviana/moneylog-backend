@@ -39,9 +39,10 @@ public class ListGoalsUseCaseImpl implements ListGoalsUseCase {
         LocalDate today = time.today();
         GoalReserves reserves = GoalReserves.at(loaded, CashPosition.at(loaded, loaded.ledger(), today));
         Map<UUID, String> names = GoalViews.accountNames(loaded);
+        com.moneylog.core.sk.money.Money debtTotal = GoalViews.debtTotal(loaded, today);
         // quem filtra é o domínio (status derivado), não o SQL (S-150); são poucas metas por usuário
         List<GoalDetails> all = goals.findAll(query.userId()).stream()
-                .map(goal -> GoalViews.of(goal, names, reserves, today))
+                .map(goal -> GoalViews.of(goal, names, reserves, debtTotal, today))
                 .filter(details -> query.status() == null || details.status() == query.status())
                 .sorted(Comparator.comparing((GoalDetails d) -> d.status().ordinal())
                         .thenComparing(d -> d.goal().priority().ordinal())

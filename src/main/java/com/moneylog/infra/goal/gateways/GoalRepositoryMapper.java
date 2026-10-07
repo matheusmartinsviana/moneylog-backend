@@ -24,7 +24,8 @@ public final class GoalRepositoryMapper {
                 .sorted(Comparator.comparing(GoalReservationEntity::getCreatedAt).thenComparing(GoalReservationEntity::getId))
                 .map(GoalRepositoryMapper::toDomain).toList();
         return Goal.restore(e.getId(), e.getUserId(), e.getName(), Money.ofCents(e.getTargetCents(), CurrencyCode.of(e.getCurrency())),
-                e.getDeadline(), e.getPriority(), e.getDescription(), e.isArchived(), mapped);
+                e.getDeadline(), e.getPriority(), e.getDescription(), e.isArchived(), e.getKind(),
+                e.getBaselineCents() == null ? null : Money.ofCents(e.getBaselineCents(), CurrencyCode.of(e.getCurrency())), e.getBaselineAt(), mapped);
     }
 
     public static Versioned<Goal> toVersioned(GoalEntity e, Collection<GoalReservationEntity> reservations) {
@@ -38,7 +39,7 @@ public final class GoalRepositoryMapper {
 
     public static GoalEntity toEntity(Goal g, Instant now) {
         return new GoalEntity(g.id(), g.userId(), g.name(), g.target().cents(), g.target().currency().value(), g.deadline(),
-                g.priority(), g.description(), g.isArchived(), now);
+                g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline() == null ? null : g.baseline().cents(), g.baselineAt(), now);
     }
 
     public static GoalReservationEntity toEntity(GoalReservation r, java.util.UUID userId) {

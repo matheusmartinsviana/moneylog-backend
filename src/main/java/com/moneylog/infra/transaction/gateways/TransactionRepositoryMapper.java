@@ -140,6 +140,9 @@ public final class TransactionRepositoryMapper {
         if (e.getSource() == TransactionSource.RECURRENCE) {
             return TransactionOrigin.recurrence(e.getRecurrenceId(), e.getOccurrenceDate());
         }
+        if (e.getSource() == TransactionSource.ONGOING) {
+            return TransactionOrigin.ongoing();
+        }
         return TransactionOrigin.manual();
     }
 }

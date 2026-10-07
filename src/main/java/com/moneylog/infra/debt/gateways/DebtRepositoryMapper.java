@@ -32,7 +32,7 @@ public final class DebtRepositoryMapper {
                 .toList();
         DebtState state = new DebtState(e.getId(), e.getUserId(), e.getPersonId(), e.getDirection(), e.getOrigin(),
                 Money.ofCents(e.getPrincipalCents(), currency), e.getDescription(), e.getDebtDate(), e.getExpectedDate(),
-                e.getOriginTransactionId(), e.getClosure(), e.getClosureDate(), e.getClosureReason(), categoryId(e));
+                e.getOriginTransactionId(), e.getClosure(), e.getClosureDate(), e.getClosureReason(), categoryId(e), e.getCreditorName());
         return Debt.restore(state, settlements, entries);
     }
 
@@ -45,6 +45,6 @@ public final class DebtRepositoryMapper {
         DebtState s = debt.state();
         return new DebtEntity(s.id(), s.userId(), s.personId(), s.direction(), s.origin(), s.principal().cents(),
                 s.principal().currency().value(), s.description(), s.date(), s.expectedDate(), s.originTransactionId(), s.closure(),
-                s.closureDate(), s.closureReason(), s.categoryId(), now);
+                s.closureDate(), s.closureReason(), s.categoryId(), s.creditorName(), now);
     }
 }

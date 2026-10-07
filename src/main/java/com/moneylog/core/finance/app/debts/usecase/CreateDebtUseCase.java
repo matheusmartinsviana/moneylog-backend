@@ -14,6 +14,9 @@ public interface CreateDebtUseCase {
      * {@code RECEIVABLE +X / EQUITY −X}) na data da dívida. Com {@code categoryId} (só em {@code PAYABLE}, S-137: "um amigo pagou
      * meu jantar"): {@code EXPENSE(cat) +X / PAYABLE −X}, consumo +X na competência da data e caixa 0.
      *
+     * <p>Com {@code creditorName} (P1, "outras dívidas") e sem {@code personId}: dívida {@code PAYABLE} com credor livre, também contra
+     * {@code EQUITY}; sem categoria. Pessoa e credor juntos, ou nenhum dos dois, são {@code 422 DEBT_CREDITOR_INVALID}.
+     *
      * @throws com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException pessoa de outro usuário
      * @throws com.moneylog.core.debt.exception.DebtExceptions.PersonArchivedException pessoa arquivada
      * @throws com.moneylog.core.debt.exception.DebtExceptions.DebtCategoryNotAllowedException categoria numa {@code RECEIVABLE}
@@ -28,7 +31,13 @@ public interface CreateDebtUseCase {
      *                       outro comando com a mesma chave é {@code 409 IDEMPOTENCY_KEY_REUSED}
      */
     record CreateDebtCommand(UUID userId, UUID personId, DebtDirection direction, Money principal, LocalDate date,
-                             LocalDate expectedDate, String description, UUID categoryId, UUID idempotencyKey) {
+                             LocalDate expectedDate, String description, UUID categoryId, UUID idempotencyKey, String creditorName) {
+
+        /** Com chave de idempotência, sem credor livre. */
+        public CreateDebtCommand(UUID userId, UUID personId, DebtDirection direction, Money principal, LocalDate date,
+                                 LocalDate expectedDate, String description, UUID categoryId, UUID idempotencyKey) {
+            this(userId, personId, direction, principal, date, expectedDate, description, categoryId, idempotencyKey, null);
+        }
 
         /** Sem chave de idempotência. */
         public CreateDebtCommand(UUID userId, UUID personId, DebtDirection direction, Money principal, LocalDate date,
