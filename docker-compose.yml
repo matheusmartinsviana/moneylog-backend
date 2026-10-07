@@ -1,0 +1,25 @@
+# Postgres local do moneylog. Credenciais e porta vêm do .env (copie de .env.example).
+# A imagem precisa ser a mesma dos testes de integração (backend/pom.xml, <postgres.image>).
+name: moneylog
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:?defina DB_NAME no .env}
+      POSTGRES_USER: ${DB_USER:?defina DB_USER no .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    ports:
+      - "127.0.0.1:${DB_PORT:?defina DB_PORT no .env}:5432"
+    volumes:
+      - moneylog-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  moneylog-pgdata:
