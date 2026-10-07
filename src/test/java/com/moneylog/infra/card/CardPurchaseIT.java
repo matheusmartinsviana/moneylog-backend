@@ -399,9 +399,7 @@ class CardPurchaseIT {
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                     .andExpect(ContractValidation.responseOnly());
         }
-        createTx(purchase("10.00", 1, "2026-10-10", "x").replace(",\"installments\":1", "")).andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errors[0].field").value("installments")).andExpect(jsonPath("$.errors[0].code").value("NOT_NULL"))
-                .andExpect(ContractValidation.responseOnly());
+        // `installments` ausente é válido desde o contrato 2.11.0 (padrão 1x): coberto em OptionalFieldsIT
         createTx(purchase("10.005", 1, "2026-10-10", "x")).andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
         createTx(purchase("10.00", 1, "2026-10-10", "x").replace(",\"cardId\":\"" + card + "\"", "")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());

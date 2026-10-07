@@ -224,7 +224,7 @@ class CardSecurityQaIT {
                 failures.add("closingDay=" + v + " -> " + r);
             }
         }
-        for (String v : List.of("2.5", "2.0", "1e0", "0", "37", "-1", "null")) {
+        for (String v : List.of("2.5", "2.0", "1e0", "0", "37", "-1")) {
             CardQaWorld.Res r = a.raw(HttpMethod.POST, "/v1/transactions", "{\"type\":\"CARD_PURCHASE\",\"amount\":\"10.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"cardId\":\"" + a.card
                     + "\",\"categoryId\":\"" + a.tech + "\",\"installments\":" + v + "}", UUID.randomUUID().toString());
             if (r.status() != 400) {

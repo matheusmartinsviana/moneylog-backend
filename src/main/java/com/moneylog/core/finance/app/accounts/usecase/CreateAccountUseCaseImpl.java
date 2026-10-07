@@ -13,7 +13,11 @@ import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
 
+import java.time.LocalDate;
 import java.util.List;
+
+import com.moneylog.core.sk.money.CurrencyCode;
+import com.moneylog.core.sk.money.Money;
 
 public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
@@ -34,8 +38,11 @@ public class CreateAccountUseCaseImpl implements CreateAccountUseCase {
 
     @Override
     public AccountDetails handle(CreateAccountCommand command) {
+        // saldo e data de abertura ausentes se resolvem aqui: 0,00 e hoje (relógio injetado, fuso do usuário)
+        Money openingBalance = command.openingBalance() == null ? Money.zero(CurrencyCode.BRL) : command.openingBalance();
+        LocalDate openingDate = command.openingDate() == null ? time.today() : command.openingDate();
         Account account = Account.open(ids.next(), command.userId(), command.name(), command.type(), command.institution(),
-                command.openingBalance(), command.openingDate());
+                openingBalance, openingDate);
         Persisted<Account> saved = accounts.save(account);
         List<Posting> opening = account.openingPostings();
         if (!opening.isEmpty()) {

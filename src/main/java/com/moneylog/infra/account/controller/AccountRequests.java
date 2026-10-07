@@ -19,8 +19,8 @@ public final class AccountRequests {
     }
 
     public record AccountInput(@NotBlank @Size(max = 100) @NoControlChars String name, @NotNull AccountType type,
-                               @Size(max = 100) @NoControlChars String institution, @NotNull Money openingBalance,
-                               @NotNull @DateInWindow LocalDate openingDate) {
+                               @Size(max = 100) @NoControlChars String institution, Money openingBalance,
+                               @DateInWindow LocalDate openingDate) {
     }
 
     public record AccountUpdate(@NotBlank @Size(max = 100) @NoControlChars String name, @Size(max = 100) @NoControlChars String institution,

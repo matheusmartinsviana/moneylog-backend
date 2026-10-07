@@ -66,6 +66,11 @@ public class CategoryGatewayImpl implements CategoryGateway {
     }
 
     @Override
+    public Optional<Category> findBySystemKey(UUID userId, String systemKey) {
+        return repository.findByUserIdAndSystemKey(userId, systemKey).map(CategoryRepositoryMapper::toDomain);
+    }
+
+    @Override
     public Set<String> systemKeysOf(UUID userId) {
         return repository.findSystemKeys(userId);
     }

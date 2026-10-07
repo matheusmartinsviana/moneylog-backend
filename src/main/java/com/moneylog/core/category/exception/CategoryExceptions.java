@@ -21,6 +21,14 @@ public final class CategoryExceptions {
         }
     }
 
+    /** A categoria de sistema usada como padrão (Outros / Outras receitas) não existe ou está arquivada para o usuário. */
+    public static class DefaultCategoryUnavailableException extends BusinessRuleException {
+        public DefaultCategoryUnavailableException(String systemKey) {
+            super("DEFAULT_CATEGORY_UNAVAILABLE", "A categoria padrão (" + systemKey
+                    + ") não existe ou está arquivada; informe 'categoryId' ou desarquive a categoria.");
+        }
+    }
+
     public static class CategoryOwnerRequiredException extends BusinessRuleException {
         public CategoryOwnerRequiredException() {
             super("CATEGORY_OWNER_REQUIRED", "A categoria precisa pertencer a um usuário.");

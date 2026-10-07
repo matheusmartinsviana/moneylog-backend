@@ -17,6 +17,8 @@ public interface CategoryRepositoryJpa extends JpaRepository<CategoryEntity, UUI
 
     List<CategoryEntity> findByUserId(UUID userId);
 
+    Optional<CategoryEntity> findByUserIdAndSystemKey(UUID userId, String systemKey);
+
     @Query("""
             select c from CategoryEntity c
             where c.userId = :userId and (:includeArchived = true or c.archived = false)

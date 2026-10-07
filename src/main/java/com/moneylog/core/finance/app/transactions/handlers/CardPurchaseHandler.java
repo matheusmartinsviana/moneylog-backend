@@ -9,6 +9,7 @@ import com.moneylog.core.card.domain.InvoiceChain;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.CardPurchase;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -52,7 +53,7 @@ public class CardPurchaseHandler implements TransactionTypeHandler<CardPurchase>
                 .orElseThrow(() -> new CardNotFoundException(c.cardId()));
         InvoiceChain chain = CardInvoices.chainFor(card, support.transactions().findAllOfCard(c.userId(), card.id()));
         return plan(support.header(c.common(), id, origin), c.common().amount(), card,
-                support.category(c.userId(), c.categoryId(), editing), c.installments(), chain, time.today());
+                support.category(c.userId(), c.categoryId(), editing, CategoryKind.EXPENSE), c.installments(), chain, time.today());
     }
 
     /**
@@ -79,7 +80,7 @@ public class CardPurchaseHandler implements TransactionTypeHandler<CardPurchase>
                     + "estorne a compra (se nenhuma parcela estiver em fatura fechada) e lance de novo, ou cancele as parcelas restantes "
                     + "e registre um reembolso.");
         }
-        Category category = support.category(c.userId(), c.categoryId(), current);
+        Category category = support.category(c.userId(), c.categoryId(), current, CategoryKind.EXPENSE);
         return CardTransactions.editPurchaseDetails(current, support.header(c.common(), current.id(), current.origin()), category,
                 activeRefunds);
     }

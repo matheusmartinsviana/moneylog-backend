@@ -7,6 +7,7 @@ import com.moneylog.core.finance.app.goals.GoalDetails;
 import com.moneylog.core.finance.app.goals.GoalViews;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
+import com.moneylog.core.goal.domain.GoalPriority;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNotFoundException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.persistence.Versioned;
@@ -46,7 +47,7 @@ public class CreateGoalUseCaseImpl implements CreateGoalUseCase {
                 return GoalViews.of(current, records.load(c.userId()), time.today());
             }
         }
-        Goal goal = Goal.create(goalId, c.userId(), c.name(), c.target(), c.deadline(), c.priority(), c.description());
+        Goal goal = Goal.create(goalId, c.userId(), c.name(), c.target(), c.deadline(), c.priority() == null ? GoalPriority.MEDIUM : c.priority(), c.description());
         Versioned<Goal> saved = goals.save(goal);
         return GoalViews.of(saved, records.load(c.userId()), time.today());
     }

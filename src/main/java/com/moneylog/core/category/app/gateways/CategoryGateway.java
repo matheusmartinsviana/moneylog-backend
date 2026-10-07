@@ -29,6 +29,9 @@ public interface CategoryGateway {
     /** Existe outra categoria <b>não arquivada</b> com esse nome (sem diferenciar maiúsculas) no mesmo {@code kind}? */
     boolean existsActiveWithName(UUID userId, CategoryKind kind, String name, UUID excludingId);
 
+    /** A categoria de sistema do usuário com essa chave estável (arquivada ou não), se existir. */
+    Optional<Category> findBySystemKey(UUID userId, String systemKey);
+
     /** Chaves das categorias de sistema que o usuário já tem. */
     Set<String> systemKeysOf(UUID userId);
 }

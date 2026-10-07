@@ -131,6 +131,22 @@ class AccountUseCasesTest {
         }
 
         @Test
+        @DisplayName("saldo e data de abertura ausentes: 0,00 e hoje (relógio injetado); nenhum lançamento, saldo atual zero")
+        void deveCriarSemSaldoENemDataDeAbertura() {
+            when(ids.next()).thenReturn(NUBANK_ID);
+            ArgumentCaptor<Account> saved = ArgumentCaptor.forClass(Account.class);
+            when(accounts.save(saved.capture())).thenAnswer(call -> persisted(call.getArgument(0)));
+            when(records.load(USER_ID)).thenReturn(recordsOf());
+
+            new CreateAccountUseCaseImpl(accounts, ledger, records, ids, time).handle(
+                    new CreateAccountCommand(USER_ID, "Carteira", AccountType.CHECKING, null, null, null));
+
+            assertThat(saved.getValue().openingBalance()).isEqualTo(Money.of("0.00"));
+            assertThat(saved.getValue().openingDate()).isEqualTo(time.today());
+            verify(ledger, never()).append(any(), any());
+        }
+
+        @Test
         @DisplayName("saldo inicial zero não grava lançamento")
         void naoDeveGravarLancamentoDeSaldoZero() {
             when(ids.next()).thenReturn(NUBANK_ID);

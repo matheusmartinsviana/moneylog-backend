@@ -67,13 +67,13 @@ public sealed interface TransactionInput {
 
     @JsonIgnoreProperties("type")
     record Expense(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                   @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
-                   @NotNull UUID categoryId, @NotNull PaymentMethod method, @Valid @Size(min = 1, max = 20) List<ShareInput> shares,
+                   @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
+                   UUID categoryId, PaymentMethod method, @Valid @Size(min = 1, max = 20) List<ShareInput> shares,
                    Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
             List<Share> parts = shares == null ? List.of() : shares.stream().map(ShareInput::toShare).toList();
-            return new CreateTransactionCommand.Expense(common(userId, amount, date, description, notes), accountId, categoryId, method, parts);
+            return new CreateTransactionCommand.Expense(common(userId, amount, date, description, notes), accountId, categoryId, method == null ? PaymentMethod.OTHER : method, parts);
         }
     }
 
@@ -95,17 +95,18 @@ public sealed interface TransactionInput {
 
     @JsonIgnoreProperties("type")
     record Income(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                  @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
-                  @NotNull UUID categoryId, @NotNull PaymentMethod method, Long version) implements TransactionInput {
+                  @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
+                  UUID categoryId, PaymentMethod method, Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
-            return new CreateTransactionCommand.Income(common(userId, amount, date, description, notes), accountId, categoryId, method);
+            return new CreateTransactionCommand.Income(common(userId, amount, date, description, notes), accountId, categoryId,
+                    method == null ? PaymentMethod.OTHER : method);
         }
     }
 
     @JsonIgnoreProperties("type")
     record Transfer(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                    @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID fromAccountId,
+                    @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID fromAccountId,
                     @NotNull UUID toAccountId, Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
@@ -115,7 +116,7 @@ public sealed interface TransactionInput {
 
     @JsonIgnoreProperties("type")
     record Investment(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                      @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes,
+                      @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes,
                       @NotNull UUID cashAccountId, @NotNull UUID investmentAccountId, @NotNull InvestmentDirection direction, Long version)
             implements TransactionInput {
         @Override
@@ -127,7 +128,7 @@ public sealed interface TransactionInput {
 
     @JsonIgnoreProperties("type")
     record Adjustment(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                      @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
+                      @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
                       @NotNull AdjustmentDirection direction, AdjustmentKind kind, @NotBlank @Size(max = 500) @NoControlChars String reason, Long version)
             implements TransactionInput {
         @Override
@@ -143,8 +144,8 @@ public sealed interface TransactionInput {
      */
     @JsonIgnoreProperties("type")
     record Refund(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
-                  @NotBlank @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, UUID accountId,
-                  @NotNull UUID categoryId, UUID refundOfTransactionId, UUID cardId, Long version) implements TransactionInput {
+                  @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, UUID accountId,
+                  UUID categoryId, UUID refundOfTransactionId, UUID cardId, Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
             if (accountId == null && cardId == null) {
@@ -184,13 +185,13 @@ public sealed interface TransactionInput {
                         @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
                         @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
                         @Size(max = 2000, groups = Strict.class) @NoControlChars(allowLineBreaks = true, groups = Strict.class) String notes,
-                        @NotNull(groups = Strict.class) UUID cardId, @NotNull(groups = Strict.class) UUID categoryId,
-                        @NotNull(groups = Strict.class) @Min(value = 1, groups = Strict.class) @Max(value = 36, groups = Strict.class) Integer installments,
+                        @NotNull(groups = Strict.class) UUID cardId, UUID categoryId,
+                        @Min(value = 1, groups = Strict.class) @Max(value = 36, groups = Strict.class) Integer installments,
                         Long version) implements TransactionInput, StrictValidated {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
             return new CreateTransactionCommand.CardPurchase(common(userId, amount, date, description, notes), cardId, categoryId,
-                    installments);
+                    installments == null ? 1 : installments);
         }
     }
 
@@ -201,7 +202,7 @@ public sealed interface TransactionInput {
     @JsonIgnoreProperties("type")
     record LoanGiven(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                      @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
-                     @NotBlank(groups = Strict.class) @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
+                     @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
                      @Size(max = 2000, groups = Strict.class) @NoControlChars(allowLineBreaks = true, groups = Strict.class) String notes,
                      @NotNull(groups = Strict.class) UUID accountId, @Valid NewDebtInput newDebt, UUID debtId, Long version)
             implements TransactionInput, StrictValidated, NotEditable {
@@ -228,7 +229,7 @@ public sealed interface TransactionInput {
     @JsonIgnoreProperties("type")
     record MoneyReceived(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                          @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
-                         @NotBlank(groups = Strict.class) @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
+                         @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
                          @Size(max = 2000, groups = Strict.class) @NoControlChars(allowLineBreaks = true, groups = Strict.class) String notes,
                          @NotNull(groups = Strict.class) UUID accountId, UUID debtId, @Valid NewDebtInput newDebt, Long version)
             implements TransactionInput, StrictValidated, NotEditable {
@@ -252,7 +253,7 @@ public sealed interface TransactionInput {
     @JsonIgnoreProperties("type")
     record DebtPayment(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                        @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
-                       @NotBlank(groups = Strict.class) @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
+                       @Size(max = 200, groups = Strict.class) @NoControlChars(groups = Strict.class) String description,
                        @Size(max = 2000, groups = Strict.class) @NoControlChars(allowLineBreaks = true, groups = Strict.class) String notes,
                        @NotNull(groups = Strict.class) UUID accountId, @NotNull(groups = Strict.class) UUID debtId, Long version)
             implements TransactionInput, StrictValidated, NotEditable {

@@ -45,8 +45,9 @@ public class CardRefundHandler {
         CreditCard card = cards.findById(c.userId(), c.cardId()).map(Persisted::value)
                 .orElseThrow(() -> new CardNotFoundException(c.cardId()));
         InvoiceChain chain = CardInvoices.chainFor(card, support.transactions().findAllOfCard(c.userId(), card.id()));
+        var refundOf = support.refundOrigin(c, editing);
         return plan(support.header(c.common(), id, origin), c.common().amount(), card,
-                support.category(c.userId(), c.categoryId(), editing), support.refundOrigin(c, editing), chain, time.today());
+                support.refundCategory(c, refundOf, editing), refundOf, chain, time.today());
     }
 
     /** O crédito que o cartão, a cadeia e o "hoje" determinam: a única forma de montá-lo. */

@@ -7,7 +7,6 @@ import com.moneylog.core.debt.domain.DebtDirection;
 import com.moneylog.infra.web.validation.DateInWindow;
 import com.moneylog.infra.web.validation.NoControlChars;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -22,11 +21,11 @@ public final class DebtRequests {
 
     public record DebtInput(@NotNull UUID personId, @NotNull DebtDirection direction,
                             @NotNull @Pattern(regexp = AMOUNT_PATTERN) String principal, @NotNull @DateInWindow LocalDate date,
-                            @DateInWindow LocalDate expectedDate, @NotBlank @Size(max = 200) @NoControlChars String description,
+                            @DateInWindow LocalDate expectedDate, @Size(max = 200) @NoControlChars String description,
                             UUID categoryId) {
     }
 
-    public record DebtUpdate(@DateInWindow LocalDate expectedDate, @NotBlank @Size(max = 200) @NoControlChars String description,
+    public record DebtUpdate(@DateInWindow LocalDate expectedDate, @Size(max = 200) @NoControlChars String description,
                              @NotNull Long version) {
     }
 

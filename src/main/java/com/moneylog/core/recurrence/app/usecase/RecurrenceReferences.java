@@ -10,7 +10,9 @@ import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.category.app.SystemCategories;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.exception.CategoryExceptions.DefaultCategoryUnavailableException;
 import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
 import com.moneylog.core.sk.persistence.Persisted;
@@ -34,10 +36,19 @@ final class RecurrenceReferences {
         this.cards = cards;
     }
 
-    void category(UUID userId, UUID categoryId, TransactionType type) {
+    /** A categoria informada, conferida; ausente = a de sistema padrão do tipo (Outros / Outras receitas), 422 se faltar ou estiver arquivada. */
+    Category category(UUID userId, UUID categoryId, TransactionType type) {
+        CategoryKind kind = type == TransactionType.INCOME ? CategoryKind.INCOME : CategoryKind.EXPENSE;
+        if (categoryId == null) {
+            String key = kind == CategoryKind.INCOME ? SystemCategories.DEFAULT_INCOME_KEY : SystemCategories.DEFAULT_EXPENSE_KEY;
+            Category fallback = categories.findBySystemKey(userId, key).filter(c -> !c.isArchived())
+                    .orElseThrow(() -> new DefaultCategoryUnavailableException(key));
+            return fallback;
+        }
         Category category = categories.findById(userId, categoryId).orElseThrow(() -> new CategoryNotFoundException(categoryId));
         category.ensureCanReceiveTransactions();
-        category.ensureKind(type == TransactionType.INCOME ? CategoryKind.INCOME : CategoryKind.EXPENSE);
+        category.ensureKind(kind);
+        return category;
     }
 
     void account(UUID userId, UUID accountId, TransactionType type) {

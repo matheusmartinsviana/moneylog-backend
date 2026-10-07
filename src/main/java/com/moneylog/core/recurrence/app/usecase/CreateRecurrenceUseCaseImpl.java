@@ -5,6 +5,7 @@ import java.util.UUID;
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.recurrence.app.RecurrenceView;
 import com.moneylog.core.recurrence.app.RecurrenceViews;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
@@ -20,6 +21,7 @@ import com.moneylog.core.recurrence.exception.RecurrenceExceptions.RecurrenceNot
 import com.moneylog.core.transaction.app.IdempotentClaim;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
+import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
 
 public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
@@ -66,21 +68,23 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
         }
         Schedule schedule = new Schedule(c.frequency(), c.interval() == null ? 1 : c.interval(), c.unit(), c.startDate(), c.endDate(),
                 c.maxOccurrences());
+        // categoria e meio de pagamento ausentes se resolvem aqui, no servidor (padrão: Outros/Outras receitas e OTHER)
+        Category category = references.category(c.userId(), c.categoryId(), c.type());
+        UUID categoryId = category.id();
         RecurringTransaction recurrence;
         if (c.type() == TransactionType.CARD_PURCHASE) {
             if (c.accountId() != null || c.method() != null) {
                 throw new InvalidRecurrenceException("compra no cartão exige só o cartão.");
             }
-            recurrence = RecurringTransaction.ofCard(recurrenceId, c.userId(), c.amount(), c.description(), c.categoryId(), c.cardId(),
+            recurrence = RecurringTransaction.ofCard(recurrenceId, c.userId(), c.amount(), c.description(), categoryId, c.cardId(),
                     schedule);
         } else {
             if (c.cardId() != null) {
                 throw new InvalidRecurrenceException("despesa e receita exigem conta e meio de pagamento, não cartão.");
             }
-            recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), c.amount(), c.description(), c.categoryId(),
-                    c.accountId(), c.method(), schedule);
+            recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), c.amount(), c.description(), categoryId,
+                    c.accountId(), c.method() == null ? PaymentMethod.OTHER : c.method(), schedule);
         }
-        references.category(c.userId(), c.categoryId(), c.type());
         if (recurrence.accountId() != null) {
             references.account(c.userId(), recurrence.accountId(), c.type());
         } else {

@@ -32,6 +32,11 @@ public final class SystemCategories {
             new Definition("EXTRA_WORK", "Trabalho extra", CategoryKind.INCOME),
             new Definition("OTHER_INCOME", "Outras receitas", CategoryKind.INCOME));
 
+    /** Padrão de despesa, compra no cartão e reembolso sem categoria informada. */
+    public static final String DEFAULT_EXPENSE_KEY = "OTHER_EXPENSE";
+    /** Padrão de receita sem categoria informada. */
+    public static final String DEFAULT_INCOME_KEY = "OTHER_INCOME";
+
     private SystemCategories() {
     }
 }

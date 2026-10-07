@@ -153,6 +153,12 @@ class GoalUseCasesTest {
     }
 
     @Test
+    @DisplayName("prioridade ausente: MEDIUM")
+    void deveAssumirPrioridadeMedia() {
+        assertThat(novaMeta("Viagem", "3000.00", null, null).goal().priority()).isEqualTo(GoalPriority.MEDIUM);
+    }
+
+    @Test
     @DisplayName("CA2: reservar não grava lançamento nem movimentação: o caso de uso só fala com a porta de metas, a de contas (leitura e trava) e a de idempotência")
     void naoDeveTocarORazao() {
         emergencia();

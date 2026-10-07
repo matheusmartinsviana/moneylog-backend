@@ -34,6 +34,7 @@ import com.moneylog.core.card.exception.CardExceptions.CardArchivedException;
 import com.moneylog.core.card.util.factory.CreditCardTestFactory;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryKindMismatchException;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
@@ -146,6 +147,37 @@ class RecorrenciasUseCasesTest {
                 nubank.id(), PaymentMethod.TRANSFER, null, Frequency.CUSTOM, 2, IntervalUnit.WEEKS, LocalDate.of(2026, 10, 5), null, 10));
         assertThat(custom.recurrence().schedule().interval()).isEqualTo(2);
         assertThat(custom.monthlyEstimate()).isEqualTo(Money.of("10833.33"));
+    }
+
+    @Test
+    @DisplayName("sem descrição, categoria e método: descrição nula, categoria de sistema padrão e OTHER; sem categoria padrão = 422")
+    void deveResolverPadroesNaCriacao() {
+        Category otherExpense = Category.createSystem(UUID.fromString("00000000-0000-0000-0000-00000000c0a1"), USER_ID, "Outros", CategoryKind.EXPENSE);
+        Category otherIncome = Category.createSystem(UUID.fromString("00000000-0000-0000-0000-00000000c0a2"), USER_ID, "Outras receitas", CategoryKind.INCOME);
+        when(categories.findBySystemKey(USER_ID, "OTHER_EXPENSE")).thenReturn(Optional.of(otherExpense));
+        when(categories.findBySystemKey(USER_ID, "OTHER_INCOME")).thenReturn(Optional.of(otherIncome));
+        when(categories.findById(USER_ID, otherExpense.id())).thenReturn(Optional.of(otherExpense));
+        when(categories.findById(USER_ID, otherIncome.id())).thenReturn(Optional.of(otherIncome));
+        when(categories.list(USER_ID, null, true)).thenReturn(List.of(bills, salary, otherExpense, otherIncome));
+
+        RecurrenceView expense = create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.EXPENSE, Money.of("30.00"), null, null,
+                nubank.id(), null, null, Frequency.MONTHLY, null, null, TODAY, null, null));
+        RecurrenceView income = create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.INCOME, Money.of("30.00"), null, null,
+                nubank.id(), null, null, Frequency.MONTHLY, null, null, TODAY, null, null));
+        RecurrenceView card = create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.CARD_PURCHASE, Money.of("30.00"), null, null,
+                null, null, roxinho.id(), Frequency.MONTHLY, null, null, TODAY, null, null));
+
+        assertThat(expense.recurrence().description()).isNull();
+        assertThat(expense.recurrence().categoryId()).isEqualTo(otherExpense.id());
+        assertThat(expense.recurrence().paymentMethod()).isEqualTo(PaymentMethod.OTHER);
+        assertThat(income.recurrence().categoryId()).isEqualTo(otherIncome.id());
+        assertThat(card.recurrence().categoryId()).isEqualTo(otherExpense.id());
+        assertThat(card.recurrence().paymentMethod()).isNull();
+
+        when(categories.findBySystemKey(USER_ID, "OTHER_EXPENSE")).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.EXPENSE, Money.of("30.00"), null, null,
+                nubank.id(), null, null, Frequency.MONTHLY, null, null, TODAY, null, null)))
+                .hasFieldOrPropertyWithValue("code", "DEFAULT_CATEGORY_UNAVAILABLE");
     }
 
     @Test

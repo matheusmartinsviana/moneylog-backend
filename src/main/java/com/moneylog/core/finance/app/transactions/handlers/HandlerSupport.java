@@ -7,7 +7,10 @@ import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.exception.AccountExceptions.AccountNotFoundException;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.category.app.SystemCategories;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.domain.CategoryKind;
+import com.moneylog.core.category.exception.CategoryExceptions.DefaultCategoryUnavailableException;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
 import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.app.gateways.PersonGateway;
@@ -100,9 +103,27 @@ public class HandlerSupport {
      * Na edição, a categoria arquivada só é recusada se a edição a <b>troca</b> por ela (B9, S-113); mantendo a que a
      * movimentação já tinha, a edição passa.
      */
-    Category category(UUID userId, UUID categoryId, Transaction editing) {
+    Category category(UUID userId, UUID categoryId, Transaction editing, CategoryKind kind) {
+        if (categoryId == null) {
+            return defaultCategory(userId, kind);
+        }
         Category category = categories.findById(userId, categoryId).orElseThrow(() -> new CategoryNotFoundException(categoryId));
         return editing != null && categoryId.equals(editing.categoryId()) ? category.forExistingUse() : category;
+    }
+
+    /** Categoria de sistema padrão (Outros / Outras receitas) quando o comando não traz categoria; 422 se faltar ou estiver arquivada. */
+    Category defaultCategory(UUID userId, CategoryKind kind) {
+        String key = kind == CategoryKind.INCOME ? SystemCategories.DEFAULT_INCOME_KEY : SystemCategories.DEFAULT_EXPENSE_KEY;
+        return categories.findBySystemKey(userId, key).filter(c -> !c.isArchived())
+                .orElseThrow(() -> new DefaultCategoryUnavailableException(key));
+    }
+
+    /** Reembolso sem categoria: herda a da original; sem origem, cai na padrão de despesa. */
+    Category refundCategory(Refund c, RefundOrigin origin, Transaction editing) {
+        if (c.categoryId() == null && origin != null && origin.original().categoryId() != null) {
+            return category(c.userId(), origin.original().categoryId(), editing, CategoryKind.EXPENSE);
+        }
+        return category(c.userId(), c.categoryId(), editing, CategoryKind.EXPENSE);
     }
 
     /**

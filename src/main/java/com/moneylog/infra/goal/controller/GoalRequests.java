@@ -25,7 +25,7 @@ public final class GoalRequests {
 
     public record GoalInput(@NotBlank @Size(max = 100) @NoControlChars String name,
                             @NotNull @Pattern(regexp = AMOUNT_PATTERN) String target, @DateInWindow LocalDate deadline,
-                            @NotNull GoalPriority priority,
+                            GoalPriority priority,
                             @Size(max = 500) @NoControlChars(allowLineBreaks = true) String description) {
     }
 

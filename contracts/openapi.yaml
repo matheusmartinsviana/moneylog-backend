@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.10.0
+  version: 2.11.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -10,6 +10,12 @@ info:
 
     **Versão do OpenAPI: 3.1.0** (spike S-84: o `swagger-request-validator` 3.0.0 valida `oneOf` + `discriminator`,
     `type: [string, "null"]` e `$ref` com irmãos).
+
+    ## Campos opcionais com padrão no servidor (2.11.0, só afrouxa, não quebra cliente antigo)
+    Ausentes, estes campos são resolvidos pelo servidor (o front pode omiti-los): `description` (movimentações, `DebtInput`, `RecurrenceInput`;
+    fica nula, o front gera o rótulo), `categoryId` (despesa, compra no cartão, reembolso sem origem e recorrência de despesa = categoria de
+    sistema `OTHER_EXPENSE`; receita e recorrência de receita = `OTHER_INCOME`; reembolso com `refundOfTransactionId` herda a da original),
+    `method` (`OTHER`), `installments` (1), `openingBalance` (0,00), `openingDate` (hoje no fuso do usuário), `priority` da meta (`MEDIUM`).
 
     ## Convenções
     - Base `/v1`, JSON, `Authorization: Bearer <accessToken>` em tudo, exceto `/v1/auth/*`.
@@ -32,7 +38,7 @@ info:
     | 403 | `ORIGIN_NOT_ALLOWED` |
     | 404 | `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND` |
     | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro) |
-    | 422 | o `code` da exceção de domínio: `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
+    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
     | 404, 405, 406, 415 (rota ou mídia que o servidor não atende) | `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`): login, as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
     | 500 | `INTERNAL_ERROR` |
@@ -4663,7 +4669,7 @@ components:
           format: date-time
     AccountInput:
       type: object
-      required: [name, type, openingBalance, openingDate]
+      required: [name, type]
       additionalProperties: false
       properties:
         name:
@@ -4768,7 +4774,7 @@ components:
     ExpenseInput:
       type: object
       description: Despesa paga de conta (`EXPENSE`).
-      required: [type, amount, date, description, accountId, categoryId, method]
+      required: [type, amount, date, accountId]
       additionalProperties: false
       properties:
         type:
@@ -4810,7 +4816,7 @@ components:
     IncomeInput:
       type: object
       description: Receita (`INCOME`). O campo `origin` de D2 §4.2 fica de fora (S-60).
-      required: [type, amount, date, description, accountId, categoryId, method]
+      required: [type, amount, date, accountId]
       additionalProperties: false
       properties:
         type:
@@ -4842,7 +4848,7 @@ components:
     TransferInput:
       type: object
       description: Transferência entre contas próprias da mesma liquidez (`TRANSFER`).
-      required: [type, amount, date, description, fromAccountId, toAccountId]
+      required: [type, amount, date, fromAccountId, toAccountId]
       additionalProperties: false
       properties:
         type:
@@ -4870,7 +4876,7 @@ components:
     InvestmentInput:
       type: object
       description: Aplicação ou resgate entre conta `CASH` e conta `INVESTMENT` (`INVESTMENT`).
-      required: [type, amount, date, description, cashAccountId, investmentAccountId, direction]
+      required: [type, amount, date, cashAccountId, investmentAccountId, direction]
       additionalProperties: false
       properties:
         type:
@@ -4900,7 +4906,7 @@ components:
     AdjustmentInput:
       type: object
       description: Ajuste manual (`ADJUSTMENT`); o motivo é obrigatório.
-      required: [type, amount, date, description, accountId, direction, reason]
+      required: [type, amount, date, accountId, direction, reason]
       additionalProperties: false
       properties:
         type:
@@ -4934,7 +4940,7 @@ components:
     RefundInput:
       type: object
       description: Reembolso em conta ou crédito no cartão (`REFUND`); informe `accountId` **ou** `cardId`.
-      required: [type, amount, date, description, categoryId]
+      required: [type, amount, date]
       additionalProperties: false
       properties:
         type:
@@ -4995,7 +5001,7 @@ components:
     ExpenseUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Despesa paga de conta (`EXPENSE`).'
-      required: [type, amount, date, description, accountId, categoryId, method, version]
+      required: [type, amount, date, accountId, version]
       additionalProperties: false
       properties:
         type:
@@ -5041,7 +5047,7 @@ components:
     IncomeUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Receita (`INCOME`). O campo `origin` de D2 §4.2 fica de fora (S-60).'
-      required: [type, amount, date, description, accountId, categoryId, method, version]
+      required: [type, amount, date, accountId, version]
       additionalProperties: false
       properties:
         type:
@@ -5076,7 +5082,7 @@ components:
     TransferUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Transferência entre contas próprias da mesma liquidez (`TRANSFER`).'
-      required: [type, amount, date, description, fromAccountId, toAccountId, version]
+      required: [type, amount, date, fromAccountId, toAccountId, version]
       additionalProperties: false
       properties:
         type:
@@ -5107,7 +5113,7 @@ components:
     InvestmentUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Aplicação ou resgate entre conta `CASH` e conta `INVESTMENT` (`INVESTMENT`).'
-      required: [type, amount, date, description, cashAccountId, investmentAccountId, direction, version]
+      required: [type, amount, date, cashAccountId, investmentAccountId, direction, version]
       additionalProperties: false
       properties:
         type:
@@ -5140,7 +5146,7 @@ components:
     AdjustmentUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Ajuste manual (`ADJUSTMENT`); o motivo é obrigatório.'
-      required: [type, amount, date, description, accountId, direction, reason, version]
+      required: [type, amount, date, accountId, direction, reason, version]
       additionalProperties: false
       properties:
         type:
@@ -5177,7 +5183,7 @@ components:
     RefundUpdate:
       type: object
       description: 'Edição: o corpo do `POST` do tipo + `version`. Reembolso em conta (`REFUND` com `accountId`; o crédito no cartão não é editável).'
-      required: [type, amount, date, description, categoryId, version]
+      required: [type, amount, date, version]
       additionalProperties: false
       properties:
         type:
@@ -6493,7 +6499,7 @@ components:
       description: |
         Compra no cartão (`CARD_PURCHASE`). `installments` de 1 a 36 (obrigatório; à vista = 1). O valor é dividido em
         centavos (`1000.00` em 3x = 333,34 + 333,33 + 333,33) e a parcela 1 cai na competência da compra.
-      required: [type, amount, date, cardId, categoryId, installments]
+      required: [type, amount, date, cardId]
       additionalProperties: false
       properties:
         type:
@@ -6529,7 +6535,7 @@ components:
         Edição limitada da compra no cartão (S-121, T57): o corpo do `POST` (`CardPurchaseInput`) + `version`. Só
         `description`, `categoryId` e `notes` mudam; `amount`, `date`, `installments` e `cardId` precisam ser os da
         compra (senão `422 TRANSACTION_NOT_EDITABLE`, com a explicação).
-      required: [type, amount, date, cardId, categoryId, installments, version]
+      required: [type, amount, date, cardId, installments, version]
       additionalProperties: false
       properties:
         type:
@@ -6866,7 +6872,7 @@ components:
     DebtInput:
       type: object
       description: Dívida sem movimentação (`WITHOUT_MOVEMENT`).
-      required: [personId, direction, principal, date, description]
+      required: [personId, direction, principal, date]
       additionalProperties: false
       properties:
         personId:
@@ -6894,7 +6900,7 @@ components:
           description: Categoria `EXPENSE`; só em `PAYABLE` (S-137).
     DebtUpdate:
       type: object
-      required: [description, version]
+      required: [version]
       additionalProperties: false
       properties:
         expectedDate:
@@ -6961,7 +6967,7 @@ components:
         Dinheiro emprestado (`LOAN_GIVEN`): `ACCOUNT −X / RECEIVABLE +X`, sem despesa. Informe `newDebt` **ou** `debtId`
         (este só para recusar com o motivo certo: a dívida existente nunca recebe outra origem, `422 DEBT_ALREADY_HAS_ORIGIN`;
         emprestar de novo cria outra dívida).
-      required: [type, amount, date, description, accountId]
+      required: [type, amount, date, accountId]
       additionalProperties: false
       properties:
         type:
@@ -6997,7 +7003,7 @@ components:
         Dinheiro recebido (`MONEY_RECEIVED`), **nunca receita**: devolução de uma `RECEIVABLE` (`debtId`: `ACCOUNT +X /
         RECEIVABLE −X`) ou captação (`newDebt`: cria uma `PAYABLE`, `ACCOUNT +X / PAYABLE −X`, S-6). Informe `debtId` **ou**
         `newDebt`. Devolução acima do saldo → `422 DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING` (S-143).
-      required: [type, amount, date, description, accountId]
+      required: [type, amount, date, accountId]
       additionalProperties: false
       properties:
         type:
@@ -7030,7 +7036,7 @@ components:
     DebtPaymentInput:
       type: object
       description: 'Pagamento de dívida (`DEBT_PAYMENT`): `PAYABLE +X / ACCOUNT −X`, sem despesa. Dívida `RECEIVABLE` → `422 DEBT_DIRECTION_MISMATCH`.'
-      required: [type, amount, date, description, accountId, debtId]
+      required: [type, amount, date, accountId, debtId]
       additionalProperties: false
       properties:
         type:
@@ -7166,7 +7172,7 @@ components:
         `EXPENSE`/`INCOME`: `accountId` + `method`. `CARD_PURCHASE`: `cardId` (à vista). Conta **e** cartão, ou nenhum dos
         dois, → `422 RECURRENCE_INVALID`. Em `CUSTOM`, `interval` (≥ 1) e `unit` são obrigatórios (`interval` ausente ou `null`
         → `422 RECURRENCE_INVALID`, S-242); nas demais não existem.
-      required: [type, amount, description, categoryId, frequency, startDate]
+      required: [type, amount, frequency, startDate]
       additionalProperties: false
       properties:
         type:
@@ -7213,7 +7219,7 @@ components:
     RecurrenceUpdate:
       type: object
       description: Só os dados do modelo (S-139). Frequência e início não existem aqui.
-      required: [amount, description, categoryId, version]
+      required: [amount, categoryId, version]
       additionalProperties: false
       properties:
         amount:
@@ -7383,7 +7389,7 @@ components:
       examples: ['0.4250']
     GoalInput:
       type: object
-      required: [name, target, priority]
+      required: [name, target]
       additionalProperties: false
       properties:
         name:

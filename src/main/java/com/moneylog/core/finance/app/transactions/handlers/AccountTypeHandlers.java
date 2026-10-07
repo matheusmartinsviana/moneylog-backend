@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Share;
 import com.moneylog.core.transaction.domain.ExpenseOperation;
@@ -79,7 +80,7 @@ public final class AccountTypeHandlers {
         public BuiltTransaction buildWithEffects(Expense c, UUID id, TransactionOrigin origin, Transaction editing) {
             var header = support.header(c.common(), id, origin);
             Account account = support.account(c.userId(), c.accountId());
-            Category category = support.category(c.userId(), c.categoryId(), editing);
+            Category category = support.category(c.userId(), c.categoryId(), editing, CategoryKind.EXPENSE);
             List<Debt> existing = editing == null ? List.of() : support.debtsOriginatedBy(c.userId(), editing.id());
             if (!existing.isEmpty()) {
                 if (!c.shares().isEmpty() && !sameShares(c.shares(), existing)) {
@@ -150,7 +151,7 @@ public final class AccountTypeHandlers {
         @Override
         public Transaction build(Income c, UUID id, TransactionOrigin origin, Transaction editing) {
             return AccountTransactions.income(support.header(c.common(), id, origin), c.common().amount(),
-                    support.account(c.userId(), c.accountId()), support.category(c.userId(), c.categoryId(), editing), c.method());
+                    support.account(c.userId(), c.accountId()), support.category(c.userId(), c.categoryId(), editing, CategoryKind.INCOME), c.method());
         }
     }
 
@@ -251,9 +252,9 @@ public final class AccountTypeHandlers {
                 }
                 return cardHandler.build(c, id, origin, editing);
             }
+            var refundOf = support.refundOrigin(c, editing);
             return AccountTransactions.refundToAccount(support.header(c.common(), id, origin), c.common().amount(),
-                    support.account(c.userId(), c.accountId()), support.category(c.userId(), c.categoryId(), editing),
-                    support.refundOrigin(c, editing));
+                    support.account(c.userId(), c.accountId()), support.refundCategory(c, refundOf, editing), refundOf);
         }
     }
 

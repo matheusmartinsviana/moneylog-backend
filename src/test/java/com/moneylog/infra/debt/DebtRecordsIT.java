@@ -144,8 +144,6 @@ class DebtRecordsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("AMOUNT_ABOVE_LIMIT"));
         mockMvc.perform(post("/v1/debts", debtJson(maria, "PAYABLE", "-5.00", "2026-10-10", null, "Negativo"))).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
-        mockMvc.perform(post("/v1/debts", debtJson(maria, "PAYABLE", "10.00", "2026-10-10", null, "   "))).andExpect(status().isBadRequest())
-                .andExpect(ContractValidation.responseOnly());
         mockMvc.perform(post("/v1/debts", debtJson(maria, "PAYABLE", "10.00", "1990-01-01", null, "Antiga"))).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
 
