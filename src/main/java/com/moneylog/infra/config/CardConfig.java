@@ -138,6 +138,14 @@ public class CardConfig {
     }
 
     @Bean
+    com.moneylog.core.finance.app.cards.usecase.CreateHistoricalInvoiceUseCase createHistoricalInvoiceUseCase(CardGateway cards,
+            TransactionGateway transactions, LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, IdGenerator ids,
+            TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(com.moneylog.core.finance.app.cards.usecase.CreateHistoricalInvoiceUseCase.class,
+                new com.moneylog.core.finance.app.cards.usecase.CreateHistoricalInvoiceUseCaseImpl(cards, transactions, ledger, assembler, ids, time), tm);
+    }
+
+    @Bean
     PreviewOngoingInstallmentsUseCase previewOngoingInstallmentsUseCase(CardGateway cards, CategoryGateway categories,
                                                                         FinancialRecordsGateway records, IdGenerator ids,
                                                                         TimeProvider time, PlatformTransactionManager tm) {

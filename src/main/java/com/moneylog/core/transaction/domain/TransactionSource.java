@@ -6,5 +6,7 @@ public enum TransactionSource {
     IMPORT,
     RECURRENCE,
     /** Compra parcelada em andamento (ADR-013): só as parcelas restantes, sem consumo retroativo. */
-    ONGOING
+    ONGOING,
+    /** Item de fatura histórica (ADR-014): CARD −X / EQUITY +X numa fatura passada, sem consumo, para registrar o pagamento real dela. */
+    HISTORICAL
 }

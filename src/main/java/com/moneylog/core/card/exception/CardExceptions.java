@@ -179,6 +179,12 @@ public final class CardExceptions {
     }
 
     /** A fatura da próxima parcela já está paga: a compra em andamento não pode cair nela. */
+    public static class HistoricalInvoiceNotClosedException extends BusinessRuleException {
+        public HistoricalInvoiceNotClosedException(java.time.LocalDate closingDate) {
+            super("HISTORICAL_INVOICE_NOT_CLOSED", "A fatura que fecha em " + closingDate + " ainda não fechou: a fatura histórica é só de fatura já fechada.");
+        }
+    }
+
     public static class OngoingFirstInvoiceNotPayableException extends BusinessRuleException {
         public OngoingFirstInvoiceNotPayableException(java.time.LocalDate closingDate) {
             super("ONGOING_FIRST_INVOICE_NOT_PAYABLE",

@@ -143,6 +143,9 @@ public final class TransactionRepositoryMapper {
         if (e.getSource() == TransactionSource.ONGOING) {
             return TransactionOrigin.ongoing();
         }
+        if (e.getSource() == TransactionSource.HISTORICAL) {
+            return TransactionOrigin.historical();
+        }
         return TransactionOrigin.manual();
     }
 }

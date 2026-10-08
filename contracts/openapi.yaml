@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.15.0
+  version: 2.16.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -12,6 +12,10 @@ info:
     `GET /v1/auth/status` (público) devolve `{ passwordSetupRequired }` e `POST /v1/auth/setup-password` define a senha do dono
     com um código de uso único (`setupCode`), abre a sessão como o login e revoga todas as sessões anteriores. O restante do
     contrato não muda.
+
+    ## Fatura histórica (2.16.0, só acréscimos compatíveis; ADR-014)
+    `POST /v1/cards/{id}/historical-invoices` registra o valor de uma fatura passada que o usuário só conhece pelo pagamento (item `CARD -X / EQUITY +X`,
+    sem categoria e sem consumo, `Transaction.source = HISTORICAL`); em seguida o pagamento real quita a fatura. Acréscimo: `TransactionSource.HISTORICAL`.
 
     ## Compromissos acompanhados, despesa de terceiro e carga de fatura emitida (2.14.0, só acréscimos compatíveis; ADR-014)
     `/v1/commitments` (empréstimo no nome de terceiro e projeto de longo prazo com cronograma próprio, sem efeito em contas, consumo ou no
@@ -58,7 +62,7 @@ info:
     | 403 | `ORIGIN_NOT_ALLOWED` |
     | 404 | `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND` |
     | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro) |
-    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_ACCOUNT_REQUIRED` (2.14.0), `COMMITMENT_INVALID`, `COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`, `THIRD_PARTY_EXPENSE_INVALID`, `THIRD_PARTY_EXPENSE_ALREADY_MARKED`, `THIRD_PARTY_EXPENSE_NOT_FOUND`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`, `WEAK_PASSWORD` (2.15.0: senha do primeiro acesso com menos de 12 caracteres, mais de 72 bytes ou igual ao e-mail; o código de setup não é consumido); **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
+    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_ACCOUNT_REQUIRED` (2.14.0), `HISTORICAL_INVOICE_NOT_CLOSED` (2.16.0), `COMMITMENT_INVALID`, `COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`, `THIRD_PARTY_EXPENSE_INVALID`, `THIRD_PARTY_EXPENSE_ALREADY_MARKED`, `THIRD_PARTY_EXPENSE_NOT_FOUND`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`, `WEAK_PASSWORD` (2.15.0: senha do primeiro acesso com menos de 12 caracteres, mais de 72 bytes ou igual ao e-mail; o código de setup não é consumido); **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
     | 404, 405, 406, 415 (rota ou mídia que o servidor não atende) | `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`): login, o primeiro acesso (`setup-password`, mesmo limite por IP do login), as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
     | 500 | `INTERNAL_ERROR` |
@@ -1161,6 +1165,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PurchasePreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/cards/{id}/historical-invoices:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Cards]
+      operationId: createHistoricalInvoice
+      summary: Registra o valor de uma fatura passada conhecida só pelo pagamento
+      description: |
+        Para pagamentos de fatura de meses anteriores ao app: cria um item `CARD -X / EQUITY +X` na fatura que fechou em `closingDate`, **sem categoria e sem
+        consumo**, com `source: HISTORICAL`. Depois, `POST /v1/invoices/{id}/payments` com a data real quita a fatura (resultado final: `CARD 0`,
+        conta `-X`). O limite, a dívida e o patrimônio só se movem pelo caixa que saiu. `closingDate` que não é fechamento do calendário do cartão
+        → `404/422 INVOICE_NOT_FOUND`; fatura que ainda não fechou → `422 HISTORICAL_INVOICE_NOT_CLOSED`; cartão arquivado → `422 CARD_ARCHIVED`.
+        Sem idempotência: repetir cria outro item (o script de carga controla por estado).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HistoricalInvoiceRequest'
+      responses:
+        '201':
+          description: Item criado.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -5147,8 +5191,8 @@ components:
       enum: [ACTIVE, VOIDED]
     TransactionSource:
       type: string
-      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4). `ONGOING` (2.13.0) é a compra parcelada cadastrada já em andamento.
-      enum: [MANUAL, IMPORT, RECURRENCE, ONGOING]
+      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4). `ONGOING` (2.13.0) é a compra parcelada cadastrada já em andamento. `HISTORICAL` (2.16.0) é o item de fatura histórica.
+      enum: [MANUAL, IMPORT, RECURRENCE, ONGOING, HISTORICAL]
     EntryLens:
       type: string
       enum: [CONSUMPTION, INCOME]
@@ -7749,6 +7793,21 @@ components:
           $ref: '#/components/schemas/Money'
         remainingAfter:
           $ref: '#/components/schemas/Money'
+    HistoricalInvoiceRequest:
+      type: object
+      required: [closingDate, amount, description]
+      additionalProperties: false
+      properties:
+        closingDate:
+          type: string
+          format: date
+          description: Fechamento da fatura (data de fechamento do calendário do cartão, já passada).
+        amount:
+          $ref: '#/components/schemas/AmountInput'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
     CardClosingConfirmationInput:
       type: object
       required: [confirmed, version]

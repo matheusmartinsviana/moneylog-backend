@@ -100,6 +100,33 @@ public final class CardTransactions {
     }
 
     /**
+     * Item de <b>fatura histórica</b> (ADR-014): o banco já cobrou a fatura que fechou em {@code closingDate} e o usuário só tem o
+     * valor pago, não as compras. Grava {@code CARD −X / EQUITY +X} na fatura desse fechamento (mesmo vazia/"paga"), sem categoria, sem
+     * lançamento tardio e <b>sem consumo</b>; depois o pagamento real ({@code INVOICE_PAYMENT}) a quita. Resultado final: CARD 0,
+     * ACCOUNT −X, EQUITY +X. A fatura precisa ter fechado ({@code closingDate} anterior ou igual a hoje) e ser fechamento do calendário.
+     */
+    public static Transaction historicalInvoiceItem(TransactionHeader header, Money amount, CreditCard card, LocalDate closingDate,
+                                                    InvoiceChain chain, LocalDate today) {
+        AccountTransactions.requireHeaderAndAmount(header, amount);
+        requireUsableCard(header, amount, card);
+        requireChain(card, chain, today);
+        TransactionHeader.required(closingDate, "closingDate");
+        if (!chain.hasClosingDate(closingDate)) {
+            throw new com.moneylog.core.card.exception.CardExceptions.InvoiceClosingDateNotFoundException(closingDate);
+        }
+        if (closingDate.isAfter(today)) {
+            throw new com.moneylog.core.card.exception.CardExceptions.HistoricalInvoiceNotClosedException(closingDate);
+        }
+        var period = chain.calendar().periodClosingIn(java.time.YearMonth.from(closingDate));
+        List<TransactionInstallment> plan = InstallmentPlan.generateOngoing(header.id(), amount, 1, 1, header.date(),
+                List.of(new Allocation(period, false)));
+        List<LedgerEntry> entries = new ArrayList<>(LedgerEntry.activeGroup(PostingSource.installment(header.id(), plan.get(0).id()), List.of(
+                new Posting(BookRef.equity(), amount, header.date()), new Posting(card.book(), amount.negate(), header.date()))));
+        return Transaction.builder(header, TransactionType.CARD_PURCHASE, amount)
+                .card(card.id()).installments(plan).entries(entries).build();
+    }
+
+    /**
      * Edição da compra em andamento sem categoria (contrapartida EQUITY): só descrição e observação mudam; os lançamentos e as
      * parcelas ficam como estão. Com categoria, a edição é a da compra comum ({@link #editPurchaseDetails}).
      */
