@@ -31,6 +31,21 @@ public class UserEntity {
     @Version
     private Long version;
 
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
+    @Column(name = "password_set_at")
+    private Instant passwordSetAt;
+
+    @Column(name = "password_setup_pending", nullable = false)
+    private boolean passwordSetupPending;
+
+    @Column(name = "setup_code_hash", length = 64)
+    private String setupCodeHash;
+
+    @Column(name = "setup_code_expires_at")
+    private Instant setupCodeExpiresAt;
+
     protected UserEntity() {
     }
 
@@ -52,6 +67,38 @@ public class UserEntity {
 
     public void changeEmail(String newEmail, Instant now) {
         this.email = newEmail;
+        this.updatedAt = now;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public boolean isPasswordSetupPending() {
+        return passwordSetupPending;
+    }
+
+    public String getSetupCodeHash() {
+        return setupCodeHash;
+    }
+
+    public Instant getSetupCodeExpiresAt() {
+        return setupCodeExpiresAt;
+    }
+
+    /** Redefinição pedida: sem senha, setup pendente, sem código. */
+    public void resetPassword(Instant now) {
+        this.passwordHash = null;
+        this.passwordSetAt = null;
+        this.passwordSetupPending = true;
+        this.setupCodeHash = null;
+        this.setupCodeExpiresAt = null;
+        this.updatedAt = now;
+    }
+
+    public void storeSetupCode(String codeHash, Instant expiresAt, Instant now) {
+        this.setupCodeHash = codeHash;
+        this.setupCodeExpiresAt = expiresAt;
         this.updatedAt = now;
     }
 }

@@ -105,7 +105,7 @@ class FlywayMigrationIT {
         // imutável (notificações, assinaturas push, prévias e análises de IA, regras aprendidas) não têm updated_at.
         Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items");
         Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items"); // filhas do lote: nascem e morrem com ele
-        Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses");
+        Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts");
         for (String table : tables) {
             if (!keyedByUser.contains(table)) {
                 assertThat(column(table, "id")).as(table + ".id").isEqualTo("uuid|NO|null");

@@ -1,11 +1,13 @@
 package com.moneylog.infra.auth.gateways;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.domain.PageRequest;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.auth.persistence.UserEntity;
@@ -46,6 +48,31 @@ public class UserGatewayImpl implements UserGateway {
         UserEntity entity = repository.findById(id).orElseThrow();
         entity.changeEmail(email, time.now());
         repository.saveAndFlush(entity);
+    }
+
+    @Override
+    public Optional<OwnerAccess> findAccess(UUID id) {
+        return repository.findById(id).map(e -> new OwnerAccess(e.getPasswordHash(), e.isPasswordSetupPending(),
+                e.getSetupCodeHash(), e.getSetupCodeExpiresAt()));
+    }
+
+    @Override
+    public void resetPassword(UUID id, Instant now) {
+        UserEntity entity = repository.findById(id).orElseThrow();
+        entity.resetPassword(now);
+        repository.saveAndFlush(entity);
+    }
+
+    @Override
+    public void storeSetupCode(UUID id, String codeHash, Instant expiresAt, Instant now) {
+        UserEntity entity = repository.findById(id).orElseThrow();
+        entity.storeSetupCode(codeHash, expiresAt, now);
+        repository.saveAndFlush(entity);
+    }
+
+    @Override
+    public boolean completeSetup(UUID id, String expectedCodeHash, String passwordHash, Instant now) {
+        return repository.completeSetup(id, expectedCodeHash, passwordHash, now) == 1;
     }
 
     private static User toDomain(UserEntity entity) {

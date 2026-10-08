@@ -1,6 +1,8 @@
 package com.moneylog.infra.config;
 
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -13,7 +15,13 @@ import com.moneylog.core.auth.app.gateways.TokenIssuer;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.app.usecase.EnsureOwnerUseCase;
 import com.moneylog.core.auth.app.usecase.EnsureOwnerUseCaseImpl;
+import com.moneylog.core.auth.app.usecase.AuthStatusUseCase;
+import com.moneylog.core.auth.app.usecase.AuthStatusUseCaseImpl;
 import com.moneylog.core.auth.app.usecase.LoginUseCase;
+import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase;
+import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCaseImpl;
+import com.moneylog.core.auth.app.usecase.SetupPasswordUseCase;
+import com.moneylog.core.auth.app.usecase.SetupPasswordUseCaseImpl;
 import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCase;
 import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCaseImpl;
 import com.moneylog.infra.auth.RefreshTokenPurgeJob;
@@ -77,8 +85,32 @@ public class AuthConfig {
     }
 
     @Bean
-    EnsureOwnerUseCase ensureOwnerUseCase(UserGateway users, IdGenerator ids, PlatformTransactionManager transactionManager) {
-        return TransactionalProxies.required(EnsureOwnerUseCase.class, new EnsureOwnerUseCaseImpl(users, ids), transactionManager);
+    EnsureOwnerUseCase ensureOwnerUseCase(UserGateway users, IdGenerator ids, RefreshTokenGateway refreshTokens,
+                                          TimeProvider time, PlatformTransactionManager transactionManager) {
+        return TransactionalProxies.required(EnsureOwnerUseCase.class,
+                new EnsureOwnerUseCaseImpl(users, ids, refreshTokens, time), transactionManager);
+    }
+
+    @Bean
+    PrepareFirstAccessUseCase prepareFirstAccessUseCase(UserGateway users, PasswordVerifier passwordVerifier, TimeProvider time,
+                                                        PlatformTransactionManager transactionManager) {
+        return TransactionalProxies.required(PrepareFirstAccessUseCase.class,
+                new PrepareFirstAccessUseCaseImpl(users, passwordVerifier, time), transactionManager);
+    }
+
+    @Bean
+    SetupPasswordUseCase setupPasswordUseCase(UserGateway users, PasswordVerifier passwordVerifier,
+                                              RefreshTokenGateway refreshTokens, SessionOpener sessions, IdGenerator ids,
+                                              TimeProvider time, PlatformTransactionManager transactionManager) {
+        return TransactionalProxies.required(SetupPasswordUseCase.class,
+                new SetupPasswordUseCaseImpl(users, passwordVerifier, refreshTokens, sessions, ids, time), transactionManager);
+    }
+
+    @Bean
+    AuthStatusUseCase authStatusUseCase(UserGateway users, PasswordVerifier passwordVerifier,
+                                        PlatformTransactionManager transactionManager) {
+        return TransactionalProxies.required(AuthStatusUseCase.class, new AuthStatusUseCaseImpl(users, passwordVerifier),
+                transactionManager);
     }
 
     @Bean
@@ -94,8 +126,9 @@ public class AuthConfig {
     }
 
     @Bean
-    OwnerBootstrap ownerBootstrap(EnsureOwnerUseCase ensureOwner, MoneylogOwnerProperties owner,
-                                  ApplicationEventPublisher publisher) {
-        return new OwnerBootstrap(ensureOwner, owner.email(), publisher);
+    OwnerBootstrap ownerBootstrap(EnsureOwnerUseCase ensureOwner, PrepareFirstAccessUseCase prepareFirstAccess,
+                                  MoneylogOwnerProperties owner, ApplicationEventPublisher publisher, Environment environment) {
+        return new OwnerBootstrap(ensureOwner, prepareFirstAccess, owner, publisher,
+                environment.acceptsProfiles(Profiles.of("dev")));
     }
 }

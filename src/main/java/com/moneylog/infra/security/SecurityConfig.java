@@ -46,7 +46,7 @@ import com.moneylog.core.sk.time.TimeProvider;
 /**
  * Segurança da API (ADR-003): stateless, JWT HS256 validado pelo Resource Server do Spring (Nimbus), CSRF desligado
  * (a API usa {@code Bearer}, não cookie; o refresh em cookie confere o {@code Origin}), sem CORS. Rotas públicas: as
- * três de {@code /v1/auth}, o health e o Swagger (que só existe no perfil {@code dev}: fora dele as rotas respondem
+ * de {@code /v1/auth} (login, refresh, logout, setup-password e status), o health e o Swagger (que só existe no perfil {@code dev}: fora dele as rotas respondem
  * {@code 404}). Falhas de autenticação viram {@code ProblemDetail 401} pelo mesmo {@code GlobalExceptionHandler}.
  */
 @Configuration(proxyBeanMethods = false)
@@ -70,7 +70,8 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/setup-password").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/v1/auth/status").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated())
@@ -114,7 +115,7 @@ public class SecurityConfig {
 
     @Bean
     PasswordVerifier passwordVerifier(MoneylogOwnerProperties owner) {
-        return new BcryptPasswordVerifier(OwnerPasswordHash.resolve(owner.passwordHash(), owner.passwordHashFile()));
+        return new BcryptPasswordVerifier(OwnerPasswordHash.resolveOptional(owner.passwordHash(), owner.passwordHashFile()));
     }
 
     @Bean

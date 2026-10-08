@@ -43,12 +43,15 @@ public class CardController {
     private final CreateCardUseCase create;
     private final UpdateCardDetailsUseCase update;
     private final ArchiveCardUseCase archive;
+    private final com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCase closing;
     private final UnarchiveCardUseCase unarchive;
     private final GetCardUseCase get;
     private final ListCardsUseCase list;
 
-    public CardController(CreateCardUseCase create, UpdateCardDetailsUseCase update, ArchiveCardUseCase archive,
+    public CardController(com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCase closing, CreateCardUseCase create,
+                          UpdateCardDetailsUseCase update, ArchiveCardUseCase archive,
                           UnarchiveCardUseCase unarchive, GetCardUseCase get, ListCardsUseCase list) {
+        this.closing = closing;
         this.create = create;
         this.update = update;
         this.archive = archive;
@@ -80,6 +83,18 @@ public class CardController {
     public CardResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody CardUpdate body) {
         return CardResponse.of(update.handle(new UpdateCardDetailsCommand(userId, id, body.name(), body.institution(),
                 body.limit(), body.closingDay(), body.dueDay(), body.defaultPaymentAccountId(), body.confirmedEffectiveFrom(), body.version())));
+    }
+
+    public record ClosingConfirmationInput(@jakarta.validation.constraints.NotNull Boolean confirmed,
+                                           @jakarta.validation.constraints.NotNull Long version) {
+    }
+
+    /** Marca se o fechamento está confirmado por documento (ADR-014); desconhecido = {@code false}. Não muda o calendário. */
+    @PostMapping("/{id}/closing-confirmation")
+    public CardResponse closingConfirmation(@CurrentUser UUID userId, @PathVariable UUID id,
+                                            @Valid @RequestBody ClosingConfirmationInput body) {
+        return CardResponse.of(closing.handle(new com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCase
+                .SetClosingConfirmationCommand(userId, id, body.confirmed(), body.version())));
     }
 
     @PostMapping("/{id}/archive")

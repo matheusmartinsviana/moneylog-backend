@@ -21,6 +21,13 @@ public final class OwnerPasswordHash {
         this.cost = cost;
     }
 
+    /** Como {@link #resolve}, mas {@code null} quando nenhum hash foi informado (a senha vive só no banco: ADR-015). */
+    public static OwnerPasswordHash resolveOptional(String direct, String file) {
+        boolean noFile = file == null || file.isBlank();
+        boolean noDirect = direct == null || unquote(direct.strip()).isBlank();
+        return noFile && noDirect ? null : resolve(direct, file);
+    }
+
     /** O arquivo, se informado, vale mais que o valor direto. */
     public static OwnerPasswordHash resolve(String direct, String file) {
         String raw;

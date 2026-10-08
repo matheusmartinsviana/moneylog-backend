@@ -26,7 +26,7 @@ public final class CardRepositoryMapper {
                 .sorted(Comparator.comparing(BillingRule::effectiveFrom)).toList();
         return CreditCard.restore(e.getId(), e.getUserId(), e.getName(), e.getInstitution(),
                 Money.ofCents(e.getLimitCents(), CurrencyCode.of(e.getCurrency())), e.getDefaultPaymentAccountId(), domainRules,
-                e.getStatus(), e.getVersion());
+                e.getStatus(), e.getVersion(), e.isClosingConfirmed());
     }
 
     public static Persisted<CreditCard> toPersisted(CardEntity e, List<BillingRuleEntity> rules) {

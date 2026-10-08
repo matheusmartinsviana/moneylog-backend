@@ -91,7 +91,7 @@ public class CommitmentController {
     @PostMapping("/{id}/progress")
     public CommitmentResponse progress(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody ProgressInput body) {
         return CommitmentResponse.of(progress.handle(new UpdateCommitmentProgressCommand(userId, id, body.installmentsPaid(),
-                money(body.paidAmount()), body.nextDueDate(), body.notes(), body.version())));
+                money(body.paidAmount()), body.nextDueDate(), body.notes(), body.version(), body.name(), body.counterparty())));
     }
 
     private static Money money(String value) {

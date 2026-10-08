@@ -35,6 +35,20 @@ class ThirdPartyConfig {
     }
 
     @Bean
+    com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase recordThirdPartyReceiptUseCase(ThirdPartyExpenseGateway marks,
+            PersonGateway people, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase.class,
+                new com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCaseImpl(marks, people, idempotency, ids, time), tm);
+    }
+
+    @Bean
+    com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase unmarkThirdPartyExpenseUseCase(ThirdPartyExpenseGateway marks,
+                                                                                                    PlatformTransactionManager tm) {
+        return TransactionalProxies.required(com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.class,
+                new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCaseImpl(marks), tm);
+    }
+
+    @Bean
     GetThirdPartyReceivablesUseCase getThirdPartyReceivablesUseCase(FinancialRecordsGateway records, ThirdPartyExpenseGateway marks,
                                                                     PersonGateway people, TimeProvider time, PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(GetThirdPartyReceivablesUseCase.class,

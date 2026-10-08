@@ -40,8 +40,8 @@ public final class TrackedCommitment {
     private final UUID id;
     private final UUID userId;
     private final CommitmentKind kind;
-    private final String name;
-    private final String counterparty;
+    private String name;
+    private String counterparty;
     private String notes;
     private final Money total;
     private Money informedPaid;
@@ -162,6 +162,16 @@ public final class TrackedCommitment {
 
     /** Atualiza o que o usuário informou do empréstimo de terceiro (parcelas pagas, valor pago, próximo vencimento, observações). */
     public void updateProgress(int newInstallmentsPaid, Money newPaidAmount, LocalDate newNextDueDate, String newNotes) {
+        updateProgress(newInstallmentsPaid, newPaidAmount, newNextDueDate, newNotes, null, null);
+    }
+
+    /** Como {@link #updateProgress(int, Money, LocalDate, String)}; {@code newName} e {@code newCounterparty} nulos não mudam (corrigir a titularidade, por exemplo). */
+    public void updateProgress(int newInstallmentsPaid, Money newPaidAmount, LocalDate newNextDueDate, String newNotes, String newName,
+                               String newCounterparty) {
+        if (newName != null && (newName.isBlank() || newName.strip().length() > NAME_MAX_LENGTH)
+                || newCounterparty != null && newCounterparty.strip().length() > NAME_MAX_LENGTH) {
+            throw new InvalidCommitmentException("nome e contraparte têm até " + NAME_MAX_LENGTH + " caracteres.");
+        }
         if (kind != CommitmentKind.TRACKED_THIRD_PARTY) {
             throw new InvalidCommitmentException("só o compromisso de terceiro tem o progresso informado.");
         }
@@ -174,6 +184,12 @@ public final class TrackedCommitment {
         FinancialDates.requireInWindow(newNextDueDate, "nextDueDate");
         if (newNotes != null && newNotes.length() > NOTES_MAX_LENGTH) {
             throw new InvalidCommitmentException("as observações têm até " + NOTES_MAX_LENGTH + " caracteres.");
+        }
+        if (newName != null) {
+            this.name = newName.strip();
+        }
+        if (newCounterparty != null) {
+            this.counterparty = newCounterparty.isBlank() ? null : newCounterparty.strip();
         }
         this.installmentsPaid = newInstallmentsPaid;
         this.informedPaid = newPaidAmount;

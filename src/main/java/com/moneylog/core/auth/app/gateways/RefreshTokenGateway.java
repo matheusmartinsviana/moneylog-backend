@@ -20,4 +20,7 @@ public interface RefreshTokenGateway {
 
     /** Revoga todos os tokens ainda não revogados da família. */
     int revokeFamily(UUID familyId, Instant at);
+
+    /** Revoga todos os tokens ainda não revogados do usuário (troca de senha); devolve quantos. */
+    int revokeAllByUser(UUID userId, Instant at);
 }

@@ -58,6 +58,9 @@ public class CardEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "closing_confirmed", nullable = false)
+    private boolean closingConfirmed = true;
+
     @Version
     private Long version;
 
@@ -91,6 +94,14 @@ public class CardEntity {
         this.defaultPaymentAccountId = newDefaultPaymentAccountId;
         this.status = Objects.requireNonNull(newStatus, "status");
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+    }
+
+    public boolean isClosingConfirmed() {
+        return closingConfirmed;
+    }
+
+    public void setClosingConfirmed(boolean closingConfirmed) {
+        this.closingConfirmed = closingConfirmed;
     }
 
     public UUID getId() {

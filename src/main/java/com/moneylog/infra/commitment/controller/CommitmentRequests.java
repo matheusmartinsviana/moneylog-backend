@@ -41,6 +41,7 @@ public final class CommitmentRequests {
     }
 
     public record ProgressInput(@NotNull @Min(0) Integer installmentsPaid, @Pattern(regexp = AMOUNT_OR_ZERO_PATTERN) String paidAmount,
-                                @DateInWindow LocalDate nextDueDate, @Size(max = 1000) String notes, @NotNull Long version) {
+                                @DateInWindow LocalDate nextDueDate, @Size(max = 1000) String notes, @NotNull Long version,
+                                @Size(max = 100) @NoControlChars String name, @Size(max = 100) @NoControlChars String counterparty) {
     }
 }

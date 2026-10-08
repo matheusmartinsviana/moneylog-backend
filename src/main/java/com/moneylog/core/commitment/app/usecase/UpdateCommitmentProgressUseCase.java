@@ -12,6 +12,11 @@ public interface UpdateCommitmentProgressUseCase {
     CommitmentView handle(UpdateCommitmentProgressCommand command);
 
     record UpdateCommitmentProgressCommand(UUID userId, UUID id, int installmentsPaid, Money paidAmount, LocalDate nextDueDate,
-                                           String notes, long version) {
+                                           String notes, long version, String name, String counterparty) {
+
+        public UpdateCommitmentProgressCommand(UUID userId, UUID id, int installmentsPaid, Money paidAmount, LocalDate nextDueDate,
+                                               String notes, long version) {
+            this(userId, id, installmentsPaid, paidAmount, nextDueDate, notes, version, null, null);
+        }
     }
 }

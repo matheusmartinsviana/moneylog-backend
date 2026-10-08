@@ -30,15 +30,18 @@ Um usuário só (o dono), sem cadastro público. JWT HS256 de 15 min (em memóri
 |---|---|
 | `JWT_SECRET` | segredo do JWT, **no mínimo 32 bytes** (o app não sobe com menos). `openssl rand -base64 48` |
 | `MONEYLOG_OWNER_EMAIL` | e-mail do dono. Criado no primeiro boot; se mudar, o e-mail é atualizado mantendo o `id` (os dados continuam visíveis) |
-| `MONEYLOG_OWNER_PASSWORD_HASH` | hash BCrypt da senha, **entre aspas simples** no `.env` (o `$` é interpolado por Compose e shell). Não use `$$` |
+| `MONEYLOG_OWNER_PASSWORD_HASH` | (opcional desde o ADR-015; retrocompatibilidade) hash BCrypt da senha, **entre aspas simples** no `.env` (o `$` é interpolado por Compose e shell). Não use `$$` |
 | `MONEYLOG_OWNER_PASSWORD_HASH_FILE` | alternativa: caminho de um arquivo com só o hash (vale mais que o valor direto). Evita o problema do `$` |
+| `MONEYLOG_OWNER_SETUP_CODE` / `_FILE` | código de uso único do primeiro acesso (mín. 16 caracteres; em prod, por secret). Vazio: gerado e impresso **uma vez** no log do perfil dev |
+| `MONEYLOG_OWNER_RESET_PASSWORD` | `true` apaga a senha do banco e exige novo primeiro acesso (uso único: **remova depois**) |
 | `MONEYLOG_ALLOWED_ORIGINS` | origens do front, separadas por vírgula; `refresh` e `logout` conferem o header `Origin` (CSRF). Sem CORS |
 | `MONEYLOG_TRUSTED_PROXIES` | CIDRs de proxies de confiança (CloudFront/ALB). Só então o IP do rate limit vem de `X-Forwarded-For`. **Vazio = o header é ignorado** |
 
 Propriedades (`application.yaml`, prefixo `moneylog.auth`): `access-token-ttl` (`PT15M`), `refresh-ttl` (`P30D`), `reuse-grace` (`PT30S`: refresh já rotacionado reapresentado até 30 s depois não é reuso e gera um par novo da mesma família; depois disso, ou se já revogado, `401 REFRESH_INVALID` e a família inteira é revogada), `max-login-failures`/`login-window` (5 falhas por IP em 15 min → `429` com `Retry-After`), `cookie-secure` (padrão `true`).
 
 - **`cookie-secure=false` é plano B** e só é aceito com o perfil `dev` ativo **e** todas as `MONEYLOG_ALLOWED_ORIGINS` em `localhost`/`127.0.0.1`; em qualquer outro caso o app não sobe. O caminho principal é HTTPS local com `mkcert`, documentado no `frontend/README.md` (T30).
-- Trocar a senha é trocar o hash no ambiente e reiniciar. Isso **não** revoga os refresh tokens emitidos; para derrubar todas as sessões, troque o `JWT_SECRET` e limpe `refresh_tokens` (S-97).
+- **Primeiro acesso (ADR-015).** `GET /v1/auth/status` → `{passwordSetupRequired}`; `POST /v1/auth/setup-password {email, setupCode, newPassword}` define a senha (12+ caracteres, até 72 bytes, diferente do e-mail), devolve a sessão e revoga todos os refresh tokens. Ordem do login: senha do banco (a única que vale quando definida) > redefinição pendente (ninguém entra) > hash do ambiente (retrocompatibilidade). Trocar o e-mail do dono é só mudar `MONEYLOG_OWNER_EMAIL` (mesmo id, dados intactos).
+- (Legado, sem senha no banco) Trocar a senha é trocar o hash no ambiente e reiniciar. Isso **não** revoga os refresh tokens emitidos; para derrubar todas as sessões, troque o `JWT_SECRET` e limpe `refresh_tokens` (S-97).
 - O rate limit é em memória (uma instância); com mais de uma, precisa de armazenamento compartilhado (pendência do deploy).
 - Nos testes de integração, `src/test/resources/application-it.yaml` traz um segredo de 32+ bytes e o hash BCrypt de `senha-forte-123` (valores só de teste).
 

@@ -43,6 +43,11 @@ public class RefreshTokenGatewayImpl implements RefreshTokenGateway {
         return repository.revokeFamily(familyId, at);
     }
 
+    @Override
+    public int revokeAllByUser(UUID userId, Instant at) {
+        return repository.revokeAllByUser(userId, at);
+    }
+
     private static RefreshToken toDomain(RefreshTokenEntity e) {
         return new RefreshToken(e.getId(), e.getUserId(), e.getFamilyId(), e.getTokenHash(), e.getCreatedAt(),
                 e.getExpiresAt(), e.getRevokedAt(), e.getReplacedBy(), e.getReplacedAt(),

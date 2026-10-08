@@ -36,16 +36,31 @@ public class ThirdPartyController {
 
     private final MarkThirdPartyExpenseUseCase mark;
     private final GetThirdPartyReceivablesUseCase overview;
+    private final com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase unmark;
+    private final com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase receipt;
 
-    public ThirdPartyController(MarkThirdPartyExpenseUseCase mark, GetThirdPartyReceivablesUseCase overview) {
+    public ThirdPartyController(MarkThirdPartyExpenseUseCase mark, GetThirdPartyReceivablesUseCase overview,
+                                com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase unmark,
+                                com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase receipt) {
+        this.receipt = receipt;
+        this.unmark = unmark;
         this.mark = mark;
         this.overview = overview;
     }
 
-    public record MarkInput(@NotNull UUID transactionId, @NotNull UUID personId, @Size(max = 200) @NoControlChars String note) {
+    public record MarkInput(@NotNull UUID transactionId, @NotNull UUID personId, @Size(max = 200) @NoControlChars String note,
+                            @jakarta.validation.constraints.Pattern(regexp = "^\\d{1,13}(\\.\\d{1,2})?$") String amount) {
     }
 
-    public record MarkResponse(UUID id, UUID transactionId, UUID personId, String note) {
+    public record MarkResponse(UUID id, UUID transactionId, UUID personId, String note, Money amount) {
+    }
+
+    public record ReceiptInput(@NotNull UUID personId, UUID transactionId,
+                               @NotNull @jakarta.validation.constraints.Pattern(regexp = "^\\d{1,13}(\\.\\d{1,2})?$") String amount,
+                               @com.moneylog.infra.web.validation.DateInWindow LocalDate receivedOn, @Size(max = 200) @NoControlChars String note) {
+    }
+
+    public record ReceiptResponse(UUID id, UUID personId, UUID transactionId, Money amount, LocalDate receivedOn, String note) {
     }
 
     public record ItemResponse(ThirdPartyReceivables.Source source, UUID refId, String description, LocalDate date, LocalDate expectedDate,
@@ -69,9 +84,28 @@ public class ThirdPartyController {
                                              @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
                                              @Valid @RequestBody MarkInput body) {
         ThirdPartyExpense created = mark.handle(new MarkThirdPartyExpenseCommand(userId, body.transactionId(), body.personId(), body.note(),
-                idempotencyKey));
+                body.amount() == null ? null : Money.of(body.amount(), com.moneylog.core.sk.money.CurrencyCode.BRL), idempotencyKey));
         return ResponseEntity.created(URI.create("/v1/transactions/" + created.transactionId()))
-                .body(new MarkResponse(created.id(), created.transactionId(), created.personId(), created.note()));
+                .body(new MarkResponse(created.id(), created.transactionId(), created.personId(), created.note(), created.amount()));
+    }
+
+    /** Recebimento já refletido no saldo, sem movimento de conta (nunca renda). */
+    @PostMapping("/v1/third-party-receipts")
+    public ResponseEntity<ReceiptResponse> receipt(@CurrentUser UUID userId,
+                                                   @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
+                                                   @Valid @RequestBody ReceiptInput body) {
+        var created = receipt.handle(new com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase.RecordThirdPartyReceiptCommand(userId,
+                body.personId(), body.transactionId(), Money.of(body.amount(), com.moneylog.core.sk.money.CurrencyCode.BRL), body.receivedOn(),
+                body.note(), idempotencyKey));
+        return ResponseEntity.created(URI.create("/v1/debts/third-party-receivables"))
+                .body(new ReceiptResponse(created.id(), created.personId(), created.transactionId(), created.amount(), created.receivedOn(), created.note()));
+    }
+
+    /** Desfaz a marca (correção de responsável); a despesa e o consumo não mudam. */
+    @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-expenses/{id}")
+    public ResponseEntity<Void> unmark(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {
+        unmark.handle(new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.UnmarkThirdPartyExpenseCommand(userId, id));
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/v1/debts/third-party-receivables")

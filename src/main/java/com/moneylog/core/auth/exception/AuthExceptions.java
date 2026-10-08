@@ -1,5 +1,6 @@
 package com.moneylog.core.auth.exception;
 
+import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.UnauthorizedException;
 
 /**
@@ -21,6 +22,20 @@ public final class AuthExceptions {
     public static class RefreshInvalidException extends UnauthorizedException {
         public RefreshInvalidException() {
             super("REFRESH_INVALID", "Sessão inválida ou expirada. Entre de novo.");
+        }
+    }
+
+    /** Primeiro acesso: e-mail, código ou estado inválidos (mesma resposta para qualquer causa; não revela qual). */
+    public static class InvalidSetupCodeException extends UnauthorizedException {
+        public InvalidSetupCodeException() {
+            super("INVALID_SETUP_CODE", "Código de primeiro acesso inválido ou expirado.");
+        }
+    }
+
+    /** A nova senha não cumpre a regra mínima. */
+    public static class WeakPasswordException extends BusinessRuleException {
+        public WeakPasswordException() {
+            super("WEAK_PASSWORD", "A senha precisa ter pelo menos 12 caracteres (no máximo 72 bytes) e não pode ser igual ao e-mail.");
         }
     }
 }

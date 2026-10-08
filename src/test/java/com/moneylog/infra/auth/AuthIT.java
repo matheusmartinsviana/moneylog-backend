@@ -79,6 +79,15 @@ class AuthIT {
     @Autowired
     private org.springframework.context.ApplicationEventPublisher publisher;
 
+    @Autowired
+    private com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase prepareFirstAccess;
+
+    private OwnerBootstrap bootstrap(String email) {
+        var props = new com.moneylog.infra.security.MoneylogOwnerProperties(email, null, null, false, null, null,
+                Duration.ofHours(24));
+        return new OwnerBootstrap(ensureOwner, prepareFirstAccess, props, publisher, false);
+    }
+
     @AfterEach
     void restaurar() {
         clock.set(MutableClockConfig.INITIAL);
@@ -127,7 +136,7 @@ class AuthIT {
             assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("select email from users", String.class)).isEqualTo(OWNER_EMAIL);
 
-            new OwnerBootstrap(ensureOwner, OWNER_EMAIL, publisher).run(null);
+            bootstrap(OWNER_EMAIL).run(null);
 
             assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
             assertThat(events.stream(OwnerCreated.class)).isEmpty();
@@ -139,7 +148,7 @@ class AuthIT {
             UUID id = auth.ownerId();
             String bearer = auth.ownerBearer();
 
-            new OwnerBootstrap(ensureOwner, "novo@moneylog.com", publisher).run(null);
+            bootstrap("novo@moneylog.com").run(null);
 
             assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("select id from users", UUID.class)).isEqualTo(id);

@@ -97,6 +97,13 @@ public class CardConfig {
     }
 
     @Bean
+    com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCase setClosingConfirmationUseCase(CardGateway cards,
+            FinancialRecordsGateway records, TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCase.class,
+                new com.moneylog.core.finance.app.cards.usecase.SetClosingConfirmationUseCaseImpl(cards, records, time), tm);
+    }
+
+    @Bean
     ArchiveCardUseCase archiveCardUseCase(CardGateway cards, FinancialRecordsGateway records, TimeProvider time,
                                           PlatformTransactionManager tm) {
         return TransactionalProxies.required(ArchiveCardUseCase.class, new ArchiveCardUseCaseImpl(cards, records, time), tm);

@@ -41,7 +41,7 @@ public class MarkThirdPartyExpenseUseCaseImpl implements MarkThirdPartyExpenseUs
     public ThirdPartyExpense handle(MarkThirdPartyExpenseCommand c) {
         UUID id = ids.next();
         if (c.idempotencyKey() != null) {
-            String hash = IdempotentClaim.hash("tx=" + c.transactionId() + ";person=" + c.personId() + ";note=" + (c.note() == null ? "-" : c.note()) + ";");
+            String hash = IdempotentClaim.hash("tx=" + c.transactionId() + ";person=" + c.personId() + ";note=" + (c.note() == null ? "-" : c.note()) + ";amount=" + (c.amount() == null ? "-" : c.amount().toPlainString()) + ";");
             Claim existing = IdempotentClaim.claimOrFind(idempotency, c.userId(), IDEMPOTENCY_SCOPE, c.idempotencyKey(), hash, id, time.now());
             if (existing != null) {
                 IdempotentClaim.requireSameCommand(existing, hash);
@@ -53,11 +53,14 @@ public class MarkThirdPartyExpenseUseCaseImpl implements MarkThirdPartyExpenseUs
         if (!tx.isActive() || (tx.type() != TransactionType.EXPENSE && tx.type() != TransactionType.CARD_PURCHASE)) {
             throw new ThirdPartyExpenseInvalidException("só uma despesa ou compra no cartão ativa pode ser de terceiro.");
         }
+        if (c.amount() != null && (!c.amount().isPositive() || c.amount().isGreaterThan(tx.chargedAmount()))) {
+            throw new ThirdPartyExpenseInvalidException("a parte reembolsável precisa estar entre 0,01 e o valor cobrado da compra.");
+        }
         var person = people.findById(c.userId(), c.personId()).map(v -> v.value()).orElseThrow(() -> new PersonNotFoundException(c.personId()));
         person.ensureCanReceiveDebts();
         if (marks.findByTransaction(c.userId(), c.transactionId()).isPresent()) {
             throw new ThirdPartyExpenseAlreadyMarkedException();
         }
-        return marks.insert(new ThirdPartyExpense(id, c.userId(), c.transactionId(), c.personId(), c.note()));
+        return marks.insert(new ThirdPartyExpense(id, c.userId(), c.transactionId(), c.personId(), c.note(), c.amount()));
     }
 }

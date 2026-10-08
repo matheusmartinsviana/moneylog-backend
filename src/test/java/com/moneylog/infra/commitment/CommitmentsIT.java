@@ -94,8 +94,13 @@ class CommitmentsIT extends E4ItBase {
                 "{\"installmentsPaid\":4,\"paidAmount\":\"400.00\",\"nextDueDate\":\"2026-12-10\",\"version\":0}")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
         assertThat(updated.get("remainingInstallments").asInt()).isEqualTo(6);
+        JsonNode renamed = body(mockMvc.perform(post("/v1/commitments/" + first.get("id").asString() + "/progress",
+                "{\"installmentsPaid\":4,\"name\":\"Outro nome\",\"counterparty\":\"Titular a confirmar\",\"version\":1}")).andExpect(status().isOk())
+                .andExpect(ContractValidation.conforms()).andReturn());
+        assertThat(renamed.get("name").asString()).isEqualTo("Outro nome");
+        assertThat(renamed.get("counterparty").asString()).isEqualTo("Titular a confirmar");
         assertThat(updated.get("nominalBalance").isNull()).isTrue();
-        mockMvc.perform(post("/v1/commitments/" + first.get("id").asString() + "/schedule/1/pay", "{\"paidOn\":\"2026-12-10\",\"version\":1}"))
+        mockMvc.perform(post("/v1/commitments/" + first.get("id").asString() + "/schedule/1/pay", "{\"paidOn\":\"2026-12-10\",\"version\":2}"))
                 .andExpect(status().isUnprocessableEntity());
     }
 

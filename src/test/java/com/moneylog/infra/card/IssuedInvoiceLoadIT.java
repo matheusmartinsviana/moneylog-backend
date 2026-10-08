@@ -56,4 +56,19 @@ class IssuedInvoiceLoadIT extends E4ItBase {
         assertThat(list.get("items")).hasSize(1);
         assertThat(list.get("items").get(0).get("closingDate").asString()).isEqualTo("2026-11-25");
     }
+
+    @Test
+    @DisplayName("fechamento não confirmado: cartão novo nasce confirmado; marcar false aparece no cartão e não muda o calendário nem as faturas; versão velha é 409")
+    void deveMarcarFechamentoNaoConfirmado() throws Exception {
+        JsonNode before = okBody(get("/v1/cards/" + card));
+        assertThat(before.get("closingConfirmed").asBoolean()).isTrue();
+        JsonNode marked = body(mockMvc.perform(post("/v1/cards/" + card + "/closing-confirmation", "{\"confirmed\":false,\"version\":" + before.get("version").asLong() + "}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(com.moneylog.util.ContractValidation.conforms()).andReturn());
+        assertThat(marked.get("closingConfirmed").asBoolean()).isFalse();
+        assertThat(marked.get("closingDay").asInt()).isEqualTo(before.get("closingDay").asInt());
+        assertThat(okBody(get("/v1/cards/" + card)).get("closingConfirmed").asBoolean()).isFalse();
+        mockMvc.perform(post("/v1/cards/" + card + "/closing-confirmation", "{\"confirmed\":true,\"version\":" + before.get("version").asLong() + "}"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isConflict());
+    }
 }

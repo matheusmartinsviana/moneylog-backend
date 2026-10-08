@@ -40,7 +40,7 @@ public final class ThirdPartyReceivables {
     }
 
     public enum Source {
-        DEBT, EXPENSE
+        DEBT, EXPENSE, RECEIPT
     }
 
     public record Item(Source source, UUID refId, String description, LocalDate date, LocalDate expectedDate, Money owed, Money received,
@@ -67,6 +67,15 @@ public final class ThirdPartyReceivables {
 
     public static Overview of(FinancialRecords records, List<ThirdPartyExpense> marks, Map<UUID, String> personNames, LocalDate today,
                               Competence competence) {
+        return of(records, marks, List.of(), personNames, today, competence);
+    }
+
+    /**
+     * @param receipts recebimentos já refletidos nos saldos, sem movimento de conta: os ligados a uma despesa marcada reduzem o pendente dela;
+     *                 os sem vínculo viram um item {@code RECEIPT} já recebido (a receber = recebido, pendente 0), "origem a confirmar"
+     */
+    public static Overview of(FinancialRecords records, List<ThirdPartyExpense> marks, List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts,
+                              Map<UUID, String> personNames, LocalDate today, Competence competence) {
         Money zero = Money.zero(CurrencyCode.BRL);
         Map<UUID, Transaction> txs = records.transactionsById();
         Map<UUID, List<Item>> byPerson = new LinkedHashMap<>();
@@ -86,11 +95,18 @@ public final class ThirdPartyReceivables {
             if (tx == null || !tx.isActive()) {
                 continue;
             }
-            Money owed = tx.chargedAmount();
-            Money received = refundsOf(records, tx.id());
+            Money owed = mark.amount() != null ? mark.amount() : tx.chargedAmount();
+            Money received = refundsOf(records, tx.id()).add(Money.sum(receipts.stream()
+                    .filter(r -> tx.id().equals(r.transactionId())).map(com.moneylog.core.thirdparty.domain.ThirdPartyReceipt::amount).toList(), CurrencyCode.BRL));
             Money pending = received.isLessThan(owed) ? owed.subtract(received) : zero;
             byPerson.computeIfAbsent(mark.personId(), k -> new ArrayList<>()).add(new Item(Source.EXPENSE, tx.id(), tx.description(),
                     tx.date(), null, owed, received, pending, pending.isZero() ? "RECEIVED" : received.isZero() ? "PENDING" : "PARTIAL"));
+        }
+        for (com.moneylog.core.thirdparty.domain.ThirdPartyReceipt r : receipts) {
+            if (r.transactionId() == null) {
+                byPerson.computeIfAbsent(r.personId(), k -> new ArrayList<>()).add(new Item(Source.RECEIPT, r.id(), r.note(),
+                        r.receivedOn() == null ? today : r.receivedOn(), null, r.amount(), r.amount(), zero, "RECEIVED"));
+            }
         }
         List<PersonLine> lines = new ArrayList<>();
         Money owedT = zero;

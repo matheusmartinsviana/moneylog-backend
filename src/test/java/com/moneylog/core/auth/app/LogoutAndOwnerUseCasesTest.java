@@ -89,7 +89,7 @@ class LogoutAndOwnerUseCasesTest {
     class EnsureOwner {
 
         private EnsureOwnerUseCaseImpl useCase() {
-            return new EnsureOwnerUseCaseImpl(users, ids);
+            return new EnsureOwnerUseCaseImpl(users, ids, refreshTokens, new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC)));
         }
 
         @Test

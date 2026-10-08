@@ -45,6 +45,8 @@ public final class CreditCard {
     private final List<BillingRule> rules;
     private CardStatus status;
     private final long version;
+    /** {@code false} = o fechamento ainda não foi confirmado por documento: o dia numérico é só parâmetro técnico provisório, nunca um fato. */
+    private boolean closingDayConfirmed = true;
 
     private CreditCard(UUID id, UUID userId, String name, String institution, Money limit, UUID defaultPaymentAccountId,
                        List<BillingRule> rules, CardStatus status, long version) {
@@ -76,6 +78,24 @@ public final class CreditCard {
     public static CreditCard restore(UUID id, UUID userId, String name, String institution, Money limit,
                                      UUID defaultPaymentAccountId, List<BillingRule> rules, CardStatus status, long version) {
         return new CreditCard(id, userId, name, institution, limit, defaultPaymentAccountId, rules, status, version);
+    }
+
+    /** Reidrata com a marca de fechamento confirmado (ADR-014). */
+    public static CreditCard restore(UUID id, UUID userId, String name, String institution, Money limit,
+                                     UUID defaultPaymentAccountId, List<BillingRule> rules, CardStatus status, long version,
+                                     boolean closingDayConfirmed) {
+        CreditCard card = new CreditCard(id, userId, name, institution, limit, defaultPaymentAccountId, rules, status, version);
+        card.closingDayConfirmed = closingDayConfirmed;
+        return card;
+    }
+
+    /** Marca se o dia de fechamento está confirmado. Não muda o calendário nem as faturas: é só a honestidade do dado. */
+    public void markClosingDayConfirmed(boolean confirmed) {
+        this.closingDayConfirmed = confirmed;
+    }
+
+    public boolean closingDayConfirmed() {
+        return closingDayConfirmed;
     }
 
     public InvoiceCalendar calendar() {

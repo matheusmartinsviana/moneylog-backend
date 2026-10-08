@@ -39,6 +39,15 @@ class ThirdPartyReceivablesIT extends E4ItBase {
         assertThat(ledgerTotal()).isEqualTo(ledger);
         mockMvc.perform(post("/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + maria + "\"}"))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("THIRD_PARTY_EXPENSE_ALREADY_MARKED"));
+        // corrigir o responsável: desfaz a marca (nada do razão muda) e marca de novo com a outra pessoa
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/third-party-expenses/" + mark.get("id").asString())
+                .header(org.springframework.http.HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNoContent());
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/third-party-expenses/" + mark.get("id").asString())
+                .header(org.springframework.http.HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNotFound());
+        assertThat(ledgerTotal()).isEqualTo(ledger);
+        mark = body(mockMvc.perform(post("/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + joao + "\"}"))
+                .andExpect(status().isCreated()).andReturn());
+        assertThat(okBody(get("/v1/debts/third-party-receivables")).get("people").get(0).get("name").asString()).isEqualTo("João");
 
         JsonNode before = okBody(get("/v1/debts/third-party-receivables?month=2026-10"));
         assertThat(money(before, "owed")).isEqualTo("430.00");
@@ -90,5 +99,35 @@ class ThirdPartyReceivablesIT extends E4ItBase {
         mockMvc.perform(getAs(otherBearer, "/v1/debts/third-party-receivables")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.people.length()").value(0)).andExpect(jsonPath("$.owed.amount").value("0.00"));
         mockMvc.perform(get("/v1/debts/third-party-receivables?month=2026-13")).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("recebimento já refletido no saldo, sem movimento: o ligado reduz o pendente da despesa marcada (parte comprovada); o sem vínculo vira item já recebido; razão e caixa não mudam")
+    void deveRegistrarRecebimentoSemMovimento() throws Exception {
+        String tx = purchase("600.00", "2026-10-05");
+        mockMvc.perform(post("/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + maria + "\",\"amount\":\"120.00\"}"))
+                .andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.amount.amount").value("120.00"));
+        mockMvc.perform(post("/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + joao + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
+        long ledger = ledgerTotal();
+        String balance = accountBalance();
+        long transactions = count("transactions");
+        mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"transactionId\":\"" + tx + "\",\"amount\":\"120.00\",\"note\":\"parte comprovada\"}"))
+                .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
+        mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"amount\":\"80.00\",\"note\":\"origem a confirmar\"}"))
+                .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
+        // de outra pessoa que a da marca, valor zero e despesa não marcada são recusados
+        mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + joao + "\",\"transactionId\":\"" + tx + "\",\"amount\":\"1.00\"}"))
+                .andExpect(status().isUnprocessableEntity());
+        mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"amount\":\"0.00\"}")).andExpect(status().isUnprocessableEntity());
+        assertThat(ledgerTotal()).isEqualTo(ledger);
+        assertThat(accountBalance()).isEqualTo(balance);
+        assertThat(count("transactions")).isEqualTo(transactions);
+        JsonNode view = okBody(get("/v1/debts/third-party-receivables"));
+        assertThat(money(view, "owed")).isEqualTo("200.00");
+        assertThat(money(view, "received")).isEqualTo("200.00");
+        assertThat(money(view, "pending")).isEqualTo("0.00");
+        assertThat(view.get("people").get(0).get("items")).hasSize(2);
+        assertThat(money(summary().get("month"), "income")).isEqualTo("0.00");
     }
 }

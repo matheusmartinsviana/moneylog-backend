@@ -53,10 +53,10 @@ public class CommitmentGatewayImpl implements CommitmentGateway {
     @Override
     public Versioned<TrackedCommitment> update(TrackedCommitment c, long expectedVersion) {
         int rows = jdbc.update("""
-                UPDATE tracked_commitments SET notes = ?, informed_paid_cents = ?, installments_paid = ?, next_due_date = ?,
+                UPDATE tracked_commitments SET name = ?, counterparty = ?, notes = ?, informed_paid_cents = ?, installments_paid = ?, next_due_date = ?,
                     updated_at = ?, version = version + 1
                 WHERE id = ? AND user_id = ? AND version = ?""",
-                c.notes(), c.informedPaid() == null ? null : c.informedPaid().cents(), c.installmentsPaid(),
+                c.name(), c.counterparty(), c.notes(), c.informedPaid() == null ? null : c.informedPaid().cents(), c.installmentsPaid(),
                 toSql(c.storedNextDueDate()), Timestamp.from(time.now()), c.id(), c.userId(), expectedVersion);
         if (rows == 0) {
             long stored = jdbc.query("SELECT version FROM tracked_commitments WHERE id = ? AND user_id = ?",

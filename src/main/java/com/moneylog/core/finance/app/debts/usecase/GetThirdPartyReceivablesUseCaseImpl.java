@@ -43,6 +43,9 @@ public class GetThirdPartyReceivablesUseCaseImpl implements GetThirdPartyReceiva
         Map<UUID, String> names = new HashMap<>();
         people.findByIds(query.userId(), ids).forEach((id, person) -> names.put(id, person.name()));
         Competence competence = query.competence() == null ? Competence.from(time.today()) : query.competence();
-        return ThirdPartyReceivables.of(loaded, expenses, names, time.today(), competence);
+        List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts = marks.findAllReceipts(query.userId());
+        receipts.forEach(r -> ids.add(r.personId()));
+        people.findByIds(query.userId(), ids).forEach((id, person) -> names.put(id, person.name()));
+        return ThirdPartyReceivables.of(loaded, expenses, receipts, names, time.today(), competence);
     }
 }

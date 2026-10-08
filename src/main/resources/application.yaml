@@ -114,6 +114,12 @@ moneylog:
     # Hash BCrypt direto (entre aspas simples no .env) ou arquivo com o hash (evita o problema do "$").
     password-hash: ${MONEYLOG_OWNER_PASSWORD_HASH:}
     password-hash-file: ${MONEYLOG_OWNER_PASSWORD_HASH_FILE:}
+    # Primeiro acesso (ADR-015). reset-password é de uso único: apaga a senha do banco; remova a variável depois.
+    reset-password: ${MONEYLOG_OWNER_RESET_PASSWORD:false}
+    # Código de uso único do primeiro acesso, informado pelo operador (secret em produção). Vazio: gerado e impresso no log do dev.
+    setup-code: ${MONEYLOG_OWNER_SETUP_CODE:}
+    setup-code-file: ${MONEYLOG_OWNER_SETUP_CODE_FILE:}
+    setup-code-ttl: PT24H
   ai:
     provider: ${AI_PROVIDER:none}
     api-key: ${AI_API_KEY:}

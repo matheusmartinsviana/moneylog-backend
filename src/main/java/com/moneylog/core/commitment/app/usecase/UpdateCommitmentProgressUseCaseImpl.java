@@ -23,7 +23,7 @@ public class UpdateCommitmentProgressUseCaseImpl implements UpdateCommitmentProg
             throw new VersionConflictException(c.version(), current.version());
         }
         TrackedCommitment commitment = current.value();
-        commitment.updateProgress(c.installmentsPaid(), c.paidAmount(), c.nextDueDate(), c.notes());
+        commitment.updateProgress(c.installmentsPaid(), c.paidAmount(), c.nextDueDate(), c.notes(), c.name(), c.counterparty());
         return new CommitmentView(commitments.update(commitment, c.version()));
     }
 }
