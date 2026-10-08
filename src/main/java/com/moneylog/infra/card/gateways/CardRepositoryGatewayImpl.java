@@ -56,13 +56,13 @@ public class CardRepositoryGatewayImpl implements CardGateway {
         Instant now = time.now();
         CardEntity entity = cards.findByIdAndUserId(card.id(), card.userId()).orElse(null);
         if (entity == null) {
-            entity = new CardEntity(card.id(), card.userId(), card.name(), card.institution(), card.limit().cents(),
+            entity = new CardEntity(card.id(), card.userId(), card.name(), card.institution(), card.limit() == null ? null : card.limit().cents(),
                     card.currency().value(), card.defaultPaymentAccountId(), card.status(), now);
         } else {
             if (entity.getVersion() != card.version()) {
                 throw new VersionConflictException(card.version(), entity.getVersion());
             }
-            entity.apply(card.name(), card.institution(), card.limit().cents(), card.defaultPaymentAccountId(), card.status(), now);
+            entity.apply(card.name(), card.institution(), card.limit() == null ? null : card.limit().cents(), card.defaultPaymentAccountId(), card.status(), now);
         }
         entity.setClosingConfirmed(card.closingDayConfirmed());
         CardEntity saved = cards.saveAndFlush(entity);

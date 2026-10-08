@@ -29,7 +29,12 @@ public final class AvailableLimitCalculator {
                 balance = balance.add(posting.amount());
             }
         }
+        Money credit = balance.isPositive() ? balance : Money.zero(card.currency());
+        if (card.limit() == null) {
+            // sem limite definido: não há disponível nem estouro a calcular (ADR-014)
+            return new AvailableLimit(null, false, credit);
+        }
         Money available = card.limit().add(balance);
-        return new AvailableLimit(available, available.isNegative(), balance.isPositive() ? balance : Money.zero(card.currency()));
+        return new AvailableLimit(available, available.isNegative(), credit);
     }
 }

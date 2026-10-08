@@ -86,6 +86,9 @@ public final class CardViews {
 
     /** {@code (limite − disponível) / limite}, limitada a 0..1, com 4 casas (só para a barra; E3-12). */
     static BigDecimal usedRatio(Money limit, Money available) {
+        if (limit == null || available == null) {
+            return null; // sem limite definido não há razão de uso (sem divisão por zero)
+        }
         long used = limit.cents() - available.cents();
         if (used <= 0 || limit.cents() <= 0) {
             return BigDecimal.ZERO.setScale(4);

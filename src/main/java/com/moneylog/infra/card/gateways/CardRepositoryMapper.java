@@ -25,7 +25,7 @@ public final class CardRepositoryMapper {
                         DayOfMonthRule.of(r.getDueDay())))
                 .sorted(Comparator.comparing(BillingRule::effectiveFrom)).toList();
         return CreditCard.restore(e.getId(), e.getUserId(), e.getName(), e.getInstitution(),
-                Money.ofCents(e.getLimitCents(), CurrencyCode.of(e.getCurrency())), e.getDefaultPaymentAccountId(), domainRules,
+                e.getLimitCents() == null ? null : Money.ofCents(e.getLimitCents(), CurrencyCode.of(e.getCurrency())), e.getDefaultPaymentAccountId(), domainRules,
                 e.getStatus(), e.getVersion(), e.isClosingConfirmed());
     }
 

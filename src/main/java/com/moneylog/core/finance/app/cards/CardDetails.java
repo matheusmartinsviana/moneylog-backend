@@ -31,6 +31,5 @@ public record CardDetails(CreditCard card, Instant createdAt, Instant updatedAt,
         Objects.requireNonNull(currentInvoice, "currentInvoice");
         Objects.requireNonNull(totalCommitted, "totalCommitted");
         Objects.requireNonNull(committedFuture, "committedFuture");
-        Objects.requireNonNull(usedRatio, "usedRatio");
     }
 }

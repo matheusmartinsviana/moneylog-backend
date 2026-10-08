@@ -1977,6 +1977,24 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /v1/third-party-receipts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    delete:
+      tags: [Debts]
+      operationId: deleteThirdPartyReceipt
+      summary: Remove um recebimento de terceiro registrado sem movimento (correção de vínculo)
+      description: Não há movimento a desfazer (o recebimento nunca tocou conta, renda ou consumo).
+      responses:
+        '204':
+          description: Recebimento removido.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /v1/third-party-expenses/{id}:
     parameters:
       - $ref: '#/components/parameters/IdPath'
@@ -6802,11 +6820,8 @@ components:
         - id
         - name
         - institution
-        - limit
-        - availableLimit
         - overLimit
         - creditBalance
-        - usedRatio
         - closingDay
         - dueDay
         - defaultPaymentAccountId
@@ -6829,10 +6844,15 @@ components:
         institution:
           type: [string, 'null']
         limit:
-          $ref: '#/components/schemas/Money'
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: 'Limite do cartão; `null` ou ausente = ainda não definido (2.14.0). Sem limite: `availableLimit` e `usedRatio` também ficam nulos/ausentes e `overLimit` é `false`.'
         availableLimit:
-          $ref: '#/components/schemas/Money'
-          description: limite + saldo do livro `CARD` em todas as datas (S-46); pode ser negativo ou passar do limite.
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: 'limite + saldo do livro `CARD` em todas as datas (S-46); pode ser negativo ou passar do limite. Nulo/ausente sem limite definido.'
         overLimit:
           type: boolean
           description: Disponível negativo. Sinalizado, nunca bloqueia (S-11).
@@ -6840,7 +6860,7 @@ components:
           $ref: '#/components/schemas/Money'
           description: Crédito no cartão = `creditCarry` da última fatura da cadeia (0,00 se não houver).
         usedRatio:
-          type: number
+          type: [number, 'null']
           minimum: 0
           maximum: 1
           description: Razão do limite usado, 0..1 (4 casas), calculada no backend só para a largura da barra. Com `overLimit` vale 1.
@@ -6885,7 +6905,7 @@ components:
           format: date-time
     CardInput:
       type: object
-      required: [name, limit, closingDay, dueDay]
+      required: [name, closingDay, dueDay]
       additionalProperties: false
       properties:
         name:
@@ -6895,8 +6915,10 @@ components:
           type: [string, 'null']
           description: Até 100 caracteres (senão `422 CARD_INSTITUTION_TOO_LONG`).
         limit:
-          $ref: '#/components/schemas/Money'
-          description: Maior que zero e até R$ 999.999.999,99 (senão `422 CARD_INVALID_LIMIT` / `AMOUNT_ABOVE_LIMIT`).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: 'Opcional (2.14.0), ausente ou `null` = limite ainda não definido. Informado, maior que zero e até R$ 999.999.999,99 (senão `422 CARD_INVALID_LIMIT` / `AMOUNT_ABOVE_LIMIT`).'
         closingDay:
           type: integer
           description: 1..31 (senão `422 CARD_INVALID_BILLING_DAY`); em mês curto vale o último dia.
@@ -6909,7 +6931,7 @@ components:
           description: Conta `CASH` sugerida no pagamento da fatura.
     CardUpdate:
       type: object
-      required: [name, limit, closingDay, dueDay, version]
+      required: [name, closingDay, dueDay, version]
       additionalProperties: false
       properties:
         name:
@@ -6919,7 +6941,10 @@ components:
           type: [string, 'null']
           description: Até 100 caracteres (senão `422 CARD_INSTITUTION_TOO_LONG`).
         limit:
-          $ref: '#/components/schemas/Money'
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: 'Opcional (2.14.0), `null`/ausente = sem limite (a edição é substituição completa).'
         closingDay:
           type: integer
         dueDay:
@@ -7062,7 +7087,7 @@ components:
           type: boolean
     PurchasePreview:
       type: object
-      required: [installments, total, availableLimitAfter, overLimit, warnings]
+      required: [installments, total, overLimit, warnings]
       additionalProperties: false
       properties:
         installments:
@@ -7072,8 +7097,10 @@ components:
         total:
           $ref: '#/components/schemas/Money'
         availableLimitAfter:
-          $ref: '#/components/schemas/Money'
-          description: Limite disponível depois da compra (pode ser negativo).
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+          description: 'Limite disponível depois da compra (pode ser negativo); nulo/ausente sem limite definido.'
         overLimit:
           type: boolean
         warnings:
@@ -9432,7 +9459,7 @@ components:
           type: integer
     BackupCard:
       type: object
-      required: [id, name, institution, limit, closingDay, dueDay, defaultPaymentAccountId, status, billingRules]
+      required: [id, name, institution, closingDay, dueDay, defaultPaymentAccountId, status, billingRules]
       additionalProperties: false
       properties:
         id:
@@ -9443,7 +9470,9 @@ components:
         institution:
           type: [string, 'null']
         limit:
-          $ref: '#/components/schemas/Money'
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
         closingDay:
           type: integer
         dueDay:

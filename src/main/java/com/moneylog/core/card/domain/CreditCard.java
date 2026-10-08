@@ -196,12 +196,13 @@ public final class CreditCard {
         return institution;
     }
 
+    /** O limite; {@code null} = ainda não definido (ADR-014). */
     public Money limit() {
         return limit;
     }
 
     public CurrencyCode currency() {
-        return limit.currency();
+        return limit == null ? CurrencyCode.BRL : limit.currency();
     }
 
     public UUID defaultPaymentAccountId() {
@@ -264,7 +265,10 @@ public final class CreditCard {
     }
 
     private static Money requireLimit(Money limit) {
-        if (limit == null || !limit.isPositive() || !CurrencyCode.BRL.equals(limit.currency())) {
+        if (limit == null) {
+            return null; // limite ainda não definido (ADR-014): o cartão funciona sem limite; disponível e uso ficam nulos
+        }
+        if (!limit.isPositive() || !CurrencyCode.BRL.equals(limit.currency())) {
             throw new InvalidCardLimitException();
         }
         return AmountLimit.ensureWithinLimit(limit, "limit");

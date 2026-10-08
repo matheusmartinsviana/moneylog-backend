@@ -57,6 +57,11 @@ public class ThirdPartyExpenseGatewayImpl implements ThirdPartyExpenseGateway {
     }
 
     @Override
+    public boolean deleteReceipt(UUID userId, UUID id) {
+        return jdbc.update("DELETE FROM third_party_receipts WHERE user_id = ? AND id = ?", userId, id) > 0;
+    }
+
+    @Override
     public Optional<ThirdPartyExpense> findById(UUID userId, UUID id) {
         return jdbc.query("SELECT * FROM third_party_expenses WHERE user_id = ? AND id = ?", (rs, i) -> map(rs), userId, id).stream().findFirst();
     }

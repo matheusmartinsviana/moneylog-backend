@@ -199,4 +199,22 @@ class CardLimitAndVoidTest {
                 .map(Posting::amount).toList(), CurrencyCode.BRL);
         assertThat(consumoLiquido).isEqualTo(Money.of("0.00"));
     }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("sem limite definido (ADR-014): disponível nulo, sem estouro, crédito preservado; limite zero continua inválido")
+    void deveCalcularSemLimite() {
+        var card = com.moneylog.core.card.util.factory.CreditCardTestFactory.umCartaoComLimite(null, 25, 5);
+        assertThat(card.limit()).isNull();
+        var limit = AvailableLimitCalculator.calculate(card, java.util.List.of());
+        assertThat(limit.available()).isNull();
+        assertThat(limit.overLimit()).isFalse();
+        assertThat(limit.creditBalance().isZero()).isTrue();
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> com.moneylog.core.card.util.factory.CreditCardTestFactory
+                .umCartaoComLimite(com.moneylog.core.sk.money.Money.of("0.00"), 25, 5))
+                .isInstanceOf(com.moneylog.core.card.exception.CardExceptions.InvalidCardLimitException.class);
+        card.updateDetails("Roxinho", "Nubank", com.moneylog.core.sk.money.Money.of("1000.00"), null);
+        assertThat(card.limit()).isNotNull();
+        card.updateDetails("Roxinho", "Nubank", null, null);
+        assertThat(card.limit()).isNull();
+    }
 }

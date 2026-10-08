@@ -38,8 +38,8 @@ public class CardEntity {
     @Column(length = 100)
     private String institution;
 
-    @Column(name = "limit_cents", nullable = false)
-    private long limitCents;
+    @Column(name = "limit_cents")
+    private Long limitCents;
 
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3, columnDefinition = "char(3)", updatable = false)
@@ -67,7 +67,7 @@ public class CardEntity {
     protected CardEntity() {
     }
 
-    public CardEntity(UUID id, UUID userId, String name, String institution, long limitCents, String currency,
+    public CardEntity(UUID id, UUID userId, String name, String institution, Long limitCents, String currency,
                       UUID defaultPaymentAccountId, CardStatus status, Instant now) {
         this.id = id;
         this.userId = userId;
@@ -86,7 +86,7 @@ public class CardEntity {
      * fica "suja" e o JPA sempre incrementa a versão, então trocar só as regras de fechamento também cria a versão
      * seguinte do cartão (lock otimista do {@code PUT}).
      */
-    public void apply(String newName, String newInstitution, long newLimitCents, UUID newDefaultPaymentAccountId,
+    public void apply(String newName, String newInstitution, Long newLimitCents, UUID newDefaultPaymentAccountId,
                       CardStatus newStatus, Instant now) {
         this.name = newName;
         this.institution = newInstitution;
@@ -120,7 +120,7 @@ public class CardEntity {
         return institution;
     }
 
-    public long getLimitCents() {
+    public Long getLimitCents() {
         return limitCents;
     }
 

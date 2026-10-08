@@ -18,11 +18,11 @@ public final class CardRequests {
     private CardRequests() {
     }
 
-    public record CardInput(@NotNull @NoControlChars String name, @NoControlChars String institution, @NotNull Money limit,
+    public record CardInput(@NotNull @NoControlChars String name, @NoControlChars String institution, Money limit,
                             @NotNull Integer closingDay, @NotNull Integer dueDay, UUID defaultPaymentAccountId) {
     }
 
-    public record CardUpdate(@NotNull @NoControlChars String name, @NoControlChars String institution, @NotNull Money limit,
+    public record CardUpdate(@NotNull @NoControlChars String name, @NoControlChars String institution, Money limit,
                              @NotNull Integer closingDay, @NotNull Integer dueDay, UUID defaultPaymentAccountId,
                              LocalDate confirmedEffectiveFrom, @NotNull Long version) {
     }

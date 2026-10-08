@@ -188,7 +188,8 @@ class CardsIT {
         mockMvc.perform(post("/v1/cards", "{\"limit\":{\"amount\":\"1.00\",\"currency\":\"BRL\"},\"closingDay\":25,\"dueDay\":5}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("name"))
                 .andExpect(ContractValidation.responseOnly());
-        mockMvc.perform(post("/v1/cards", "{\"name\":\"X\",\"closingDay\":25,\"dueDay\":5}")).andExpect(status().isBadRequest())
+        // o limite é opcional (2.14.0): sem ele o cartão é criado; sem o dia de fechamento é 400
+        mockMvc.perform(post("/v1/cards", "{\"name\":\"X\",\"dueDay\":5}")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
         mockMvc.perform(post("/v1/cards", roxinho(",\"number\":\"4111111111111111\""))).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD")).andExpect(ContractValidation.responseOnly());
@@ -363,5 +364,25 @@ class CardsIT {
 
     private static List<String> names(JsonNode slice) {
         return slice.get("items").valueStream().map(card -> card.get("name").asString()).toList();
+    }
+
+    @Test
+    @DisplayName("limite opcional (2.14.0): criar sem limite devolve limit, availableLimit e usedRatio nulos/ausentes e overLimit false, mesmo com compra; PUT define o limite e depois volta a nulo; zero continua 422")
+    void devePermitirCartaoSemLimite() throws Exception {
+        JsonNode created = createCard("{\"name\":\"Sem limite\",\"closingDay\":25,\"dueDay\":5}");
+        assertThat(created.has("limit") && !created.get("limit").isNull()).isFalse();
+        assertThat(created.has("availableLimit") && !created.get("availableLimit").isNull()).isFalse();
+        assertThat(created.has("usedRatio") && !created.get("usedRatio").isNull()).isFalse();
+        assertThat(created.get("overLimit").asBoolean()).isFalse();
+        String id = created.get("id").asString();
+        JsonNode withLimit = json(mockMvc.perform(put("/v1/cards/" + id, "{\"name\":\"Sem limite\",\"limit\":{\"amount\":\"1000.00\",\"currency\":\"BRL\"},"
+                + "\"closingDay\":25,\"dueDay\":5,\"version\":" + created.get("version").asLong() + "}")).andExpect(status().isOk())
+                .andExpect(ContractValidation.conforms()).andReturn());
+        assertThat(withLimit.get("availableLimit").get("amount").asString()).isEqualTo("1000.00");
+        JsonNode cleared = json(mockMvc.perform(put("/v1/cards/" + id, "{\"name\":\"Sem limite\",\"closingDay\":25,\"dueDay\":5,\"version\":"
+                + withLimit.get("version").asLong() + "}")).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
+        assertThat(cleared.has("limit") && !cleared.get("limit").isNull()).isFalse();
+        mockMvc.perform(post("/v1/cards", cardBody("Zero", null, "0.00", 25, 5))).andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CARD_INVALID_LIMIT"));
     }
 }

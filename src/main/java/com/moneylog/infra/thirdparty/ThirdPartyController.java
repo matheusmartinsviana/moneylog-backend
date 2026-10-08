@@ -101,6 +101,13 @@ public class ThirdPartyController {
                 .body(new ReceiptResponse(created.id(), created.personId(), created.transactionId(), created.amount(), created.receivedOn(), created.note()));
     }
 
+    /** Remove um recebimento registrado sem movimento (correção de vínculo). */
+    @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-receipts/{id}")
+    public ResponseEntity<Void> deleteReceipt(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {
+        unmark.deleteReceipt(new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.UnmarkThirdPartyExpenseCommand(userId, id));
+        return ResponseEntity.noContent().build();
+    }
+
     /** Desfaz a marca (correção de responsável); a despesa e o consumo não mudam. */
     @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-expenses/{id}")
     public ResponseEntity<Void> unmark(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {

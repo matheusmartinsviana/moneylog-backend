@@ -12,6 +12,13 @@ public class UnmarkThirdPartyExpenseUseCaseImpl implements UnmarkThirdPartyExpen
     }
 
     @Override
+    public void deleteReceipt(UnmarkThirdPartyExpenseCommand c) {
+        if (!marks.deleteReceipt(c.userId(), c.id())) {
+            throw new ThirdPartyExpenseNotFoundException(c.id());
+        }
+    }
+
+    @Override
     public void handle(UnmarkThirdPartyExpenseCommand c) {
         marks.findById(c.userId(), c.id()).orElseThrow(() -> new ThirdPartyExpenseNotFoundException(c.id()));
         marks.delete(c.userId(), c.id());
