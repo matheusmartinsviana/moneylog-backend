@@ -64,6 +64,7 @@ public class InMemoryGoalGateway implements GoalGateway {
     }
 
     private static Goal copy(Goal g) {
-        return Goal.restore(g.id(), g.userId(), g.name(), g.target(), g.deadline(), g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline(), g.baselineAt(), g.reservations());
+        return Goal.restore(g.id(), g.userId(), g.name(), g.target(), g.deadline(), g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline(), g.baselineAt(), g.metric(), g.direction(), g.reservations())
+                .restorePlan(g.planNote(), g.actions());
     }
 }

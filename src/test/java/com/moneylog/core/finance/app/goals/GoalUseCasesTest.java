@@ -57,6 +57,9 @@ import com.moneylog.core.goal.exception.GoalExceptions.GoalNotFoundException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalReleaseExceedsReservedException;
 import com.moneylog.core.goal.util.InMemoryGoalGateway;
 import com.moneylog.core.sk.exception.VersionConflictException;
+import com.moneylog.core.finance.app.gateways.CommitmentSourcesGateway;
+import com.moneylog.core.finance.app.goals.GoalReadModel;
+import com.moneylog.core.goal.app.gateways.GoalSnapshotGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
@@ -78,6 +81,8 @@ class GoalUseCasesTest {
     private final IdempotencyGateway idempotency = mock(IdempotencyGateway.class);
     private final IdGenerator ids = mock(IdGenerator.class);
     private final TimeProvider time = mock(TimeProvider.class);
+    private final CommitmentSourcesGateway sources = mock(CommitmentSourcesGateway.class);
+    private final GoalSnapshotGateway snapshots = mock(GoalSnapshotGateway.class);
     private final FinanceScenarioFactory scenario = FinanceScenarioFactory.umCenarioBase();
 
     private CreateGoalUseCaseImpl create;
@@ -92,6 +97,7 @@ class GoalUseCasesTest {
     void setUp() {
         when(time.today()).thenReturn(TODAY);
         when(time.now()).thenReturn(NOW);
+        when(time.zone()).thenReturn(java.time.ZoneId.of("America/Sao_Paulo"));
         when(ids.next()).thenReturn(GOAL_ID, UUID.fromString("00000000-0000-0000-0000-0000000000b1"), UUID.fromString("00000000-0000-0000-0000-0000000000b2"),
                 UUID.fromString("00000000-0000-0000-0000-0000000000b3"));
         // as metas do carregamento único são as da porta em memória (no sistema real, o FinancialRecordsGateway as lê do banco)
@@ -102,13 +108,14 @@ class GoalUseCasesTest {
         });
         when(accounts.findById(USER_ID, NUBANK_ID)).thenReturn(Optional.of(new Persisted<>(scenario.nubank, NOW, NOW)));
         when(idempotency.claim(any(), anyString(), any(), anyString(), any(), any(), any())).thenReturn(true);
-        create = new CreateGoalUseCaseImpl(goals, records, idempotency, ids, time);
-        update = new UpdateGoalUseCaseImpl(goals, records, time);
-        get = new GetGoalUseCaseImpl(goals, records, time);
-        list = new ListGoalsUseCaseImpl(goals, records, time);
-        reserve = new ReserveOnGoalUseCaseImpl(goals, accounts, records, idempotency, ids, time);
-        archive = new ArchiveGoalUseCaseImpl(goals, records, time);
-        unarchive = new UnarchiveGoalUseCaseImpl(goals, records, time);
+        GoalReadModel model = new GoalReadModel(sources, snapshots, time);
+        create = new CreateGoalUseCaseImpl(goals, records, idempotency, ids, time, model);
+        update = new UpdateGoalUseCaseImpl(goals, records, time, model);
+        get = new GetGoalUseCaseImpl(goals, records, time, model);
+        list = new ListGoalsUseCaseImpl(goals, records, time, model);
+        reserve = new ReserveOnGoalUseCaseImpl(goals, accounts, records, idempotency, ids, time, model);
+        archive = new ArchiveGoalUseCaseImpl(goals, records, time, model);
+        unarchive = new UnarchiveGoalUseCaseImpl(goals, records, time, model);
     }
 
     private GoalDetails novaMeta(String name, String target, LocalDate deadline, GoalPriority priority) {

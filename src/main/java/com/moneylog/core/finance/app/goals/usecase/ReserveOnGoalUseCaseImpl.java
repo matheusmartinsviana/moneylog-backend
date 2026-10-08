@@ -7,6 +7,7 @@ import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.exception.AccountExceptions.AccountNotFoundException;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.finance.app.goals.GoalDetails;
+import com.moneylog.core.finance.app.goals.GoalReadModel;
 import com.moneylog.core.finance.app.goals.GoalViews;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
@@ -33,10 +34,13 @@ public class ReserveOnGoalUseCaseImpl implements ReserveOnGoalUseCase {
     private final IdempotencyGateway idempotency;
     private final IdGenerator ids;
     private final TimeProvider time;
+    private final GoalReadModel model;
 
     @SuppressWarnings("java:S107")
     public ReserveOnGoalUseCaseImpl(GoalGateway goals, AccountGateway accounts, FinancialRecordsGateway records,
-                                    IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time) {
+                                    IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                    GoalReadModel model) {
+        this.model = model;
         this.goals = goals;
         this.accounts = accounts;
         this.records = records;
@@ -56,7 +60,7 @@ public class ReserveOnGoalUseCaseImpl implements ReserveOnGoalUseCase {
             if (existing != null) {
                 IdempotentClaim.requireSameCommand(existing, hash);
                 Versioned<Goal> current = goals.findById(userId, c.goalId()).orElseThrow(() -> new GoalNotFoundException(c.goalId()));
-                return GoalViews.of(current, records.load(userId), time.today());
+                return model.view(userId, current, records.load(userId));
             }
         }
         goals.lockForUpdate(userId, c.goalId());
@@ -66,7 +70,7 @@ public class ReserveOnGoalUseCaseImpl implements ReserveOnGoalUseCase {
                 .orElseThrow(() -> new AccountNotFoundException(c.accountId()));
         goal.reserve(reservationId, ReserveAllocation.of(account, c.amount()), c.date(), c.note(), time.now());
         Versioned<Goal> saved = goals.save(goal);
-        return GoalViews.of(saved, records.load(userId), time.today());
+        return model.view(userId, saved, records.load(userId));
     }
 
     /** Hash do comando canônico (o dono não entra: a chave é por usuário). */

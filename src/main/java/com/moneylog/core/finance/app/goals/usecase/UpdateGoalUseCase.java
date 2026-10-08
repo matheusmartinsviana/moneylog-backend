@@ -15,7 +15,16 @@ public interface UpdateGoalUseCase {
      */
     GoalDetails handle(UpdateGoalCommand command);
 
+    /**
+     * {@code name} e {@code target} só são exigidos em {@code SAVINGS}; em {@code METRIC} o nome é opcional (vazio apaga) e o alvo ausente
+     * mantém o atual; em {@code DEBT_PAYOFF} ausentes mantêm os atuais. {@code planNote} vazio apaga o texto do plano.
+     */
     record UpdateGoalCommand(UUID userId, UUID goalId, String name, Money target, LocalDate deadline, GoalPriority priority,
-                             String description, long version) {
+                             String description, long version, String planNote) {
+
+        public UpdateGoalCommand(UUID userId, UUID goalId, String name, Money target, LocalDate deadline, GoalPriority priority,
+                                 String description, long version) {
+            this(userId, goalId, name, target, deadline, priority, description, version, null);
+        }
     }
 }

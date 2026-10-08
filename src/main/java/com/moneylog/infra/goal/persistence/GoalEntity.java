@@ -8,7 +8,9 @@ import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import com.moneylog.core.goal.domain.GoalDirection;
 import com.moneylog.core.goal.domain.GoalKind;
+import com.moneylog.core.goal.domain.GoalMetric;
 import com.moneylog.core.goal.domain.GoalPriority;
 
 import jakarta.persistence.Column;
@@ -30,7 +32,8 @@ public class GoalEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(nullable = false, length = 100)
+    /** Opcional só na meta {@code METRIC} (V8.14). */
+    @Column(length = 100)
     private String name;
 
     @Column(name = "target_cents", nullable = false)
@@ -65,6 +68,20 @@ public class GoalEntity {
     @Column(name = "baseline_at")
     private Instant baselineAt;
 
+    /** V8.14: medida acompanhada (só {@code METRIC}). */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 24, updatable = false)
+    private GoalMetric metric;
+
+    /** V8.14: sentido derivado de alvo × baseline (só {@code METRIC}); muda se o alvo ou a baseline mudam. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 8)
+    private GoalDirection direction;
+
+    /** V8.14: texto do plano declarado. */
+    @Column(name = "plan_note", length = 500)
+    private String planNote;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -79,7 +96,11 @@ public class GoalEntity {
 
     @SuppressWarnings("java:S107")
     public GoalEntity(UUID id, UUID userId, String name, long targetCents, String currency, LocalDate deadline, GoalPriority priority,
-                      String description, boolean archived, GoalKind kind, Long baselineCents, Instant baselineAt, Instant now) {
+                      String description, boolean archived, GoalKind kind, Long baselineCents, Instant baselineAt, GoalMetric metric,
+                      GoalDirection direction, String planNote, Instant now) {
+        this.metric = metric;
+        this.direction = direction;
+        this.planNote = planNote;
         this.kind = kind;
         this.baselineCents = baselineCents;
         this.baselineAt = baselineAt;
@@ -99,7 +120,10 @@ public class GoalEntity {
     /** Aplica o estado do domínio. {@code updatedAt} sempre avança, então a versão sobe a cada gravação (também ao reservar). */
     @SuppressWarnings("java:S107")
     public void apply(String newName, long newTargetCents, LocalDate newDeadline, GoalPriority newPriority, String newDescription,
-                      boolean newArchived, Long newBaselineCents, Instant newBaselineAt, Instant now) {
+                      boolean newArchived, Long newBaselineCents, Instant newBaselineAt, GoalDirection newDirection, String newPlanNote,
+                      Instant now) {
+        this.direction = newDirection;
+        this.planNote = newPlanNote;
         this.baselineCents = newBaselineCents;
         this.baselineAt = newBaselineAt;
         this.name = newName;
@@ -145,6 +169,18 @@ public class GoalEntity {
 
     public GoalKind getKind() {
         return kind;
+    }
+
+    public GoalMetric getMetric() {
+        return metric;
+    }
+
+    public GoalDirection getDirection() {
+        return direction;
+    }
+
+    public String getPlanNote() {
+        return planNote;
     }
 
     public Long getBaselineCents() {

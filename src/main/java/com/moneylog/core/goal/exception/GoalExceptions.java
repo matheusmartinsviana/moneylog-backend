@@ -3,7 +3,9 @@ package com.moneylog.core.goal.exception;
 import java.util.UUID;
 
 import com.moneylog.core.sk.exception.BusinessRuleException;
+import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.DomainException;
+import com.moneylog.core.goal.domain.GoalActionFrequency;
 import com.moneylog.core.sk.exception.NotFoundException;
 import com.moneylog.core.sk.money.Money;
 
@@ -116,6 +118,48 @@ public final class GoalExceptions {
     public static class GoalKindMismatchException extends BusinessRuleException {
         public GoalKindMismatchException(String expected) {
             super("GOAL_KIND_MISMATCH", "Esta operação só vale para meta do tipo " + expected + ".");
+        }
+    }
+
+    /** Meta {@code METRIC} com alvo igual à medida atual: não há caminho a percorrer (ADR-016). */
+    public static class GoalMetricTargetEqualsBaselineException extends BusinessRuleException {
+        public GoalMetricTargetEqualsBaselineException() {
+            super("GOAL_METRIC_TARGET_EQUALS_BASELINE", "O alvo é igual ao valor atual da medida; escolha um alvo diferente.");
+        }
+    }
+
+    /** Alvo negativo numa meta {@code METRIC} (zero vale: dívida zerada, custo fixo zerado). */
+    public static class GoalMetricTargetNegativeException extends BusinessRuleException {
+        public GoalMetricTargetNegativeException() {
+            super("GOAL_METRIC_TARGET_NEGATIVE", "O alvo da meta de medida não pode ser negativo.");
+        }
+    }
+
+    /** Já existe meta {@code METRIC} ativa com a mesma medida e o mesmo alvo. */
+    public static class GoalMetricDuplicateException extends ConflictException {
+        public GoalMetricDuplicateException() {
+            super("GOAL_METRIC_DUPLICATE", "Você já tem uma meta ativa para esta medida e este alvo.");
+        }
+    }
+
+    /** Ação inexistente na meta. */
+    public static class GoalActionNotFoundException extends NotFoundException {
+        public GoalActionNotFoundException(UUID actionId) {
+            super("GOAL_ACTION_NOT_FOUND", "Ação da meta não encontrada: " + actionId + ".");
+        }
+    }
+
+    /** Mais ações do que o plano comporta. */
+    public static class GoalActionLimitException extends BusinessRuleException {
+        public GoalActionLimitException(int max) {
+            super("GOAL_ACTION_LIMIT", "O plano da meta pode ter no máximo " + max + " ações.");
+        }
+    }
+
+    /** Período do check-in fora do formato da frequência da ação. */
+    public static class GoalCheckInPeriodInvalidException extends BusinessRuleException {
+        public GoalCheckInPeriodInvalidException(GoalActionFrequency frequency) {
+            super("GOAL_CHECKIN_PERIOD_INVALID", "Período inválido para ação " + frequency + " (MONTHLY: YYYY-MM; WEEKLY: YYYY-Www; ONE_TIME: ONCE).");
         }
     }
 

@@ -2,6 +2,7 @@ package com.moneylog.core.finance.app.goals.usecase;
 
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.finance.app.goals.GoalDetails;
+import com.moneylog.core.finance.app.goals.GoalReadModel;
 import com.moneylog.core.finance.app.goals.GoalViews;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
@@ -14,8 +15,10 @@ public class ArchiveGoalUseCaseImpl implements ArchiveGoalUseCase {
     private final GoalGateway goals;
     private final FinancialRecordsGateway records;
     private final TimeProvider time;
+    private final GoalReadModel model;
 
-    public ArchiveGoalUseCaseImpl(GoalGateway goals, FinancialRecordsGateway records, TimeProvider time) {
+    public ArchiveGoalUseCaseImpl(GoalGateway goals, FinancialRecordsGateway records, TimeProvider time, GoalReadModel model) {
+        this.model = model;
         this.goals = goals;
         this.records = records;
         this.time = time;
@@ -29,6 +32,6 @@ public class ArchiveGoalUseCaseImpl implements ArchiveGoalUseCase {
         Goal goal = current.value();
         goal.archive();
         Versioned<Goal> saved = goals.save(goal);
-        return GoalViews.of(saved, records.load(command.userId()), time.today());
+        return model.view(command.userId(), saved, records.load(command.userId()));
     }
 }

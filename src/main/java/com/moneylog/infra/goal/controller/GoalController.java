@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,6 +23,14 @@ import com.moneylog.core.finance.app.goals.GoalDetails;
 import com.moneylog.core.finance.app.goals.usecase.AnchorDebtPayoffBaselineUseCase;
 import com.moneylog.core.finance.app.goals.usecase.AnchorDebtPayoffBaselineUseCase.AnchorDebtPayoffBaselineCommand;
 import com.moneylog.core.finance.app.goals.usecase.ArchiveGoalUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.AddGoalActionUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.AddGoalActionUseCase.AddGoalActionCommand;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.CheckInGoalActionUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.CheckInGoalActionUseCase.CheckInGoalActionCommand;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.DeleteGoalActionUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.DeleteGoalActionUseCase.DeleteGoalActionCommand;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.UpdateGoalActionUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalActionUseCases.UpdateGoalActionUseCase.UpdateGoalActionCommand;
 import com.moneylog.core.finance.app.goals.usecase.ArchiveGoalUseCase.ArchiveGoalCommand;
 import com.moneylog.core.finance.app.goals.usecase.CreateGoalUseCase;
 import com.moneylog.core.finance.app.goals.usecase.CreateGoalUseCase.CreateGoalCommand;
@@ -40,6 +49,8 @@ import com.moneylog.core.goal.domain.GoalStatus;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
+import com.moneylog.infra.goal.controller.GoalRequests.GoalActionInput;
+import com.moneylog.infra.goal.controller.GoalRequests.GoalCheckInInput;
 import com.moneylog.infra.goal.controller.GoalRequests.GoalInput;
 import com.moneylog.infra.goal.controller.GoalRequests.GoalReservationInput;
 import com.moneylog.infra.goal.controller.GoalRequests.GoalUpdate;
@@ -64,11 +75,20 @@ public class GoalController {
     private final ArchiveGoalUseCase archive;
     private final UnarchiveGoalUseCase unarchive;
     private final AnchorDebtPayoffBaselineUseCase baseline;
+    private final AddGoalActionUseCase addAction;
+    private final UpdateGoalActionUseCase updateAction;
+    private final DeleteGoalActionUseCase deleteAction;
+    private final CheckInGoalActionUseCase checkIn;
 
     @SuppressWarnings("java:S107")
     public GoalController(CreateGoalUseCase create, UpdateGoalUseCase update, GetGoalUseCase get, ListGoalsUseCase list,
                           ReserveOnGoalUseCase reserve, ArchiveGoalUseCase archive, UnarchiveGoalUseCase unarchive,
-                          AnchorDebtPayoffBaselineUseCase baseline) {
+                          AnchorDebtPayoffBaselineUseCase baseline, AddGoalActionUseCase addAction, UpdateGoalActionUseCase updateAction,
+                          DeleteGoalActionUseCase deleteAction, CheckInGoalActionUseCase checkIn) {
+        this.addAction = addAction;
+        this.updateAction = updateAction;
+        this.deleteAction = deleteAction;
+        this.checkIn = checkIn;
         this.baseline = baseline;
         this.create = create;
         this.update = update;
@@ -88,22 +108,28 @@ public class GoalController {
     public ResponseEntity<GoalResponse> create(@CurrentUser UUID userId,
                                                @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
                                                @Valid @RequestBody GoalInput body) {
-        boolean payoff = body.kind() == GoalKind.DEBT_PAYOFF;
-        if (!payoff) {
-            List<FieldIssue> issues = new ArrayList<>();
+        List<FieldIssue> issues = new ArrayList<>();
+        if (body.kind() == GoalKind.METRIC) {
+            if (body.metric() == null) {
+                issues.add(new FieldIssue("metric", "NotNull", "must not be null"));
+            }
+            if (body.target() == null) {
+                issues.add(new FieldIssue("target", "NotNull", "must not be null"));
+            }
+        } else if (body.kind() != GoalKind.DEBT_PAYOFF) {
             if (body.name() == null || body.name().isBlank()) {
                 issues.add(new FieldIssue("name", "NotBlank", "must not be blank"));
             }
             if (body.target() == null) {
                 issues.add(new FieldIssue("target", "NotNull", "must not be null"));
             }
-            if (!issues.isEmpty()) {
-                throw new RequestValidationException(issues);
-            }
+        }
+        if (!issues.isEmpty()) {
+            throw new RequestValidationException(issues);
         }
         GoalDetails created = create.handle(new CreateGoalCommand(userId, body.name(),
                 body.target() == null ? null : Money.of(body.target(), CurrencyCode.BRL), body.deadline(), body.priority(),
-                body.description(), idempotencyKey, body.kind()));
+                body.description(), idempotencyKey, body.kind(), body.kind() == GoalKind.METRIC ? body.metric() : null));
         return ResponseEntity.created(URI.create("/v1/goals/" + created.goal().id())).body(GoalResponse.of(created));
     }
 
@@ -116,7 +142,7 @@ public class GoalController {
     public GoalResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody GoalUpdate body) {
         return GoalResponse.of(update.handle(new UpdateGoalCommand(userId, id, body.name(),
                 body.target() == null ? null : Money.of(body.target(), CurrencyCode.BRL),
-                body.deadline(), body.priority(), body.description(), body.version())));
+                body.deadline(), body.priority(), body.description(), body.version(), body.planNote())));
     }
 
     /** Reserva (positivo) ou libera (negativo) dinheiro de uma conta; não cria movimentação nem lançamento. */
@@ -131,6 +157,32 @@ public class GoalController {
     @PostMapping("/{id}/baseline")
     public GoalResponse baseline(@CurrentUser UUID userId, @PathVariable UUID id) {
         return GoalResponse.of(baseline.handle(new AnchorDebtPayoffBaselineCommand(userId, id)));
+    }
+
+    /** Acrescenta uma ação ao plano declarado (ADR-016); devolve a meta atualizada. */
+    @PostMapping("/{id}/actions")
+    public ResponseEntity<GoalResponse> addAction(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody GoalActionInput body) {
+        GoalDetails details = addAction.handle(new AddGoalActionCommand(userId, id, body.title(), body.frequency()));
+        return ResponseEntity.created(URI.create("/v1/goals/" + id)).body(GoalResponse.of(details));
+    }
+
+    @PutMapping("/{id}/actions/{actionId}")
+    public GoalResponse updateAction(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable UUID actionId,
+                                     @Valid @RequestBody GoalActionInput body) {
+        return GoalResponse.of(updateAction.handle(new UpdateGoalActionCommand(userId, id, actionId, body.title(), body.frequency())));
+    }
+
+    @DeleteMapping("/{id}/actions/{actionId}")
+    public GoalResponse deleteAction(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable UUID actionId) {
+        return GoalResponse.of(deleteAction.handle(new DeleteGoalActionCommand(userId, id, actionId)));
+    }
+
+    /** Marca (ou desmarca com {@code done=false}) o período da ação; idempotente. */
+    @PostMapping("/{id}/actions/{actionId}/check-in")
+    public GoalResponse checkIn(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable UUID actionId,
+                                @Valid @RequestBody GoalCheckInInput body) {
+        return GoalResponse.of(checkIn.handle(new CheckInGoalActionCommand(userId, id, actionId, body.period(),
+                body.done() == null || body.done())));
     }
 
     @PostMapping("/{id}/archive")

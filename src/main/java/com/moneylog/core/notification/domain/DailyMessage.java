@@ -34,7 +34,7 @@ public record DailyMessage(String key, Map<String, String> params) {
         params.put("available", available.toPlainString());
         params.put("committed7d", committed7d.toPlainString());
         // a meta ativa com prazo mais próxima; empate pelo nome (determinístico)
-        Optional<Goal> goal = goals.stream().filter(g -> g.deadline() != null && g.status(today) == GoalStatus.ACTIVE)
+        Optional<Goal> goal = goals.stream().filter(g -> !g.isMetric() && g.deadline() != null && g.status(today) == GoalStatus.ACTIVE)
                 .min(Comparator.comparing(Goal::deadline).thenComparing(Goal::name).thenComparing(Goal::id));
         goal.ifPresent(g -> {
             params.put("goalName", g.name());

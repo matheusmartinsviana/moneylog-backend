@@ -86,6 +86,12 @@ public final class DebtOverviewCalculator {
         return positions(records, Map.of(), today).total();
     }
 
+    /** As três partes do total hoje (mesma conta de {@code overview().parts()}); usada pelas metas de medida. */
+    public static Parts parts(FinancialRecords records, LocalDate today) {
+        Positions p = positions(records, Map.of(), today);
+        return new Parts(p.cards().total(), p.people().total(), p.other().total());
+    }
+
     public static DebtOverview overview(FinancialRecords records, Map<UUID, String> personNames, MonthlyEstimate recurrence,
                                         Money lastFullMonthIncome, Money inAccounts, Money available, LocalDate today, int months) {
         if (months < MIN_MONTHS || months > MAX_MONTHS) {

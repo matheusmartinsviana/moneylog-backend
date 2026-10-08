@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -14,9 +15,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
+import com.moneylog.core.goal.exception.GoalExceptions.GoalActionLimitException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalActionNotFoundException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalAlreadyArchivedException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalArchivedException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalFieldRequiredException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalMetricTargetEqualsBaselineException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalMetricTargetNegativeException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNameRequiredException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNameTooLongException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNotArchivedException;
@@ -46,6 +51,8 @@ public final class Goal {
 
     public static final int NAME_MAX_LENGTH = 100;
     public static final int DESCRIPTION_MAX_LENGTH = 500;
+    public static final int PLAN_NOTE_MAX_LENGTH = 500;
+    public static final int MAX_ACTIONS = 10;
 
     private final UUID id;
     private final UUID userId;
@@ -56,21 +63,52 @@ public final class Goal {
     private String description;
     private boolean archived;
     private final GoalKind kind;
-    /** Total de dívidas fixado em "cadastrei tudo" (só {@code DEBT_PAYOFF}); {@code null} enquanto a meta está "montando". */
+    /** Total de dívidas fixado em "cadastrei tudo" ({@code DEBT_PAYOFF}) ou valor da medida na criação/re-ancoragem ({@code METRIC}); {@code null} enquanto "montando". */
     private Money baseline;
     private Instant baselineAt;
+    /** Só {@code METRIC} (ADR-016). */
+    private final GoalMetric metric;
+    private GoalDirection direction;
     private final List<GoalReservation> reservations = new ArrayList<>();
+    /** Plano declarado (ADR-016): texto curto e ações. */
+    private String planNote;
+    private final List<GoalAction> actions = new ArrayList<>();
 
+    @SuppressWarnings("java:S107")
     private Goal(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority, String description,
-                 boolean archived, GoalKind kind, Money baseline, Instant baselineAt) {
+                 boolean archived, GoalKind kind, Money baseline, Instant baselineAt, GoalMetric metric, GoalDirection direction) {
         this.id = Objects.requireNonNull(id, "id");
         if (userId == null) {
             throw new GoalFieldRequiredException("userId");
         }
         this.userId = userId;
-        this.name = requireName(name);
         this.kind = Objects.requireNonNull(kind, "kind");
-        if (kind == GoalKind.DEBT_PAYOFF) {
+        if (kind != GoalKind.METRIC && (metric != null || direction != null)) {
+            throw new GoalStateInconsistentException("só a meta de medida tem metric e direction.");
+        }
+        this.metric = metric;
+        if (kind == GoalKind.METRIC) {
+            // nome opcional: sem nome, o front mostra o rótulo gerado pela medida
+            this.name = name == null || name.isBlank() ? null : requireName(name);
+            if (metric == null) {
+                throw new GoalFieldRequiredException("metric");
+            }
+            if (baseline == null || baselineAt == null) {
+                throw new GoalStateInconsistentException("a meta de medida sempre tem baseline e baselineAt.");
+            }
+            this.target = requireMetricTarget(target);
+            this.baseline = AmountLimit.ensureWithinLimit(baseline, "baseline");
+            this.baselineAt = baselineAt;
+            GoalDirection derived = GoalDirection.derive(this.target, this.baseline);
+            if (derived == null) {
+                throw new GoalMetricTargetEqualsBaselineException();
+            }
+            if (direction != null && direction != derived) {
+                throw new GoalStateInconsistentException("direction não bate com alvo e baseline.");
+            }
+            this.direction = derived;
+        } else if (kind == GoalKind.DEBT_PAYOFF) {
+            this.name = requireName(name);
             this.target = baseline == null ? Money.zero(CurrencyCode.BRL) : requireTarget(baseline);
             if ((baseline == null) != (baselineAt == null) || (baseline != null && !baseline.equals(target))) {
                 throw new GoalStateInconsistentException("baseline, baselineAt e alvo da meta de quitar dívidas não batem.");
@@ -78,6 +116,7 @@ public final class Goal {
             this.baseline = baseline;
             this.baselineAt = baselineAt;
         } else {
+            this.name = requireName(name);
             if (baseline != null || baselineAt != null) {
                 throw new GoalStateInconsistentException("só a meta de quitar dívidas tem baseline.");
             }
@@ -94,7 +133,7 @@ public final class Goal {
 
     public static Goal create(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
                               String description) {
-        return new Goal(id, userId, name, target, deadline, priority, description, false, GoalKind.SAVINGS, null, null);
+        return new Goal(id, userId, name, target, deadline, priority, description, false, GoalKind.SAVINGS, null, null, null, null);
     }
 
     /**
@@ -102,7 +141,19 @@ public final class Goal {
      * progresso e o restante vêm do total de dívidas, que o chamador informa.
      */
     public static Goal createDebtPayoff(UUID id, UUID userId, String name, LocalDate deadline, GoalPriority priority, String description) {
-        return new Goal(id, userId, name, null, deadline, priority, description, false, GoalKind.DEBT_PAYOFF, null, null);
+        return new Goal(id, userId, name, null, deadline, priority, description, false, GoalKind.DEBT_PAYOFF, null, null, null, null);
+    }
+
+    /**
+     * Meta de medida (ADR-016): acompanha {@code metric} até {@code target}, a partir de {@code baseline} (o valor da medida agora,
+     * capturado pelo chamador na criação, sem passo "montando"). O sentido é derivado: {@code target < baseline} diminui,
+     * {@code target > baseline} aumenta; igual é recusado. Sem nome, o front mostra o rótulo gerado pela medida. Sem reservas.
+     */
+    @SuppressWarnings("java:S107")
+    public static Goal createMetric(UUID id, UUID userId, String name, GoalMetric metric, Money target, Money baseline, Instant now,
+                                    LocalDate deadline, GoalPriority priority, String description) {
+        return new Goal(id, userId, name, target, deadline, priority, description, false, GoalKind.METRIC, baseline,
+                Objects.requireNonNull(now, "now"), metric, null);
     }
 
     /** Reidratação: recusa reserva de outra meta e valor zero (dado gravado corrompido vira 500). */
@@ -116,9 +167,20 @@ public final class Goal {
     public static Goal restore(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
                                String description, boolean archived, GoalKind kind, Money baseline, Instant baselineAt,
                                List<GoalReservation> stored) {
+        return restore(id, userId, name, target, deadline, priority, description, archived, kind, baseline, baselineAt, null, null, stored);
+    }
+
+    /** Reidratação completa (inclui a medida e o sentido da meta {@code METRIC}). */
+    @SuppressWarnings("java:S107")
+    public static Goal restore(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority,
+                               String description, boolean archived, GoalKind kind, Money baseline, Instant baselineAt, GoalMetric metric,
+                               GoalDirection direction, List<GoalReservation> stored) {
         Goal goal = new Goal(id, userId, name, kind == GoalKind.DEBT_PAYOFF ? baseline : target, deadline, priority, description, archived,
-                kind, baseline, baselineAt);
+                kind, baseline, baselineAt, metric, direction);
         for (GoalReservation reservation : stored) {
+            if (kind == GoalKind.METRIC) {
+                throw new GoalStateInconsistentException("a meta de medida não tem reservas.");
+            }
             if (!id.equals(reservation.goalId())) {
                 throw new GoalStateInconsistentException("reserva " + reservation.id() + " de outra meta.");
             }
@@ -133,8 +195,9 @@ public final class Goal {
     public void update(String newName, Money newTarget, LocalDate newDeadline, GoalPriority newPriority, String newDescription) {
         ensureNotArchived();
         Goal valid = new Goal(id, userId, newName, kind == GoalKind.DEBT_PAYOFF ? baseline : newTarget, newDeadline, newPriority,
-                newDescription, false, kind, baseline, baselineAt);
+                newDescription, false, kind, baseline, baselineAt, metric, null);
         this.name = valid.name;
+        this.direction = valid.direction; // METRIC: o sentido acompanha o novo alvo (igual à baseline é recusado acima)
         this.target = valid.target; // na meta de quitar dívidas o alvo é a baseline: o campo do corpo é ignorado
         this.deadline = valid.deadline;
         this.priority = valid.priority;
@@ -149,7 +212,7 @@ public final class Goal {
      */
     public GoalReservation reserve(UUID reservationId, ReserveAllocation allocation, LocalDate date, String note, Instant now) {
         ensureNotArchived();
-        if (kind == GoalKind.DEBT_PAYOFF) {
+        if (kind != GoalKind.SAVINGS) {
             throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindNotReservableException();
         }
         GoalReservation reservation = new GoalReservation(reservationId, id, allocation.accountId(), allocation.amount(), date, note, now);
@@ -256,20 +319,95 @@ public final class Goal {
     }
 
     /**
-     * Fixa (ou re-ancora, P8) a baseline com o total atual de dívidas. Total zero é recusado: não há o que quitar e a meta nunca vira
-     * "conquistada" sem ter tido dívida. O alvo passa a ser a baseline.
+     * Fixa (ou re-ancora, P8) a baseline com o valor atual. {@code DEBT_PAYOFF}: total zero é recusado (não há o que quitar; a meta
+     * nunca vira "conquistada" sem ter tido dívida) e o alvo passa a ser a baseline. {@code METRIC} (ADR-016): vale qualquer valor
+     * (inclusive zero ou negativo); o sentido é re-derivado e alvo igual ao valor atual é recusado, sem alterar a meta.
      */
-    public void anchorBaseline(Money totalDebt, Instant now) {
-        if (kind != GoalKind.DEBT_PAYOFF) {
-            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindMismatchException(GoalKind.DEBT_PAYOFF.name());
+    public void anchorBaseline(Money current, Instant now) {
+        if (kind == GoalKind.SAVINGS) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindMismatchException("DEBT_PAYOFF ou METRIC");
         }
         ensureNotArchived();
-        if (totalDebt == null || !totalDebt.isPositive()) {
+        Objects.requireNonNull(now, "now");
+        if (kind == GoalKind.METRIC) {
+            Money bounded = AmountLimit.ensureWithinLimit(Objects.requireNonNull(current, "current"), "baseline");
+            GoalDirection derived = GoalDirection.derive(target, bounded);
+            if (derived == null) {
+                throw new GoalMetricTargetEqualsBaselineException();
+            }
+            this.baseline = bounded;
+            this.baselineAt = now;
+            this.direction = derived;
+            return;
+        }
+        if (current == null || !current.isPositive()) {
             throw new com.moneylog.core.goal.exception.GoalExceptions.DebtPayoffNothingToBaselineException();
         }
-        this.baseline = AmountLimit.ensureWithinLimit(totalDebt, "baseline");
-        this.baselineAt = Objects.requireNonNull(now, "now");
+        this.baseline = AmountLimit.ensureWithinLimit(current, "baseline");
+        this.baselineAt = now;
         this.target = this.baseline;
+    }
+
+    // ------------------------------------------------------------------ medida (ADR-016)
+
+    public boolean isMetric() {
+        return kind == GoalKind.METRIC;
+    }
+
+    /** {@code null} fora de {@code METRIC}. */
+    public GoalMetric metric() {
+        return metric;
+    }
+
+    /** {@code null} fora de {@code METRIC}. */
+    public GoalDirection direction() {
+        return direction;
+    }
+
+    /**
+     * Progresso a partir do valor ATUAL da medida (calculado pelo chamador na fonte de cada medida). {@code DECREASE}:
+     * {@code (baseline − current) / (baseline − target)}; {@code INCREASE}: {@code (current − baseline) / (target − baseline)}; limitado a
+     * 0..1. {@code reached} é a comparação exata com o alvo; a razão só chega a 1,0000 quando {@code reached} (arredondar para cima não
+     * promete conquista que ainda não houve). Monotônica em {@code current} na direção da meta.
+     */
+    public MetricProgress metricProgress(Money current) {
+        if (kind != GoalKind.METRIC) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalKindMismatchException(GoalKind.METRIC.name());
+        }
+        boolean decrease = direction == GoalDirection.DECREASE;
+        boolean reached = decrease ? !current.isGreaterThan(target) : !current.isLessThan(target);
+        Money remaining = reached ? Money.zero(CurrencyCode.BRL) : decrease ? current.subtract(target) : target.subtract(current);
+        long done = decrease ? baseline.cents() - current.cents() : current.cents() - baseline.cents();
+        long span = Math.abs(target.cents() - baseline.cents());
+        BigDecimal ratio;
+        if (reached) {
+            ratio = BigDecimal.ONE.setScale(GoalProgress.RATIO_SCALE);
+        } else if (done <= 0) {
+            ratio = BigDecimal.ZERO.setScale(GoalProgress.RATIO_SCALE);
+        } else {
+            ratio = BigDecimal.valueOf(done).divide(BigDecimal.valueOf(span), GoalProgress.RATIO_SCALE, java.math.RoundingMode.HALF_UP);
+            BigDecimal almost = new BigDecimal("0.9999");
+            if (ratio.compareTo(almost) > 0) {
+                ratio = almost;
+            }
+        }
+        return new MetricProgress(current, remaining, ratio, reached);
+    }
+
+    public GoalStatus metricStatus(MetricProgress progress) {
+        return archived ? GoalStatus.ARCHIVED : progress.reached() ? GoalStatus.ACHIEVED : GoalStatus.ACTIVE;
+    }
+
+    /** Estimativa por mês da distância restante até o prazo (como S-156); atingida → 0,00; sem prazo ou prazo vencido → {@code null}. */
+    public Money metricMonthlyNeeded(MetricProgress progress, LocalDate today) {
+        if (progress.reached()) {
+            return Money.zero(CurrencyCode.BRL);
+        }
+        if (deadline == null || deadline.isBefore(today)) {
+            return null;
+        }
+        long months = ChronoUnit.MONTHS.between(YearMonth.from(today), YearMonth.from(deadline)) + 1;
+        return Money.ofCents(Math.ceilDiv(progress.remaining().cents(), months), CurrencyCode.BRL);
     }
 
     /**
@@ -308,6 +446,96 @@ public final class Goal {
         }
         long months = ChronoUnit.MONTHS.between(YearMonth.from(today), YearMonth.from(deadline)) + 1;
         return Money.ofCents(Math.ceilDiv(totalDebt.cents(), months), CurrencyCode.BRL);
+    }
+
+    // ------------------------------------------------------------------ plano declarado (ADR-016)
+
+    public String planNote() {
+        return planNote;
+    }
+
+    public List<GoalAction> actions() {
+        return List.copyOf(actions);
+    }
+
+    /** O dono declarou um plano: texto ou ao menos uma ação. */
+    public boolean hasDeclaredPlan() {
+        return planNote != null || !actions.isEmpty();
+    }
+
+    /** Reidratação do plano declarado (usado só pelo mapper). */
+    public Goal restorePlan(String storedNote, List<GoalAction> storedActions) {
+        this.planNote = requirePlanNote(storedNote);
+        this.actions.clear();
+        this.actions.addAll(storedActions);
+        return this;
+    }
+
+    /** Define (ou limpa, com texto vazio/{@code null}) o texto do plano. */
+    public void declarePlanNote(String note) {
+        ensureNotArchived();
+        this.planNote = requirePlanNote(note);
+    }
+
+    public GoalAction addAction(UUID actionId, String title, GoalActionFrequency frequency, Instant now) {
+        ensureNotArchived();
+        if (actions.size() >= MAX_ACTIONS) {
+            throw new GoalActionLimitException(MAX_ACTIONS);
+        }
+        GoalAction action = GoalAction.create(actionId, title, frequency, now);
+        actions.add(action);
+        return action;
+    }
+
+    public GoalAction updateAction(UUID actionId, String title, GoalActionFrequency frequency) {
+        ensureNotArchived();
+        int index = indexOfAction(actionId);
+        GoalAction edited = actions.get(index).edit(title, frequency);
+        actions.set(index, edited);
+        return edited;
+    }
+
+    public void removeAction(UUID actionId) {
+        ensureNotArchived();
+        actions.remove(indexOfAction(actionId));
+    }
+
+    /** Marca (ou desmarca) o período da ação; idempotente. */
+    public GoalAction checkIn(UUID actionId, String period, boolean done) {
+        ensureNotArchived();
+        int index = indexOfAction(actionId);
+        GoalAction updated = actions.get(index).checkIn(period, done);
+        actions.set(index, updated);
+        return updated;
+    }
+
+    private int indexOfAction(UUID actionId) {
+        for (int i = 0; i < actions.size(); i++) {
+            if (actions.get(i).id().equals(actionId)) {
+                return i;
+            }
+        }
+        throw new GoalActionNotFoundException(actionId);
+    }
+
+    /**
+     * Trajetória para o plano automático e a consistência; {@code null} se a meta não tem trajetória (quitar dívidas ainda "montando").
+     *
+     * @param createdOn início de {@code SAVINGS} (data da criação da meta)
+     */
+    public GoalPlanner.Track track(LocalDate createdOn, ZoneId zone) {
+        return switch (kind) {
+            case SAVINGS -> new GoalPlanner.Track(false, Money.zero(CurrencyCode.BRL), createdOn, target, deadline);
+            case METRIC -> new GoalPlanner.Track(direction == GoalDirection.DECREASE, baseline, baselineAt.atZone(zone).toLocalDate(), target,
+                    deadline);
+            case DEBT_PAYOFF -> baseline == null ? null
+                    : new GoalPlanner.Track(true, baseline, baselineAt.atZone(zone).toLocalDate(), Money.zero(CurrencyCode.BRL), deadline);
+        };
+    }
+
+    /** Existe plano automático válido: prazo + alvo (quitar dívidas exige a baseline). Não depende do valor atual. */
+    public boolean hasAutoPlan() {
+        return deadline != null && (kind != GoalKind.DEBT_PAYOFF || baseline != null);
     }
 
     /** Reservado líquido da meta na conta até {@code asOf}; meta arquivada não reserva nada. */
@@ -416,6 +644,31 @@ public final class Goal {
             throw new com.moneylog.core.goal.exception.GoalExceptions.GoalReservationAccountNotEligibleException("só BRL no MVP.");
         }
         return AmountLimit.ensureWithinLimit(value, "target");
+    }
+
+    private static Money requireMetricTarget(Money value) {
+        if (value == null) {
+            throw new GoalFieldRequiredException("target");
+        }
+        if (value.isNegative()) {
+            throw new GoalMetricTargetNegativeException();
+        }
+        if (!CurrencyCode.BRL.equals(value.currency())) {
+            throw new com.moneylog.core.goal.exception.GoalExceptions.GoalReservationAccountNotEligibleException("só BRL no MVP.");
+        }
+        return AmountLimit.ensureWithinLimit(value, "target");
+    }
+
+    private static String requirePlanNote(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String stripped = value.strip();
+        PlainText.requireClean(stripped, "planNote", true);
+        if (stripped.length() > PLAN_NOTE_MAX_LENGTH) {
+            throw new GoalTextTooLongException("planNote", PLAN_NOTE_MAX_LENGTH);
+        }
+        return stripped;
     }
 
     private static String requireDescription(String value) {

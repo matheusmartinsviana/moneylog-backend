@@ -110,7 +110,7 @@ public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, 
     }
 
     private static Goals goals(FinancialRecords records, CashPosition cash, LocalDate today) {
-        List<GoalInfo> items = records.goals().stream().filter(g -> !g.isArchived())
+        List<GoalInfo> items = records.goals().stream().filter(g -> !g.isArchived() && !g.isMetric())
                 .map((Goal g) -> new GoalInfo(g.id(), g.name(), g.current(today), g.target())).toList();
         return new Goals(GoalReserves.at(records, cash).inCash(), items);
     }

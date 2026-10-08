@@ -188,7 +188,7 @@ public final class NotificationGenerators {
     static List<NotificationDraft> goals(GenerationContext ctx) {
         List<NotificationDraft> result = new ArrayList<>();
         for (Goal goal : ctx.goals()) {
-            if (goal.deadline() == null || goal.status(ctx.today()) != GoalStatus.ACTIVE) {
+            if (goal.isMetric() || goal.deadline() == null || goal.status(ctx.today()) != GoalStatus.ACTIVE) {
                 continue;
             }
             if (ChronoUnit.DAYS.between(ctx.today(), goal.deadline()) == GOAL_DEADLINE_DAYS) {
