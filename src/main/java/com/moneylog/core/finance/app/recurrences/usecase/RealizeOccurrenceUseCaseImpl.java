@@ -88,12 +88,16 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
             return cardRealization.handle(new RealizeCardRecurrenceCommand(userId, command.recurrenceId(), command.occurrenceDate(),
                     command.actualAmount(), transactionId));
         }
-        UUID accountId = recurrence.accountId();
+        // recorrência de "conta a definir": a conta e o meio vêm da confirmação
+        UUID accountId = recurrence.accountId() != null ? recurrence.accountId() : command.accountId();
+        if (accountId == null) {
+            throw new com.moneylog.core.recurrence.exception.RecurrenceExceptions.AccountRequiredException();
+        }
         accounts.lockForUpdate(userId, accountId);
         Account account = accounts.findById(userId, accountId).map(Persisted::value).orElseThrow(() -> new AccountNotFoundException(accountId));
         Category category = categories.findById(userId, recurrence.categoryId())
                 .orElseThrow(() -> new CategoryNotFoundException(recurrence.categoryId()));
-        Transaction transaction = recurrence.realize(command.occurrenceDate(), transactionId, command.actualAmount(), account, category);
+        Transaction transaction = recurrence.realize(command.occurrenceDate(), transactionId, command.actualAmount(), account, category, command.method());
         Persisted<Transaction> saved = transactions.insert(transaction);
         ledger.append(userId, transaction.entries());
         return assembler.assemble(saved);
@@ -128,7 +132,8 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
     /** Hash do comando canônico: a recorrência, a data e o valor (ausente = o do modelo). O dono não entra (a chave é por usuário). */
     private static String hashOf(RealizeOccurrenceCommand command) {
         String canonical = "recurrenceId=" + command.recurrenceId() + ";date=" + command.occurrenceDate() + ";amount="
-                + (command.actualAmount() == null ? "-" : command.actualAmount().toPlainString()) + ";";
+                + (command.actualAmount() == null ? "-" : command.actualAmount().toPlainString()) + ";account="
+                + (command.accountId() == null ? "-" : command.accountId()) + ";method=" + (command.method() == null ? "-" : command.method()) + ";";
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(canonical.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException e) {

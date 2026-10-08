@@ -11,6 +11,7 @@ import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.InvoiceChain;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.recurrence.exception.RecurrenceExceptions;
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.InvalidRecurrenceException;
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.NotAnOccurrenceException;
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.OccurrenceAlreadyRealizedException;
@@ -97,8 +98,12 @@ public final class RecurringTransaction {
             throw new InvalidRecurrenceException("a descrição pode ter no máximo " + TransactionHeader.DESCRIPTION_MAX_LENGTH + " caracteres.");
         }
         boolean card = type == TransactionType.CARD_PURCHASE;
-        if (card ? cardId == null || accountId != null || paymentMethod != null : accountId == null || paymentMethod == null || cardId != null) {
-            throw new InvalidRecurrenceException(card ? "compra no cartão exige só o cartão." : "despesa e receita exigem conta e meio de pagamento.");
+        // despesa/receita: conta e meio de pagamento juntos, ou nenhum dos dois ("conta a definir": a previsão existe e a conta/meio
+        // são informados ao confirmar cada ocorrência, RECURRENCE_ACCOUNT_REQUIRED)
+        if (card ? cardId == null || accountId != null || paymentMethod != null
+                : (accountId == null) != (paymentMethod == null) || cardId != null) {
+            throw new InvalidRecurrenceException(card ? "compra no cartão exige só o cartão."
+                    : "despesa e receita exigem conta e meio de pagamento juntos (ou nenhum dos dois, conta a definir).");
         }
     }
 
@@ -174,17 +179,36 @@ public final class RecurringTransaction {
      * origem {@code RECURRENCE}. O valor pode ser o real (ex.: conta de luz); {@code null} usa o do modelo.
      */
     public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category) {
+        return realize(occurrenceDate, transactionId, actualAmount, account, category, null);
+    }
+
+    /**
+     * Como {@link #realize(LocalDate, UUID, Money, Account, Category)}; numa recorrência de "conta a definir" (sem conta no modelo) a
+     * conta e o meio de pagamento vêm da confirmação ({@code RECURRENCE_ACCOUNT_REQUIRED} se faltarem).
+     */
+    public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category,
+                               PaymentMethod method) {
         ensureActive();
         ensurePending(occurrenceDate);
         if (type == TransactionType.CARD_PURCHASE) {
             throw new RecurrenceReferenceMismatchException("conta");
         }
         TransactionHeader header = header(occurrenceDate, transactionId, category);
-        Account validAccount = requireAccount(account);
+        PaymentMethod usedMethod = paymentMethod;
+        Account validAccount;
+        if (accountId == null) {
+            if (account == null || method == null) {
+                throw new RecurrenceExceptions.AccountRequiredException();
+            }
+            validAccount = account;
+            usedMethod = method;
+        } else {
+            validAccount = requireAccount(account);
+        }
         Money value = actualAmount == null ? amount : actualAmount;
         Transaction transaction = type == TransactionType.EXPENSE
-                ? AccountTransactions.expense(header, value, validAccount, category, paymentMethod)
-                : AccountTransactions.income(header, value, validAccount, category, paymentMethod);
+                ? AccountTransactions.expense(header, value, validAccount, category, usedMethod)
+                : AccountTransactions.income(header, value, validAccount, category, usedMethod);
         realized.add(occurrenceDate);
         return transaction;
     }

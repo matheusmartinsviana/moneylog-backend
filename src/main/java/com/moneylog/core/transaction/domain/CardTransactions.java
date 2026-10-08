@@ -80,7 +80,8 @@ public final class CardTransactions {
             }
         }
         var firstPeriod = chain.calendar().periodFor(header.date());
-        if (chain.statusOf(firstPeriod.closingDate(), today) == com.moneylog.core.card.domain.InvoiceStatus.PAID) {
+        if (chain.statusOf(firstPeriod.closingDate(), today) == com.moneylog.core.card.domain.InvoiceStatus.PAID
+                && !chain.isUntouchedIssued(firstPeriod.closingDate(), today)) {
             throw new com.moneylog.core.card.exception.CardExceptions.OngoingFirstInvoiceNotPayableException(firstPeriod.closingDate());
         }
         List<Allocation> allocations = InvoiceAllocator.forInstallments(header.date(), remainingInstallments, chain, today);

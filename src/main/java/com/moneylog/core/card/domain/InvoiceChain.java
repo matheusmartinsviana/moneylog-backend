@@ -110,6 +110,13 @@ public final class InvoiceChain {
      */
     public void ensureCanReceiveItem(LocalDate closingDate, boolean lateEntry, LocalDate today) {
         requireExistingInvoice(closingDate);
+        if (isUntouchedIssued(closingDate, today)) {
+            if (!lateEntry) {
+                throw new InvalidInvoiceOperationException(INVOICE_CLOSED_REQUIRES_LATE_ENTRY,
+                        "Fatura fechada só recebe item como lançamento tardio.");
+            }
+            return;
+        }
         switch (statusOf(closingDate, today)) {
             case FUTURE, OPEN -> { }
             case CLOSED, OVERDUE -> {
@@ -133,6 +140,18 @@ public final class InvoiceChain {
             throw new InvalidInvoiceOperationException(INVOICE_NOT_PAYABLE,
                     "A fatura " + status + " não pode ser paga; pague a fatura corrente e o excedente é transportado.");
         }
+    }
+
+    /**
+     * Fatura já fechada, ainda dentro do prazo de vencimento e sem nenhum item ou pagamento (nem desativado): o status derivado a
+     * chama de {@code PAID} (total zero), mas ninguém a pagou; o banco a emitiu e o app só não recebeu os itens ainda (carga de uma
+     * fatura emitida, lançamento tardio). Depois do vencimento volta a valer a regra geral (fatura sem movimento = paga, S-14).
+     */
+    public boolean isUntouchedIssued(LocalDate closingDate, LocalDate today) {
+        requireExistingInvoice(closingDate);
+        CreditCardInvoice invoice = invoice(closingDate);
+        return invoice.statusAt(today) == InvoiceStatus.PAID && invoice.items().isEmpty() && invoice.payments().isEmpty()
+                && invoice.carryIn().isZero() && !today.isBefore(invoice.closingDate()) && !today.isAfter(invoice.dueDate());
     }
 
     public void addItem(InvoiceItem item, LocalDate today) {

@@ -46,6 +46,7 @@ public final class RecurrenceRequests {
     public record EndInput(@DateInWindow LocalDate endDate) {
     }
 
-    public record RealizeInput(@Pattern(regexp = AMOUNT_PATTERN) String amount) {
+    public record RealizeInput(@Pattern(regexp = AMOUNT_PATTERN) String amount, java.util.UUID accountId,
+                               com.moneylog.core.transaction.domain.PaymentMethod method) {
     }
 }

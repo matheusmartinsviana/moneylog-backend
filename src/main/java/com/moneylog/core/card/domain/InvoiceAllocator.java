@@ -10,7 +10,8 @@ import java.util.List;
  *   <li>pega a fatura do calendário;</li>
  *   <li>{@code FUTURE}/{@code OPEN}: o item entra nela;</li>
  *   <li>{@code CLOSED}/{@code OVERDUE} (fechada e não paga): entra nela mesmo, com {@code lateEntry};</li>
- *   <li>{@code PAID}: entra na fatura corrente, com {@code lateEntry}.</li>
+ *   <li>{@code PAID}: entra na fatura corrente, com {@code lateEntry}; exceção: fatura fechada, ainda no prazo e sem nenhum
+ *       movimento (emitida pelo banco e ainda não carregada) recebe o item como lançamento tardio.</li>
  * </ol>
  * Nas parcelas, cada uma segue a anterior (k-ésima fatura depois da 1ª) e a mesma regra vale para cada parcela: uma
  * parcela nunca cai em fatura paga (S-50).
@@ -50,6 +51,9 @@ public final class InvoiceAllocator {
     }
 
     private static Allocation allocate(InvoicePeriod period, InvoiceChain chain, LocalDate today) {
+        if (chain.isUntouchedIssued(period.closingDate(), today)) {
+            return new Allocation(period, true);
+        }
         return switch (chain.statusOf(period.closingDate(), today)) {
             case FUTURE, OPEN -> new Allocation(period, false);
             case CLOSED, OVERDUE -> new Allocation(period, true);

@@ -82,12 +82,15 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
             if (c.cardId() != null) {
                 throw new InvalidRecurrenceException("despesa e receita exigem conta e meio de pagamento, não cartão.");
             }
+            if (c.accountId() == null && c.method() != null) {
+                throw new InvalidRecurrenceException("o meio de pagamento exige a conta (ou deixe os dois para definir ao confirmar).");
+            }
             recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), c.amount(), c.description(), categoryId,
-                    c.accountId(), c.method() == null ? PaymentMethod.OTHER : c.method(), schedule);
+                    c.accountId(), c.accountId() == null ? null : (c.method() == null ? PaymentMethod.OTHER : c.method()), schedule);
         }
         if (recurrence.accountId() != null) {
             references.account(c.userId(), recurrence.accountId(), c.type());
-        } else {
+        } else if (recurrence.cardId() != null) {
             references.card(c.userId(), recurrence.cardId());
         }
         Versioned<RecurringTransaction> saved = recurrences.save(recurrence);

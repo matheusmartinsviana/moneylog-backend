@@ -43,8 +43,9 @@ public class DashboardConfig {
 
     @Bean
     GetDebtOverviewUseCase getDebtOverviewUseCase(FinancialRecordsGateway records, CommitmentSourcesGateway sources, PersonGateway people,
-                                                  TimeProvider time, PlatformTransactionManager tm) {
+                                                  TimeProvider time, PlatformTransactionManager tm,
+                                                  com.moneylog.core.commitment.app.gateways.CommitmentGateway commitments) {
         return TransactionalProxies.snapshotReadOnly(GetDebtOverviewUseCase.class,
-                new GetDebtOverviewUseCaseImpl(records, sources, people, time), tm);
+                new GetDebtOverviewUseCaseImpl(records, sources, people, time, commitments), tm);
     }
 }

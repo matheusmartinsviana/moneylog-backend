@@ -12,7 +12,13 @@ import com.moneylog.core.sk.money.Money;
  *
  * @param payoffGoal a meta {@code DEBT_PAYOFF} ativa; {@code null} sem meta
  */
-public record DebtOverviewView(DebtOverview overview, PayoffGoalRef payoffGoal) {
+public record DebtOverviewView(DebtOverview overview, PayoffGoalRef payoffGoal,
+                               java.util.List<com.moneylog.core.commitment.domain.TrackedCommitment> tracked) {
+
+    public DebtOverviewView(DebtOverview overview, PayoffGoalRef payoffGoal) {
+        this(overview, payoffGoal, java.util.List.of());
+    }
+
 
     /** @param progress razão com 4 casas ({@code 0.0000} com {@code baselineSet = false}) */
     public record PayoffGoalRef(UUID goalId, boolean baselineSet, BigDecimal progress, Money remaining) {

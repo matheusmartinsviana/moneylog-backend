@@ -154,8 +154,11 @@ class RecurringTransactionRestoreTest {
                 r.description(), r.categoryId(), r.accountId(), ROXINHO_ID, null, r.schedule(), List.of(), List.of(), true))
                 .isInstanceOf(RecurrenceStateInconsistentException.class);
         assertThatThrownBy(() -> RecurringTransaction.restore(r.id(), r.userId(), r.type(), r.amount(), r.description(),
-                r.categoryId(), null, null, null, r.schedule(), List.of(), List.of(), true))
+                r.categoryId(), r.accountId(), null, null, r.schedule(), List.of(), List.of(), true))
                 .isInstanceOf(RecurrenceStateInconsistentException.class);
+        // conta a definir (sem conta nem método) é um estado válido (2.14.0)
+        assertThat(RecurringTransaction.restore(r.id(), r.userId(), r.type(), r.amount(), r.description(), r.categoryId(), null, null, null,
+                r.schedule(), List.of(), List.of(), true).accountId()).isNull();
         assertThatThrownBy(() -> RecurringTransaction.restore(r.id(), r.userId(), TransactionType.TRANSFER, r.amount(),
                 r.description(), r.categoryId(), r.accountId(), null, r.paymentMethod(), r.schedule(), List.of(), List.of(), true))
                 .isInstanceOf(RecurrenceStateInconsistentException.class);

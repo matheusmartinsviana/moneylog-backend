@@ -216,6 +216,11 @@ class PropriedadesRazaoAleatorioTest {
 
     private static void assertItemAllocation(InvoiceChain before, LocalDate closing, boolean lateEntry, LocalDate today, String what) {
         InvoiceStatus status = before.statusOf(closing, today);
+        if (status == InvoiceStatus.PAID && before.isUntouchedIssued(closing, today)) {
+            // ADR-014: fatura emitida (fechada, no prazo) e ainda sem nenhum movimento não foi paga por ninguém: recebe o item como lançamento tardio
+            assertThat(lateEntry).as("item em fatura emitida e vazia é lançamento tardio — " + what).isTrue();
+            return;
+        }
         assertThat(status).as("S-14: item nunca entra em fatura PAID — " + what).isNotEqualTo(InvoiceStatus.PAID);
         if (status == InvoiceStatus.CLOSED || status == InvoiceStatus.OVERDUE) {
             assertThat(lateEntry).as("item em fatura fechada é lançamento tardio — " + what).isTrue();

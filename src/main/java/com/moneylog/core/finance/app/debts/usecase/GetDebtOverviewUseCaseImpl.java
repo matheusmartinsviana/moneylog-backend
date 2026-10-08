@@ -34,9 +34,16 @@ public class GetDebtOverviewUseCaseImpl implements GetDebtOverviewUseCase {
     private final CommitmentSourcesGateway sources;
     private final PersonGateway people;
     private final TimeProvider time;
+    private final com.moneylog.core.commitment.app.gateways.CommitmentGateway commitments;
 
     public GetDebtOverviewUseCaseImpl(FinancialRecordsGateway records, CommitmentSourcesGateway sources, PersonGateway people,
                                       TimeProvider time) {
+        this(records, sources, people, time, null);
+    }
+
+    public GetDebtOverviewUseCaseImpl(FinancialRecordsGateway records, CommitmentSourcesGateway sources, PersonGateway people,
+                                      TimeProvider time, com.moneylog.core.commitment.app.gateways.CommitmentGateway commitments) {
+        this.commitments = commitments;
         this.records = records;
         this.sources = sources;
         this.people = people;
@@ -56,7 +63,9 @@ public class GetDebtOverviewUseCaseImpl implements GetDebtOverviewUseCase {
         persons.forEach((id, person) -> names.put(id, person.name()));
         DebtOverview overview = DebtOverviewCalculator.overview(loaded, names, MonthlyEstimate.of(recurrences, today), lastFullMonth,
                 dashboard.balances().inAccounts(), dashboard.balances().available(), today, query.months());
-        return new DebtOverviewView(overview, payoffGoal(loaded, overview));
+        // compromissos acompanhados (empréstimo de terceiro, projeto de longo prazo): vão à parte, NUNCA entram no total (sem dupla contagem)
+        return new DebtOverviewView(overview, payoffGoal(loaded, overview),
+                commitments == null ? java.util.List.of() : commitments.findAll(query.userId()));
     }
 
     private static PayoffGoalRef payoffGoal(FinancialRecords loaded, DebtOverview overview) {

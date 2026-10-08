@@ -87,7 +87,7 @@ class DebtMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(16); // V8.02 a V8.04 + V4.00 a V4.02, V5.00 e V6.00, V6.01, V6.02, V7.00 a V7.03 e V8.00 e V8.01 (Etapas 7 e 8)
+            assertThat(result.migrationsExecuted).isEqualTo(20); // V8.05 a V8.08 (ADR-014) + V8.02 a V8.04 + V4.00 a V4.02, V5.00 e V6.00, V6.01, V6.02, V7.00 a V7.03 e V8.00 e V8.01 (Etapas 7 e 8)
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 
@@ -143,7 +143,7 @@ class DebtMigrationQaIT {
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 2, "WEEKS", "2026-10-10", null, null)).hasMessageContaining("ck_recurring_transactions_custom");
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", "2026-10-09", null)).hasMessageContaining("ck_recurring_transactions_period");
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, 0)).hasMessageContaining("ck_recurring_transactions_max");
-            assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, null, null, null, "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("ck_recurring_transactions_target");
+            assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, null, "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("ck_recurring_transactions_target");
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), other, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("fk_recurring_transactions_account");
             // pulada: única por (recorrência, data); de outro usuário não vale
             jdbc.update("insert into recurrence_skips (id,user_id,recurrence_id,occurrence_date,created_at,updated_at) values (?,?,?,'2026-11-10',?,?)", UUID.randomUUID(), user, rec, NOW, NOW);

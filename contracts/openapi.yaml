@@ -1,12 +1,20 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.13.0
+  version: 2.14.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
+
+    ## Compromissos acompanhados, despesa de terceiro e carga de fatura emitida (2.14.0, só acréscimos compatíveis; ADR-014)
+    `/v1/commitments` (empréstimo no nome de terceiro e projeto de longo prazo com cronograma próprio, sem efeito em contas, consumo ou no
+    total de dívidas), `POST /v1/third-party-expenses` e `GET /v1/debts/third-party-receivables` ("dinheiro a receber de terceiros" e o
+    gasto bruto x terceiros x líquido do mês), `DebtOverview.tracked` (à parte do total). Acréscimos em schemas existentes:
+    `RecurrenceInput` aceita despesa/receita sem `accountId`/`method` ("conta a definir"; `RealizeOccurrenceInput.accountId`/`method` os
+    informam ao confirmar, senão `422 RECURRENCE_ACCOUNT_REQUIRED`). Mudança de comportamento (sem mudar o formato): uma fatura já fechada,
+    ainda no prazo de vencimento e sem nenhum item recebe a compra do ciclo como lançamento tardio (antes: ia para a fatura corrente).
 
     ## Visão total de dívidas (2.13.0, só acréscimos compatíveis; ADR-013, `docs/planos/2026-10-14-visao-total-de-dividas.md`)
     `GET /v1/debts/overview` (quanto o usuário ainda deve, custo fixo ao lado, comparação e cronograma), compra parcelada em andamento
@@ -45,7 +53,7 @@ info:
     | 403 | `ORIGIN_NOT_ALLOWED` |
     | 404 | `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND` |
     | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro) |
-    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
+    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `RECURRENCE_INVALID`, `RECURRENCE_ACCOUNT_REQUIRED` (2.14.0), `COMMITMENT_INVALID`, `COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`, `THIRD_PARTY_EXPENSE_INVALID`, `THIRD_PARTY_EXPENSE_ALREADY_MARKED`, `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`; **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
     | 404, 405, 406, 415 (rota ou mídia que o servidor não atende) | `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`): login, as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
     | 500 | `INTERNAL_ERROR` |
@@ -82,6 +90,8 @@ tags:
     description: Pessoas com quem há dívidas (saldo e histórico).
   - name: Debts
     description: Dívidas (me devem / eu devo), quitação por movimentação, perdão e estorno do registro.
+  - name: Commitments
+    description: 'Compromissos acompanhados (2.14.0): empréstimo de terceiro e projeto de longo prazo, sem efeito em contas nem no total de dívidas.'
   - name: Recurrences
     description: Recorrências, ocorrências previstas e a confirmação de cada uma (nunca automática).
   - name: Goals
@@ -1615,6 +1625,251 @@ paths:
           $ref: '#/components/responses/InternalServerError'
 
   # ---------------------------------------------------------------- Debts (Etapa 4)
+  /v1/commitments:
+    get:
+      tags: [Commitments]
+      operationId: listCommitments
+      summary: Compromissos acompanhados (ordem `name asc`)
+      description: |
+        Empréstimo no nome de terceiro e projeto de longo prazo (ADR-014). Não geram lançamento: não mexem em caixa, consumo, patrimônio
+        nem no total de `GET /v1/debts/overview`. Tudo que é derivado (pago, saldo nominal, progresso, próximo vencimento) vem do backend.
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Página de compromissos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentSlice'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Commitments]
+      operationId: createCommitment
+      summary: Cadastra um compromisso acompanhado
+      description: |
+        `TRACKED_THIRD_PARTY`: `installmentsTotal` e `installmentsPaid` (+ `paidAmount` e `nextDueDate`, se informados). O saldo restante **não é
+        calculado** (`nominalBalance` e `total` ficam nulos). `LONG_TERM_PROJECT`: `schedule` completo (itens pagos e pendentes, cada um com
+        `type`, `amount`, `dueDate` opcional, `paid` e `paidOn` opcional); `total`, se informado, tem de fechar com Σ do cronograma
+        (`422 COMMITMENT_INVALID`). O item `FINANCING` faz parte do saldo nominal mas **não é despesa nem dinheiro recebido** e fica fora do
+        pendente de pagamento direto. `Idempotency-Key` opcional: mesma chave e mesmo corpo devolvem o mesmo compromisso.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentInput'
+      responses:
+        '201':
+          description: Compromisso criado.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commitment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/commitments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    get:
+      tags: [Commitments]
+      operationId: getCommitment
+      summary: Um compromisso acompanhado
+      responses:
+        '200':
+          description: O compromisso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commitment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/commitments/{id}/schedule/{position}/pay:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: position
+        in: path
+        required: true
+        description: Posição do item no cronograma (1..n).
+        schema:
+          type: integer
+          minimum: 1
+    post:
+      tags: [Commitments]
+      operationId: payCommitmentScheduleItem
+      summary: Marca um item do cronograma como pago
+      description: |
+        Só o acompanhamento: **nenhuma conta é movimentada**. Devolve o compromisso atualizado. Já pago → `422 COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`;
+        posição inexistente → `404 COMMITMENT_SCHEDULE_ITEM_NOT_FOUND`; versão diferente → `409`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentPayInput'
+      responses:
+        '200':
+          description: O compromisso atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commitment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/commitments/{id}/progress:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Commitments]
+      operationId: updateCommitmentProgress
+      summary: Atualiza o progresso informado de um empréstimo de terceiro
+      description: Só para `TRACKED_THIRD_PARTY` (parcelas pagas, valor pago, próximo vencimento, observações). Devolve o compromisso atualizado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentProgressInput'
+      responses:
+        '200':
+          description: O compromisso atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Commitment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/third-party-expenses:
+    post:
+      tags: [Debts]
+      operationId: markThirdPartyExpense
+      summary: Marca uma despesa ou compra no cartão como de terceiro (responsável real)
+      description: |
+        Não muda nenhum lançamento: o gasto **continua consumo bruto do usuário até o reembolso**. O reembolso recebido é um `REFUND` ligado à
+        compra (`refundOfTransactionId`), que reduz o consumo na categoria original e nunca é receita. Compra parcelada: a marca vale para a
+        compra inteira, inclusive as parcelas futuras. Já marcada → `422 THIRD_PARTY_EXPENSE_ALREADY_MARKED`; estornada ou de outro tipo →
+        `422 THIRD_PARTY_EXPENSE_INVALID`. `Idempotency-Key` opcional.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThirdPartyExpenseInput'
+      responses:
+        '201':
+          description: Marca criada.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThirdPartyExpense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/debts/third-party-receivables:
+    get:
+      tags: [Debts]
+      operationId: getThirdPartyReceivables
+      summary: Dinheiro a receber de terceiros, por pessoa, e o gasto bruto x terceiros x líquido do mês
+      description: |
+        Lê o **estado**: dívidas `RECEIVABLE` (empréstimo concedido: a receber = principal, recebido = Σ quitações ativas) e despesas marcadas como de
+        terceiro (a receber = valor cobrado, recebido = Σ `REFUND` ativos ligados à compra). Fora de patrimônio, renda e consumo. `month`
+        (padrão: mês atual) traz o **bruto** (`grossConsumption` = despesas pagas + cartão + dívidas de consumo, antes dos reembolsos), os
+        `refunds`, o `personalNet` (= consumo do livro = bruto − reembolsos), o consumo de terceiro (`thirdPartyConsumption`), o já
+        reembolsado (`thirdPartyReimbursed`) e o `thirdPartyPending` (de terceiro e ainda não reembolsado, dentro do bruto).
+      parameters:
+        - name: month
+          in: query
+          required: false
+          description: Competência `AAAA-MM`. Padrão o mês atual.
+          schema:
+            type: string
+            pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+      responses:
+        '200':
+          description: A visão.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThirdPartyReceivables'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /v1/debts/overview:
     get:
       tags: [Debts]
@@ -7280,12 +7535,389 @@ components:
           $ref: '#/components/schemas/Money'
         remainingAfter:
           $ref: '#/components/schemas/Money'
+    CommitmentKind:
+      type: string
+      enum: [TRACKED_THIRD_PARTY, LONG_TERM_PROJECT]
+    CommitmentItemType:
+      type: string
+      enum: [DOWN_PAYMENT, INSTALLMENT, EXTRAORDINARY, FINANCING]
+    CommitmentItem:
+      type: object
+      required: [position, label, type, dueDate, amount, paid, paidOn]
+      additionalProperties: false
+      properties:
+        position:
+          type: integer
+        label:
+          type: string
+        type:
+          $ref: '#/components/schemas/CommitmentItemType'
+        dueDate:
+          type: [string, 'null']
+          format: date
+        amount:
+          $ref: '#/components/schemas/Money'
+        paid:
+          type: boolean
+        paidOn:
+          type: [string, 'null']
+          format: date
+    CommitmentMonth:
+      type: object
+      required: [competence, amount]
+      additionalProperties: false
+      properties:
+        competence:
+          type: string
+          pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'
+        amount:
+          $ref: '#/components/schemas/Money'
+    Commitment:
+      type: object
+      description: |
+        Compromisso acompanhado (2.14.0). `total`, `nominalBalance` e `progress` só existem no projeto (`LONG_TERM_PROJECT`); no empréstimo de
+        terceiro são `null` (o saldo exato não é conhecido nem estimado). `directPending` e `financingPending` só no projeto.
+      required: [id, kind, name, counterparty, notes, total, paid, nominalBalance, progress, installmentsTotal, installmentsPaid, remainingInstallments, nextDueDate, directPending, financingPending, pendingByMonth, schedule, version, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/CommitmentKind'
+        name:
+          type: string
+        counterparty:
+          type: [string, 'null']
+        notes:
+          type: [string, 'null']
+        total:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        paid:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        nominalBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        progress:
+          type: [string, 'null']
+          description: Razão pago ÷ total com 4 casas (`0.0227`).
+        installmentsTotal:
+          type: [integer, 'null']
+        installmentsPaid:
+          type: [integer, 'null']
+        remainingInstallments:
+          type: [integer, 'null']
+        nextDueDate:
+          type: [string, 'null']
+          format: date
+        directPending:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        financingPending:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        pendingByMonth:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentMonth'
+        schedule:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentItem'
+        version:
+          type: integer
+          format: int64
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CommitmentSlice:
+      type: object
+      required: [items, hasNext]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Commitment'
+        hasNext:
+          type: boolean
+    CommitmentItemInput:
+      type: object
+      required: [label, type, amount]
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 100
+        type:
+          $ref: '#/components/schemas/CommitmentItemType'
+        dueDate:
+          type: [string, 'null']
+          format: date
+        amount:
+          $ref: '#/components/schemas/AmountInput'
+        paid:
+          type: boolean
+          default: false
+        paidOn:
+          type: [string, 'null']
+          format: date
+    CommitmentInput:
+      type: object
+      required: [kind, name]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: '#/components/schemas/CommitmentKind'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        counterparty:
+          type: [string, 'null']
+          maxLength: 100
+        notes:
+          type: [string, 'null']
+          maxLength: 1000
+        total:
+          type: [string, 'null']
+          description: Só no projeto; tem de fechar com Σ do cronograma.
+        installmentsTotal:
+          type: [integer, 'null']
+          minimum: 1
+        installmentsPaid:
+          type: [integer, 'null']
+          minimum: 0
+        paidAmount:
+          type: [string, 'null']
+        nextDueDate:
+          type: [string, 'null']
+          format: date
+        schedule:
+          type: [array, 'null']
+          maxItems: 120
+          items:
+            $ref: '#/components/schemas/CommitmentItemInput'
+    CommitmentPayInput:
+      type: object
+      required: [paidOn, version]
+      additionalProperties: false
+      properties:
+        paidOn:
+          type: string
+          format: date
+        version:
+          type: integer
+          format: int64
+    CommitmentProgressInput:
+      type: object
+      required: [installmentsPaid, version]
+      additionalProperties: false
+      properties:
+        installmentsPaid:
+          type: integer
+          minimum: 0
+        paidAmount:
+          type: [string, 'null']
+        nextDueDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+          maxLength: 1000
+        version:
+          type: integer
+          format: int64
+    ThirdPartyExpenseInput:
+      type: object
+      required: [transactionId, personId]
+      additionalProperties: false
+      properties:
+        transactionId:
+          type: string
+          format: uuid
+        personId:
+          type: string
+          format: uuid
+        note:
+          type: [string, 'null']
+          maxLength: 200
+    ThirdPartyExpense:
+      type: object
+      required: [id, transactionId, personId, note]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        transactionId:
+          type: string
+          format: uuid
+        personId:
+          type: string
+          format: uuid
+        note:
+          type: [string, 'null']
+    ThirdPartyItem:
+      type: object
+      required: [source, refId, description, date, expectedDate, owed, received, pending, status]
+      additionalProperties: false
+      properties:
+        source:
+          type: string
+          enum: [DEBT, EXPENSE]
+        refId:
+          type: string
+          format: uuid
+        description:
+          type: [string, 'null']
+        date:
+          type: string
+          format: date
+        expectedDate:
+          type: [string, 'null']
+          format: date
+        owed:
+          $ref: '#/components/schemas/Money'
+        received:
+          $ref: '#/components/schemas/Money'
+        pending:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+    ThirdPartyPerson:
+      type: object
+      required: [personId, name, owed, received, pending, items]
+      additionalProperties: false
+      properties:
+        personId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        owed:
+          $ref: '#/components/schemas/Money'
+        received:
+          $ref: '#/components/schemas/Money'
+        pending:
+          $ref: '#/components/schemas/Money'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThirdPartyItem'
+    ThirdPartyMonth:
+      type: object
+      required: [competence, grossConsumption, refunds, personalNet, thirdPartyConsumption, thirdPartyReimbursed, thirdPartyPending]
+      additionalProperties: false
+      properties:
+        competence:
+          type: string
+        grossConsumption:
+          $ref: '#/components/schemas/Money'
+        refunds:
+          $ref: '#/components/schemas/Money'
+        personalNet:
+          $ref: '#/components/schemas/Money'
+        thirdPartyConsumption:
+          $ref: '#/components/schemas/Money'
+        thirdPartyReimbursed:
+          $ref: '#/components/schemas/Money'
+        thirdPartyPending:
+          $ref: '#/components/schemas/Money'
+    ThirdPartyReceivables:
+      type: object
+      required: [asOf, owed, received, pending, people, month]
+      additionalProperties: false
+      properties:
+        asOf:
+          type: string
+          format: date
+        owed:
+          $ref: '#/components/schemas/Money'
+        received:
+          $ref: '#/components/schemas/Money'
+        pending:
+          $ref: '#/components/schemas/Money'
+        people:
+          type: array
+          items:
+            $ref: '#/components/schemas/ThirdPartyPerson'
+        month:
+          $ref: '#/components/schemas/ThirdPartyMonth'
+    DebtOverviewTrackedItem:
+      type: object
+      required: [id, kind, name, counterparty, total, paid, nominalBalance, progress, installmentsTotal, installmentsPaid, remainingInstallments, nextDueDate, directPending]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          $ref: '#/components/schemas/CommitmentKind'
+        name:
+          type: string
+        counterparty:
+          type: [string, 'null']
+        total:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        paid:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        nominalBalance:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+        progress:
+          type: [string, 'null']
+        installmentsTotal:
+          type: [integer, 'null']
+        installmentsPaid:
+          type: [integer, 'null']
+        remainingInstallments:
+          type: [integer, 'null']
+        nextDueDate:
+          type: [string, 'null']
+          format: date
+        directPending:
+          oneOf:
+            - $ref: '#/components/schemas/Money'
+            - type: 'null'
+    DebtOverviewTracked:
+      type: object
+      description: 'Compromissos acompanhados (2.14.0), **fora do `total`** (sem dupla contagem). `scheduleByMonth` é o pendente de pagamento direto por mês de vencimento.'
+      required: [items, scheduleByMonth]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DebtOverviewTrackedItem'
+        scheduleByMonth:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentMonth'
     DebtOverview:
       type: object
       description: Veja `GET /v1/debts/overview`. Tudo calculado pelo backend; o front só exibe.
-      required: [asOf, total, parts, cards, people, other, receivablesInfo, hasRecords, fixedCosts, income, liquidity, comparison, schedule, payoffGoal]
+      required: [asOf, total, parts, cards, people, other, receivablesInfo, hasRecords, fixedCosts, income, liquidity, comparison, schedule, payoffGoal, tracked]
       additionalProperties: false
       properties:
+        tracked:
+          $ref: '#/components/schemas/DebtOverviewTracked'
         asOf:
           type: string
           format: date
@@ -7667,7 +8299,7 @@ components:
     RecurrenceInput:
       type: object
       description: |
-        `EXPENSE`/`INCOME`: `accountId` + `method`. `CARD_PURCHASE`: `cardId` (à vista). Conta **e** cartão, ou nenhum dos
+        `EXPENSE`/`INCOME`: `accountId` + `method` (2.14.0: ou nenhum dos dois, "conta a definir", informados ao confirmar cada ocorrência). `CARD_PURCHASE`: `cardId` (à vista). Conta **e** cartão, ou nenhum dos
         dois, → `422 RECURRENCE_INVALID`. Em `CUSTOM`, `interval` (≥ 1) e `unit` são obrigatórios (`interval` ausente ou `null`
         → `422 RECURRENCE_INVALID`, S-242); nas demais não existem.
       required: [type, amount, frequency, startDate]
@@ -7792,6 +8424,15 @@ components:
             - $ref: '#/components/schemas/AmountInput'
             - type: 'null'
           description: 'Valor real (ex.: a conta de luz veio diferente). Padrão = valor do modelo.'
+        accountId:
+          type: [string, 'null']
+          format: uuid
+          description: 'Só na recorrência de conta a definir (2.14.0), a conta `CASH` do pagamento. Faltando, `422 RECURRENCE_ACCOUNT_REQUIRED`.'
+        method:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentMethod'
+            - type: 'null'
+          description: 'Só na recorrência de conta a definir (2.14.0).'
     Occurrence:
       type: object
       description: Ocorrência de uma recorrência (prevista, realizada ou pulada).

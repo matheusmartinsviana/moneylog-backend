@@ -25,7 +25,12 @@ public interface RealizeOccurrenceUseCase {
      * @param actualAmount   valor real; {@code null} usa o do modelo
      * @param idempotencyKey chave de idempotência (obrigatória na rota HTTP)
      */
-    record RealizeOccurrenceCommand(UUID userId, UUID recurrenceId, LocalDate occurrenceDate, Money actualAmount, UUID idempotencyKey) {
+    record RealizeOccurrenceCommand(UUID userId, UUID recurrenceId, LocalDate occurrenceDate, Money actualAmount, UUID idempotencyKey,
+                                    UUID accountId, com.moneylog.core.transaction.domain.PaymentMethod method) {
+
+        public RealizeOccurrenceCommand(UUID userId, UUID recurrenceId, LocalDate occurrenceDate, Money actualAmount, UUID idempotencyKey) {
+            this(userId, recurrenceId, occurrenceDate, actualAmount, idempotencyKey, null, null);
+        }
     }
 
     /** Escopo da chave de idempotência (a tabela é compartilhada com as demais rotas de criação). */

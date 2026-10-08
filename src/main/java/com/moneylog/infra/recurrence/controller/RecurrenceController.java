@@ -161,7 +161,8 @@ public class RecurrenceController {
                                                        @RequestHeader("Idempotency-Key") UUID idempotencyKey,
                                                        @Valid @RequestBody(required = false) RealizeInput body) {
         Money amount = body == null || body.amount() == null ? null : Money.of(body.amount(), CurrencyCode.BRL);
-        TransactionDetails created = realize.handle(new RealizeOccurrenceCommand(userId, id, date, amount, idempotencyKey));
+        TransactionDetails created = realize.handle(new RealizeOccurrenceCommand(userId, id, date, amount, idempotencyKey,
+                body == null ? null : body.accountId(), body == null ? null : body.method()));
         return ResponseEntity.created(URI.create("/v1/transactions/" + created.transaction().id())).body(TransactionResponse.of(created));
     }
 

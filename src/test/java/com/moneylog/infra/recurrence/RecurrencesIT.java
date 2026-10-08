@@ -143,6 +143,24 @@ class RecurrencesIT extends E4ItBase {
     }
 
     @Test
+    @DisplayName("conta a definir (2.14.0): despesa sem conta nem método é aceita; método sem conta é 422; confirmar exige conta e método (RECURRENCE_ACCOUNT_REQUIRED) e, com eles, cria a despesa na data")
+    void deveAceitarContaADefinir() throws Exception {
+        JsonNode created = createdBody(post("/v1/recurrences", body("EXPENSE", "79.99", "Celular", bills, "\"method\":null", "MONTHLY", "2026-10-07", null)));
+        assertThat(created.get("account").isNull()).isTrue();
+        assertThat(created.get("method").isNull()).isTrue();
+        String id = created.get("id").asString();
+        mockMvc.perform(post("/v1/recurrences", body("EXPENSE", "10.00", "Método sem conta", bills, "\"method\":\"PIX\"", "MONTHLY", "2026-10-10", null)))
+                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("RECURRENCE_INVALID"));
+        mockMvc.perform(post("/v1/recurrences/" + id + "/occurrences/2026-10-07/realize", "{}").header("Idempotency-Key", UUID.randomUUID().toString()))
+                .andExpect(status().isUnprocessableEntity()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("RECURRENCE_ACCOUNT_REQUIRED"));
+        assertThat(count("transactions")).isZero();
+        mockMvc.perform(post("/v1/recurrences/" + id + "/occurrences/2026-10-07/realize", "{\"accountId\":\"" + nubank + "\",\"method\":\"PIX\"}")
+                .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isCreated()).andExpect(ContractValidation.conforms())
+                .andExpect(jsonPath("$.type").value("EXPENSE")).andExpect(jsonPath("$.amount.amount").value("79.99"));
+        assertThat(count("transactions")).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("CA4: PUT muda valor e categoria das ocorrências não realizadas; as realizadas ficam; frequência no corpo é 400; version velha é 409")
     void deveEditarOModelo() throws Exception {
         String id = internet("2026-10-10").get("id").asString();

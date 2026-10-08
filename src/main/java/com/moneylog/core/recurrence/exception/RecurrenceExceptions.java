@@ -29,6 +29,13 @@ public final class RecurrenceExceptions {
     }
 
     /** A mesma ocorrência não é realizada duas vezes ({@code recurrenceId + occurrenceDate} é único). */
+    public static class AccountRequiredException extends BusinessRuleException {
+        public AccountRequiredException() {
+            super("RECURRENCE_ACCOUNT_REQUIRED",
+                    "A recorrência está com a conta a definir: informe a conta e o meio de pagamento ao confirmar a ocorrência.");
+        }
+    }
+
     public static class OccurrenceAlreadyRealizedException extends BusinessRuleException {
         public OccurrenceAlreadyRealizedException(LocalDate date) {
             super("RECURRENCE_OCCURRENCE_ALREADY_REALIZED", "A ocorrência de " + date + " já foi realizada.");
