@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.18.0
+  version: 2.19.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -16,6 +16,17 @@ info:
     ## Fatura histórica (2.16.0, só acréscimos compatíveis; ADR-014)
     `POST /v1/cards/{id}/historical-invoices` registra o valor de uma fatura passada que o usuário só conhece pelo pagamento (item `CARD -X / EQUITY +X`,
     sem categoria e sem consumo, `Transaction.source = HISTORICAL`); em seguida o pagamento real quita a fatura. Acréscimo: `TransactionSource.HISTORICAL`.
+
+    ## Metas de sonho com fotos (2.19.0, só acréscimos compatíveis; ADR-018)
+    A meta `SAVINGS` ganha `featured` (meta em destaque da Home: no máximo uma por usuário), `coverPhotoId` e `photos[]` (só metadados, na
+    ordem de exibição; a capa é a primeira). Fora de `SAVINGS`, `featured = false`, `coverPhotoId = null` e `photos = []`. Rotas novas:
+    `POST /v1/goals/{id}/photos` (multipart `file`, `Idempotency-Key` opcional), `GET /v1/goals/{id}/photos/{photoId}/content?variant=thumb|display`
+    (bytes `image/jpeg`, **autenticado por Bearer**, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`; o front busca com o
+    interceptor e cria um object URL), `PUT .../photos/order`, `PUT .../photos/{photoId}/cover`, `DELETE .../photos/{photoId}` e
+    `PUT /v1/goals/{id}/featured`; `GET /v1/goals` aceita `featured`. Limites: 8 fotos por meta, 40 por usuário, 40 MB por usuário,
+    arquivo de até 8 MB, só JPEG e PNG (conferidos pelo conteúdo, não pelo nome nem pelo MIME), até 24 megapixels e 8000 px no maior lado.
+    O servidor recodifica sempre (sem EXIF/GPS) e guarda só a exibição (até 1280 px) e a miniatura (até 320 px). As fotos não vão no
+    backup JSON nem no vault, nunca em log e nunca para a IA.
 
     ## Competência de renda (2.18.0, só acréscimos compatíveis; ADR-017)
     Uma **receita** (`INCOME`) pode pertencer a um mês diferente do mês em que o dinheiro cai (salário dividido: o adiantamento pago em
@@ -2735,6 +2746,11 @@ paths:
           in: query
           schema:
             $ref: '#/components/schemas/GoalStatus'
+        - name: featured
+          in: query
+          description: '`true` devolve só a meta em destaque da Home (no máximo uma; ADR-018); `false`, as demais. Ausente = todas.'
+          schema:
+            type: boolean
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -3097,6 +3113,242 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/photos:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    post:
+      tags: [Goals]
+      operationId: uploadGoalPhoto
+      summary: Envia uma foto da meta de sonho
+      description: |
+        Só `SAVINGS` (outro tipo → `422 GOAL_PHOTOS_KIND_NOT_SUPPORTED`; arquivada → `422 GOAL_ARCHIVED`). A foto entra no **fim** da lista
+        (o primeiro envio vira a capa). O servidor confere os magic bytes (JPEG ou PNG; outro conteúdo → `422 GOAL_PHOTO_UNSUPPORTED_TYPE`,
+        qualquer que seja o nome ou o `Content-Type` enviados), lê as dimensões do cabeçalho antes de decodificar (acima de 24 megapixels ou
+        8000 px → `422 GOAL_PHOTO_DIMENSIONS_EXCEEDED`), recodifica sempre (derruba EXIF/GPS e qualquer dado anexado) e guarda a exibição
+        (até 1280 px) e a miniatura (até 320 px). Imagem ilegível ou truncada → `422 GOAL_PHOTO_INVALID_IMAGE`. Acima de 8 MB →
+        `422 GOAL_PHOTO_TOO_LARGE`. Já com 8 fotos na meta → `422 GOAL_PHOTO_LIMIT_REACHED`; 40 fotos ou 40 MB do usuário →
+        `422 GOAL_PHOTO_QUOTA_EXCEEDED`. O nome do arquivo é ignorado. `Idempotency-Key` opcional (escopo próprio, 24 h): repetir o mesmo
+        arquivo na mesma meta devolve a mesma foto; outro arquivo com a mesma chave é `409 IDEMPOTENCY_KEY_REUSED`. Limite de envios por
+        minuto → `429`.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: A imagem (JPEG ou PNG, até 8 MB).
+      responses:
+        '201':
+          description: Foto guardada.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GoalPhoto'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/photos/{photoId}/content:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: photoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [Goals]
+      operationId: getGoalPhotoContent
+      summary: Bytes da foto (JPEG), autenticado
+      description: |
+        Rota protegida por Bearer: `<img src>` não envia o header, então o front busca com o `HttpClient` (interceptor) como `Blob` e usa
+        `URL.createObjectURL`. Sem URL assinada e sem token na query. Resposta com `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`
+        e `Content-Type: image/jpeg` fixo. Foto de outra meta ou de outro usuário → `404 GOAL_PHOTO_NOT_FOUND`.
+      parameters:
+        - name: variant
+          in: query
+          description: '`display` (até 1280 px, padrão) ou `thumb` (até 320 px). Outro valor → `400`.'
+          schema:
+            type: string
+            enum: [thumb, display]
+            default: display
+      responses:
+        '200':
+          description: A imagem.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+            X-Content-Type-Options:
+              schema:
+                type: string
+                example: nosniff
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/photos/order:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    put:
+      tags: [Goals]
+      operationId: reorderGoalPhotos
+      summary: Reordena as fotos da meta
+      description: |
+        `photoIds` precisa ser exatamente o conjunto de fotos da meta, sem faltar nem repetir (senão `422 GOAL_PHOTOS_ORDER_MISMATCH`). A
+        primeira vira a capa. Devolve a meta atualizada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalPhotoOrderInput'
+      responses:
+        '200':
+          description: Meta com as fotos na nova ordem.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/photos/{photoId}/cover:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: photoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      tags: [Goals]
+      operationId: setGoalPhotoCover
+      summary: Define a capa da meta
+      description: A foto vai para a posição 0 e as demais descem uma posição. Devolve a meta atualizada.
+      responses:
+        '200':
+          description: Meta com a nova capa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/photos/{photoId}:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+      - name: photoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags: [Goals]
+      operationId: deleteGoalPhoto
+      summary: Remove uma foto da meta
+      description: Apaga os metadados e os bytes. Se era a capa, a próxima assume (`coverPhotoId` acompanha). Devolve a meta atualizada.
+      responses:
+        '200':
+          description: Meta sem a foto.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/goals/{id}/featured:
+    parameters:
+      - $ref: '#/components/parameters/IdPath'
+    put:
+      tags: [Goals]
+      operationId: setGoalFeatured
+      summary: Marca ou desmarca a meta em destaque da Home
+      description: |
+        Só `SAVINGS` ativa. **Uma só meta em destaque por usuário**: marcar esta desmarca a anterior na mesma transação. Meta arquivada →
+        `422 GOAL_ARCHIVED`; outro tipo → `422 GOAL_FEATURED_KIND_NOT_SUPPORTED`. Arquivar a meta em destaque limpa o destaque. Devolve a
+        meta atualizada.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalFeaturedInput'
+      responses:
+        '200':
+          description: Meta com o destaque atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
@@ -9222,6 +9474,46 @@ components:
         version:
           type: integer
           format: int64
+    GoalPhoto:
+      type: object
+      description: Metadados de uma foto da meta (ADR-018). Os bytes vêm de `GET /v1/goals/{id}/photos/{photoId}/content`.
+      additionalProperties: false
+      required: [id, position, width, height, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        position:
+          type: integer
+          minimum: 0
+          description: Ordem de exibição; 0 é a capa.
+        width:
+          type: integer
+          description: Largura da versão de exibição, em pixels.
+        height:
+          type: integer
+          description: Altura da versão de exibição, em pixels.
+        createdAt:
+          type: string
+          format: date-time
+    GoalPhotoOrderInput:
+      type: object
+      additionalProperties: false
+      required: [photoIds]
+      properties:
+        photoIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+    GoalFeaturedInput:
+      type: object
+      additionalProperties: false
+      required: [featured]
+      properties:
+        featured:
+          type: boolean
     GoalReservationInput:
       type: object
       required: [accountId, amount, date]
@@ -9304,6 +9596,9 @@ components:
         - consistency
         - streak
         - consistencyRate
+        - featured
+        - coverPhotoId
+        - photos
         - version
         - createdAt
         - updatedAt
@@ -9431,6 +9726,18 @@ components:
           oneOf:
             - $ref: '#/components/schemas/Ratio'
             - type: 'null'
+        featured:
+          type: boolean
+          description: Meta em destaque da Home (ADR-018). No máximo uma por usuário; só `SAVINGS` ativa.
+        coverPhotoId:
+          type: [string, 'null']
+          format: uuid
+          description: Id da capa (a primeira de `photos`); `null` sem fotos.
+        photos:
+          type: array
+          description: Fotos da meta na ordem de exibição (só metadados; só `SAVINGS`, vazio nos demais tipos).
+          items:
+            $ref: '#/components/schemas/GoalPhoto'
         grewSinceBaseline:
           type: boolean
           description: |
@@ -9485,6 +9792,9 @@ components:
           consistency: []
           streak: 0
           consistencyRate: null
+          featured: false
+          coverPhotoId: null
+          photos: []
           version: 1
           createdAt: '2026-10-10T12:00:00Z'
           updatedAt: '2026-10-10T13:00:00Z'

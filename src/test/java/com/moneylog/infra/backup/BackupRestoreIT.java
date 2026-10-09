@@ -96,9 +96,20 @@ class BackupRestoreIT {
                     VALUES (?, ?, 'ACCOUNT_OPENING', ?, ?, ?, '2026-10', DATE '2026-10-01', ?, 'BRL', TRUE, now(), now())""",
                     UUID.randomUUID(), user, account, p[0], p[1], p[2]);
         }
+        UUID goal = UUID.randomUUID();
         j.update("""
-                INSERT INTO goals (id, user_id, name, target_cents, currency, priority, created_at, updated_at, version)
-                VALUES (?, ?, 'Reserva', 500000, 'BRL', 'HIGH', now(), now(), 0)""", UUID.randomUUID(), user);
+                INSERT INTO goals (id, user_id, name, target_cents, currency, priority, featured, created_at, updated_at, version)
+                VALUES (?, ?, 'Reserva', 500000, 'BRL', 'HIGH', TRUE, now(), now(), 0)""", goal, user);
+        // fotos sintéticas (ADR-018): geradas por código, nunca arquivos do repositório
+        for (int position = 0; position < 2; position++) {
+            UUID photo = UUID.randomUUID();
+            byte[] display = com.moneylog.util.SyntheticImages.jpeg(640, 400, "Foto " + position);
+            byte[] thumbnail = com.moneylog.util.SyntheticImages.jpeg(320, 200, "Mini " + position);
+            j.update("""
+                    INSERT INTO goal_photos (id, user_id, goal_id, position, width, height, size_bytes, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, 640, 400, ?, now(), now())""", photo, user, goal, position, display.length + thumbnail.length);
+            j.update("INSERT INTO goal_photo_blobs (photo_id, user_id, display, thumbnail) VALUES (?, ?, ?, ?)", photo, user, display, thumbnail);
+        }
         j.update("""
                 INSERT INTO notes (id, user_id, path, path_key, title, body, created_at, updated_at, version)
                 VALUES (?, ?, 'Casa/Reforma.md', 'casa/reforma.md', 'Reforma', 'Orçamento da reforma: acentuação ok', now(), now(), 0)""",
@@ -149,6 +160,11 @@ class BackupRestoreIT {
             List<String> before = snapshot(src);
             assertThat(before).contains("saldos=[Conta Teste:123456]", "razao=0");
             assertThat(snapshot(dst)).isEqualTo(before);
+            // as fotos (ADR-018) voltam com o mesmo conteúdo: hash dos bytes de exibição e de miniatura, e a meta segue em destaque
+            String photoHash = "SELECT string_agg(md5(display) || md5(thumbnail), ',' ORDER BY photo_id) FROM goal_photo_blobs";
+            assertThat(src.queryForObject(photoHash, String.class)).isNotBlank().isEqualTo(dst.queryForObject(photoHash, String.class));
+            assertThat(dst.queryForObject("SELECT count(*) FROM goal_photo_blobs", Long.class)).isEqualTo(2L);
+            assertThat(dst.queryForObject("SELECT count(*) FROM goals WHERE featured", Long.class)).isEqualTo(1L);
         }
     }
 }

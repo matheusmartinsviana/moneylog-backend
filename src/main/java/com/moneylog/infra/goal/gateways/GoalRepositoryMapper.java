@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.goal.domain.GoalAction;
+import com.moneylog.core.goal.domain.GoalPhoto;
 import com.moneylog.core.goal.domain.GoalReservation;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
@@ -25,17 +26,24 @@ public final class GoalRepositoryMapper {
     }
 
     public static Goal toDomain(GoalEntity e, Collection<GoalReservationEntity> reservations, List<GoalAction> actions) {
+        return toDomain(e, reservations, actions, List.of());
+    }
+
+    public static Goal toDomain(GoalEntity e, Collection<GoalReservationEntity> reservations, List<GoalAction> actions,
+                                List<GoalPhoto> photos) {
         List<GoalReservation> mapped = reservations.stream()
                 .sorted(Comparator.comparing(GoalReservationEntity::getCreatedAt).thenComparing(GoalReservationEntity::getId))
                 .map(GoalRepositoryMapper::toDomain).toList();
         return Goal.restore(e.getId(), e.getUserId(), e.getName(), Money.ofCents(e.getTargetCents(), CurrencyCode.of(e.getCurrency())),
                 e.getDeadline(), e.getPriority(), e.getDescription(), e.isArchived(), e.getKind(),
                 e.getBaselineCents() == null ? null : Money.ofCents(e.getBaselineCents(), CurrencyCode.of(e.getCurrency())), e.getBaselineAt(),
-                e.getMetric(), e.getDirection(), mapped).restorePlan(e.getPlanNote(), actions);
+                e.getMetric(), e.getDirection(), mapped).restorePlan(e.getPlanNote(), actions)
+                .restoreMedia(e.isFeatured(), photos);
     }
 
-    public static Versioned<Goal> toVersioned(GoalEntity e, Collection<GoalReservationEntity> reservations, List<GoalAction> actions) {
-        return new Versioned<>(toDomain(e, reservations, actions), e.getVersion(), e.getCreatedAt(), e.getUpdatedAt());
+    public static Versioned<Goal> toVersioned(GoalEntity e, Collection<GoalReservationEntity> reservations, List<GoalAction> actions,
+                                              List<GoalPhoto> photos) {
+        return new Versioned<>(toDomain(e, reservations, actions, photos), e.getVersion(), e.getCreatedAt(), e.getUpdatedAt());
     }
 
     public static GoalReservation toDomain(GoalReservationEntity r) {
@@ -45,7 +53,7 @@ public final class GoalRepositoryMapper {
 
     public static GoalEntity toEntity(Goal g, Instant now) {
         return new GoalEntity(g.id(), g.userId(), g.name(), g.target().cents(), g.target().currency().value(), g.deadline(),
-                g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline() == null ? null : g.baseline().cents(), g.baselineAt(), g.metric(), g.direction(), g.planNote(), now);
+                g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline() == null ? null : g.baseline().cents(), g.baselineAt(), g.metric(), g.direction(), g.planNote(), g.isFeatured(), now);
     }
 
     public static GoalReservationEntity toEntity(GoalReservation r, java.util.UUID userId) {

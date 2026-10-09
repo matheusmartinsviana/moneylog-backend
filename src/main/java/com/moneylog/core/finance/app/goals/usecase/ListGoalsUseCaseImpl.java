@@ -43,6 +43,7 @@ public class ListGoalsUseCaseImpl implements ListGoalsUseCase {
         List<GoalDetails> all = stored.stream()
                 .map(goal -> GoalViews.of(goal, context))
                 .filter(details -> query.status() == null || details.status() == query.status())
+                .filter(details -> query.featured() == null || details.goal().isFeatured() == query.featured())
                 .sorted(Comparator.comparing((GoalDetails d) -> d.status().ordinal())
                         .thenComparing(d -> d.goal().priority().ordinal())
                         .thenComparing(d -> d.goal().deadline(), Comparator.nullsLast(Comparator.naturalOrder()))

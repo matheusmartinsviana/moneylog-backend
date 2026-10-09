@@ -103,8 +103,9 @@ class FlywayMigrationIT {
                 "credit_card_invoices", "persons", "debts", "transactions", "transaction_installments", "ledger_postings");
         // Etapas 7 e 8: tabelas de preferência/mapeamento têm user_id como chave (sem id nem created_at) e as de registro
         // imutável (notificações, assinaturas push, prévias e análises de IA, regras aprendidas) não têm updated_at.
-        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items");
-        Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items"); // filhas do lote: nascem e morrem com ele
+        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs");
+        // filhas do lote ou da foto: nascem e morrem com o pai (goal_photo_blobs tem photo_id como chave, ADR-018)
+        Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs");
         Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts");
         for (String table : tables) {
             if (!keyedByUser.contains(table)) {

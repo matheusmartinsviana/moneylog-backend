@@ -100,8 +100,9 @@ public class GoalController {
     }
 
     @GetMapping
-    public SliceResponse<GoalResponse> list(@CurrentUser UUID userId, @RequestParam(required = false) GoalStatus status, PageQuery page) {
-        return SliceResponse.of(list.handle(new ListGoalsQuery(userId, status, page)), GoalResponse::of);
+    public SliceResponse<GoalResponse> list(@CurrentUser UUID userId, @RequestParam(required = false) GoalStatus status,
+                                            @RequestParam(required = false) Boolean featured, PageQuery page) {
+        return SliceResponse.of(list.handle(new ListGoalsQuery(userId, status, featured, page)), GoalResponse::of);
     }
 
     @PostMapping

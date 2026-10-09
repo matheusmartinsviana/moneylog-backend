@@ -180,7 +180,7 @@ class GoalExportQaIT {
         long expected = jdbc.queryForObject("select count(*) from transactions where user_id = ? and status = 'ACTIVE' and transaction_date between '2026-10-01' and '2026-10-31'", Long.class, a.id);
         assertThat(rows).as("cabeçalho + uma linha por movimentação").hasSize((int) expected + 1);
         for (List<String> row : rows) {
-            assertThat(row).as("colunas (8 + Direção, S-261)").hasSize(9);
+            assertThat(row).as("colunas (8 + Direção, S-261 + Competência da renda, ADR-017)").hasSize(10);
         }
         List<String> offenders = new ArrayList<>();
         for (List<String> row : rows.subList(1, rows.size())) {
@@ -221,7 +221,7 @@ class GoalExportQaIT {
         assertThat(result.getResponse().getHeader("X-Content-Type-Options")).as("nosniff num download").isEqualTo("nosniff");
         // sem filtro de datas e com Accept-Language
         MvcResult en = csv(a, "", "en-US,en;q=0.9");
-        assertThat(body(en).substring(1)).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction\r\n");
+        assertThat(body(en).substring(1)).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction;Income month\r\n");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).doesNotContain("\r").doesNotContain("\n");
         assertThat(csv(a, "", "pt-BR,pt;q=0.9").getResponse().getContentAsString(StandardCharsets.UTF_8)).contains("Data;Tipo;Descrição");
         for (String lang : List.of("xx", "*", "!!!", "en;q=0.1, pt", "x".repeat(2000), "en-", "EN", "pt;q=abc")) {

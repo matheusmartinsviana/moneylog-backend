@@ -94,6 +94,11 @@ Schema: `src/main/resources/db/migration/V1.00`–`V1.08` (editáveis até o pri
 - O job de notificações (`moneylog.notifications.job.*`) roda a cada 15 min em `America/Sao_Paulo` e é idempotente (índice único). Nos ITs fica desligado.
 - **Push preparado e desligado**: `moneylog.push.enabled=false`. Para ligar: `MONEYLOG_PUSH_VAPID_PUBLIC`, `MONEYLOG_PUSH_VAPID_PRIVATE`, `MONEYLOG_PUSH_VAPID_SUBJECT` (ver `.env.example`), HTTPS real e PWA instalada. Detalhes em `docs/adrs/ADR-012-notificacoes-e-push.md`.
 
+## Metas de sonho com fotos (ADR-018)
+- `POST /v1/goals/{id}/photos` (multipart `file`, só JPEG/PNG, até 8 MB) valida pelos **magic bytes**, lê as dimensões do cabeçalho antes de decodificar, recodifica sempre (sem EXIF/GPS) e guarda só a exibição (1280 px) e a miniatura (320 px) em `goal_photo_blobs` (`bytea`, tabela separada dos metadados) atrás da porta `PhotoStorage`. O conteúdo sai só por `GET .../photos/{photoId}/content` autenticado (`no-store`, `nosniff`). Nunca vai para log nem para a IA.
+- Limites (`moneylog.goals.photos.*`): 8 por meta, 40 por usuário, 40 MB por usuário, 24 MP e 8000 px, 30 envios/min. Uma só meta em destaque por usuário (`PUT /v1/goals/{id}/featured`).
+- Imagens dos testes são **geradas por código** (`com.moneylog.util.SyntheticImages`); não há foto nem binário versionado. Não existe seed de demonstração no repositório: quando houver, deve gerar as fotos com `SyntheticImages`/`ImageIO`.
+
 ## Produção, imagem Docker e backup (Etapa 9)
 - Imagem: `docker build -t moneylog-backend:local backend/` (multi-stage, JRE 21 alpine, usuário não-root, `SPRING_PROFILES_ACTIVE=prod`). Subir com `docker compose -f docker-compose.prod.yml --env-file .env up --build` (precisa de `MONEYLOG_TRUSTED_PROXIES`; local: `172.16.0.0/12`).
 - Perfil `prod` (`application-prod.yaml`): logs JSON (ECS), swagger e api-docs desligados, probes `liveness`/`readiness`, cookie `Secure`. Segredos por arquivo: cada arquivo de `SECRETS_DIR` (padrão `/run/secrets`) com o nome da variável (ex.: `JWT_SECRET`).

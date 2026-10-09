@@ -26,6 +26,11 @@ import com.moneylog.core.goal.exception.GoalExceptions.GoalNameRequiredException
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNameTooLongException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNotArchivedException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNotFoundException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalFeaturedKindNotSupportedException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoLimitReachedException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoNotFoundException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotosKindNotSupportedException;
+import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotosOrderMismatchException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalReleaseExceedsReservedException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalStateInconsistentException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalTargetNotPositiveException;
@@ -73,6 +78,10 @@ public final class Goal {
     /** Plano declarado (ADR-016): texto curto e ações. */
     private String planNote;
     private final List<GoalAction> actions = new ArrayList<>();
+    /** Destaque da Home (ADR-018): só {@code SAVINGS} ativa; no máximo uma por usuário (garantido pelo caso de uso e pelo índice único parcial). */
+    private boolean featured;
+    /** Metadados das fotos (ADR-018), na ordem de exibição: a primeira é a capa. Só {@code SAVINGS}. */
+    private final List<GoalPhoto> photos = new ArrayList<>();
 
     @SuppressWarnings("java:S107")
     private Goal(UUID id, UUID userId, String name, Money target, LocalDate deadline, GoalPriority priority, String description,
@@ -228,6 +237,7 @@ public final class Goal {
             throw new GoalAlreadyArchivedException();
         }
         this.archived = true;
+        this.featured = false; // meta arquivada não fica em destaque (ADR-018)
     }
 
     public void unarchive() {
@@ -446,6 +456,112 @@ public final class Goal {
         }
         long months = ChronoUnit.MONTHS.between(YearMonth.from(today), YearMonth.from(deadline)) + 1;
         return Money.ofCents(Math.ceilDiv(totalDebt.cents(), months), CurrencyCode.BRL);
+    }
+
+    // ------------------------------------------------------------------ destaque e fotos (ADR-018)
+
+    public boolean isFeatured() {
+        return featured;
+    }
+
+    /** Fotos na ordem de exibição (a primeira é a capa). */
+    public List<GoalPhoto> photos() {
+        return List.copyOf(photos);
+    }
+
+    /** A capa é a primeira foto; {@code null} sem fotos. */
+    public UUID coverPhotoId() {
+        return photos.isEmpty() ? null : photos.getFirst().id();
+    }
+
+    /** Reidratação de destaque e fotos (usado só pelo mapper). */
+    public Goal restoreMedia(boolean storedFeatured, List<GoalPhoto> storedPhotos) {
+        if ((storedFeatured || !storedPhotos.isEmpty()) && kind != GoalKind.SAVINGS) {
+            throw new GoalStateInconsistentException("só a meta de guardar dinheiro tem fotos e destaque.");
+        }
+        if (storedFeatured && archived) {
+            throw new GoalStateInconsistentException("meta arquivada em destaque.");
+        }
+        this.featured = storedFeatured;
+        this.photos.clear();
+        this.photos.addAll(storedPhotos);
+        return this;
+    }
+
+    /** Põe a meta em destaque. O caso de uso desmarca a anterior antes. */
+    public void feature() {
+        if (kind != GoalKind.SAVINGS) {
+            throw new GoalFeaturedKindNotSupportedException();
+        }
+        ensureNotArchived();
+        this.featured = true;
+    }
+
+    public void unfeature() {
+        this.featured = false;
+    }
+
+    /** Acrescenta a foto ao fim da lista. Meta arquivada, de outro tipo ou cheia recusa. */
+    public GoalPhoto addPhoto(GoalPhoto photo, int maxPerGoal) {
+        ensureCanAddPhoto(maxPerGoal);
+        photos.add(photo);
+        return photo;
+    }
+
+    /** Confere tipo, arquivamento e limite por meta sem alterar nada (permite recusar antes de decodificar a imagem). */
+    public void ensureCanAddPhoto(int maxPerGoal) {
+        ensurePhotosAllowed();
+        if (photos.size() >= maxPerGoal) {
+            throw new GoalPhotoLimitReachedException(maxPerGoal);
+        }
+    }
+
+    /** Remove a foto; se era a capa, a próxima assume. */
+    public GoalPhoto removePhoto(UUID photoId) {
+        ensurePhotosAllowed();
+        return photos.remove(indexOfPhoto(photoId));
+    }
+
+    /** Leva a foto para a posição 0. */
+    public void setCover(UUID photoId) {
+        ensurePhotosAllowed();
+        photos.addFirst(photos.remove(indexOfPhoto(photoId)));
+    }
+
+    /** Nova ordem: precisa ser exatamente o conjunto de fotos da meta, sem repetir. */
+    public void reorderPhotos(List<UUID> orderedIds) {
+        ensurePhotosAllowed();
+        if (orderedIds == null || orderedIds.size() != photos.size() || new java.util.HashSet<>(orderedIds).size() != photos.size()) {
+            throw new GoalPhotosOrderMismatchException();
+        }
+        Map<UUID, GoalPhoto> byId = new LinkedHashMap<>();
+        photos.forEach(p -> byId.put(p.id(), p));
+        List<GoalPhoto> reordered = new ArrayList<>();
+        for (UUID id : orderedIds) {
+            GoalPhoto photo = byId.get(id);
+            if (photo == null) {
+                throw new GoalPhotosOrderMismatchException();
+            }
+            reordered.add(photo);
+        }
+        photos.clear();
+        photos.addAll(reordered);
+    }
+
+    private void ensurePhotosAllowed() {
+        if (kind != GoalKind.SAVINGS) {
+            throw new GoalPhotosKindNotSupportedException();
+        }
+        ensureNotArchived();
+    }
+
+    private int indexOfPhoto(UUID photoId) {
+        for (int i = 0; i < photos.size(); i++) {
+            if (photos.get(i).id().equals(photoId)) {
+                return i;
+            }
+        }
+        throw new GoalPhotoNotFoundException(photoId);
     }
 
     // ------------------------------------------------------------------ plano declarado (ADR-016)

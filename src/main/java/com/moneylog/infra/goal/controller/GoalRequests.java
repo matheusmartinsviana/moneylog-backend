@@ -1,6 +1,7 @@
 package com.moneylog.infra.goal.controller;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import com.moneylog.core.goal.domain.GoalActionFrequency;
@@ -56,5 +57,13 @@ public final class GoalRequests {
     public record GoalReservationInput(@NotNull UUID accountId, @NotNull @Pattern(regexp = SIGNED_AMOUNT_PATTERN) String amount,
                                        @NotNull @DateInWindow LocalDate date,
                                        @Size(max = 200) @NoControlChars(allowLineBreaks = true) String note) {
+    }
+
+    /** {@code PUT /v1/goals/{id}/photos/order}: o conjunto exato de ids das fotos da meta, na nova ordem. */
+    public record GoalPhotoOrderInput(@NotNull @Size(max = 100) List<@NotNull UUID> photoIds) {
+    }
+
+    /** {@code PUT /v1/goals/{id}/featured}. */
+    public record GoalFeaturedInput(@NotNull Boolean featured) {
     }
 }

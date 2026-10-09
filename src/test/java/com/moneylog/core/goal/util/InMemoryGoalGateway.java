@@ -63,8 +63,25 @@ public class InMemoryGoalGateway implements GoalGateway {
                 .map(g -> new Versioned<>(copy(g), versions.get(g.id()), now, now)).toList();
     }
 
+    @Override
+    public Optional<Versioned<Goal>> findFeatured(UUID userId) {
+        return goals.values().stream().filter(g -> g.userId().equals(userId) && g.isFeatured()).findFirst()
+                .map(g -> new Versioned<>(copy(g), versions.get(g.id()), now, now));
+    }
+
+    @Override
+    public void lockUserMedia(UUID userId) {
+        calls.add("lockMedia");
+    }
+
+    @Override
+    public PhotoUsage photoUsage(UUID userId) {
+        var photos = goals.values().stream().filter(g -> g.userId().equals(userId)).flatMap(g -> g.photos().stream()).toList();
+        return new PhotoUsage(photos.size(), photos.stream().mapToLong(com.moneylog.core.goal.domain.GoalPhoto::sizeBytes).sum());
+    }
+
     private static Goal copy(Goal g) {
         return Goal.restore(g.id(), g.userId(), g.name(), g.target(), g.deadline(), g.priority(), g.description(), g.isArchived(), g.kind(), g.baseline(), g.baselineAt(), g.metric(), g.direction(), g.reservations())
-                .restorePlan(g.planNote(), g.actions());
+                .restorePlan(g.planNote(), g.actions()).restoreMedia(g.isFeatured(), g.photos());
     }
 }

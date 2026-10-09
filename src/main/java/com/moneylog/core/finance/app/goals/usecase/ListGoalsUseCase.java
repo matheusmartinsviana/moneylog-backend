@@ -16,6 +16,11 @@ public interface ListGoalsUseCase {
      */
     Slice<GoalDetails> handle(ListGoalsQuery query);
 
-    record ListGoalsQuery(UUID userId, GoalStatus status, PageQuery page) {
+    /** @param featured {@code null} = sem filtro; {@code true} = só a meta em destaque (ADR-018); {@code false} = as demais */
+    record ListGoalsQuery(UUID userId, GoalStatus status, Boolean featured, PageQuery page) {
+
+        public ListGoalsQuery(UUID userId, GoalStatus status, PageQuery page) {
+            this(userId, status, null, page);
+        }
     }
 }

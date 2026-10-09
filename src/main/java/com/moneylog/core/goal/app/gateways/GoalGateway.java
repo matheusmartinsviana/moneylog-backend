@@ -32,4 +32,20 @@ public interface GoalGateway {
 
     /** Todas as metas do usuário (com reservas), sem ordem garantida. */
     List<Versioned<Goal>> findAll(UUID userId);
+
+    /** A meta em destaque do usuário, se houver (no máximo uma; ADR-018). */
+    Optional<Versioned<Goal>> findFeatured(UUID userId);
+
+    /**
+     * Serializa, até o fim da transação, as mudanças de destaque e de cota de fotos do usuário (advisory lock): duas requisições
+     * concorrentes não passam da cota nem deixam duas metas em destaque. Chame depois da trava da meta.
+     */
+    void lockUserMedia(UUID userId);
+
+    /** Fotos e bytes guardados do usuário em todas as metas (para a cota). */
+    PhotoUsage photoUsage(UUID userId);
+
+    /** @param count fotos do usuário; @param bytes soma de exibição + miniatura */
+    record PhotoUsage(int count, long bytes) {
+    }
 }

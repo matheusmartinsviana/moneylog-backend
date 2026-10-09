@@ -1,5 +1,9 @@
 package com.moneylog.infra.config;
 
+import java.time.Clock;
+import java.time.Duration;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,6 +41,20 @@ import com.moneylog.core.finance.app.goals.usecase.UnarchiveGoalUseCaseImpl;
 import com.moneylog.core.finance.app.goals.usecase.UpdateGoalUseCase;
 import com.moneylog.core.finance.app.goals.usecase.UpdateGoalUseCaseImpl;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
+import com.moneylog.core.goal.app.gateways.PhotoStorage;
+import com.moneylog.core.goal.photo.PhotoImagePipeline;
+import com.moneylog.core.goal.photo.PhotoLimits;
+import com.moneylog.core.finance.app.goals.usecase.GetGoalPhotoContentUseCaseImpl;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.GetGoalPhotoContentUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.RemoveGoalPhotoUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.ReorderGoalPhotosUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.SetGoalFeaturedUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.SetGoalPhotoCoverUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.UploadGoalPhotoUseCase;
+import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCasesImpl;
+import com.moneylog.core.finance.app.goals.usecase.SetGoalFeaturedUseCaseImpl;
+import com.moneylog.infra.goal.controller.PhotoUploadRateLimiter;
+import com.moneylog.infra.goal.gateways.DbPhotoStorage;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
@@ -52,6 +70,77 @@ public class GoalConfig {
     @Bean
     GoalGateway goalGateway(GoalRepositoryJpa goals, GoalReservationRepositoryJpa reservations, TimeProvider time, JdbcTemplate jdbc) {
         return new GoalGatewayImpl(goals, reservations, time, jdbc);
+    }
+
+    // ------------------------------------------------------------------ fotos e destaque (ADR-018)
+
+    @Bean
+    PhotoLimits photoLimits(@Value("${moneylog.goals.photos.max-per-goal:8}") int maxPerGoal,
+                            @Value("${moneylog.goals.photos.max-per-user:40}") int maxPerUser,
+                            @Value("${moneylog.goals.photos.max-bytes-per-user:41943040}") long maxBytesPerUser,
+                            @Value("${moneylog.goals.photos.max-upload-bytes:8388608}") long maxUploadBytes,
+                            @Value("${moneylog.goals.photos.max-pixels:24000000}") long maxPixels,
+                            @Value("${moneylog.goals.photos.max-side:8000}") int maxSide) {
+        return new PhotoLimits(maxPerGoal, maxPerUser, maxBytesPerUser, maxUploadBytes, maxPixels, maxSide);
+    }
+
+    @Bean
+    PhotoImagePipeline photoImagePipeline(PhotoLimits limits) {
+        return new PhotoImagePipeline(limits);
+    }
+
+    @Bean
+    PhotoStorage photoStorage(JdbcTemplate jdbc) {
+        return new DbPhotoStorage(jdbc);
+    }
+
+    @Bean
+    PhotoUploadRateLimiter photoUploadRateLimiter(Clock clock, @Value("${moneylog.goals.photos.rate-limit.max-requests:30}") int maxRequests,
+                                                  @Value("${moneylog.goals.photos.rate-limit.window:PT1M}") Duration window) {
+        return new PhotoUploadRateLimiter(clock, maxRequests, window);
+    }
+
+    @Bean
+    UploadGoalPhotoUseCase uploadGoalPhotoUseCase(GoalGateway goals, PhotoStorage storage, PhotoImagePipeline pipeline, PhotoLimits limits,
+                                                  FinancialRecordsGateway records, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                                  GoalReadModel model, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(UploadGoalPhotoUseCase.class,
+                new GoalPhotoUseCasesImpl(goals, storage, pipeline, limits, records, idempotency, ids, time, model), tm);
+    }
+
+    @Bean
+    ReorderGoalPhotosUseCase reorderGoalPhotosUseCase(GoalGateway goals, PhotoStorage storage, PhotoImagePipeline pipeline, PhotoLimits limits,
+                                                      FinancialRecordsGateway records, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                                      GoalReadModel model, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(ReorderGoalPhotosUseCase.class,
+                new GoalPhotoUseCasesImpl(goals, storage, pipeline, limits, records, idempotency, ids, time, model), tm);
+    }
+
+    @Bean
+    SetGoalPhotoCoverUseCase setGoalPhotoCoverUseCase(GoalGateway goals, PhotoStorage storage, PhotoImagePipeline pipeline, PhotoLimits limits,
+                                                      FinancialRecordsGateway records, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                                      GoalReadModel model, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(SetGoalPhotoCoverUseCase.class,
+                new GoalPhotoUseCasesImpl(goals, storage, pipeline, limits, records, idempotency, ids, time, model), tm);
+    }
+
+    @Bean
+    RemoveGoalPhotoUseCase removeGoalPhotoUseCase(GoalGateway goals, PhotoStorage storage, PhotoImagePipeline pipeline, PhotoLimits limits,
+                                                  FinancialRecordsGateway records, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                                  GoalReadModel model, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(RemoveGoalPhotoUseCase.class,
+                new GoalPhotoUseCasesImpl(goals, storage, pipeline, limits, records, idempotency, ids, time, model), tm);
+    }
+
+    @Bean
+    GetGoalPhotoContentUseCase getGoalPhotoContentUseCase(PhotoStorage storage, PlatformTransactionManager tm) {
+        return TransactionalProxies.readOnly(GetGoalPhotoContentUseCase.class, new GetGoalPhotoContentUseCaseImpl(storage), tm);
+    }
+
+    @Bean
+    SetGoalFeaturedUseCase setGoalFeaturedUseCase(GoalGateway goals, FinancialRecordsGateway records, GoalReadModel model,
+                                                  PlatformTransactionManager tm) {
+        return TransactionalProxies.required(SetGoalFeaturedUseCase.class, new SetGoalFeaturedUseCaseImpl(goals, records, model), tm);
     }
 
     @Bean

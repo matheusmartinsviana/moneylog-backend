@@ -103,6 +103,22 @@ moneylog:
       # Pedidos de exportação por usuário na janela (em memória, como o login); acima, 429 TOO_MANY_ATTEMPTS com Retry-After.
       max-requests: 6
       window: PT1M
+  goals:
+    photos:
+      # Fotos das metas de sonho (ADR-018). Os bytes ficam no Postgres (goal_photo_blobs) atrás da porta PhotoStorage.
+      max-per-goal: 8
+      max-per-user: 40
+      # Exibição + miniatura de todas as fotos do usuário (40 MB).
+      max-bytes-per-user: 41943040
+      # Arquivo enviado (8 MB); acima disso 422 GOAL_PHOTO_TOO_LARGE.
+      max-upload-bytes: 8388608
+      # Teto de dimensões lido do cabeçalho ANTES de decodificar (anti decompression bomb): 24 megapixels e 8000 px no maior lado.
+      max-pixels: 24000000
+      max-side: 8000
+      rate-limit:
+        # Envios por usuário na janela (decodificar imagem é caro na instância pequena).
+        max-requests: 30
+        window: PT1M
   search:
     # Busca global (S-287): pedidos por usuário por minuto (a busca roda a cada pausa de digitação) e teto de tempo de cada grupo de consulta.
     rate-limit:

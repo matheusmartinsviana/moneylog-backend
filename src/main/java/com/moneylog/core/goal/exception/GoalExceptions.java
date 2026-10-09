@@ -163,6 +163,78 @@ public final class GoalExceptions {
         }
     }
 
+    // ------------------------------------------------------------------ fotos e destaque (ADR-018)
+
+    /** Foto inexistente na meta, ou de outro usuário (não revela existência). */
+    public static class GoalPhotoNotFoundException extends NotFoundException {
+        public GoalPhotoNotFoundException(UUID photoId) {
+            super("GOAL_PHOTO_NOT_FOUND", "Foto da meta não encontrada: " + photoId + ".");
+        }
+    }
+
+    /** Arquivo acima do teto de upload. */
+    public static class GoalPhotoTooLargeException extends BusinessRuleException {
+        public GoalPhotoTooLargeException(long maxBytes) {
+            super("GOAL_PHOTO_TOO_LARGE", "A foto passa do limite de " + (maxBytes / (1024 * 1024)) + " MB.");
+        }
+    }
+
+    /** O conteúdo não é JPEG nem PNG (conferido pelos magic bytes, nunca pelo nome ou pelo MIME). */
+    public static class GoalPhotoUnsupportedTypeException extends BusinessRuleException {
+        public GoalPhotoUnsupportedTypeException() {
+            super("GOAL_PHOTO_UNSUPPORTED_TYPE", "Envie uma foto em JPEG ou PNG.");
+        }
+    }
+
+    /** Imagem corrompida, truncada ou que o decodificador recusa. */
+    public static class GoalPhotoInvalidImageException extends BusinessRuleException {
+        public GoalPhotoInvalidImageException() {
+            super("GOAL_PHOTO_INVALID_IMAGE", "Não foi possível ler a imagem. Tente outra foto.");
+        }
+    }
+
+    /** Dimensões acima do teto (lado ou megapixels), conferidas no cabeçalho, antes de decodificar. */
+    public static class GoalPhotoDimensionsExceededException extends BusinessRuleException {
+        public GoalPhotoDimensionsExceededException() {
+            super("GOAL_PHOTO_DIMENSIONS_EXCEEDED", "A foto tem dimensões grandes demais.");
+        }
+    }
+
+    /** Já há o máximo de fotos na meta. */
+    public static class GoalPhotoLimitReachedException extends BusinessRuleException {
+        public GoalPhotoLimitReachedException(int max) {
+            super("GOAL_PHOTO_LIMIT_REACHED", "A meta pode ter no máximo " + max + " fotos.");
+        }
+    }
+
+    /** Cota do usuário (quantidade ou tamanho total de fotos) esgotada. */
+    public static class GoalPhotoQuotaExceededException extends BusinessRuleException {
+        public GoalPhotoQuotaExceededException() {
+            super("GOAL_PHOTO_QUOTA_EXCEEDED", "Você chegou ao limite de fotos guardadas. Remova alguma para enviar outra.");
+        }
+    }
+
+    /** Foto só existe em meta de guardar dinheiro ({@code SAVINGS}). */
+    public static class GoalPhotosKindNotSupportedException extends BusinessRuleException {
+        public GoalPhotosKindNotSupportedException() {
+            super("GOAL_PHOTOS_KIND_NOT_SUPPORTED", "Só a meta de guardar dinheiro aceita fotos.");
+        }
+    }
+
+    /** Destaque só existe em meta de guardar dinheiro ({@code SAVINGS}). */
+    public static class GoalFeaturedKindNotSupportedException extends BusinessRuleException {
+        public GoalFeaturedKindNotSupportedException() {
+            super("GOAL_FEATURED_KIND_NOT_SUPPORTED", "Só a meta de guardar dinheiro pode ficar em destaque.");
+        }
+    }
+
+    /** A lista de ids da nova ordem não é exatamente o conjunto de fotos da meta. */
+    public static class GoalPhotosOrderMismatchException extends BusinessRuleException {
+        public GoalPhotosOrderMismatchException() {
+            super("GOAL_PHOTOS_ORDER_MISMATCH", "A nova ordem precisa ter todas as fotos da meta, sem repetir nenhuma.");
+        }
+    }
+
     /** Estado gravado de uma meta inconsistente ao reidratar: vira 500 (invariante interna). */
     public static class GoalStateInconsistentException extends DomainException {
         public GoalStateInconsistentException(String reason) {

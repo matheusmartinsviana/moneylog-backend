@@ -19,6 +19,7 @@ import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.goal.domain.GoalAction;
 import com.moneylog.core.goal.domain.GoalActionFrequency;
+import com.moneylog.core.goal.domain.GoalPhoto;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.goal.persistence.GoalEntity;
@@ -49,7 +50,7 @@ public class GoalGatewayImpl implements GoalGateway {
             entity = GoalRepositoryMapper.toEntity(goal, now);
         } else {
             entity.apply(goal.name(), goal.target().cents(), goal.deadline(), goal.priority(), goal.description(), goal.isArchived(),
-                    goal.baseline() == null ? null : goal.baseline().cents(), goal.baselineAt(), goal.direction(), goal.planNote(), now);
+                    goal.baseline() == null ? null : goal.baseline().cents(), goal.baselineAt(), goal.direction(), goal.planNote(), goal.isFeatured(), now);
         }
         GoalEntity saved = goals.saveAndFlush(entity);
         List<GoalReservationEntity> stored = reservations.findByUserIdAndGoalIdIn(goal.userId(), List.of(goal.id()));
@@ -61,7 +62,8 @@ public class GoalGatewayImpl implements GoalGateway {
             reservations.saveAllAndFlush(toInsert);
         }
         syncActions(goal, now);
-        return GoalRepositoryMapper.toVersioned(saved, concat(stored, toInsert), goal.actions());
+        syncPhotos(goal, now);
+        return GoalRepositoryMapper.toVersioned(saved, concat(stored, toInsert), goal.actions(), goal.photos());
     }
 
     @Override
@@ -73,7 +75,25 @@ public class GoalGatewayImpl implements GoalGateway {
     public Optional<Versioned<Goal>> findById(UUID userId, UUID goalId) {
         return goals.findByIdAndUserId(goalId, userId)
                 .map(e -> GoalRepositoryMapper.toVersioned(e, reservations.findByUserIdAndGoalIdIn(userId, List.of(goalId)),
-                        loadActions(userId, goalId).getOrDefault(goalId, List.of())));
+                        loadActions(userId, goalId).getOrDefault(goalId, List.of()),
+                        loadPhotos(userId, goalId).getOrDefault(goalId, List.of())));
+    }
+
+    @Override
+    public Optional<Versioned<Goal>> findFeatured(UUID userId) {
+        return goals.findByUserIdAndFeaturedTrue(userId).map(e -> findById(userId, e.getId()).orElseThrow());
+    }
+
+    @Override
+    public void lockUserMedia(UUID userId) {
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", (org.springframework.jdbc.core.ResultSetExtractor<Void>) rs -> null,
+                "goal-media:" + userId);
+    }
+
+    @Override
+    public PhotoUsage photoUsage(UUID userId) {
+        return jdbc.queryForObject("SELECT count(*), COALESCE(sum(size_bytes), 0) FROM goal_photos WHERE user_id = ?",
+                (rs, row) -> new PhotoUsage(rs.getInt(1), rs.getLong(2)), userId);
     }
 
     @Override
@@ -85,8 +105,9 @@ public class GoalGatewayImpl implements GoalGateway {
         Map<UUID, List<GoalReservationEntity>> byGoal = reservations.findByUserId(userId).stream()
                 .collect(Collectors.groupingBy(GoalReservationEntity::getGoalId));
         Map<UUID, List<GoalAction>> actions = loadActions(userId, null);
+        Map<UUID, List<GoalPhoto>> photos = loadPhotos(userId, null);
         return entities.stream().map(e -> GoalRepositoryMapper.toVersioned(e, byGoal.getOrDefault(e.getId(), List.of()),
-                actions.getOrDefault(e.getId(), List.of()))).toList();
+                actions.getOrDefault(e.getId(), List.of()), photos.getOrDefault(e.getId(), List.of()))).toList();
     }
 
     // ------------------------------------------------------------------ plano declarado (ações e check-ins)
@@ -126,6 +147,50 @@ public class GoalGatewayImpl implements GoalGateway {
             for (String period : action.doneIn()) {
                 jdbc.update("INSERT INTO goal_action_checkins (id, user_id, action_id, period, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
                         UUID.randomUUID(), goal.userId(), action.id(), period, stamp, stamp);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ fotos (só metadados; os bytes ficam em PhotoStorage)
+
+    private Map<UUID, List<GoalPhoto>> loadPhotos(UUID userId, UUID goalId) {
+        Map<UUID, List<GoalPhoto>> byGoal = new java.util.HashMap<>();
+        jdbc.query("SELECT id, goal_id, width, height, size_bytes, created_at FROM goal_photos WHERE user_id = ?"
+                + (goalId == null ? "" : " AND goal_id = ?") + " ORDER BY goal_id, position", rs -> {
+            byGoal.computeIfAbsent(rs.getObject(2, UUID.class), k -> new ArrayList<>()).add(new GoalPhoto(rs.getObject(1, UUID.class),
+                    rs.getInt(3), rs.getInt(4), rs.getLong(5), rs.getObject(6, OffsetDateTime.class).toInstant()));
+        }, goalId == null ? new Object[] {userId} : new Object[] {userId, goalId});
+        return byGoal;
+    }
+
+    /**
+     * Alinha {@code goal_photos} com a lista do agregado: apaga as que saíram (o {@code ON DELETE CASCADE} leva os bytes), insere as novas e
+     * regrava a posição das que mudaram. A unicidade de posição é adiada ao fim da transação, então trocar posições não colide.
+     */
+    private void syncPhotos(Goal goal, java.time.Instant now) {
+        Map<UUID, Integer> stored = new java.util.HashMap<>();
+        jdbc.query("SELECT id, position FROM goal_photos WHERE goal_id = ? AND user_id = ?",
+                rs -> {
+                    stored.put(rs.getObject(1, UUID.class), rs.getInt(2));
+                }, goal.id(), goal.userId());
+        List<GoalPhoto> photos = goal.photos();
+        Set<UUID> keep = photos.stream().map(GoalPhoto::id).collect(Collectors.toSet());
+        for (UUID id : stored.keySet()) {
+            if (!keep.contains(id)) {
+                jdbc.update("DELETE FROM goal_photos WHERE id = ? AND user_id = ?", id, goal.userId());
+            }
+        }
+        Timestamp stamp = Timestamp.from(now);
+        for (int position = 0; position < photos.size(); position++) {
+            GoalPhoto photo = photos.get(position);
+            Integer current = stored.get(photo.id());
+            if (current == null) {
+                jdbc.update("INSERT INTO goal_photos (id, user_id, goal_id, position, width, height, size_bytes, created_at, updated_at)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", photo.id(), goal.userId(), goal.id(), position, photo.width(), photo.height(),
+                        photo.sizeBytes(), OffsetDateTime.ofInstant(photo.createdAt(), ZoneOffset.UTC), stamp);
+            } else if (current != position) {
+                jdbc.update("UPDATE goal_photos SET position = ?, updated_at = ? WHERE id = ? AND user_id = ?", position, stamp, photo.id(),
+                        goal.userId());
             }
         }
     }

@@ -21,4 +21,6 @@ public interface GoalRepositoryJpa extends JpaRepository<GoalEntity, UUID> {
     Optional<GoalEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);
 
     List<GoalEntity> findByUserId(UUID userId);
+
+    Optional<GoalEntity> findByUserIdAndFeaturedTrue(UUID userId);
 }

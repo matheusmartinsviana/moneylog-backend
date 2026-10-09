@@ -82,6 +82,10 @@ public class GoalEntity {
     @Column(name = "plan_note", length = 500)
     private String planNote;
 
+    /** V8.16: meta em destaque da Home (no máximo uma por usuário; índice único parcial). */
+    @Column(nullable = false)
+    private boolean featured;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -97,7 +101,8 @@ public class GoalEntity {
     @SuppressWarnings("java:S107")
     public GoalEntity(UUID id, UUID userId, String name, long targetCents, String currency, LocalDate deadline, GoalPriority priority,
                       String description, boolean archived, GoalKind kind, Long baselineCents, Instant baselineAt, GoalMetric metric,
-                      GoalDirection direction, String planNote, Instant now) {
+                      GoalDirection direction, String planNote, boolean featured, Instant now) {
+        this.featured = featured;
         this.metric = metric;
         this.direction = direction;
         this.planNote = planNote;
@@ -121,7 +126,8 @@ public class GoalEntity {
     @SuppressWarnings("java:S107")
     public void apply(String newName, long newTargetCents, LocalDate newDeadline, GoalPriority newPriority, String newDescription,
                       boolean newArchived, Long newBaselineCents, Instant newBaselineAt, GoalDirection newDirection, String newPlanNote,
-                      Instant now) {
+                      boolean newFeatured, Instant now) {
+        this.featured = newFeatured;
         this.direction = newDirection;
         this.planNote = newPlanNote;
         this.baselineCents = newBaselineCents;
@@ -189,6 +195,10 @@ public class GoalEntity {
 
     public Instant getBaselineAt() {
         return baselineAt;
+    }
+
+    public boolean isFeatured() {
+        return featured;
     }
 
     public boolean isArchived() {

@@ -315,7 +315,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleMaxUploadSizeExceededException(org.springframework.web.multipart.MaxUploadSizeExceededException ex,
                                                                           HttpHeaders headers, HttpStatusCode status, WebRequest request) {
-        return respond(HttpStatus.UNPROCESSABLE_ENTITY, "VAULT_IMPORT_TOO_LARGE", "O arquivo enviado passa do limite de 20 MB.", servlet(request));
+        HttpServletRequest servlet = servlet(request);
+        if (servlet.getRequestURI().matches("/v1/goals/[^/]+/photos/?")) {
+            return respond(HttpStatus.UNPROCESSABLE_ENTITY, "GOAL_PHOTO_TOO_LARGE", "A foto passa do limite de tamanho.", servlet);
+        }
+        return respond(HttpStatus.UNPROCESSABLE_ENTITY, "VAULT_IMPORT_TOO_LARGE", "O arquivo enviado passa do limite de 20 MB.", servlet);
     }
 
     /** Multipart malformado (sem boundary, sem fechamento, corpo cortado): é erro do cliente, 400 {@code VALIDATION_FAILED}, nunca 500. */

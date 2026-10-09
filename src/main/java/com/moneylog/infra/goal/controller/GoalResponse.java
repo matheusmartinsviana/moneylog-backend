@@ -14,6 +14,7 @@ import com.moneylog.core.goal.domain.GoalConsistency;
 import com.moneylog.core.goal.domain.GoalDirection;
 import com.moneylog.core.goal.domain.GoalKind;
 import com.moneylog.core.goal.domain.GoalMetric;
+import com.moneylog.core.goal.domain.GoalPhoto;
 import com.moneylog.core.goal.domain.GoalPlan;
 import com.moneylog.core.goal.domain.GoalPriority;
 import com.moneylog.core.goal.domain.GoalReservation;
@@ -33,7 +34,13 @@ public record GoalResponse(UUID id, GoalKind kind, String name, Money target, Mo
                            GoalMetric metric, GoalDirection direction, boolean reached, LocalDate metricAsOf,
                            GoalStage stage, Money requiredPace, Integer monthsLeft, Money nextMilestone, Boolean onTrack, Money gap,
                            String planNote, List<ActionResponse> actions, List<ConsistencyMonth> consistency, int streak,
-                           String consistencyRate, long version, Instant createdAt, Instant updatedAt) {
+                           String consistencyRate, boolean featured, UUID coverPhotoId, List<PhotoResponse> photos, long version,
+                           Instant createdAt, Instant updatedAt) {
+
+    /** {@code GoalPhoto} do contrato: só metadados, na ordem de exibição; os bytes vêm de {@code .../photos/{photoId}/content}. */
+    public record PhotoResponse(UUID id, int position, int width, int height, Instant createdAt) {
+    }
+
 
     /** {@code GoalReservation} do contrato. */
     public record ReservationResponse(UUID id, AccountRef account, Money amount, LocalDate date, String note, Instant createdAt) {
@@ -73,7 +80,20 @@ public record GoalResponse(UUID id, GoalKind kind, String name, Money target, Mo
                 plan == null ? null : plan.monthsLeft(), plan == null ? null : plan.nextMilestone(), plan == null ? null : plan.onTrack(),
                 plan == null ? null : plan.gap(), planning.planNote(), planning.actions().stream().map(GoalResponse::action).toList(),
                 consistency.history().stream().map(m -> new ConsistencyMonth(m.month().toString(), m.expected(), m.actual(), m.met(), m.closed())).toList(),
-                consistency.streak(), rate(consistency.rate()), details.version(), details.createdAt(), details.updatedAt());
+                consistency.streak(), rate(consistency.rate()), goal.isFeatured(), goal.coverPhotoId(), photos(goal), details.version(), details.createdAt(), details.updatedAt());
+    }
+
+    public static List<PhotoResponse> photos(Goal goal) {
+        List<GoalPhoto> photos = goal.photos();
+        List<PhotoResponse> out = new java.util.ArrayList<>(photos.size());
+        for (int i = 0; i < photos.size(); i++) {
+            out.add(photo(photos.get(i), i));
+        }
+        return out;
+    }
+
+    public static PhotoResponse photo(GoalPhoto p, int position) {
+        return new PhotoResponse(p.id(), position, p.width(), p.height(), p.createdAt());
     }
 
     private static ActionResponse action(GoalAction a) {
