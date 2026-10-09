@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
@@ -61,7 +62,18 @@ public sealed interface CreateTransactionCommand {
         }
     }
 
-    record Income(Common common, UUID accountId, UUID categoryId, PaymentMethod method) implements CreateTransactionCommand {
+    /**
+     * Receita. {@code incomeCompetence} (opcional, ADR-017): o mês a que a renda pertence quando difere do mês da data; {@code null}
+     * = o mês da data. O caixa e o saldo seguem na data; só a competência da renda muda.
+     */
+    record Income(Common common, UUID accountId, UUID categoryId, PaymentMethod method, Competence incomeCompetence)
+            implements CreateTransactionCommand {
+
+        /** Receita no mês da data. */
+        public Income(Common common, UUID accountId, UUID categoryId, PaymentMethod method) {
+            this(common, accountId, categoryId, method, null);
+        }
+
         @Override
         public UUID userId() {
             return common.userId();

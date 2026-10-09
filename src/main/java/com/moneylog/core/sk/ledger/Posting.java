@@ -5,12 +5,23 @@ import java.time.LocalDate;
 import com.moneylog.core.sk.ledger.LedgerExceptions.InvalidPostingException;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
+import com.moneylog.core.sk.time.FinancialDates;
 
 /**
- * Lançamento no razão (D1 §1.1): livro, valor com sinal (débito {@code +}, crédito {@code −}) e data efetiva.
- * A competência é sempre o mês da data efetiva. Valor zero não é lançamento.
+ * Lançamento no razão (D1 §1.1): livro, valor com sinal (débito {@code +}, crédito {@code −}), data efetiva e competência.
+ * A competência é o mês da data efetiva, com <b>uma única exceção</b> (ADR-017): o posting do livro {@code INCOME} pode
+ * pertencer a outro mês (renda de outubro recebida em setembro). A data efetiva (caixa, saldo) nunca muda; só a competência
+ * da renda. Nos demais livros, competência diferente do mês da data é recusada. Valor zero não é lançamento.
+ *
+ * <p>{@code competence} nulo = mês da data efetiva (o componente nunca fica nulo depois de construído). Toda leitura que agrupa
+ * por competência usa {@link #competence()}: é a única fonte da regra.
  */
-public record Posting(BookRef book, Money amount, LocalDate effectiveDate) {
+public record Posting(BookRef book, Money amount, LocalDate effectiveDate, Competence competence) {
+
+    /** Posting na competência do mês da data efetiva (todos os livros). */
+    public Posting(BookRef book, Money amount, LocalDate effectiveDate) {
+        this(book, amount, effectiveDate, null);
+    }
 
     public Posting {
         if (book == null) {
@@ -22,10 +33,22 @@ public record Posting(BookRef book, Money amount, LocalDate effectiveDate) {
         if (effectiveDate == null) {
             throw new InvalidPostingException("a data efetiva é obrigatória.");
         }
+        Competence ofDate = Competence.from(effectiveDate);
+        if (competence == null) {
+            competence = ofDate;
+        } else if (!competence.equals(ofDate)) {
+            if (book.type() != BookType.INCOME) {
+                throw new InvalidPostingException("só a receita (livro INCOME) pode ter competência diferente do mês da data.");
+            }
+            if (!FinancialDates.isInWindow(competence.firstDay()) || !FinancialDates.isInWindow(competence.lastDay())) {
+                throw new InvalidPostingException("a competência precisa estar entre 2000-01 e 2100-12.");
+            }
+        }
     }
 
-    public Competence competence() {
-        return Competence.from(effectiveDate);
+    /** O posting no mesmo livro/valor/data, mas na competência informada (só a receita aceita). */
+    public Posting inCompetence(Competence target) {
+        return new Posting(book, amount, effectiveDate, target);
     }
 
     public BookType bookType() {

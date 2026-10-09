@@ -76,4 +76,38 @@ class PostingTest {
         assertThat(BookType.values()).filteredOn(BookType::isResult)
                 .containsExactlyInAnyOrder(BookType.EXPENSE, BookType.INCOME);
     }
+
+    @Test
+    @DisplayName("ADR-017: só o livro INCOME aceita competência diferente do mês da data; a data efetiva não muda")
+    void deveAceitarCompetenciaDeRendaDeOutroMes() {
+        Posting renda = new Posting(BookRef.income(ID), Money.of("-1500.00"), LocalDate.of(2026, 9, 16), Competence.of(2026, 10));
+
+        assertThat(renda.competence()).isEqualTo(Competence.of(2026, 10));
+        assertThat(renda.effectiveDate()).isEqualTo(LocalDate.of(2026, 9, 16));
+        // a mesma competência do mês da data é normal; ausente também
+        assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(2027, 1)).competence()).isEqualTo(Competence.of(2027, 1));
+        assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, null).competence()).isEqualTo(Competence.of(2027, 1));
+        assertThat(renda.inCompetence(Competence.of(2026, 9)).competence()).isEqualTo(Competence.of(2026, 9));
+    }
+
+    @ParameterizedTest(name = "{0} recusa competência de outro mês")
+    @EnumSource(value = BookType.class, names = "INCOME", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("ADR-017: despesa, conta, cartão, dívida e patrimônio nunca mudam de mês")
+    void deveRecusarCompetenciaDeOutroMesForaDaRenda(BookType tipo) {
+        BookRef book = tipo == BookType.EQUITY ? BookRef.equity() : new BookRef(tipo, ID);
+
+        assertThatThrownBy(() -> new Posting(book, Money.of("1.00"), DIA, Competence.of(2027, 2))).isInstanceOf(InvalidPostingException.class);
+        assertThat(new Posting(book, Money.of("1.00"), DIA, Competence.of(2027, 1)).competence()).isEqualTo(Competence.of(2027, 1));
+    }
+
+    @Test
+    @DisplayName("ADR-017: a competência da renda fica na janela 2000-01..2100-12")
+    void deveManterACompetenciaDaRendaNaJanela() {
+        assertThatThrownBy(() -> new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(1999, 12)))
+                .isInstanceOf(InvalidPostingException.class);
+        assertThatThrownBy(() -> new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(2101, 1)))
+                .isInstanceOf(InvalidPostingException.class);
+        assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(2100, 12)).competence()).isEqualTo(Competence.of(2100, 12));
+        assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(2000, 1)).competence()).isEqualTo(Competence.of(2000, 1));
+    }
 }

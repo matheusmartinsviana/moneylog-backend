@@ -57,7 +57,8 @@ public class UpdateRecurrenceUseCaseImpl implements UpdateRecurrenceUseCase {
         if (c.endDate() == null) {
             recurrence.ensureEndRemovalDoesNotReopen(time.today());
         }
-        recurrence.updateDetails(c.amount(), c.description(), c.categoryId(), c.accountId(), c.method(), c.cardId());
+        recurrence.updateDetails(c.amount(), c.description(), c.categoryId(), c.accountId(), c.method(), c.cardId(),
+                c.incomeCompetenceOffsetMonths() == null ? recurrence.incomeCompetenceOffsetMonths() : c.incomeCompetenceOffsetMonths());
         recurrence.changeEnd(c.endDate());
         return views.one(c.userId(), recurrences.save(recurrence), time.today());
     }

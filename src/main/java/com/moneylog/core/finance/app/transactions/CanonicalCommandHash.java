@@ -50,6 +50,10 @@ public final class CanonicalCommandHash {
                 field(canonical, "accountId", c.accountId());
                 field(canonical, "categoryId", c.categoryId());
                 field(canonical, "method", c.method());
+                if (c.incomeCompetence() != null) {
+                    // só entra quando informada: o hash das receitas sem competência é o de antes (chaves de 24 h seguem valendo)
+                    field(canonical, "incomeCompetence", c.incomeCompetence());
+                }
             }
             case Transfer c -> {
                 field(canonical, "type", "TRANSFER");

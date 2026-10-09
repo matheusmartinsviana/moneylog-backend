@@ -69,7 +69,8 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
                                   UUID accountId, UUID counterpartAccountId, UUID cardId, UUID categoryId, UUID debtId, UUID refundOfId,
                                   InvestmentDirection investmentDirection, AdjustmentDirection adjustmentDirection,
                                   AdjustmentKind adjustmentKind, String reason, LocalDate invoiceClosingDate, boolean lateEntry,
-                                  TransactionStatus status, String voidReason, Instant voidedAt, List<InstallmentItem> installments) {
+                                  TransactionStatus status, String voidReason, Instant voidedAt, List<InstallmentItem> installments,
+                                  String incomeCompetence) {
     }
 
     public record SettlementItem(UUID transactionId, Money amount, boolean active) {
@@ -86,7 +87,7 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
     public record RecurrenceItem(UUID id, TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
                                  UUID cardId, PaymentMethod paymentMethod, Frequency frequency, int interval, IntervalUnit unit,
                                  LocalDate startDate, LocalDate endDate, Integer maxOccurrences, boolean active,
-                                 List<LocalDate> skippedDates) {
+                                 List<LocalDate> skippedDates, int incomeCompetenceOffsetMonths) {
     }
 
     public record ReservationItem(UUID id, UUID accountId, Money amount, LocalDate date, String note, Instant createdAt) {
@@ -97,7 +98,7 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
     }
 
     public record PostingItem(PostingSourceType sourceType, UUID sourceId, UUID installmentId, BookType bookType, UUID bookId,
-                              Money amount, LocalDate effectiveDate, boolean active) {
+                              Money amount, LocalDate effectiveDate, boolean active, String competence) {
     }
 
     public static BackupResponse of(BackupSnapshot s) {
@@ -130,7 +131,8 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
         return new TransactionItem(t.id(), t.type(), t.amount(), t.date(), t.description(), t.notes(), t.origin().source(),
                 t.origin().recurrenceId(), t.origin().occurrenceDate(), t.paymentMethod(), t.accountId(), t.counterpartAccountId(),
                 t.cardId(), t.categoryId(), t.debtId(), t.refundOfId(), t.investmentDirection(), t.adjustmentDirection(),
-                t.adjustmentKind(), t.reason(), t.invoiceClosingDate(), t.lateEntry(), t.status(), t.voidReason(), t.voidedAt(), installments);
+                t.adjustmentKind(), t.reason(), t.invoiceClosingDate(), t.lateEntry(), t.status(), t.voidReason(), t.voidedAt(), installments,
+                t.incomeCompetence() == null ? null : t.incomeCompetence().toString());
     }
 
     private static DebtItem debt(Debt d) {
@@ -146,7 +148,8 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
     private static RecurrenceItem recurrence(RecurringTransaction r) {
         return new RecurrenceItem(r.id(), r.type(), r.amount(), r.description(), r.categoryId(), r.accountId(), r.cardId(),
                 r.paymentMethod(), r.schedule().frequency(), r.schedule().interval(), r.schedule().unit(), r.schedule().startDate(),
-                r.schedule().endDate(), r.schedule().maxOccurrences(), r.isActive(), r.skippedDates());
+                r.schedule().endDate(), r.schedule().maxOccurrences(), r.isActive(), r.skippedDates(),
+                r.incomeCompetenceOffsetMonths());
     }
 
     private static GoalItem goal(Goal g) {
@@ -157,6 +160,6 @@ public record BackupResponse(int schemaVersion, Instant generatedAt, List<Accoun
 
     private static PostingItem posting(LedgerEntry e) {
         return new PostingItem(e.source().type(), e.source().sourceId(), e.source().installmentId(), e.posting().bookType(),
-                e.posting().book().id(), e.posting().amount(), e.posting().effectiveDate(), e.active());
+                e.posting().book().id(), e.posting().amount(), e.posting().effectiveDate(), e.active(), e.posting().competence().toString());
     }
 }

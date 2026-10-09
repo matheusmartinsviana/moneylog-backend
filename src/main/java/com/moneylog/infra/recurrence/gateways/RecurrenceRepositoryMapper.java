@@ -25,7 +25,8 @@ public final class RecurrenceRepositoryMapper {
                 e.getMaxOccurrences());
         return RecurringTransaction.restore(e.getId(), e.getUserId(), e.getType(),
                 Money.ofCents(e.getAmountCents(), CurrencyCode.of(e.getCurrency())), e.getDescription(), e.getCategoryId(),
-                e.getAccountId(), e.getCardId(), e.getPaymentMethod(), schedule, realized, skipped, e.isActive());
+                e.getAccountId(), e.getCardId(), e.getPaymentMethod(), schedule, realized, skipped, e.isActive(),
+                e.getIncomeCompetenceOffsetMonths());
     }
 
     public static Versioned<RecurringTransaction> toVersioned(RecurrenceEntity e, Collection<LocalDate> realized,
@@ -37,6 +38,6 @@ public final class RecurrenceRepositoryMapper {
         Schedule s = r.schedule();
         return new RecurrenceEntity(r.id(), r.userId(), r.type(), r.amount().cents(), r.amount().currency().value(), r.description(),
                 r.categoryId(), r.accountId(), r.cardId(), r.paymentMethod(), s.frequency(), s.interval(), s.unit(), s.startDate(),
-                s.endDate(), s.maxOccurrences(), r.isActive(), now);
+                s.endDate(), s.maxOccurrences(), r.isActive(), r.incomeCompetenceOffsetMonths(), now);
     }
 }

@@ -151,7 +151,8 @@ public final class AccountTypeHandlers {
         @Override
         public Transaction build(Income c, UUID id, TransactionOrigin origin, Transaction editing) {
             return AccountTransactions.income(support.header(c.common(), id, origin), c.common().amount(),
-                    support.account(c.userId(), c.accountId()), support.category(c.userId(), c.categoryId(), editing, CategoryKind.INCOME), c.method());
+                    support.account(c.userId(), c.accountId()), support.category(c.userId(), c.categoryId(), editing, CategoryKind.INCOME), c.method(),
+                    c.incomeCompetence());
         }
     }
 

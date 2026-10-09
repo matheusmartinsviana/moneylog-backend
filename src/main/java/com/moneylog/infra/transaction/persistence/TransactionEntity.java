@@ -117,6 +117,11 @@ public class TransactionEntity {
     @Column(name = "original_dedup_key", length = 64, columnDefinition = "char(64)")
     private String originalDedupKey;
 
+    /** Mês a que a receita pertence quando difere do mês da data ({@code AAAA-MM}, ADR-017); {@code null} = o mês da data. */
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "income_competence", length = 7, columnDefinition = "char(7)")
+    private String incomeCompetence;
+
     @Column(name = "recurrence_id")
     private UUID recurrenceId;
 
@@ -148,7 +153,7 @@ public class TransactionEntity {
                              UUID invoiceId, boolean lateEntry, Integer installmentCount, UUID categoryId,
                              UUID refundOfId, UUID debtId, String direction, String adjustmentKind, String reason, TransactionSource source,
                              UUID importBatchId, String dedupKey, String originalDedupKey, UUID recurrenceId,
-                             LocalDate occurrenceDate, String voidReason, Instant voidedAt, Instant now) {
+                             LocalDate occurrenceDate, String voidReason, Instant voidedAt, String incomeCompetence, Instant now) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -179,6 +184,7 @@ public class TransactionEntity {
         this.occurrenceDate = occurrenceDate;
         this.voidReason = voidReason;
         this.voidedAt = voidedAt;
+        this.incomeCompetence = incomeCompetence;
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -191,7 +197,7 @@ public class TransactionEntity {
     public void apply(TransactionStatus newStatus, long newAmountCents, LocalDate newDate, String newDescription, String newNotes,
                       PaymentMethod newPaymentMethod, UUID newAccountId, UUID newCounterpartAccountId, UUID newInvoiceId,
                       boolean newLateEntry, UUID newCategoryId, UUID newRefundOfId, String newDirection, String newAdjustmentKind, String newReason, String newVoidReason,
-                      Instant newVoidedAt, Instant now) {
+                      Instant newVoidedAt, String newIncomeCompetence, Instant now) {
         this.status = newStatus;
         this.amountCents = newAmountCents;
         this.transactionDate = newDate;
@@ -209,9 +215,14 @@ public class TransactionEntity {
         this.reason = newReason;
         this.voidReason = newVoidReason;
         this.voidedAt = newVoidedAt;
+        this.incomeCompetence = newIncomeCompetence;
         // updated_at sobe a cada gravação (mesmo com o relógio parado): a linha sempre fica "suja" e o JPA sempre incrementa
         // a versão, então uma edição sem mudança de valor também cria a versão seguinte
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, java.time.temporal.ChronoUnit.MICROS);
+    }
+
+    public String getIncomeCompetence() {
+        return incomeCompetence;
     }
 
     public UUID getId() {

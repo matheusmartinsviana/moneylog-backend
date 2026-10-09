@@ -107,7 +107,7 @@ public class RecurrenceController {
         RecurrenceView created = create.handle(new CreateRecurrenceCommand(userId, TransactionType.valueOf(body.type().name()),
                 Money.of(body.amount(), CurrencyCode.BRL), body.description(), body.categoryId(), body.accountId(), body.method(),
                 body.cardId(), body.frequency(), body.interval(), body.unit(), body.startDate(), body.endDate(),
-                body.maxOccurrences(), idempotencyKey));
+                body.maxOccurrences(), idempotencyKey, body.incomeCompetenceOffsetMonths()));
         return ResponseEntity.created(URI.create("/v1/recurrences/" + created.recurrence().id())).body(RecurrenceResponse.of(created));
     }
 
@@ -140,7 +140,8 @@ public class RecurrenceController {
     @PutMapping("/{id}")
     public RecurrenceResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody RecurrenceUpdate body) {
         return RecurrenceResponse.of(update.handle(new UpdateRecurrenceCommand(userId, id, Money.of(body.amount(), CurrencyCode.BRL),
-                body.description(), body.categoryId(), body.accountId(), body.method(), body.cardId(), body.endDate(), body.version())));
+                body.description(), body.categoryId(), body.accountId(), body.method(), body.cardId(), body.endDate(), body.version(),
+                body.incomeCompetenceOffsetMonths())));
     }
 
     @PostMapping("/{id}/end")

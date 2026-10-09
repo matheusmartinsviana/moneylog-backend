@@ -92,7 +92,8 @@ public class ExportTransactionsCsvUseCaseImpl implements ExportTransactionsCsvUs
                 labels.method(t.paymentMethod()),
                 CsvCells.amount(t.amount().toPlainString()),
                 labels.status(t.status()),
-                labels.direction(t)
+                labels.direction(t),
+                t.incomeCompetence() == null ? "" : t.incomeCompetence().toString()
         };
     }
 

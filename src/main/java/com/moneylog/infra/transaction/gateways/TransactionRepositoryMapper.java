@@ -19,6 +19,7 @@ import com.moneylog.core.importing.domain.DedupKey;
 import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
@@ -75,7 +76,8 @@ public final class TransactionRepositoryMapper {
                 Money.ofCents(e.getAmountCents(), currency), e.getTransactionDate(), e.getDescription(), e.getNotes(),
                 origin(e), e.getPaymentMethod(), e.getAccountId(), e.getCounterpartAccountId(), e.getCardId(), e.getCategoryId(),
                 e.getDebtId(), e.getRefundOfId(), investment, adjustment, kind, e.getReason(), invoiceClosingDate, e.isLateEntry(),
-                installments, e.getStatus(), e.getVoidReason(), e.getVoidedAt(), e.getVersion());
+                installments, e.getStatus(), e.getVoidReason(), e.getVoidedAt(), e.getVersion(),
+                e.getIncomeCompetence() == null ? null : Competence.parse(e.getIncomeCompetence().strip()));
         return Transaction.restore(state, relevant);
     }
 
@@ -128,7 +130,8 @@ public final class TransactionRepositoryMapper {
                 invoiceId, s.lateEntry(), s.installments().isEmpty() ? null : s.installments().size(), s.categoryId(), s.refundOfId(), s.debtId(), direction, s.adjustmentKind() == null ? null : s.adjustmentKind().name(), s.reason(),
                 origin.source(), origin.importBatchId(), origin.dedupKey() == null ? null : origin.dedupKey().value(),
                 origin.originalDedupKey() == null ? null : origin.originalDedupKey().value(), origin.recurrenceId(),
-                origin.occurrenceDate(), s.voidReason(), s.voidedAt(), now);
+                origin.occurrenceDate(), s.voidReason(), s.voidedAt(),
+                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), now);
     }
 
     private static TransactionOrigin origin(TransactionEntity e) {

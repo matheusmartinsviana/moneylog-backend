@@ -85,6 +85,10 @@ public class RecurrenceEntity {
     @Column(nullable = false)
     private boolean active;
 
+    /** Deslocamento da competência da renda das ocorrências (0 ou 1, ADR-017). */
+    @Column(name = "income_competence_offset_months", nullable = false)
+    private int incomeCompetenceOffsetMonths;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -101,7 +105,7 @@ public class RecurrenceEntity {
     public RecurrenceEntity(UUID id, UUID userId, TransactionType type, long amountCents, String currency, String description,
                             UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod, Frequency frequency,
                             int intervalCount, IntervalUnit intervalUnit, LocalDate startDate, LocalDate endDate,
-                            Integer maxOccurrences, boolean active, Instant now) {
+                            Integer maxOccurrences, boolean active, int incomeCompetenceOffsetMonths, Instant now) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -119,6 +123,7 @@ public class RecurrenceEntity {
         this.endDate = endDate;
         this.maxOccurrences = maxOccurrences;
         this.active = active;
+        this.incomeCompetenceOffsetMonths = incomeCompetenceOffsetMonths;
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -126,7 +131,7 @@ public class RecurrenceEntity {
     /** Aplica o que muda numa edição, no encerramento e na desativação. A versão sobe a cada gravação. */
     @SuppressWarnings("java:S107")
     public void apply(long newAmountCents, String newDescription, UUID newCategoryId, UUID newAccountId, UUID newCardId,
-                      PaymentMethod newMethod, LocalDate newEndDate, boolean newActive, Instant now) {
+                      PaymentMethod newMethod, LocalDate newEndDate, boolean newActive, int newIncomeCompetenceOffsetMonths, Instant now) {
         this.amountCents = newAmountCents;
         this.description = newDescription;
         this.categoryId = newCategoryId;
@@ -135,7 +140,12 @@ public class RecurrenceEntity {
         this.paymentMethod = newMethod;
         this.endDate = newEndDate;
         this.active = newActive;
+        this.incomeCompetenceOffsetMonths = newIncomeCompetenceOffsetMonths;
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+    }
+
+    public int getIncomeCompetenceOffsetMonths() {
+        return incomeCompetenceOffsetMonths;
     }
 
     public UUID getId() {

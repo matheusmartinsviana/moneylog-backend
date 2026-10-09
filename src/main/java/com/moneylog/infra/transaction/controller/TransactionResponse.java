@@ -29,7 +29,7 @@ public record TransactionResponse(UUID id, TransactionType type, TransactionStat
                                   boolean editable, boolean voidable, VoidBlockedBy voidBlockedBy, String voidReason,
                                   Instant voidedAt, TransactionSource source, long version, Instant createdAt, Instant updatedAt,
                                   DebtSummaryResponse debt, List<DebtSummaryResponse> shares, UUID recurrenceId,
-                                  LocalDate occurrenceDate) {
+                                  LocalDate occurrenceDate, String incomeCompetence) {
 
     public record Ref(UUID id, String name) {
     }
@@ -71,7 +71,8 @@ public record TransactionResponse(UUID id, TransactionType type, TransactionStat
                 t.origin().source(), t.version(), d.createdAt(), d.updatedAt(),
                 t.debtId() != null && !d.debts().isEmpty() ? DebtSummaryResponse.of(d.debts().get(0)) : null,
                 t.debtId() == null ? d.debts().stream().map(DebtSummaryResponse::of).toList() : List.of(),
-                t.origin().recurrenceId(), t.origin().occurrenceDate());
+                t.origin().recurrenceId(), t.origin().occurrenceDate(),
+                t.incomeCompetence() == null ? null : t.incomeCompetence().toString());
     }
 
     private static Ref ref(Account account) {

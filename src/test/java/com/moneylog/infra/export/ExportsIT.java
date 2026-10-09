@@ -90,10 +90,10 @@ class ExportsIT extends E4ItBase {
         assertThat(result.getResponse().getContentType()).startsWith("text/csv").containsIgnoringCase("utf-8");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("attachment; filename=\"moneylog-transactions-2026-10-01_2026-10-31.csv\"");
         assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
-        assertThat(lines.getFirst()).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção");
-        assertThat(lines).contains("2026-10-10;Compra no cartão;Notebook;Tecnologia;Roxinho;;1200,00;Ativa;");
-        assertThat(lines).contains("2026-10-11;Despesa;Aluguel;Alimentação;Nubank;Pix;1234,50;Ativa;");
-        assertThat(lines).contains("2026-10-10;Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;");
+        assertThat(lines.getFirst()).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda");
+        assertThat(lines).contains("2026-10-10;Compra no cartão;Notebook;Tecnologia;Roxinho;;1200,00;Ativa;;");
+        assertThat(lines).contains("2026-10-11;Despesa;Aluguel;Alimentação;Nubank;Pix;1234,50;Ativa;;");
+        assertThat(lines).contains("2026-10-10;Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;;");
         assertThat(lines.stream().filter(l -> l.contains(";Notebook;"))).hasSize(1);
         assertThat(text).doesNotContain("Lançada por engano").doesNotContain("Setembro");
         assertThat(lines).hasSize(1 + 8);
@@ -121,7 +121,7 @@ class ExportsIT extends E4ItBase {
     void deveTraduzirEFiltrar() throws Exception {
         scenario();
 
-        assertThat(text(csv("?from=2026-10-01&to=2026-10-31", "en-US,en;q=0.9"))).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction\r\n");
+        assertThat(text(csv("?from=2026-10-01&to=2026-10-31", "en-US,en;q=0.9"))).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction;Income month\r\n");
         assertThat(text(csv("?from=2026-10-01&to=2026-10-31", "fr"))).startsWith("Data;Tipo;");
         assertThat(text(csv("?status=VOIDED", null))).contains("Lançada por engano").contains(";Estornada;").doesNotContain("Restaurante");
         String both = text(csv("?includeVoided=true&from=2026-10-01&to=2026-10-31", null));
@@ -129,7 +129,7 @@ class ExportsIT extends E4ItBase {
         assertThat(text(csv("?q=aluguel", null))).contains("Aluguel").doesNotContain("Restaurante");
         assertThat(text(csv("?type=CARD_PURCHASE", null))).contains("Notebook").doesNotContain("Aluguel");
         assertThat(text(csv("?accountId=" + nubank + "&method=PIX&categoryId=" + food, null))).contains("Aluguel").doesNotContain("Notebook");
-        assertThat(text(csv("?from=2030-01-01", null))).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção\r\n");
+        assertThat(text(csv("?from=2030-01-01", null))).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda\r\n");
     }
 
     @Test
@@ -146,7 +146,7 @@ class ExportsIT extends E4ItBase {
         committed(() -> SqlFixtures.insertUser(jdbc, other, "export-" + other + "@moneylog.com"));
         MvcResult theirs = mockMvc.perform(getAs(auth.bearer(other), "/v1/exports/transactions.csv")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn();
-        assertThat(text(theirs)).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção\r\n");
+        assertThat(text(theirs)).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda\r\n");
         JsonNode theirBackup = body(mockMvc.perform(getAs(auth.bearer(other), "/v1/exports/backup")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
         assertThat(theirBackup.get("accounts")).isEmpty();
@@ -170,14 +170,14 @@ class ExportsIT extends E4ItBase {
         created(expense("1.00", "2026-10-10", "Normal"));
 
         String pt = text(csv("?from=2026-10-10&to=2026-10-10", null));
-        assertThat(pt).contains("Investimento;CDB CONTRIBUTION;;Nubank > XP Invest;;500,00;Ativa;Aplicação\r\n")
-                .contains("Investimento;CDB REDEMPTION;;Nubank > XP Invest;;500,00;Ativa;Resgate\r\n")
-                .contains("Ajuste;Ajuste INCREASE;;Nubank;;10,00;Ativa;Crédito\r\n").contains("Ajuste;Ajuste DECREASE;;Nubank;;10,00;Ativa;Débito\r\n")
-                .contains("Despesa;Normal;Alimentação;Nubank;Pix;1,00;Ativa;\r\n");
+        assertThat(pt).contains("Investimento;CDB CONTRIBUTION;;Nubank > XP Invest;;500,00;Ativa;Aplicação;\r\n")
+                .contains("Investimento;CDB REDEMPTION;;Nubank > XP Invest;;500,00;Ativa;Resgate;\r\n")
+                .contains("Ajuste;Ajuste INCREASE;;Nubank;;10,00;Ativa;Crédito;\r\n").contains("Ajuste;Ajuste DECREASE;;Nubank;;10,00;Ativa;Débito;\r\n")
+                .contains("Despesa;Normal;Alimentação;Nubank;Pix;1,00;Ativa;;\r\n");
         String en = text(csv("?from=2026-10-10&to=2026-10-10", "en"));
-        assertThat(en).contains("Investment;CDB CONTRIBUTION;;Nubank > XP Invest;;500,00;Active;Contribution\r\n")
-                .contains(";Active;Redemption\r\n").contains("Adjustment;Ajuste INCREASE;;Nubank;;10,00;Active;Credit\r\n").contains(";Active;Debit\r\n")
-                .contains("Expense;Normal;Alimentação;Nubank;Pix;1,00;Active;\r\n");
+        assertThat(en).contains("Investment;CDB CONTRIBUTION;;Nubank > XP Invest;;500,00;Active;Contribution;\r\n")
+                .contains(";Active;Redemption;\r\n").contains("Adjustment;Ajuste INCREASE;;Nubank;;10,00;Active;Credit;\r\n").contains(";Active;Debit;\r\n")
+                .contains("Expense;Normal;Alimentação;Nubank;Pix;1,00;Active;;\r\n");
     }
 
     @Test

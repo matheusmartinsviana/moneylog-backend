@@ -40,14 +40,14 @@ public record EntryResponse(List<Item> items, boolean hasNext, Totals totals, Li
         List<Item> items = listing.items().items().stream().map(row -> {
             Transaction t = row.transaction();
             var line = row.line();
-            return new Item(line.transactionId(), t == null ? null : t.type(), line.date(), Competence.from(line.date()).toString(),
+            return new Item(line.transactionId(), t == null ? null : t.type(), line.date(), line.competence().toString(),
                     line.description() == null ? "" : line.description(), ref(row.category()),
                     line.installmentNumber() == null ? null : new Installment(line.installmentNumber(), line.installmentTotal()),
                     t != null && t.cardId() != null ? "CARD" : "ACCOUNT", t == null ? null : t.paymentMethod(),
                     t == null ? null : t.cardId(), t == null ? null : t.accountId(), line.amount());
         }).toList();
         List<DebtItem> debtItems = listing.debtItems().stream().map(row -> new DebtItem(row.line().debtId(), row.line().date(),
-                Competence.from(row.line().date()).toString(), row.line().description() == null ? "" : row.line().description(),
+                row.line().competence().toString(), row.line().description() == null ? "" : row.line().description(),
                 ref(row.category()), row.line().amount())).toList();
         return new EntryResponse(items, listing.items().hasNext(), new Totals(listing.total(),
                 listing.byCategory().stream().map(c -> new CategoryAmount(ref(c.category()), c.amount())).toList()), debtItems);

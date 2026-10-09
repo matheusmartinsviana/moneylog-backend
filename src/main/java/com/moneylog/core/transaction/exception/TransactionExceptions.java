@@ -48,6 +48,16 @@ public final class TransactionExceptions {
         }
     }
 
+    /**
+     * Competência de renda ({@code incomeCompetence}, ADR-017) fora da janela 2000-01..2100-12 ou em movimentação que não é
+     * receita (despesa, transferência, ajuste... nunca mudam de mês).
+     */
+    public static class IncomeCompetenceInvalidException extends BusinessRuleException {
+        public IncomeCompetenceInvalidException(String reason) {
+            super("INCOME_COMPETENCE_INVALID", "Competência de renda inválida: " + reason);
+        }
+    }
+
     public static class PaymentMethodRequiredException extends BusinessRuleException {
         public PaymentMethodRequiredException(TransactionType type) {
             super("TRANSACTION_PAYMENT_METHOD_REQUIRED", "O meio de pagamento é obrigatório em " + type + ".");

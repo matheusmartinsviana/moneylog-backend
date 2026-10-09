@@ -72,6 +72,10 @@ public class TransactionRevisionGatewayImpl implements TransactionRevisionGatewa
         fields.put("adjustmentDirection", s.adjustmentDirection() == null ? null : s.adjustmentDirection().name());
         fields.put("adjustmentKind", s.adjustmentKind() == null ? null : s.adjustmentKind().name());
         fields.put("reason", s.reason());
+        if (s.incomeCompetence() != null) {
+            // só aparece quando declarada (ADR-017): o snapshot das demais movimentações segue com a forma de antes
+            fields.put("incomeCompetence", s.incomeCompetence().toString());
+        }
         fields.put("version", s.version());
         return fields;
     }

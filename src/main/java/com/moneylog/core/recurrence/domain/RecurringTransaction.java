@@ -23,6 +23,7 @@ import com.moneylog.core.recurrence.exception.RecurrenceExceptions.RecurrenceSta
 import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.CardTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;
@@ -47,6 +48,9 @@ import com.moneylog.core.transaction.domain.TransactionType;
  */
 public final class RecurringTransaction {
 
+    /** Deslocamento máximo da competência da renda (ADR-017): 0 = mês da data; 1 = mês seguinte (salário dividido). */
+    public static final int MAX_INCOME_COMPETENCE_OFFSET = 1;
+
     private static final Set<TransactionType> TYPES = Set.of(TransactionType.EXPENSE, TransactionType.INCOME, TransactionType.CARD_PURCHASE);
 
     private final UUID id;
@@ -58,17 +62,19 @@ public final class RecurringTransaction {
     private UUID accountId;
     private UUID cardId;
     private PaymentMethod paymentMethod;
+    private int incomeCompetenceOffsetMonths;
     private Schedule schedule;
     private final Set<LocalDate> realized = new HashSet<>();
     private final Set<LocalDate> skipped = new HashSet<>();
     private boolean active = true;
 
     private RecurringTransaction(UUID id, UUID userId, TransactionType type, Money amount, String description, UUID categoryId,
-                                 UUID accountId, UUID cardId, PaymentMethod paymentMethod, Schedule schedule) {
+                                 UUID accountId, UUID cardId, PaymentMethod paymentMethod, Schedule schedule,
+                                 int incomeCompetenceOffsetMonths) {
         if (id == null || userId == null || schedule == null) {
             throw new InvalidRecurrenceException("id, dono, categoria e agenda são obrigatórios.");
         }
-        validateModel(type, amount, description, categoryId, accountId, cardId, paymentMethod);
+        validateModel(type, amount, description, categoryId, accountId, cardId, paymentMethod, incomeCompetenceOffsetMonths);
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -78,12 +84,19 @@ public final class RecurringTransaction {
         this.accountId = accountId;
         this.cardId = cardId;
         this.paymentMethod = paymentMethod;
+        this.incomeCompetenceOffsetMonths = incomeCompetenceOffsetMonths;
         this.schedule = schedule;
     }
 
     /** As regras do modelo, as mesmas na criação e na edição ({@link #updateDetails}). */
     private static void validateModel(TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
-                                      UUID cardId, PaymentMethod paymentMethod) {
+                                      UUID cardId, PaymentMethod paymentMethod, int incomeCompetenceOffsetMonths) {
+        if (incomeCompetenceOffsetMonths < 0 || incomeCompetenceOffsetMonths > MAX_INCOME_COMPETENCE_OFFSET) {
+            throw new InvalidRecurrenceException("o deslocamento da competência da renda é 0 (mesmo mês) ou 1 (mês seguinte).");
+        }
+        if (incomeCompetenceOffsetMonths != 0 && type != TransactionType.INCOME) {
+            throw new InvalidRecurrenceException("o deslocamento da competência existe só na recorrência de receita.");
+        }
         if (categoryId == null) {
             throw new InvalidRecurrenceException("id, dono, categoria e agenda são obrigatórios.");
         }
@@ -109,12 +122,20 @@ public final class RecurringTransaction {
 
     public static RecurringTransaction ofAccount(UUID id, UUID userId, TransactionType type, Money amount, String description,
                                                  UUID categoryId, UUID accountId, PaymentMethod method, Schedule schedule) {
-        return new RecurringTransaction(id, userId, type, amount, description, categoryId, accountId, null, method, schedule);
+        return ofAccount(id, userId, type, amount, description, categoryId, accountId, method, schedule, 0);
+    }
+
+    /** Receita/despesa em conta; {@code incomeCompetenceOffsetMonths} (0 ou 1) só vale para a receita (ADR-017). */
+    public static RecurringTransaction ofAccount(UUID id, UUID userId, TransactionType type, Money amount, String description,
+                                                 UUID categoryId, UUID accountId, PaymentMethod method, Schedule schedule,
+                                                 int incomeCompetenceOffsetMonths) {
+        return new RecurringTransaction(id, userId, type, amount, description, categoryId, accountId, null, method, schedule,
+                incomeCompetenceOffsetMonths);
     }
 
     public static RecurringTransaction ofCard(UUID id, UUID userId, Money amount, String description, UUID categoryId,
                                               UUID cardId, Schedule schedule) {
-        return new RecurringTransaction(id, userId, TransactionType.CARD_PURCHASE, amount, description, categoryId, null, cardId, null, schedule);
+        return new RecurringTransaction(id, userId, TransactionType.CARD_PURCHASE, amount, description, categoryId, null, cardId, null, schedule, 0);
     }
 
     /**
@@ -126,10 +147,18 @@ public final class RecurringTransaction {
                                                UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
                                                Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
                                                boolean active) {
+        return restore(id, userId, type, amount, description, categoryId, accountId, cardId, paymentMethod, schedule, realized,
+                skipped, active, 0);
+    }
+
+    public static RecurringTransaction restore(UUID id, UUID userId, TransactionType type, Money amount, String description,
+                                               UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
+                                               Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
+                                               boolean active, int incomeCompetenceOffsetMonths) {
         RecurringTransaction recurrence;
         try {
             recurrence = new RecurringTransaction(id, userId, type, amount, description, categoryId, accountId, cardId,
-                    paymentMethod, schedule);
+                    paymentMethod, schedule, incomeCompetenceOffsetMonths);
         } catch (InvalidRecurrenceException e) {
             throw new RecurrenceStateInconsistentException(e.getMessage(), e);
         }
@@ -208,7 +237,7 @@ public final class RecurringTransaction {
         Money value = actualAmount == null ? amount : actualAmount;
         Transaction transaction = type == TransactionType.EXPENSE
                 ? AccountTransactions.expense(header, value, validAccount, category, usedMethod)
-                : AccountTransactions.income(header, value, validAccount, category, usedMethod);
+                : AccountTransactions.income(header, value, validAccount, category, usedMethod, incomeCompetenceOf(occurrenceDate));
         realized.add(occurrenceDate);
         return transaction;
     }
@@ -234,6 +263,14 @@ public final class RecurringTransaction {
         Transaction transaction = CardTransactions.purchase(header, value, validCard, category, 1, chain, today);
         realized.add(occurrenceDate);
         return transaction;
+    }
+
+    /**
+     * Competência herdada pela ocorrência de receita realizada: mês da data da ocorrência + deslocamento (ADR-017). Sem
+     * deslocamento, {@code null} (o mês da data, como sempre). Ocorrências já realizadas não mudam se o modelo mudar depois.
+     */
+    private Competence incomeCompetenceOf(LocalDate occurrenceDate) {
+        return incomeCompetenceOffsetMonths == 0 ? null : Competence.from(occurrenceDate).plusMonths(incomeCompetenceOffsetMonths);
     }
 
     private TransactionHeader header(LocalDate occurrenceDate, UUID transactionId, Category category) {
@@ -269,7 +306,14 @@ public final class RecurringTransaction {
      */
     public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
                               UUID newCardId) {
-        validateModel(type, newAmount, newDescription, newCategoryId, newAccountId, newCardId, newMethod);
+        updateDetails(newAmount, newDescription, newCategoryId, newAccountId, newMethod, newCardId, incomeCompetenceOffsetMonths);
+    }
+
+    /** Como {@link #updateDetails(Money, String, UUID, UUID, PaymentMethod, UUID)}, trocando também o deslocamento da competência da renda. */
+    public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
+                              UUID newCardId, int newIncomeCompetenceOffsetMonths) {
+        validateModel(type, newAmount, newDescription, newCategoryId, newAccountId, newCardId, newMethod, newIncomeCompetenceOffsetMonths);
+        this.incomeCompetenceOffsetMonths = newIncomeCompetenceOffsetMonths;
         this.amount = newAmount;
         this.description = newDescription;
         this.categoryId = newCategoryId;
@@ -391,6 +435,11 @@ public final class RecurringTransaction {
 
     public UUID cardId() {
         return cardId;
+    }
+
+    /** Deslocamento da competência da renda das ocorrências (0 = mesmo mês, 1 = mês seguinte); 0 fora da receita. */
+    public int incomeCompetenceOffsetMonths() {
+        return incomeCompetenceOffsetMonths;
     }
 
     public PaymentMethod paymentMethod() {

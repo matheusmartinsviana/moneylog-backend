@@ -16,9 +16,12 @@ import com.moneylog.core.sk.ledger.Posting;
 import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
+import com.moneylog.core.sk.time.FinancialDates;
 import com.moneylog.core.sk.money.MoneyExceptions.CurrencyMismatchException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AccountNotCashException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AdjustmentReasonRequiredException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.IncomeCompetenceInvalidException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidRefundOriginException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvestmentAccountsMismatchException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.NonPositiveAmountException;
@@ -143,19 +146,38 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /** Receita: {@code ACCOUNT +X / INCOME(cat) −X}. O meio de pagamento é obrigatório. */
+    /** Receita: {@code ACCOUNT +X / INCOME(cat) −X}. O meio de pagamento é obrigatório. Competência = mês da data. */
     public static Transaction income(TransactionHeader header, Money amount, Account account, Category category,
                                      PaymentMethod method) {
+        return income(header, amount, account, category, method, null);
+    }
+
+    /**
+     * Receita que pode pertencer a outro mês (ADR-017): o posting do livro {@code INCOME} fica na competência
+     * {@code incomeCompetence} ({@code null} = mês da data), enquanto o posting da conta (caixa e saldo) segue na data real.
+     * Fora da janela 2000-01..2100-12: {@code INCOME_COMPETENCE_INVALID}.
+     */
+    public static Transaction income(TransactionHeader header, Money amount, Account account, Category category,
+                                     PaymentMethod method, Competence incomeCompetence) {
         requireHeaderAndAmount(header, amount);
         requireCashAccount(header, amount, account, TransactionType.INCOME);
         requireCategory(header, category, CategoryKind.INCOME);
         requireMethod(method, TransactionType.INCOME);
+        Competence competence = validIncomeCompetence(incomeCompetence);
         return Transaction.builder(header, TransactionType.INCOME, amount)
-                .paymentMethod(method).account(account.id()).category(category.id())
+                .paymentMethod(method).account(account.id()).category(category.id()).incomeCompetence(competence)
                 .entries(entries(header,
                         new Posting(account.book(), amount, header.date()),
-                        new Posting(category.book(), amount.negate(), header.date())))
+                        new Posting(category.book(), amount.negate(), header.date(), competence)))
                 .build();
+    }
+
+    /** A competência de renda informada (guardada como veio, para a ida e volta do {@code PUT}), se estiver na janela financeira; {@code null} passa. */
+    static Competence validIncomeCompetence(Competence competence) {
+        if (competence != null && (!FinancialDates.isInWindow(competence.firstDay()) || !FinancialDates.isInWindow(competence.lastDay()))) {
+            throw new IncomeCompetenceInvalidException("use um mês entre 2000-01 e 2100-12.");
+        }
+        return competence;
     }
 
     /** Transferência entre contas próprias da mesma liquidez: {@code ACCOUNT(dest) +X / ACCOUNT(orig) −X}. */

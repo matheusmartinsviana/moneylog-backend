@@ -34,13 +34,14 @@ public final class RecurrenceRequests {
                                   @Size(max = 200) @NoControlChars String description, UUID categoryId, UUID accountId,
                                   PaymentMethod method, UUID cardId, @NotNull Frequency frequency, @Min(1) @Max(1000) Integer interval,
                                   IntervalUnit unit, @NotNull @DateInWindow LocalDate startDate, @DateInWindow LocalDate endDate,
-                                  @Min(1) @Max(10000) Integer maxOccurrences) {
+                                  @Min(1) @Max(10000) Integer maxOccurrences,
+                                  @Min(0) @Max(1) Integer incomeCompetenceOffsetMonths) {
     }
 
     public record RecurrenceUpdate(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount,
                                    @Size(max = 200) @NoControlChars String description, @NotNull UUID categoryId,
                                    UUID accountId, PaymentMethod method, UUID cardId, @DateInWindow LocalDate endDate,
-                                   @NotNull Long version) {
+                                   @NotNull Long version, @Min(0) @Max(1) Integer incomeCompetenceOffsetMonths) {
     }
 
     public record EndInput(@DateInWindow LocalDate endDate) {

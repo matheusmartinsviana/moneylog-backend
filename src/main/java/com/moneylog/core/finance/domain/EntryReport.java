@@ -23,14 +23,22 @@ import com.moneylog.core.transaction.domain.Transaction;
  * Visão de lançamentos por competência (D1 §2.10, S-47): uma linha por posting do livro {@code EXPENSE} (ou
  * {@code INCOME}) da competência. A compra de 1.200 em 6x aparece em outubro como uma linha de 200 (1/6); o reembolso
  * aparece negativo. O consumo de uma dívida {@code PAYABLE} sem movimentação com categoria (S-137) é uma linha <b>sem
- * movimentação</b> ({@code debtId} preenchido, {@code transactionId} nulo), para a lista e o dashboard fecharem. Os totais são do filtro inteiro, calculados aqui: {@code total(CONSUMPTION, M)} =
+ * movimentação</b> ({@code debtId} preenchido, {@code transactionId} nulo), para a lista e o dashboard fecharem. A receita é lida pela
+ * competência do posting (ADR-017): uma renda recebida em setembro e atribuída a outubro aparece em outubro, com {@code date} de setembro. Os totais são do filtro inteiro, calculados aqui: {@code total(CONSUMPTION, M)} =
  * {@code month.consumption} e {@code total(INCOME, M)} = {@code month.income}.
  */
 public record EntryReport(EntryLens lens, Competence competence, List<Line> lines, Money total, Map<UUID, Money> byCategory) {
 
     /** Linha da visão: valor já no sentido da lente (consumo positivo, reembolso negativo; receita positiva). */
     public record Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal,
-                       UUID categoryId, LocalDate date, Money amount, String description, UUID debtId) {
+                       UUID categoryId, LocalDate date, Money amount, String description, UUID debtId, Competence competence) {
+
+        /** Linha cuja competência é o mês da data (tudo, menos a receita de outro mês, ADR-017). */
+        public Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal,
+                    UUID categoryId, LocalDate date, Money amount, String description, UUID debtId) {
+            this(transactionId, installmentId, installmentNumber, installmentTotal, categoryId, date, amount, description, debtId,
+                    Competence.from(date));
+        }
 
         /** Linha de movimentação (sem dívida). */
         public Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal, UUID categoryId,
@@ -87,7 +95,7 @@ public record EntryReport(EntryLens lens, Competence competence, List<Line> line
             lines.add(new Line(e.source().transactionId(), e.source().installmentId(),
                     installment == null ? null : installment.number(), installment == null ? null : installment.total(),
                     categoryId, e.posting().effectiveDate(), amount, ofDebt ? (debt == null ? null : debt.description())
-                    : tx == null ? null : tx.description(), ofDebt ? e.source().sourceId() : null));
+                    : tx == null ? null : tx.description(), ofDebt ? e.source().sourceId() : null, e.posting().competence()));
             byCategory.merge(categoryId, amount, Money::add);
             total = total.add(amount);
         }

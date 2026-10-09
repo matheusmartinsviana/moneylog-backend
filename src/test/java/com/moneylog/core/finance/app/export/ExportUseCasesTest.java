@@ -97,12 +97,12 @@ class ExportUseCasesTest {
         List<String> lines = List.of(text.split("\r\n"));
 
         assertThat(export.fileName()).isEqualTo("moneylog-transactions-2026-10-01_2026-10-31.csv");
-        assertThat(lines.getFirst()).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção");
+        assertThat(lines.getFirst()).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda");
         assertThat(lines).hasSize(5).as("cabeçalho + 4 movimentações de outubro (a de setembro fica fora)");
-        assertThat(lines).contains("2026-10-10;Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;");
-        assertThat(lines).contains("2026-10-10;Compra no cartão;Notebook;Alimentação;Roxinho;;1200,00;Ativa;");
-        assertThat(lines).contains("2026-10-05;Receita;Salário;Salário;Nubank;Pix;1234,50;Ativa;");
-        assertThat(lines).contains("2026-10-10;Transferência;Transferência;;Nubank > XP;;1000,00;Ativa;");
+        assertThat(lines).contains("2026-10-10;Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;;");
+        assertThat(lines).contains("2026-10-10;Compra no cartão;Notebook;Alimentação;Roxinho;;1200,00;Ativa;;");
+        assertThat(lines).contains("2026-10-05;Receita;Salário;Salário;Nubank;Pix;1234,50;Ativa;;");
+        assertThat(lines).contains("2026-10-10;Transferência;Transferência;;Nubank > XP;;1000,00;Ativa;;");
         assertThat(lines.stream().filter(l -> l.contains("Notebook"))).as("a compra parcelada aparece uma vez").hasSize(1);
         assertThat(lines.get(1)).as("ordem por data").startsWith("2026-10-05");
         assertThat(text).endsWith("\r\n");
@@ -115,7 +115,7 @@ class ExportUseCasesTest {
         TransactionFilter all = new TransactionFilter(null, null, null, null, null, null, null, null);
 
         assertThat(export(all, false, Locale.ENGLISH).fileName()).isEqualTo("moneylog-transactions.csv");
-        assertThat(content(export(all, false, Locale.forLanguageTag("en-US")))).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction\r\n");
+        assertThat(content(export(all, false, Locale.forLanguageTag("en-US")))).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction;Income month\r\n");
         assertThat(content(export(all, false, Locale.forLanguageTag("pt-BR")))).startsWith("Data;Tipo;");
         assertThat(content(export(all, false, Locale.FRENCH))).startsWith("Data;Tipo;");
         assertThat(content(export(all, false, null))).startsWith("Data;Tipo;");
@@ -179,7 +179,7 @@ class ExportUseCasesTest {
     void deveGerarSoOCabecalho() throws IOException {
         String text = content(export(october(), false, null));
 
-        assertThat(text).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção\r\n");
+        assertThat(text).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda\r\n");
         verify(records).load(USER_ID);
     }
 
@@ -200,10 +200,10 @@ class ExportUseCasesTest {
         String pt = content(export(all, false, null));
         String en = content(export(all, false, Locale.ENGLISH));
 
-        assertThat(pt).contains(";500,00;Ativa;Aplicação\r\n").contains(";200,00;Ativa;Resgate\r\n").contains(";10,00;Ativa;Crédito\r\n")
-                .contains(";20,00;Ativa;Débito\r\n").contains("Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;\r\n");
-        assertThat(en).contains(";500,00;Active;Contribution\r\n").contains(";200,00;Active;Redemption\r\n").contains(";10,00;Active;Credit\r\n")
-                .contains(";20,00;Active;Debit\r\n").contains("Expense;Restaurante;Alimentação;Nubank;Pix;100,00;Active;\r\n");
+        assertThat(pt).contains(";500,00;Ativa;Aplicação;\r\n").contains(";200,00;Ativa;Resgate;\r\n").contains(";10,00;Ativa;Crédito;\r\n")
+                .contains(";20,00;Ativa;Débito;\r\n").contains("Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;;\r\n");
+        assertThat(en).contains(";500,00;Active;Contribution;\r\n").contains(";200,00;Active;Redemption;\r\n").contains(";10,00;Active;Credit;\r\n")
+                .contains(";20,00;Active;Debit;\r\n").contains("Expense;Restaurante;Alimentação;Nubank;Pix;100,00;Active;;\r\n");
     }
 
     @Test

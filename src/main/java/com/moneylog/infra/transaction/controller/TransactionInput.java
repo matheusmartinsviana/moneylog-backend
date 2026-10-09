@@ -14,6 +14,7 @@ import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionComma
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Share;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
@@ -56,6 +57,9 @@ public sealed interface TransactionInput {
 
     String AMOUNT_PATTERN = "^\\d{1,13}(\\.\\d{1,2})?$";
 
+    /** Competência {@code AAAA-MM} (mês 01 a 12); a janela 2000-01..2100-12 é regra de domínio ({@code 422 INCOME_COMPETENCE_INVALID}). */
+    String COMPETENCE_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])$";
+
     CreateTransactionCommand toCommand(UUID userId);
 
     /** {@code version} do lock otimista: só o {@code PUT} usa (obrigatória lá, o controller confere); no {@code POST} é ignorada. */
@@ -96,11 +100,12 @@ public sealed interface TransactionInput {
     @JsonIgnoreProperties("type")
     record Income(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
                   @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
-                  UUID categoryId, PaymentMethod method, Long version) implements TransactionInput {
+                  UUID categoryId, PaymentMethod method, @Pattern(regexp = COMPETENCE_PATTERN) String incomeCompetence,
+                  Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
             return new CreateTransactionCommand.Income(common(userId, amount, date, description, notes), accountId, categoryId,
-                    method == null ? PaymentMethod.OTHER : method);
+                    method == null ? PaymentMethod.OTHER : method, incomeCompetence == null ? null : Competence.parse(incomeCompetence));
         }
     }
 

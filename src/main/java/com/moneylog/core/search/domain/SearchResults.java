@@ -38,7 +38,13 @@ public record SearchResults(String q, List<TransactionHit> transactions, List<Ac
     public record Ref(UUID id, String name) {
     }
 
-    public record TransactionHit(UUID id, String description, LocalDate date, Money amount, TransactionType type, Ref category, Ref account) {
+    public record TransactionHit(UUID id, String description, LocalDate date, Money amount, TransactionType type, Ref category, Ref account,
+                                 String incomeCompetence) {
+
+        /** Sem competência de renda (todos os tipos, menos a receita de outro mês, ADR-017). */
+        public TransactionHit(UUID id, String description, LocalDate date, Money amount, TransactionType type, Ref category, Ref account) {
+            this(id, description, date, amount, type, category, account, null);
+        }
     }
 
     public record AccountHit(UUID id, String name, String institution, AccountType type, AccountStatus status) {

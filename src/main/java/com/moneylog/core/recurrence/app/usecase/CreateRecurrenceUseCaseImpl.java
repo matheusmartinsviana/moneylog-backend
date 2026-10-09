@@ -86,7 +86,8 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
                 throw new InvalidRecurrenceException("o meio de pagamento exige a conta (ou deixe os dois para definir ao confirmar).");
             }
             recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), c.amount(), c.description(), categoryId,
-                    c.accountId(), c.accountId() == null ? null : (c.method() == null ? PaymentMethod.OTHER : c.method()), schedule);
+                    c.accountId(), c.accountId() == null ? null : (c.method() == null ? PaymentMethod.OTHER : c.method()), schedule,
+                    c.incomeCompetenceOffsetMonths() == null ? 0 : c.incomeCompetenceOffsetMonths());
         }
         if (recurrence.accountId() != null) {
             references.account(c.userId(), recurrence.accountId(), c.type());
@@ -102,7 +103,9 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
         return IdempotentClaim.hash("type=" + c.type() + ";amount=" + c.amount().toPlainString() + ";description=" + nz(c.description()).strip()
                 + ";categoryId=" + nz(c.categoryId()) + ";accountId=" + nz(c.accountId()) + ";method=" + nz(c.method()) + ";cardId=" + nz(c.cardId())
                 + ";frequency=" + c.frequency() + ";interval=" + nz(c.interval()) + ";unit=" + nz(c.unit()) + ";startDate=" + nz(c.startDate())
-                + ";endDate=" + nz(c.endDate()) + ";max=" + nz(c.maxOccurrences()) + ";");
+                + ";endDate=" + nz(c.endDate()) + ";max=" + nz(c.maxOccurrences()) + ";"
+                + (c.incomeCompetenceOffsetMonths() == null || c.incomeCompetenceOffsetMonths() == 0 ? ""
+                        : "incomeCompetenceOffsetMonths=" + c.incomeCompetenceOffsetMonths() + ";"));
     }
 
     private static String nz(Object value) {

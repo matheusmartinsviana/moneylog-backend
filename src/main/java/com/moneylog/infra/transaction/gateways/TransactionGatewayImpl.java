@@ -134,7 +134,8 @@ public class TransactionGatewayImpl implements TransactionGateway {
                 : s.adjustmentDirection() == null ? null : s.adjustmentDirection().name();
         entity.apply(s.status(), s.amount().cents(), s.date(), s.description(), s.notes(), s.paymentMethod(), s.accountId(),
                 s.counterpartAccountId(), invoiceId, s.lateEntry(), s.categoryId(), s.refundOfId(), direction,
-                s.adjustmentKind() == null ? null : s.adjustmentKind().name(), s.reason(), s.voidReason(), s.voidedAt(), now);
+                s.adjustmentKind() == null ? null : s.adjustmentKind().name(), s.reason(), s.voidReason(), s.voidedAt(),
+                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), now);
         TransactionEntity saved = repository.saveAndFlush(entity);
         List<InstallmentEntity> rows = syncInstallments(s, binding, now);
         Map<UUID, InvoiceRow> invoiceRows = new HashMap<>(binding.rows());

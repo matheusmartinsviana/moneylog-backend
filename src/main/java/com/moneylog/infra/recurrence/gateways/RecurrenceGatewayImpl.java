@@ -73,7 +73,7 @@ public class RecurrenceGatewayImpl implements RecurrenceGateway {
             entity = RecurrenceRepositoryMapper.toEntity(recurrence, now);
         } else {
             entity.apply(recurrence.amount().cents(), recurrence.description(), recurrence.categoryId(), recurrence.accountId(),
-                    recurrence.cardId(), recurrence.paymentMethod(), recurrence.schedule().endDate(), recurrence.isActive(), now);
+                    recurrence.cardId(), recurrence.paymentMethod(), recurrence.schedule().endDate(), recurrence.isActive(), recurrence.incomeCompetenceOffsetMonths(), now);
         }
         RecurrenceEntity saved = repository.saveAndFlush(entity);
         Set<LocalDate> stored = new HashSet<>();

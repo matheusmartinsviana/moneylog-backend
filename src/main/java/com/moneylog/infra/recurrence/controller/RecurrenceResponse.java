@@ -19,7 +19,8 @@ import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceTyp
 public record RecurrenceResponse(UUID id, RecurrenceType type, Money amount, String description, Ref category, Ref account, Ref card,
                                  PaymentMethod method, Frequency frequency, int interval, IntervalUnit unit, LocalDate startDate,
                                  LocalDate endDate, Integer maxOccurrences, boolean active, LocalDate nextOccurrence,
-                                 Money monthlyEstimate, boolean ended, long version, Instant createdAt, Instant updatedAt) {
+                                 Money monthlyEstimate, boolean ended, int incomeCompetenceOffsetMonths, long version, Instant createdAt,
+                                 Instant updatedAt) {
 
     public record Ref(UUID id, String name) {
     }
@@ -33,6 +34,6 @@ public record RecurrenceResponse(UUID id, RecurrenceType type, Money amount, Str
                 new Ref(view.category().id(), view.category().name()), account == null ? null : new Ref(account.id(), account.name()),
                 card == null ? null : new Ref(card.id(), card.name()), r.paymentMethod(), s.frequency(), s.interval(), s.unit(),
                 s.startDate(), s.endDate(), s.maxOccurrences(), r.isActive(), view.nextOccurrence(), view.monthlyEstimate(), view.ended(),
-                view.stored().version(), view.createdAt(), view.updatedAt());
+                r.incomeCompetenceOffsetMonths(), view.stored().version(), view.createdAt(), view.updatedAt());
     }
 }

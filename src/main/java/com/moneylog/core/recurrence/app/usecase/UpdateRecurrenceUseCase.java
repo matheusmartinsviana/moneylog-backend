@@ -16,7 +16,16 @@ public interface UpdateRecurrenceUseCase {
      */
     RecurrenceView handle(UpdateRecurrenceCommand command);
 
+    // incomeCompetenceOffsetMonths: ausente (null) mantém o atual; 0 limpa; 1 = mês seguinte. Só na recorrência de receita (RECURRENCE_INVALID).
+
     record UpdateRecurrenceCommand(UUID userId, UUID recurrenceId, Money amount, String description, UUID categoryId, UUID accountId,
-                                   PaymentMethod method, UUID cardId, LocalDate endDate, long version) {
+                                   PaymentMethod method, UUID cardId, LocalDate endDate, long version,
+                                   Integer incomeCompetenceOffsetMonths) {
+
+        /** Sem mexer no deslocamento da competência da renda (mantém o atual). */
+        public UpdateRecurrenceCommand(UUID userId, UUID recurrenceId, Money amount, String description, UUID categoryId, UUID accountId,
+                                       PaymentMethod method, UUID cardId, LocalDate endDate, long version) {
+            this(userId, recurrenceId, amount, description, categoryId, accountId, method, cardId, endDate, version, null);
+        }
     }
 }

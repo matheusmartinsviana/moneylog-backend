@@ -14,12 +14,13 @@ import com.moneylog.core.transaction.domain.TransactionType;
 /**
  * Cabeçalho e rótulos do CSV de movimentações por idioma (S-153, S-261): português (padrão) e inglês. Tipo, método, status e direção saem
  * traduzidos conforme o cabeçalho. As colunas e a ordem não mudam; {@code Direção}/{@code Direction} é a 9ª coluna (aditiva): aplicação ou
- * resgate no {@code INVESTMENT}, crédito ou débito no {@code ADJUSTMENT}, vazia nos demais tipos.
+ * resgate no {@code INVESTMENT}, crédito ou débito no {@code ADJUSTMENT}, vazia nos demais tipos. A 10ª coluna (aditiva, ADR-017) é a
+ * competência da renda ({@code AAAA-MM}) quando a receita pertence a outro mês que o da data; vazia nas demais linhas.
  */
 final class CsvHeaders {
 
-    private static final List<String> PT = List.of("Data", "Tipo", "Descrição", "Categoria", "Conta/Cartão", "Método", "Valor", "Status", "Direção");
-    private static final List<String> EN = List.of("Date", "Type", "Description", "Category", "Account/Card", "Method", "Amount", "Status", "Direction");
+    private static final List<String> PT = List.of("Data", "Tipo", "Descrição", "Categoria", "Conta/Cartão", "Método", "Valor", "Status", "Direção", "Competência da renda");
+    private static final List<String> EN = List.of("Date", "Type", "Description", "Category", "Account/Card", "Method", "Amount", "Status", "Direction", "Income month");
 
     private static final Map<TransactionType, String> TYPE_PT = Map.ofEntries(Map.entry(TransactionType.EXPENSE, "Despesa"),
             Map.entry(TransactionType.INCOME, "Receita"), Map.entry(TransactionType.TRANSFER, "Transferência"),

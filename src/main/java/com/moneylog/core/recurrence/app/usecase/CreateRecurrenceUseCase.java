@@ -26,17 +26,28 @@ public interface CreateRecurrenceUseCase {
      * @param idempotencyKey opcional: com a chave, repetir o mesmo comando devolve a mesma recorrência; outro comando é {@code IDEMPOTENCY_KEY_REUSED}
      * @param interval só em {@code CUSTOM} ({@code null} = 1 nos demais)
      * @param unit     só em {@code CUSTOM}
+     * @param incomeCompetenceOffsetMonths só na receita: 0 (padrão, mesmo mês da data) ou 1 (a renda pertence ao mês seguinte, ADR-017);
+     *                                     {@code null} = 0
      */
     record CreateRecurrenceCommand(UUID userId, TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
                                    PaymentMethod method, UUID cardId, Frequency frequency, Integer interval, IntervalUnit unit,
-                                   LocalDate startDate, LocalDate endDate, Integer maxOccurrences, UUID idempotencyKey) {
+                                   LocalDate startDate, LocalDate endDate, Integer maxOccurrences, UUID idempotencyKey,
+                                   Integer incomeCompetenceOffsetMonths) {
 
         /** Sem chave de idempotência. */
         public CreateRecurrenceCommand(UUID userId, TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
                                        PaymentMethod method, UUID cardId, Frequency frequency, Integer interval, IntervalUnit unit,
                                        LocalDate startDate, LocalDate endDate, Integer maxOccurrences) {
             this(userId, type, amount, description, categoryId, accountId, method, cardId, frequency, interval, unit, startDate, endDate,
-                    maxOccurrences, null);
+                    maxOccurrences, null, null);
+        }
+
+        /** Com chave de idempotência, sem deslocamento de competência. */
+        public CreateRecurrenceCommand(UUID userId, TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
+                                       PaymentMethod method, UUID cardId, Frequency frequency, Integer interval, IntervalUnit unit,
+                                       LocalDate startDate, LocalDate endDate, Integer maxOccurrences, UUID idempotencyKey) {
+            this(userId, type, amount, description, categoryId, accountId, method, cardId, frequency, interval, unit, startDate, endDate,
+                    maxOccurrences, idempotencyKey, null);
         }
     }
 }

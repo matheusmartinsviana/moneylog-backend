@@ -12,6 +12,7 @@ import java.util.UUID;
 import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.card.exception.CardExceptions.InvoiceChainInconsistentException;
 import com.moneylog.core.sk.exception.DomainException;
+import com.moneylog.core.sk.ledger.BookType;
 import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.Posting;
 import com.moneylog.core.sk.ledger.PostingSourceType;
@@ -19,6 +20,8 @@ import com.moneylog.core.sk.ledger.Postings;
 import com.moneylog.core.sk.ledger.VoidDecision;
 import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
+import com.moneylog.core.transaction.exception.TransactionExceptions.IncomeCompetenceInvalidException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.NonPositiveAmountException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionAlreadyVoidedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionFieldRequiredException;
@@ -66,6 +69,7 @@ public final class Transaction {
     private final String reason;
     private LocalDate invoiceClosingDate;
     private final boolean lateEntry;
+    private final Competence incomeCompetence;
     private final List<TransactionInstallment> installments;
     private List<LedgerEntry> entries;
     private TransactionStatus status;
@@ -96,12 +100,23 @@ public final class Transaction {
         this.reason = b.reason;
         this.invoiceClosingDate = b.invoiceClosingDate;
         this.lateEntry = b.lateEntry;
+        if (b.incomeCompetence != null && b.type != TransactionType.INCOME) {
+            throw new IncomeCompetenceInvalidException("só a receita pode pertencer a outro mês.");
+        }
+        this.incomeCompetence = b.incomeCompetence;
         this.installments = new ArrayList<>(b.installments);
         this.entries = List.copyOf(b.entries);
         if (entries.isEmpty()) {
             throw new TransactionFieldRequiredException("postings");
         }
         Postings.assertBalanced(postingsOf(entries));
+        Competence expected = incomeCompetence == null ? Competence.from(date) : incomeCompetence;
+        for (LedgerEntry entry : entries) {
+            if (entry.active() && entry.posting().bookType() == BookType.INCOME && !entry.posting().competence().equals(expected)) {
+                throw new TransactionStateInconsistentException("a competência da receita (" + entry.posting().competence()
+                        + ") não é a declarada (" + expected + ").");
+            }
+        }
         this.status = TransactionStatus.ACTIVE;
         this.version = 0L;
     }
@@ -131,6 +146,7 @@ public final class Transaction {
                     .debt(state.debtId()).refundOf(state.refundOfId()).investmentDirection(state.investmentDirection())
                     .adjustment(state.adjustmentDirection(), state.adjustmentKind(), state.reason())
                     .invoice(state.invoiceClosingDate(), state.lateEntry()).installments(state.installments())
+                    .incomeCompetence(state.incomeCompetence())
                     .entries(entries);
             transaction = new Transaction(builder);
         } catch (DomainException e) {
@@ -149,7 +165,7 @@ public final class Transaction {
         return new TransactionState(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId,
                 counterpartAccountId, cardId, categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection,
                 adjustmentKind, reason, invoiceClosingDate, lateEntry, List.copyOf(installments), status, voidReason, voidedAt,
-                version);
+                version, incomeCompetence);
     }
 
     private void ensureConsistentState() {
@@ -427,6 +443,19 @@ public final class Transaction {
         return lateEntry;
     }
 
+    /**
+     * Mês a que a renda pertence quando difere do mês da data (ADR-017); {@code null} = o mês da data. Só a {@code INCOME}
+     * tem. O caixa e o saldo continuam na {@link #date()}: só a competência da receita muda.
+     */
+    public Competence incomeCompetence() {
+        return incomeCompetence;
+    }
+
+    /** Competência efetiva da receita: a declarada ou o mês da data. {@code null} fora da {@code INCOME}. */
+    public Competence effectiveIncomeCompetence() {
+        return type != TransactionType.INCOME ? null : incomeCompetence == null ? Competence.from(date) : incomeCompetence;
+    }
+
     /** Parcelas da {@code CARD_PURCHASE} (vazio nos demais tipos). */
     public List<TransactionInstallment> installments() {
         return List.copyOf(installments);
@@ -497,6 +526,7 @@ public final class Transaction {
         private String reason;
         private LocalDate invoiceClosingDate;
         private boolean lateEntry;
+        private Competence incomeCompetence;
         private List<TransactionInstallment> installments = List.of();
         private List<LedgerEntry> entries = List.of();
 
@@ -521,6 +551,7 @@ public final class Transaction {
             return this;
         }
         Builder invoice(LocalDate closingDate, boolean late) { this.invoiceClosingDate = closingDate; this.lateEntry = late; return this; }
+        Builder incomeCompetence(Competence value) { this.incomeCompetence = value; return this; }
         Builder installments(List<TransactionInstallment> value) { this.installments = value; return this; }
         Builder entries(List<LedgerEntry> value) { this.entries = value; return this; }
 

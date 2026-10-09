@@ -13,11 +13,14 @@ import com.moneylog.core.sk.money.Money;
 
 /**
  * Série de entradas e saídas por período (redesign, S-283): <b>leitura do razão ativo</b> nos livros {@code INCOME} (receita, sinal
- * invertido) e {@code EXPENSE} (consumo), agrupada pela {@code effectiveDate} do posting, nunca pela data da movimentação (a compra de
- * 1.200 em 6x tem 200 em cada mês, nunca 1.200 num dia só). É irmã de {@link ConsumptionReport} (que agrupa por competência) e <b>não tem
+ * invertido) e {@code EXPENSE} (consumo), agrupada pela {@code effectiveDate} do posting em {@code DAY}/{@code WEEK} e pela <b>competência</b> do posting em {@code MONTH}
+ * (a compra de 1.200 em 6x tem 200 em cada mês, nunca 1.200 num dia só). É irmã de {@link ConsumptionReport} (que agrupa por competência) e <b>não tem
  * classificação própria</b>: cada posting dos dois livros entra uma vez, exatamente como entra no {@code month.income} e no
- * {@code month.consumption} do dashboard, no {@code EntryReport} e no {@code MonthlySummary} (PR 01, regra 10). Como a competência de um
- * posting é o mês da data efetiva, a soma dos dias de um mês civil inteiro é igual ao ponto {@code MONTH} dele.
+ * {@code month.consumption} do dashboard, no {@code EntryReport} e no {@code MonthlySummary} (PR 01, regra 10). A competência de um posting é o mês da data efetiva,
+ * <b>exceto na receita com {@code incomeCompetence}</b> (ADR-017: renda de outubro recebida em setembro). Por isso {@code DAY}/{@code WEEK}
+ * (quando a renda <b>entrou</b>, o caixa) e {@code MONTH} (a renda <b>do mês</b>, igual ao resumo e ao dashboard) só coincidem num mês civil
+ * quando nenhuma receita muda de mês; o consumo é igual nos dois. Somando todos os meses (ou todos os dias), a renda total é a mesma:
+ * mover a competência só troca o balde, nunca cria nem perde centavo.
  *
  * <p>Fora dos dois livros, logo fora da série: pagamento de fatura, transferência, aplicação e resgate, ajuste de saldo, empréstimo
  * concedido ou recebido, quitação de dívida, estornadas (postings inativos) e saldo inicial. Reembolso abate na categoria original (valor
@@ -30,7 +33,7 @@ import com.moneylog.core.sk.money.Money;
 public record IncomeExpenseSeries(ReportPeriod period, LocalDate from, LocalDate to, Basis basis, Granularity granularity,
                                   List<Point> points, Totals totals) {
 
-    /** Rótulo da base de agrupamento: dia/semana pela data efetiva, mês pela competência (que é o mês da data efetiva). */
+    /** Rótulo da base de agrupamento: {@code DATE} (dia/semana) pela data efetiva (caixa); {@code COMPETENCE} (mês) pela competência do posting. */
     public enum Basis { DATE, COMPETENCE }
 
     public enum Granularity { DAY, WEEK, MONTH }
@@ -59,7 +62,9 @@ public record IncomeExpenseSeries(ReportPeriod period, LocalDate from, LocalDate
             if (book != BookType.INCOME && book != BookType.EXPENSE) {
                 continue;
             }
-            LocalDate date = entry.posting().effectiveDate();
+            // MONTH agrupa pela competência do posting (a renda pode pertencer a outro mês, ADR-017); DAY e WEEK são caixa: data efetiva
+            LocalDate date = period.granularity() == Granularity.MONTH ? entry.posting().competence().firstDay()
+                    : entry.posting().effectiveDate();
             if (date.isBefore(from) || date.isAfter(last)) {
                 continue;
             }

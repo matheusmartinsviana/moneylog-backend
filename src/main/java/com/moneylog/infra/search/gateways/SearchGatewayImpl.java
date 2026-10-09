@@ -135,7 +135,7 @@ public class SearchGatewayImpl implements SearchGateway {
     private static List<TransactionHit> transactions(Connection c, UUID userId, String pattern, int limit) throws SQLException {
         String sql = """
                 SELECT t.id, t.description, t.transaction_date, t.amount_cents, t.type, t.category_id, cat.name AS category_name,
-                       t.account_id, acc.name AS account_name
+                       t.account_id, acc.name AS account_name, t.income_competence
                 FROM transactions t
                 CROSS JOIN (SELECT {PAT} AS pat) p
                 LEFT JOIN categories cat ON cat.id = t.category_id AND cat.user_id = t.user_id
@@ -149,7 +149,8 @@ public class SearchGatewayImpl implements SearchGateway {
             ps.setInt(3, limit);
         }, rs -> new TransactionHit(rs.getObject("id", UUID.class), rs.getString("description"),
                 rs.getObject("transaction_date", java.time.LocalDate.class), Money.ofCents(rs.getLong("amount_cents"), CurrencyCode.BRL),
-                TransactionType.valueOf(rs.getString("type")), ref(rs, "category_id", "category_name"), ref(rs, "account_id", "account_name")));
+                TransactionType.valueOf(rs.getString("type")), ref(rs, "category_id", "category_name"), ref(rs, "account_id", "account_name"),
+                rs.getString("income_competence") == null ? null : rs.getString("income_competence").strip()));
     }
 
     private static List<AccountHit> accounts(Connection c, UUID userId, String pattern, int limit) throws SQLException {

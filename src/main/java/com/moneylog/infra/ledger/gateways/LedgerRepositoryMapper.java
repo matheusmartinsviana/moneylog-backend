@@ -10,6 +10,7 @@ import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.sk.ledger.PostingSourceType;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.time.Competence;
 import com.moneylog.infra.ledger.persistence.LedgerPostingEntity;
 
 /** {@code LedgerEntry} ⇄ {@code ledger_postings} (domínio ⇄ entity). */
@@ -30,7 +31,8 @@ public final class LedgerRepositoryMapper {
         PostingSourceType type = entity.getSourceType();
         PostingSource source = new PostingSource(type, entity.getSourceId(), entity.getInstallmentId());
         Posting posting = new Posting(new BookRef(entity.getBookType(), entity.getBookId()),
-                Money.ofCents(entity.getAmountCents(), CurrencyCode.of(entity.getCurrency())), entity.getEffectiveDate());
+                Money.ofCents(entity.getAmountCents(), CurrencyCode.of(entity.getCurrency())), entity.getEffectiveDate(),
+                Competence.parse(entity.getCompetence().strip()));
         return new LedgerEntry(source, posting, entity.isActive());
     }
 }
