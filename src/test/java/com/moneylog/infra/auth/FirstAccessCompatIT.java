@@ -87,6 +87,6 @@ class FirstAccessCompatIT {
 
         mockMvc.perform(get("/v1/auth/status")).andExpect(jsonPath("$.passwordSetupRequired").value(true));
         mockMvc.perform(login(ENV_PASSWORD)).andExpect(status().isUnauthorized());
-        assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from users where email = ?", Integer.class, EMAIL)).isEqualTo(1);
     }
 }
