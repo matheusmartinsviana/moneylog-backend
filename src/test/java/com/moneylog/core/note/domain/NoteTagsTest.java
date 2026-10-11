@@ -10,10 +10,6 @@ import org.junit.jupiter.api.Test;
 @DisplayName("NoteTags (T107, S-165): tags do frontmatter e #tag do corpo")
 class NoteTagsTest {
 
-    /**
-     * Teto de tempo da análise de 200 KB. Um algoritmo quadrático levaria segundos nesse tamanho; o teto antigo (100 ms) media a carga da
-     * máquina de desenvolvimento (com load médio acima de 20, a execução sadia levava 101 ms): 500 ms ainda separa linear de quadrático.
-     */
     private static final long MAX_ANALYZE_MILLIS = 500;
 
     private static java.util.Set<String> tags(String text, String... frontmatter) {
@@ -85,20 +81,19 @@ class NoteTagsTest {
         }
         String corpus = text.toString();
         assertThat(corpus.length()).isLessThanOrEqualTo(NoteLimits.NOTE_MAX_BYTES);
-        NoteContent.analyze(corpus.substring(0, 20_000)); // aquece o JIT
+        NoteContent.analyze(corpus.substring(0, 20_000));
         long start = System.nanoTime();
         NoteContent content = NoteContent.analyze(corpus);
         long millis = (System.nanoTime() - start) / 1_000_000;
         assertThat(content.wikilinks()).hasSize(20_000);
         assertThat(content.tags()).isEmpty();
         assertThat(millis).as("NoteContent.analyze em 200 KB").isLessThan(MAX_ANALYZE_MILLIS);
-        // com '#' dentro dos links também (a busca por link só olha o vizinho)
         StringBuilder inside = new StringBuilder();
         for (int i = 0; i < 20_000; i++) {
             inside.append("[[a#s]] #t").append(i % 7).append("x ");
         }
         String insideCorpus = inside.toString().substring(0, NoteLimits.NOTE_MAX_BYTES - 1000);
-        NoteContent.analyze(insideCorpus.substring(0, 20_000)); // aquece
+        NoteContent.analyze(insideCorpus.substring(0, 20_000));
         long start2 = System.nanoTime();
         NoteContent second = NoteContent.analyze(insideCorpus);
         assertThat((System.nanoTime() - start2) / 1_000_000).isLessThan(MAX_ANALYZE_MILLIS);

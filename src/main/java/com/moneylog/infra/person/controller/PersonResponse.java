@@ -13,10 +13,6 @@ import com.moneylog.core.debt.domain.PersonBalance;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.debt.controller.DebtSummaryResponse;
 
-/**
- * {@code Person} e {@code PersonDetail} do contrato: o detalhe traz {@code debts}; a lista e as respostas de escrita não
- * têm o campo ({@code NON_NULL}).
- */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record PersonResponse(UUID id, String name, @JsonInclude(JsonInclude.Include.ALWAYS) String notes, boolean archived, Money net,
                              PersonBalance.Direction direction, int openDebts,

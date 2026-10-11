@@ -23,7 +23,6 @@ import com.moneylog.core.auth.app.usecase.EnsureOwnerUseCase.EnsureOwnerCommand;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.IntegrationTest;
 
-/** Retrocompatibilidade (ADR-015): com hash no ambiente, nada muda até o dono ter senha no banco ou pedir redefinição. */
 @IntegrationTest
 @DisplayName("Primeiro acesso: retrocompatibilidade com o hash do ambiente")
 class FirstAccessCompatIT {
@@ -49,7 +48,6 @@ class FirstAccessCompatIT {
                 + " setup_code_hash = null, setup_code_expires_at = null"));
     }
 
-    /** O pool roda com auto-commit desligado: o JDBC direto do teste precisa de transação própria para confirmar. */
     private void committed(Runnable action) {
         new org.springframework.transaction.support.TransactionTemplate(transactionManager).executeWithoutResult(s -> action.run());
     }

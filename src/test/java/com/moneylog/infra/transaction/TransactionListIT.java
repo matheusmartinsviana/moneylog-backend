@@ -45,12 +45,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T28: {@code GET /v1/transactions} e {@code GET /v1/entries}. Cenário de outubro: Nubank 20.000,00, XP, XP Invest; despesa
- * Pix 100,00 Alimentação ("Mercado do bairro"), débito 40,00 Transporte, receita 3.000,00, transferência 1.000,00 Nubank → XP,
- * aplicação 500,00, reembolso 50,00 da despesa Pix, despesa de 30,00 estornada e despesa de 70,00 em 05/11. As movimentações
- * nascem com 1 s de diferença para a ordem {@code created_at desc} ser determinística.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Visões da lista: registros e lançamentos por competência (T28)")
@@ -113,8 +107,6 @@ class TransactionListIT {
         expense("70.00", "2026-11-05", "Conta de novembro", food, "BOLETO");
     }
 
-    // ---------------------------------------------------------------- helpers
-
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
     }
@@ -153,7 +145,6 @@ class TransactionListIT {
                 + nubank + "\",\"categoryId\":\"" + category + "\",\"method\":\"" + method + "\"}");
     }
 
-    /** Estorna por SQL (o estorno pela API é T27): status, motivo e lançamentos inativos. */
     private void voidBySql(String id) {
         committed(() -> {
             jdbc.update("update transactions set status = 'VOIDED', void_reason = 'engano', voided_at = now(), version = version + 1 where id = ?", UUID.fromString(id));
@@ -169,7 +160,6 @@ class TransactionListIT {
         return body(list(query).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
     }
 
-    /** {@code q} como parâmetro (e não na URL) para o MockMvc não codificar duas vezes. */
     private JsonNode searchBody(String q) throws Exception {
         return body(mockMvc.perform(get("/v1/transactions" + OUTUBRO).param("q", q)).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
@@ -182,8 +172,6 @@ class TransactionListIT {
     }
 
     private static final String OUTUBRO = "?from=2026-10-01&to=2026-10-31";
-
-    // ---------------------------------------------------------------- CA1, CA2, CA3
 
     @Test
     @DisplayName("CA1: outubro traz as 6 movimentações ativas em date desc, created_at desc; totals.count 6 e cashFlow 3.050,00 / 640,00 / 2.410,00")
@@ -271,13 +259,10 @@ class TransactionListIT {
         assertThat(ids(pix)).containsExactly(pixId);
         assertThat(pix.get("totals").get("cashFlow").get("out").get("amount").asString()).isEqualTo("100.00");
 
-        // sem período: junta outubro e novembro; a estornada continua fora
         JsonNode everything = listBody("");
         assertThat(everything.get("totals").get("count").asInt()).isEqualTo(7);
         assertThat(everything.get("totals").get("cashFlow").get("out").get("amount").asString()).isEqualTo("710.00");
     }
-
-    // ---------------------------------------------------------------- CA4, CA5
 
     @Test
     @DisplayName("CA4: entries de CONSUMPTION em 2026-10: 3 linhas (reembolso negativo), total 90,00, byCategory Alimentação 50,00 / Transporte 40,00; INCOME 3.000,00 positivo")
@@ -312,7 +297,6 @@ class TransactionListIT {
         assertThat(refund.get("competence").asString()).isEqualTo("2026-10");
         assertThat(refund.get("description").asString()).isEqualTo("Estorno do mercado");
 
-        // default de lens = CONSUMPTION
         assertThat(body(mockMvc.perform(get("/v1/entries?competence=2026-10")).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn()))
                 .isEqualTo(body);
 
@@ -345,7 +329,6 @@ class TransactionListIT {
         assertThat(page.get("items")).hasSize(2);
         assertThat(page.get("hasNext").asBoolean()).isTrue();
         assertThat(page.get("totals").get("total").get("amount").asString()).isEqualTo("90.00");
-        // data decrescente: a de 11/10 vem antes das de 10/10
         assertThat(page.get("items").get(0).get("date").asString()).isEqualTo("2026-10-11");
 
         JsonNode november = body(mockMvc.perform(get("/v1/entries?competence=2026-11")).andExpect(status().isOk())
@@ -366,8 +349,6 @@ class TransactionListIT {
         assertThat(entries.get("items")).hasSize(2);
         assertThat(entries.get("totals").get("total").get("amount").asString()).isEqualTo("50.00");
     }
-
-    // ---------------------------------------------------------------- CA6
 
     @Test
     @DisplayName("CA6: from > to, competence inválida, lens desconhecida, q grande demais e paginação fora do limite são 400 VALIDATION_FAILED")
@@ -398,8 +379,6 @@ class TransactionListIT {
                 .andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.items").isEmpty())
                 .andExpect(jsonPath("$.totals.total.amount").value("0.00"));
     }
-
-    // ---------------------------------------------------------------- CA7
 
     @Test
     @DisplayName("CA7: com 2.000 movimentações um mês responde rápido (medição registrada) e a consulta da página pode usar o índice por data")

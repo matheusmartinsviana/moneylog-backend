@@ -11,10 +11,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/**
- * Corpos de entrada de {@code /v1/notes} (contrato: {@code NoteInput}, {@code NoteUpdate}, {@code NoteMove}, {@code NoteLinksUpdate}). O texto da
- * nota aceita quebra de linha e tabulação; o tamanho (200 KB em bytes) é regra de domínio ({@code 422 NOTE_TOO_LARGE}).
- */
 public final class NoteRequests {
 
     private NoteRequests() {

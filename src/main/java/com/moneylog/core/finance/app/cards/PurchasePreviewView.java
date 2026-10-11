@@ -10,14 +10,9 @@ import com.moneylog.core.sk.time.Competence;
 import java.time.LocalDate;
 import java.util.UUID;
 
-/**
- * Prévia de uma compra no cartão (S-124): o que a criação gravaria, sem gravar. Os valores são os da fábrica do domínio
- * ({@code CardTransactions.purchase}), então a tela nunca calcula parcela, competência nem fatura.
- */
 public record PurchasePreviewView(List<Installment> installments, Money total, Money availableLimitAfter, boolean overLimit,
                                   List<Warning> warnings) {
 
-    /** Avisos da prévia; a UI avisa, nunca bloqueia (S-125). */
     public enum Warning {
         LATE_ENTRY,
         OVER_LIMIT,

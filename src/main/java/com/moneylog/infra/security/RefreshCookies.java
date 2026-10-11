@@ -4,7 +4,6 @@ import java.time.Duration;
 
 import org.springframework.http.ResponseCookie;
 
-/** Cookie do refresh token: {@code ml_refresh; HttpOnly; Secure; SameSite=Strict; Path=/v1/auth} (ADR-003). */
 public class RefreshCookies {
 
     public static final String NAME = "ml_refresh";
@@ -20,7 +19,6 @@ public class RefreshCookies {
         return build(value, maxAge);
     }
 
-    /** Cookie expirado (logout ou refresh inválido). */
     public String expire() {
         return build("", Duration.ZERO);
     }

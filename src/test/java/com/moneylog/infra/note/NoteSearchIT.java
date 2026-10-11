@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 
 import tools.jackson.databind.JsonNode;
 
-/** T111: busca (unaccent + ILIKE), filtros e tags, pela API real com Postgres real. */
 @DisplayName("Notas: busca, filtros e ordenação (T111, S-163)")
 class NoteSearchIT extends NotesItBase {
 
@@ -27,7 +26,6 @@ class NoteSearchIT extends NotesItBase {
         createNote("REVISÃO final.md", "o título casa");
         JsonNode result = search("revisão");
         assertThat(paths(result)).containsExactlyInAnyOrder("so-no-corpo.md", "Revisao de outubro.md", "revisão/geral.md", "REVISÃO final.md");
-        // título (nome do arquivo) primeiro, depois o caminho, depois o corpo
         java.util.List<String> order = paths(result);
         assertThat(order.indexOf("so-no-corpo.md")).isEqualTo(3);
         assertThat(order.indexOf("revisão/geral.md")).isEqualTo(2);
@@ -59,7 +57,6 @@ class NoteSearchIT extends NotesItBase {
         assertThat(paths(search("a".repeat(200)))).isEmpty();
         mockMvc.perform(get("/v1/notes").queryParam("q", "a\u0000b")).andExpect(status().isBadRequest());
         mockMvc.perform(get("/v1/notes").queryParam("q", "a\u001bb")).andExpect(status().isBadRequest());
-        // termo em branco = sem filtro
         assertThat(paths(body(mockMvc.perform(get("/v1/notes").queryParam("q", "  ")).andExpect(status().isOk()).andReturn()))).hasSize(3);
     }
 

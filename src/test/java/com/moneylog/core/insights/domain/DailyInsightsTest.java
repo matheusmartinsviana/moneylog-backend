@@ -64,12 +64,9 @@ class DailyInsightsTest {
         return InsightFacts.only(sink, type);
     }
 
-    // ---------------------------------------------------------------- DAILY_BUDGET
-
     @Test
     @DisplayName("livre restante 1.400,00 no dia 17 de um mês de 31 dias... 15 dias com hoje: orçamento 93,33; no dia 18 de outubro (14 dias): 100,00")
     void deveDividirOLivrePelosDiasRestantesComHoje() {
-        // outubro tem 31 dias: dia 18 -> 31 - 18 + 1 = 14 dias; livre = 3000 - 1600 = 1400 -> 100,00
         Insight insight = only(new Day().date(2026, 10, 18).run(), "DAILY_BUDGET");
 
         assertThat(insight.params()).containsEntry("amount", "100.00").containsEntry("daysLeft", "14").containsEntry("free", "1400.00");
@@ -83,7 +80,6 @@ class DailyInsightsTest {
     @Test
     @DisplayName("arredonda para baixo: 1.000,00 em 3 dias dá 333,33 (nunca promete centavo que não há)")
     void deveArredondarParaBaixo() {
-        // 29 de outubro: 31 - 29 + 1 = 3 dias
         assertThat(only(new Day().date(2026, 10, 29).budget("2000.00", "1000.00").run(), "DAILY_BUDGET").params()).containsEntry("amount", "333.33");
     }
 
@@ -127,8 +123,6 @@ class DailyInsightsTest {
         }
     }
 
-    // ---------------------------------------------------------------- TODAY_VS_AVERAGE
-
     @Test
     @DisplayName("gasto de hoje 40,00 com média 10,00: não emite (materialidade de R$ 50); 120,00 emite ATTENTION")
     void deveComparerHojeComAMedia() {
@@ -165,8 +159,6 @@ class DailyInsightsTest {
         assertThat(InsightFacts.insufficient(zero.run(), "TODAY_VS_AVERAGE", Reason.NO_BASELINE)).isTrue();
     }
 
-    // ---------------------------------------------------------------- DUE_SOON
-
     @Test
     @DisplayName("vencimentos hoje de 300,00 e saldo líquido de 200,00: ALERT (excede o saldo)")
     void deveAlertarQuandoOVencimentoExcedeOSaldo() {
@@ -201,8 +193,6 @@ class DailyInsightsTest {
     void naoDeveEmitirSemVencimentos() {
         assertThat(InsightFacts.has(new Day().run(), "DUE_SOON")).isFalse();
     }
-
-    // ---------------------------------------------------------------- MIN_BALANCE_FORECAST
 
     @Test
     @DisplayName("saldo 500,00 e saída agendada de 800,00 em 5 dias: ALERT com firstNegativeDate = hoje + 5 e minBalance = -300,00")
@@ -259,8 +249,6 @@ class DailyInsightsTest {
         assertThat(InsightFacts.insufficient(noAccounts.run(), "MIN_BALANCE_FORECAST", Reason.NO_ACCOUNTS)).isTrue();
         assertThat(InsightFacts.insufficient(new Day().run(), "MIN_BALANCE_FORECAST", Reason.NO_SCHEDULE)).isTrue();
     }
-
-    // ---------------------------------------------------------------- ATYPICAL_ENTRY
 
     private static List<Money> history(int n, String amount) {
         List<Money> list = new ArrayList<>();
@@ -322,8 +310,6 @@ class DailyInsightsTest {
         notDouble.entries.add(new DayFacts.TodayEntry("tx-1", CAT, brl("150.00")));
         assertThat(InsightFacts.has(notDouble.run(), "ATYPICAL_ENTRY")).isFalse();
     }
-
-    // ---------------------------------------------------------------- CARD_CLOSING_SOON
 
     @Test
     @DisplayName("fatura que fecha em até 7 dias: INFO; em até 2 dias: ATTENTION; depois de 7 dias: nada")

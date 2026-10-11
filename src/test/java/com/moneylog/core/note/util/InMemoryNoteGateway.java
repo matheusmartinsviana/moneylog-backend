@@ -25,10 +25,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/**
- * Adaptador em memória de {@link NoteGateway}, só para teste (a implementação real é {@code NoteGatewayImpl}). Guarda <b>cópias</b>, sobe a
- * versão a cada gravação e registra as chamadas em ordem. {@code failOnSave(n)} injeta uma falha na n-ésima gravação.
- */
 public class InMemoryNoteGateway implements NoteGateway {
 
     private final Map<UUID, Note> notes = new LinkedHashMap<>();
@@ -51,12 +47,10 @@ public class InMemoryNoteGateway implements NoteGateway {
         return saves;
     }
 
-    /** A n-ésima chamada de {@code save} (1-indexada) lança {@code IllegalStateException}. */
     public void failOnSave(int n) {
         this.failOnSave = n;
     }
 
-    /** Guarda o estado atual para {@link #rollback()}: simula o rollback da transação. */
     public void begin() {
         snapshotForRollback = new LinkedHashMap<>();
         notes.forEach((id, n) -> snapshotForRollback.put(id, copy(n)));
@@ -122,7 +116,6 @@ public class InMemoryNoteGateway implements NoteGateway {
         return (int) notes.values().stream().filter(n -> n.userId().equals(userId)).count();
     }
 
-    /** O id da linha de wikilink é derivado do id da nota e da posição, estável entre as chamadas. */
     public static UUID linkId(UUID noteId, int index) {
         return UUID.nameUUIDFromBytes((noteId + "#" + index).getBytes());
     }
@@ -130,12 +123,10 @@ public class InMemoryNoteGateway implements NoteGateway {
     private final List<java.util.Set<String>> nameKeyQueries = new ArrayList<>();
     private int wikilinkRowsRead;
 
-    /** As chaves de nome pedidas a cada {@code wikilinksByName}, em ordem. */
     public List<java.util.Set<String>> nameKeyQueries() {
         return nameKeyQueries;
     }
 
-    /** Quantas linhas de wikilink o recálculo leu ao todo (o recálculo parcial lê só as afetadas). */
     public int wikilinkRowsRead() {
         return wikilinkRowsRead;
     }

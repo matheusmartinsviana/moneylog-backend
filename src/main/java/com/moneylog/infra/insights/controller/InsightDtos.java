@@ -12,7 +12,6 @@ import com.moneylog.core.insights.domain.Insight;
 import com.moneylog.core.insights.domain.InsightItem;
 import com.moneylog.core.insights.domain.InsufficientData;
 
-/** Entrada e saída de {@code /v1/insights/*} (ADR-019). O backend devolve {@code key} e {@code params}; o front traduz e formata. */
 public final class InsightDtos {
 
     private InsightDtos() {
@@ -37,7 +36,6 @@ public final class InsightDtos {
         }
     }
 
-    /** O formato original (2.8.0) do alias {@code GET /v1/insights}: só os quatro campos de sempre mais {@code source}. */
     public record LegacyInsightResponse(String type, String key, Map<String, String> params, List<String> factRefs, String source) {
         static LegacyInsightResponse of(InsightItem item) {
             Insight i = item.insight();
@@ -51,7 +49,6 @@ public final class InsightDtos {
         }
     }
 
-    /** Página de insights + o que não saiu por falta de dado (mesmo envelope {@code items/hasNext} das listas). */
     public record InsightListResponse(List<InsightResponse> items, boolean hasNext, List<InsufficientResponse> insufficient) {
         static InsightListResponse of(InsightsView view) {
             return new InsightListResponse(view.items().stream().map(InsightResponse::of).toList(), view.hasNext(),
@@ -75,7 +72,6 @@ public final class InsightDtos {
     public record DismissInput(@NotNull Dismissal.Scope scope) {
     }
 
-    /** Os tipos que o contrato original conhecia: o alias não devolve nenhum outro (cliente antigo não sabe o que fazer com ele). */
     static final java.util.Set<String> LEGACY_TYPES = java.util.Set.of("CATEGORY_DELTA", "CARD_COMMITTED");
 
     static InsightResponse one(InsightItem item) {

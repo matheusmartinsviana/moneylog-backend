@@ -13,11 +13,6 @@ import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.infra.debt.persistence.DebtEntity;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa.DebtLinkRow;
 
-/**
- * {@code Debt} ⇄ {@code DebtEntity} (+ as movimentações ligadas e os lançamentos próprios). A reidratação usa
- * {@link Debt#restore}, que recusa estado gravado corrompido ({@code DEBT_STATE_INCONSISTENT}, S-94). As quitações são as
- * movimentações ligadas à dívida que não são a origem: ativas valem, estornadas ficam no histórico.
- */
 public final class DebtRepositoryMapper {
 
     private DebtRepositoryMapper() {
@@ -36,7 +31,6 @@ public final class DebtRepositoryMapper {
         return Debt.restore(state, settlements, entries);
     }
 
-    /** Coluna {@code category_id} (V4.01): a dívida {@code PAYABLE} que nasceu de consumo. */
     private static UUID categoryId(DebtEntity e) {
         return e.getCategoryId();
     }

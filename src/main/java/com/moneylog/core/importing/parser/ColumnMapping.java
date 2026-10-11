@@ -2,12 +2,6 @@ package com.moneylog.core.importing.parser;
 
 import com.moneylog.core.importing.exception.ImportingExceptions.ImportMappingInvalidException;
 
-/**
- * Mapeamento de colunas do CSV (S-169, S-170). Colunas por índice (0-based). Valor: uma coluna com sinal ({@code amount}) ou duas
- * ({@code debit}/{@code credit}). {@code invert} troca o sentido (extrato de cartão traz compra como positivo).
- *
- * @param delimiter {@code null} = detectado
- */
 public record ColumnMapping(int date, int description, Integer amount, Integer debit, Integer credit, boolean invert, boolean hasHeader,
                             Character delimiter) {
 

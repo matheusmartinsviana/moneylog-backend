@@ -30,10 +30,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T93 e T94: metas com reserva <b>lógica</b> (S-147), pela API real, com o contrato validando toda requisição e resposta. Cenário padrão do
- * {@link E4ItBase} (Nubank 20.000,00, Roxinho, relógio 10/10/2026) e a meta "Reserva de emergência" (alvo 20.000,00, prazo 31/12/2027, HIGH).
- */
 @DisplayName("Metas e reservas lógicas: API, persistência, travas, reservado e disponível (T93, T94)")
 class GoalsIT extends E4ItBase {
 
@@ -79,8 +75,6 @@ class GoalsIT extends E4ItBase {
         committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
         return auth.bearer(other);
     }
-
-    // ---------------------------------------------------------------- T93
 
     @Test
     @DisplayName("CA1: POST /v1/goals devolve 201 + Location com current 0,00 e progress 0.0000; a reserva de +8.500,00 na Nubank devolve 200 com a reserva, current 8.500,00, progress 0.4250 e monthlyNeeded 766,67")
@@ -203,7 +197,6 @@ class GoalsIT extends E4ItBase {
         String id = emergencia().get("id").asString();
         String xp = account("XP", "CHECKING", "0.00");
         reserve(id, xp, "100.00");
-        // S-259: com reserva ativa positiva a conta não arquiva (a meta arquivada não reserva, então o caminho abaixo chega à conta arquivada com reserva)
         mockMvc.perform(post("/v1/accounts/" + xp + "/archive", "")).andExpect(status().isUnprocessableEntity()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_HAS_RESERVATIONS"));
         okBody(post("/v1/goals/" + id + "/archive", ""));
@@ -245,7 +238,6 @@ class GoalsIT extends E4ItBase {
         assertThat(okBody(get("/v1/accounts/" + xp)).get("status").asString()).isEqualTo("ACTIVE");
         assertThat(summary().get("balances")).isEqualTo(before.get("balances"));
 
-        // libera só a de hoje: a futura de 50,00 ainda impede (reserva ativa em qualquer data)
         okBody(reservation(id, reservationBody(xp, "-100.00", "2026-10-10", null), UUID.randomUUID()));
         mockMvc.perform(post("/v1/accounts/" + xp + "/archive", "")).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("ACCOUNT_HAS_RESERVATIONS"));
@@ -370,8 +362,6 @@ class GoalsIT extends E4ItBase {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------------------------------------------------------------- T94
-
     @Test
     @DisplayName("T94 CA1: Nubank 20.000, fatura de 1.283 vencendo 05/11 e reserva de 8.500 na Nubank: reserved 8.500,00 e available 10.217,00; sem meta, 18.717,00")
     void deveAbaterOReservadoDoDisponivel() throws Exception {
@@ -468,13 +458,11 @@ class GoalsIT extends E4ItBase {
         assertThat(money(summary().get("balances"), "reserved")).isEqualTo("8500.00");
     }
 
-    /** Reserva ou liberação do oráculo: meta, conta (índice), valor com sinal em centavos e data. */
     private record Entry(int goal, int account, long cents, java.time.LocalDate date) {
     }
 
     private static final java.time.LocalDate TODAY = java.time.LocalDate.of(2026, 10, 10);
 
-    /** A regra S-247 do domínio, reescrita de forma independente: por meta e conta, o acumulado por data (reservas antes de liberações no dia) nunca fica negativo. */
     private static boolean releaseAllowed(List<Entry> entries, Entry release) {
         List<Entry> all = new ArrayList<>(entries.stream().filter(e -> e.goal == release.goal && e.account == release.account).toList());
         all.add(release);
@@ -511,7 +499,7 @@ class GoalsIT extends E4ItBase {
         java.util.Random random = new java.util.Random(2026);
         List<Entry> entries = new ArrayList<>();
         long[] cash = {2_000_000L, 0L};
-        List<long[]> cashMoves = new ArrayList<>(); // {conta (0 nubank, 1 xp), centavos com sinal, dia (offset de hoje), id da movimentação}
+        List<long[]> cashMoves = new ArrayList<>();
         long moveId = 0;
         long postingsExpected = count("ledger_postings");
         int rejected = 0;
@@ -520,7 +508,7 @@ class GoalsIT extends E4ItBase {
         for (int i = 0; i < 400; i++) {
             int op = random.nextInt(100);
             long cents = 100 + random.nextInt(50_000);
-            if (op < 35) { // reserva
+            if (op < 35) {
                 int g = random.nextInt(goals.length);
                 int a = random.nextInt(accounts.length);
                 java.time.LocalDate date = TODAY.plusDays(random.nextInt(41) - 20);
@@ -537,7 +525,7 @@ class GoalsIT extends E4ItBase {
                     assertThat(okBody(get("/v1/goals/" + goals[g])).get("version")).as("estado intacto").isEqualTo(before.get("version"));
                     rejected++;
                 }
-            } else if (op < 55) { // liberação, com valor às vezes acima do reservado
+            } else if (op < 55) {
                 int g = random.nextInt(goals.length);
                 int a = random.nextInt(accounts.length);
                 java.time.LocalDate date = TODAY.plusDays(random.nextInt(41) - 20);
@@ -557,11 +545,11 @@ class GoalsIT extends E4ItBase {
                     assertThat(okBody(get("/v1/goals/" + goals[g])).get("version")).as("estado intacto").isEqualTo(before.get("version"));
                     rejected++;
                 }
-            } else if (op < 63) { // arquivar/desarquivar meta
+            } else if (op < 63) {
                 int g = random.nextInt(goals.length);
                 okBody(post("/v1/goals/" + goals[g] + (goalArchived[g] ? "/unarchive" : "/archive"), ""));
                 goalArchived[g] = !goalArchived[g];
-            } else if (op < 71) { // arquivar/desarquivar a conta Parking (saldo sempre zero): só recusa com reserva ativa positiva
+            } else if (op < 71) {
                 if (parkingArchived) {
                     okBody(post("/v1/accounts/" + accounts[2] + "/unarchive", ""));
                     parkingArchived = false;
@@ -581,7 +569,7 @@ class GoalsIT extends E4ItBase {
                         accepted++;
                     }
                 }
-            } else { // movimentação real, com data de 9 dias atrás a 45 dias à frente (S-258: as futuras são compromissos)
+            } else {
                 int offset = random.nextInt(55) - 9;
                 java.time.LocalDate date = TODAY.plusDays(offset);
                 futureMoves += offset > 0 ? 1 : 0;
@@ -625,7 +613,6 @@ class GoalsIT extends E4ItBase {
                 balance[(int) move[0]] += move[1];
             }
         }
-        // S-258: cada movimentação com data futura é UM compromisso pelo efeito líquido no caixa total (a transferência entre contas de caixa soma zero)
         java.util.Map<Long, long[]> futureById = new java.util.LinkedHashMap<>();
         for (long[] move : cashMoves) {
             if (move[2] > 0) {
@@ -684,8 +671,6 @@ class GoalsIT extends E4ItBase {
     private static int countOf(List<Entry> entries, int goal) {
         return (int) entries.stream().filter(e -> e.goal == goal).count();
     }
-
-    // ---------------------------------------------------------------- banco
 
     @Test
     @DisplayName("a migração V5.00: FK composta recusa reserva com conta de outro usuário; valor zero e moeda fora de BRL são recusados pelo banco")

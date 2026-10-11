@@ -13,10 +13,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import com.moneylog.core.backup.app.BackupException;
 
-/**
- * Credenciais da role anexada à EC2 via IMDSv2 (token por PUT), sem chave estática no servidor. Guarda em cache até 5 min antes de expirar.
- * O endpoint é parametrizável para o teste com servidor falso.
- */
 public class InstanceMetadataCredentialsProvider implements S3CredentialsProvider {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(3);

@@ -78,10 +78,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.Transaction
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 
-/**
- * T76 e T78: emprestar, receber, pagar e dividir despesa pelo mesmo caminho dos demais tipos (handlers por tipo, fábrica, caso de uso
- * de criação, estorno e edição), com as dívidas gravadas antes da movimentação e as guardas de estorno de S-141.
- */
 @DisplayName("Movimentações de dívida e despesa dividida: casos de uso (T76, T78)")
 class MovimentacoesDeDividaUseCasesTest {
 
@@ -161,8 +157,6 @@ class MovimentacoesDeDividaUseCasesTest {
     private VoidTransactionCommand voidCommand(Transaction tx) {
         return new VoidTransactionCommand(USER_ID, tx.id(), "motivo");
     }
-
-    // ---------------------------------------------------------------- emprestar, receber, pagar
 
     @Test
     @DisplayName("emprestar 300 ao João: a dívida RECEIVABLE é gravada ANTES da movimentação, os lançamentos depois; caixa −300, consumo vazio, patrimônio 0")
@@ -263,8 +257,6 @@ class MovimentacoesDeDividaUseCasesTest {
         assertThat(stored).hasSize(before);
     }
 
-    // ---------------------------------------------------------------- despesa dividida
-
     @Test
     @DisplayName("despesa dividida de 200 com 100 do João e 40 do Pedro: duas dívidas gravadas antes da despesa; consumo 60; flags de estorno consideram as dívidas")
     void deveDividirADespesa() {
@@ -316,13 +308,9 @@ class MovimentacoesDeDividaUseCasesTest {
                 .isInstanceOf(com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException.class);
         TransactionDetails refund = create.handle(new CreateTransactionCommand.Refund(common("100.00"), nubank.id(), food.id(), expenseId, null), null);
         assertThat(refund.transaction().type()).isEqualTo(TransactionType.REFUND);
-        // (a soma dos reembolsos anteriores vem do banco; o IT fecha o teto depois do primeiro reembolso)
-        // despesa comum: o teto continua sendo o valor inteiro
         TransactionDetails plain = create.handle(new Expense(common("50.00"), nubank.id(), food.id(), PaymentMethod.PIX), null);
         create.handle(new CreateTransactionCommand.Refund(common("50.00"), nubank.id(), food.id(), plain.transaction().id(), null), null);
     }
-
-    // ---------------------------------------------------------------- estorno
 
     @Test
     @DisplayName("estornar a quitação devolve o status sem gravar a dívida; estornar a origem com quitação ativa é DEBT_HAS_SETTLEMENTS e nada é gravado")
@@ -361,7 +349,6 @@ class MovimentacoesDeDividaUseCasesTest {
         debts.findById(USER_ID, second.transaction().debtId()).orElseThrow().value().cancel("perdão", TODAY);
         assertThatThrownBy(() -> voidUseCase.handle(voidCommand(second.transaction()))).isInstanceOf(TransactionVoidRefusedException.class)
                 .extracting("code").isEqualTo("DEBT_CLOSED");
-        // com a conta arquivada nem a movimentação de dívida se estorna (S-73)
         Account archivedAccount = Account.restore(nubank.id(), USER_ID, "Nubank", nubank.type(), "Nubank", nubank.openingBalance(),
                 nubank.openingDate(), com.moneylog.core.account.domain.AccountStatus.ARCHIVED, 3L);
         TransactionDetails third = loan("50.00", pedro);
@@ -386,8 +373,6 @@ class MovimentacoesDeDividaUseCasesTest {
                 .extracting("code").isEqualTo("DEBT_HAS_SETTLEMENTS");
         assertThat(withSettlement.transaction().status()).isEqualTo(TransactionStatus.ACTIVE);
     }
-
-    // ---------------------------------------------------------------- edição
 
     @Test
     @DisplayName("movimentação de dívida não é editável; despesa dividida só muda descrição, categoria e observação (T78 CA7)")

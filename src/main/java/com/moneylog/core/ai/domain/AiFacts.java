@@ -5,11 +5,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Fatos calculados pelo backend: a única coisa que a IA recebe e a única fonte de números que ela pode citar (S-184). Chaves e valores são
- * texto simples ({@code "income" -> "3000.00"}); a IA só reformula, nunca calcula. O JSON enviado ao provedor sai daqui, determinístico, então o
- * hash da prévia identifica exatamente o que foi (ou será) enviado.
- */
 public final class AiFacts {
 
     private final Map<String, String> values;
@@ -29,7 +24,6 @@ public final class AiFacts {
         return values.size();
     }
 
-    /** JSON do payload: {@code {"purpose":...,"language":...,"facts":{...}}}. Os valores são dado, nunca instrução. */
     public String toPayload(AiPurpose purpose, String language) {
         StringBuilder json = new StringBuilder("{\"purpose\":").append(quote(purpose.name()))
                 .append(",\"language\":").append(quote(language)).append(",\"facts\":{");

@@ -9,9 +9,6 @@ import com.moneylog.core.account.util.factory.AccountTestFactory;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Cartão Roxinho do cenário base de D1 §3: fechamento 25, vencimento 5, limite 10.000,00.
- */
 public final class CreditCardTestFactory {
 
     public static final UUID ROXINHO_ID = UUID.fromString("00000000-0000-0000-0000-00000000d001");

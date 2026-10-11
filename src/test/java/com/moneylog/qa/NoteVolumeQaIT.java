@@ -32,11 +32,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA): limites do vault (200 KB, 500 wikilinks, 100 vínculos, 100 tags, tamanhos de tag e título, cortes de trecho no meio de um par
- * substituto) e desempenho com volume (renomear com milhares de notas linkando, busca com 5.000 notas, criação com milhares de links gravados,
- * exportar e importar 2.000 e 5.000 notas). Os tempos saem em {@code QA-E6-PERF}.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: limites e desempenho do vault")
@@ -93,8 +88,6 @@ class NoteVolumeQaIT {
         return false;
     }
 
-    // ------------------------------------------------------------------------------------------------ limites
-
     @Test
     @DisplayName("200 KB em bytes UTF-8: 204.800 bytes entra (ASCII, 2 bytes e 4 bytes por caractere) e 204.801 é 422 NOTE_TOO_LARGE, na criação e na edição; o banco recusa acima do limite")
     void duzentosKb() throws Exception {
@@ -114,7 +107,6 @@ class NoteVolumeQaIT {
         assertThat(edit.code()).isEqualTo("NOTE_TOO_LARGE");
         assertThat(NoteQa.get(a, id).get("version").asLong()).isZero();
         assertThatThrowsOnInsert();
-        // com frontmatter e CRLF dentro do limite
         assertThat(NoteQa.create(w, a, "crlf.md", "---\r\ntitle: x\r\n---\r\n" + "linha\r\n".repeat(20_000)).status()).isEqualTo(201);
         assertThat(w.contractViolations).isEmpty();
     }
@@ -131,7 +123,6 @@ class NoteVolumeQaIT {
         for (int i = 0; i < 499; i++) {
             body.append("[[pendente").append(i).append("]] ");
         }
-        // a 501ª: recusada, em vez de ser guardada pela metade (BUG-QA-12)
         Res over = NoteQa.create(w, a, "excesso.md", body + "[[Alvo Tardio]] [[Um a mais]]");
         assertThat(over.status()).as("%s", over).isEqualTo(422);
         assertThat(over.code()).isEqualTo("NOTE_LINK_LIMIT_REACHED");
@@ -192,7 +183,6 @@ class NoteVolumeQaIT {
     @Test
     @DisplayName("BUG-QA-10: título cortado no meio de um emoji")
     void tituloCortadoNoEmoji() throws Exception {
-        // título cortado no meio de um par substituto (emoji na posição 255)
         Res splitTitle = NoteQa.create(w, a, "titulo-emoji.md", "---\ntitle: " + "a".repeat(254) + "😀bb\n---\ncorpo");
         System.out.println("QA-E6-LIM título com emoji cortado em 255: " + splitTitle.status() + " " + splitTitle.code());
         assertThat(splitTitle.status()).as("%s", splitTitle).isLessThan(500);
@@ -229,8 +219,6 @@ class NoteVolumeQaIT {
         System.out.println("QA-E6-LIM trechos com substituto solto: " + broken.size() + " " + broken.subList(0, Math.min(5, broken.size())));
         assertThat(broken).isEmpty();
     }
-
-    // ------------------------------------------------------------------------------------------------ desempenho
 
     private void seedNotes(String prefix, int count, String bodySql) {
         committed(() -> jdbc.update("insert into notes (id,user_id,path,path_key,title,body,created_at,updated_at,version) select gen_random_uuid(), ?, ? || g || '.md', ? || g || '.md', ? || g, "
@@ -285,7 +273,6 @@ class NoteVolumeQaIT {
             assertThat(r.status()).isEqualTo(200);
             assertThat(ms(t)).as("busca q=%s", q).isLessThan(60_000);
         }
-        // S-279: a busca tem limite de tempo; com 1 s (em vez de 10) a busca larga sobre 300 notas de 200 KB estoura e vira NOTE_SEARCH_TIMEOUT
         com.moneylog.infra.note.gateways.NoteGatewayImpl strict = new com.moneylog.infra.note.gateways.NoteGatewayImpl(noteRepository, named, idGenerator, timeProvider, 1);
         long probe = System.nanoTime();
         a.getOk("/v1/notes?q=a&pageSize=50");
@@ -322,7 +309,6 @@ class NoteVolumeQaIT {
         assertThat(c.status()).isEqualTo(201);
         assertThat(tr.status()).isEqualTo(200);
         assertThat(rs.status()).isEqualTo(200);
-        // S-278 (A4): só os links do nome afetado são relidos, pelo índice (user_id, target_name_key): o custo não depende dos 500 mil
         assertThat(create).as("criar com 500 mil links gravados").isLessThan(3_000);
         assertThat(trash).as("lixeira com 500 mil links gravados").isLessThan(3_000);
         assertThat(restore).as("restaurar com 500 mil links gravados").isLessThan(3_000);

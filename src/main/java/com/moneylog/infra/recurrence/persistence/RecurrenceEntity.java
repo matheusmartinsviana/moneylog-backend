@@ -21,10 +21,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/**
- * Linha de {@code recurring_transactions}: o modelo e a agenda. A frequência, o início e o tipo não mudam depois de criados
- * (S-139): a agenda é calculada da âncora (D1 §2.7).
- */
 @Entity
 @Table(name = "recurring_transactions")
 public class RecurrenceEntity {
@@ -85,7 +81,6 @@ public class RecurrenceEntity {
     @Column(nullable = false)
     private boolean active;
 
-    /** Deslocamento da competência da renda das ocorrências (0 ou 1, ADR-017). */
     @Column(name = "income_competence_offset_months", nullable = false)
     private int incomeCompetenceOffsetMonths;
 
@@ -128,7 +123,6 @@ public class RecurrenceEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o que muda numa edição, no encerramento e na desativação. A versão sobe a cada gravação. */
     @SuppressWarnings("java:S107")
     public void apply(long newAmountCents, String newDescription, UUID newCategoryId, UUID newAccountId, UUID newCardId,
                       PaymentMethod newMethod, LocalDate newEndDate, boolean newActive, int newIncomeCompetenceOffsetMonths, Instant now) {

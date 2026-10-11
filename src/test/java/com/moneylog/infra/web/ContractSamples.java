@@ -15,11 +15,6 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-/**
- * Controller de amostra de {@code /v1/categories}, só para provar que o validador de contrato (T21 CA6) reprova uma
- * resposta ou requisição fora do {@code contracts/openapi.yaml}. O header {@code X-Sample-Case} escolhe o defeito.
- * É {@code @TestComponent} e classe-membro desta configuração: só existe nos contextos que a importam.
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class ContractSamples {
 

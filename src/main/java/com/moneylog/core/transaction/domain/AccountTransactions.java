@@ -33,12 +33,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.SameAccount
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransferAcrossLiquidityException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.YieldRequiresInvestmentAccountException;
 
-/**
- * Fábricas dos tipos que só envolvem contas (D1 §2.4): {@code EXPENSE}, {@code INCOME}, {@code TRANSFER},
- * {@code INVESTMENT}, {@code ADJUSTMENT} e {@code REFUND} em conta. Todas validam dono (referência de outro usuário =
- * não encontrado), arquivamento, moeda e valor &gt; 0 até o teto de S-78, e geram postings com origem
- * {@code TRANSACTION}.
- */
 public final class AccountTransactions {
 
     public static final int ADJUSTMENT_REASON_MAX_LENGTH = 500;
@@ -46,7 +40,6 @@ public final class AccountTransactions {
     private AccountTransactions() {
     }
 
-    /** Gasto pago de conta: {@code EXPENSE(cat) +X / ACCOUNT −X}. Compra no crédito é {@code CARD_PURCHASE}. */
     public static Transaction expense(TransactionHeader header, Money amount, Account account, Category category,
                                       PaymentMethod method) {
         requireHeaderAndAmount(header, amount);
@@ -61,16 +54,6 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /**
-     * Despesa dividida (D1 §2.6.1, S-40, S-137): paguei {@code amount} e cada pessoa das {@code shares} me deve a parte dela.
-     * Postings {@code EXPENSE(cat) +própria / RECEIVABLE(dívida i) +parte i / ACCOUNT −amount}: o caixa é o valor inteiro (o
-     * mesmo da linha do extrato), o consumo é só a parte do usuário e o patrimônio cai pela parte dele. A despesa é a
-     * <b>origem</b> de cada dívida ({@code originTransactionId}) e segue as guardas de estorno delas (S-36). Quando a
-     * pessoa paga, é {@code MONEY_RECEIVED} contra a dívida: caixa +, consumo intocado e <b>nunca receita</b> (PR 01).
-     *
-     * <p>Cada parte é maior que zero e Σ das partes fica abaixo de {@code amount} ({@code SHARES_EXCEED_AMOUNT}); mais de uma
-     * parte para a mesma pessoa vira duas dívidas; pessoa arquivada → {@code SHARE_PERSON_ARCHIVED}.
-     */
     public static ExpenseOperation expenseWithShares(TransactionHeader header, Money amount, Account account, Category category,
                                                      PaymentMethod method, List<ExpenseShare> shares) {
         requireHeaderAndAmount(header, amount);
@@ -105,12 +88,6 @@ public final class AccountTransactions {
         return new ExpenseOperation(sharedExpense(header, amount, account, category, method, debts), debts);
     }
 
-    /**
-     * A despesa dividida reconstruída com as dívidas que já existem (edição de descrição, categoria e observação, T78 CA7):
-     * valor, divisão e dívidas não mudam, só os postings regravados na categoria nova.
-     *
-     * @param debts as dívidas originadas pela despesa ({@code originTransactionId = header.id()})
-     */
     public static Transaction expenseKeepingShares(TransactionHeader header, Money amount, Account account, Category category,
                                                    PaymentMethod method, List<Debt> debts) {
         requireHeaderAndAmount(header, amount);
@@ -146,17 +123,11 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /** Receita: {@code ACCOUNT +X / INCOME(cat) −X}. O meio de pagamento é obrigatório. Competência = mês da data. */
     public static Transaction income(TransactionHeader header, Money amount, Account account, Category category,
                                      PaymentMethod method) {
         return income(header, amount, account, category, method, null);
     }
 
-    /**
-     * Receita que pode pertencer a outro mês (ADR-017): o posting do livro {@code INCOME} fica na competência
-     * {@code incomeCompetence} ({@code null} = mês da data), enquanto o posting da conta (caixa e saldo) segue na data real.
-     * Fora da janela 2000-01..2100-12: {@code INCOME_COMPETENCE_INVALID}.
-     */
     public static Transaction income(TransactionHeader header, Money amount, Account account, Category category,
                                      PaymentMethod method, Competence incomeCompetence) {
         requireHeaderAndAmount(header, amount);
@@ -172,7 +143,6 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /** A competência de renda informada (guardada como veio, para a ida e volta do {@code PUT}), se estiver na janela financeira; {@code null} passa. */
     static Competence validIncomeCompetence(Competence competence) {
         if (competence != null && (!FinancialDates.isInWindow(competence.firstDay()) || !FinancialDates.isInWindow(competence.lastDay()))) {
             throw new IncomeCompetenceInvalidException("use um mês entre 2000-01 e 2100-12.");
@@ -180,7 +150,6 @@ public final class AccountTransactions {
         return competence;
     }
 
-    /** Transferência entre contas próprias da mesma liquidez: {@code ACCOUNT(dest) +X / ACCOUNT(orig) −X}. */
     public static Transaction transfer(TransactionHeader header, Money amount, Account from, Account to) {
         requireHeaderAndAmount(header, amount);
         requireUsableAccount(header, amount, from);
@@ -199,10 +168,6 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /**
-     * Aplicação ({@code CONTRIBUTION}: {@code ACCOUNT(invest) +X / ACCOUNT(cash) −X}) ou resgate ({@code REDEMPTION}:
-     * sinais invertidos). Uma conta CASH e uma INVESTMENT.
-     */
     public static Transaction investment(TransactionHeader header, Money amount, InvestmentDirection direction,
                                          Account cashAccount, Account investmentAccount) {
         requireHeaderAndAmount(header, amount);
@@ -221,10 +186,6 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /**
-     * Ajuste manual: {@code ACCOUNT ±X / EQUITY ∓X}. Motivo obrigatório; {@code kind} padrão {@code CORRECTION};
-     * {@code YIELD} (rendimento, S-26) só em conta de investimento. Não toca consumo nem receita.
-     */
     public static Transaction adjustment(TransactionHeader header, Money amount, Account account, AdjustmentDirection direction,
                                          AdjustmentKind kind, String reason) {
         requireHeaderAndAmount(header, amount);
@@ -247,18 +208,11 @@ public final class AccountTransactions {
                 .build();
     }
 
-    /** Ajuste de correção (atalho para o {@code kind} padrão). */
     public static Transaction adjustment(TransactionHeader header, Money amount, Account account, AdjustmentDirection direction,
                                          String reason) {
         return adjustment(header, amount, account, direction, null, reason);
     }
 
-    /**
-     * Reembolso em conta: {@code ACCOUNT +X / EXPENSE(cat) −X}, na competência do reembolso (S-10). {@code refundOf} é
-     * opcional (S-9); se informado, a categoria é a da compra original e o valor não passa do valor efetivamente
-     * cobrado ({@link Transaction#chargedAmount()}: na compra no cartão, só as parcelas não canceladas) menos os
-     * reembolsos anteriores.
-     */
     public static Transaction refundToAccount(TransactionHeader header, Money amount, Account account, Category category,
                                               RefundOrigin refundOf) {
         requireHeaderAndAmount(header, amount);
@@ -273,8 +227,6 @@ public final class AccountTransactions {
                         new Posting(category.book(), amount.negate(), header.date())))
                 .build();
     }
-
-    // ------------------------------------------------------------------ validações compartilhadas no pacote
 
     static void requireHeaderAndAmount(TransactionHeader header, Money amount) {
         TransactionHeader.required(header, "header");
@@ -322,7 +274,6 @@ public final class AccountTransactions {
         if (!category.id().equals(original.categoryId())) {
             throw new InvalidRefundOriginException("o reembolso volta para a categoria da despesa original.");
         }
-        // A1: na compra no cartão, as parcelas canceladas já reverteram o consumo; o teto é o que foi cobrado
         Money remaining = original.chargedAmount().subtract(refundOf.alreadyRefunded());
         if (amount.isGreaterThan(remaining)) {
             throw new RefundExceedsOriginalException();

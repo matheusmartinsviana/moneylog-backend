@@ -30,10 +30,6 @@ import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionVoiding;
 import com.moneylog.core.transaction.domain.VoidContext;
 
-/**
- * A3: a cadeia de faturas é de um cartão e só conhece datas de fechamento do calendário. Fábricas e guarda de estorno
- * recusam cadeia de outro cartão; pagamento e item exigem um fechamento exato ("24/10" não é a fatura de 25/10).
- */
 @DisplayName("Cadeia de faturas: cartão e data de fechamento validados (A3)")
 class InvoiceChainGuardsTest {
 
@@ -47,7 +43,6 @@ class InvoiceChainGuardsTest {
         return TransactionHeader.of(UUID.fromString(id), USER_ID, d(date), null);
     }
 
-    /** Mesmo dono e mesmo calendário do Roxinho, outro id. */
     private static InvoiceChain cadeiaDeOutroCartao() {
         CreditCard outro = CreditCard.create(OUTRO_CARTAO_ID, USER_ID, "Outro", null, Money.of("1000.00"), 25, 5, null, d("2026-09-01"));
         return InvoiceChain.empty(outro);

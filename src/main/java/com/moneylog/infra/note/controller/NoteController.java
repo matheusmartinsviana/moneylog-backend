@@ -64,10 +64,6 @@ import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 import com.moneylog.infra.web.validation.NoControlChars;
 
-/**
- * Notas do vault (Etapa 6, S-157 a S-166): CRUD com lock otimista, lixeira, vínculos explícitos, backlinks, renomear com reescrita de wikilinks,
- * busca e tags. O texto é dado do usuário e nunca é renderizado aqui; nenhuma operação toca razão, saldo ou cálculo financeiro.
- */
 @RestController
 @RequestMapping("/v1/notes")
 @Validated
@@ -130,7 +126,6 @@ public class NoteController {
         return tags.handle(new ListTagsQuery(userId)).stream().map(TagCountResponse::of).toList();
     }
 
-    /** Esvazia a lixeira: a única exclusão definitiva do vault (ação explícita). */
     @DeleteMapping("/trash")
     public ResponseEntity<Void> emptyTrash(@CurrentUser UUID userId) {
         emptyTrash.handle(new EmptyTrashCommand(userId));
@@ -176,7 +171,6 @@ public class NoteController {
         return links == null ? List.of() : links.stream().map(l -> new ExplicitLinkSpec(l.type(), l.id(), l.key())).toList();
     }
 
-    /** O tipo exige id (ou chave, no resumo mensal) e vice-versa: 400 se faltar ou sobrar. */
     static void requireLinkFilter(NoteLinkType type, UUID id, String key, String typeField, String idField, String keyField) {
         if (type == null) {
             if (id != null || key != null) {

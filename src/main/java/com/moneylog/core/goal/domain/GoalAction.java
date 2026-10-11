@@ -14,10 +14,6 @@ import com.moneylog.core.goal.exception.GoalExceptions.GoalFieldRequiredExceptio
 import com.moneylog.core.goal.exception.GoalExceptions.GoalTextTooLongException;
 import com.moneylog.core.sk.text.PlainText;
 
-/**
- * Ação do plano declarado (ex.: "pagar a parcela do cartão todo mês"). Imutável: cada mudança devolve outra instância.
- * {@code doneIn} guarda os períodos com check-in (formato conforme a frequência). Não move dinheiro: é só acompanhamento.
- */
 public record GoalAction(UUID id, String title, GoalActionFrequency frequency, Instant createdAt, Set<String> doneIn) {
 
     public static final int TITLE_MAX_LENGTH = 100;
@@ -39,12 +35,10 @@ public record GoalAction(UUID id, String title, GoalActionFrequency frequency, I
     }
 
     public GoalAction edit(String newTitle, GoalActionFrequency newFrequency) {
-        // trocar a frequência invalida os períodos já marcados (formatos diferentes)
         Set<String> kept = newFrequency == frequency ? doneIn : Set.of();
         return new GoalAction(id, newTitle, newFrequency, createdAt, kept);
     }
 
-    /** Marca (ou desmarca) o período; idempotente. {@code period} {@code null} só vale em {@code ONE_TIME}. */
     public GoalAction checkIn(String period, boolean done) {
         String normalized = normalizePeriod(period);
         Set<String> next = new TreeSet<>(doneIn);
@@ -73,7 +67,6 @@ public record GoalAction(UUID id, String title, GoalActionFrequency frequency, I
                     return text;
                 }
             } catch (java.time.format.DateTimeParseException e) {
-                // cai no erro abaixo
             }
             throw new GoalCheckInPeriodInvalidException(frequency);
         }

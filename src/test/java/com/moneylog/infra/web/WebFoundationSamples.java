@@ -28,11 +28,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.security.CurrentUser;
 
-/**
- * Controller de amostra, só dos testes da fundação web: lança cada tipo de exceção e exercita {@code Money},
- * paginação, competência e o relógio. Registrado por {@code @Bean} (sem estereótipo), então só existe nos contextos
- * que o importam e nunca vaza para os demais ITs.
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class WebFoundationSamples {
 

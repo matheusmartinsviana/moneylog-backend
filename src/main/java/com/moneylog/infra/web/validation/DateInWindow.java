@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-/** A data está na janela financeira (2000-01-01 a 2100-12-31, S-114); {@code null} passa (use {@code @NotNull}). */
 @Documented
 @Constraint(validatedBy = DateInWindowValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})

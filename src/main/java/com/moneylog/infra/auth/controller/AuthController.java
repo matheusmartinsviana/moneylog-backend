@@ -32,7 +32,6 @@ import com.moneylog.infra.security.MoneylogAuthProperties;
 import com.moneylog.infra.security.OriginCheck;
 import com.moneylog.infra.security.RefreshCookies;
 
-/** Login, primeiro acesso, status, refresh rotativo e logout (ADR-003, ADR-015). O access token vai no corpo; o refresh, só no cookie. */
 @RestController
 @RequestMapping("/v1/auth")
 public class AuthController {
@@ -79,7 +78,6 @@ public class AuthController {
         return sessionResponse(session);
     }
 
-    /** Primeiro acesso (ADR-015): o limite por IP é o mesmo do login; só código errado conta como falha. */
     @PostMapping("/setup-password")
     public ResponseEntity<AuthTokenResponse> setupPassword(@Valid @RequestBody SetupPasswordRequest body,
                                                            HttpServletRequest request) {

@@ -24,7 +24,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/** T113 (QA): limite de taxa de exportar/importar o vault com o limite REAL de produção (6 por minuto; o perfil de IT sobe para 100.000). */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @TestPropertySource(properties = "moneylog.export.rate-limit.max-requests=6")

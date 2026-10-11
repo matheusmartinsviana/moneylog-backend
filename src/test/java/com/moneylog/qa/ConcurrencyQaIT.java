@@ -34,7 +34,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClockConfig;
 
-/** T43 (QA), critério 5: concorrência. Nenhuma corrida pode produzir 500, duplicar ou violar uma invariante financeira. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: concorrência")
@@ -119,7 +118,6 @@ class ConcurrencyQaIT {
         assertThat(jdbc.queryForObject("select count(*) from transaction_revisions where transaction_id = ?::uuid", Integer.class, a.expenseTx)).isEqualTo(1);
         assertThat(a.get("/v1/transactions/" + a.expenseTx).get("version").asLong()).isEqualTo(1);
         assertLedgerClosed();
-        // o saldo reflete exatamente a edição vencedora
         BigDecimal amount = new BigDecimal(a.get("/v1/transactions/" + a.expenseTx).get("amount").get("amount").asString());
         assertThat(new BigDecimal(balance(a.nubank))).isEqualByComparingTo(new BigDecimal("20000.00").subtract(amount));
     }
@@ -214,7 +212,7 @@ class ConcurrencyQaIT {
         }
         List<MvcResult> r = race(tasks);
         assertThat(histogram(r)).as(codes(r)).isEqualTo(Map.of(201, 12));
-        assertThat(balance(a.nubank)).isEqualTo("19816.00"); // 20000 - 100 - 12*7
+        assertThat(balance(a.nubank)).isEqualTo("19816.00");
         assertLedgerClosed();
     }
 

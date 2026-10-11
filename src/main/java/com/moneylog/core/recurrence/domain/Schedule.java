@@ -7,13 +7,6 @@ import java.util.List;
 
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.InvalidRecurrenceException;
 
-/**
- * Agenda de uma recorrência: frequência, início e fim opcional (data ou quantidade). A ocorrência {@code n} é sempre
- * calculada a partir da <b>âncora</b> ({@code startDate}), nunca da anterior: mensal no dia 31 dá 31/01, 28/02, 31/03,
- * 30/04; anual em 29/02 dá 28/02 nos anos não bissextos (D1 §2.7).
- *
- * @param interval só em {@code CUSTOM} (≥ 1); nos demais é 1
- */
 public record Schedule(Frequency frequency, int interval, IntervalUnit unit, LocalDate startDate, LocalDate endDate,
                        Integer maxOccurrences) {
 
@@ -54,7 +47,6 @@ public record Schedule(Frequency frequency, int interval, IntervalUnit unit, Loc
         return new Schedule(frequency, interval, unit, startDate, endDate, max);
     }
 
-    /** Ocorrência {@code n} (0 = início), calculada a partir da âncora. */
     public LocalDate nth(long n) {
         return switch (frequency) {
             case DAILY -> startDate.plusDays(n);
@@ -69,7 +61,6 @@ public record Schedule(Frequency frequency, int interval, IntervalUnit unit, Loc
         };
     }
 
-    /** Datas agendadas em {@code [from, to]}, respeitando fim e quantidade máxima. */
     public List<LocalDate> datesBetween(LocalDate from, LocalDate to) {
         List<LocalDate> dates = new ArrayList<>();
         for (long n = 0; n < SAFETY_LIMIT; n++) {
@@ -87,10 +78,6 @@ public record Schedule(Frequency frequency, int interval, IntervalUnit unit, Loc
         return List.copyOf(dates);
     }
 
-    /**
-     * Existe ocorrência agendada em {@code date} ou depois? {@code false} = a agenda terminou (fim anterior a {@code date}
-     * ou quantidade máxima esgotada). Sem fim nem quantidade é sempre {@code true}.
-     */
     public boolean hasOccurrenceOnOrAfter(LocalDate date) {
         if (endDate == null && maxOccurrences == null) {
             return true;
@@ -114,10 +101,6 @@ public record Schedule(Frequency frequency, int interval, IntervalUnit unit, Loc
         return datesBetween(date, date).contains(date);
     }
 
-    /**
-     * Fator de normalização para o mês, como fração exata {@code [numerador, denominador]}: semanal = 52/12,
-     * diário = 365/12, anual = 1/12, mensal = 1; no personalizado divide pelo intervalo.
-     */
     BigInteger[] monthlyFactor() {
         long numerator;
         long denominator;

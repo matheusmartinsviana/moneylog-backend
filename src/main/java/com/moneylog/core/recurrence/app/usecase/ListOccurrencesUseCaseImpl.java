@@ -32,7 +32,6 @@ public class ListOccurrencesUseCaseImpl implements ListOccurrencesUseCase {
     @Override
     public OccurrenceListing handle(ListOccurrencesQuery query) {
         LocalDate today = time.today();
-        // sem `from`, a janela começa no início da agenda: traz as vencidas e não realizadas (continuam pendentes, S-20)
         LocalDate from = query.from() == null ? LocalDate.MIN : query.from();
         LocalDate to = query.to() == null ? (query.from() == null ? today : query.from()).plusDays(DEFAULT_WINDOW_DAYS) : query.to();
         if (from.isAfter(to)) {
@@ -76,7 +75,6 @@ public class ListOccurrencesUseCaseImpl implements ListOccurrencesUseCase {
         return OccurrenceListing.of(Slice.fromOverfetch(views.subList(start, end), query.page()), truncated);
     }
 
-    /** Limita as pendentes vencidas às {@value #MAX_OVERDUE_OCCURRENCES} mais recentes (S-240); {@code true} se descartou alguma. */
     private static boolean capOverdue(List<OccurrenceView> views, Comparator<OccurrenceView> byDate) {
         List<OccurrenceView> overdue = views.stream().filter(v -> v.status() == OccurrenceStatus.PENDING && v.overdue()).toList();
         if (overdue.size() <= MAX_OVERDUE_OCCURRENCES) {

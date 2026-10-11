@@ -20,11 +20,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T55: pagamento de fatura (inclusive parcial, antecipado e a maior), prévia e estorno do pagamento. Cenário: as duas
- * compras de 10/10 e 12/10 (fatura de 25/10 com 1.283,00) e relógio 05/11 (fatura CLOSED). Toda requisição e resposta valida
- * contra o contrato.
- */
 @DisplayName("Pagamento de fatura (T55)")
 class InvoicePaymentsIT extends CardItBase {
 
@@ -68,7 +63,6 @@ class InvoicePaymentsIT extends CardItBase {
         JsonNode list = okBody(get("/v1/transactions?type=INVOICE_PAYMENT"));
         assertThat(list.get("items")).hasSize(1);
         assertThat(money(list.get("totals").get("cashFlow"), "out")).isEqualTo("1283.00");
-        // pagar não cria consumo: o consumo do mês é só o das compras
         JsonNode consumption = okBody(get("/v1/entries?competence=2026-10&lens=CONSUMPTION"));
         assertThat(consumption.get("items")).hasSize(2);
         assertThat(money(consumption.get("totals"), "total")).isEqualTo("1283.00");
@@ -186,7 +180,6 @@ class InvoicePaymentsIT extends CardItBase {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transactions WHERE user_id = ? AND type = 'INVOICE_PAYMENT'", Long.class, userId)).isEqualTo(1);
         mockMvc.perform(post("/v1/invoices/" + closed + "/payments", paymentBody(nubank, "501.00", "2026-11-05")).header("Idempotency-Key", key))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED")).andExpect(ContractValidation.conforms());
-        // escopo próprio: a mesma chave em POST /v1/transactions não colide com a do pagamento
         mockMvc.perform(post("/v1/transactions", purchase("10.00", 1, "2026-11-05", "Outra")).header("Idempotency-Key", key))
                 .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transactions WHERE user_id = ? AND type = 'INVOICE_PAYMENT'", Long.class, userId)).isEqualTo(1);
@@ -251,12 +244,10 @@ class InvoicePaymentsIT extends CardItBase {
             JsonNode invoice = okBody(get("/v1/invoices/" + closed));
             boolean purchaseFirst = invoice.get("items").size() == 2;
             if (purchaseFirst) {
-                // a compra entrou na fatura fechada e não paga (lançamento tardio) antes do pagamento: sobra 90,00
                 assertThat(invoice.get("items").get(1).get("lateEntry").asBoolean()).isTrue();
                 assertThat(money(invoice, "outstanding")).isEqualTo("90.00");
                 assertThat(invoice.get("status").asString()).isEqualTo("CLOSED");
             } else {
-                // o pagamento quitou antes: a compra foi para a fatura corrente (25/11), nunca para a paga
                 assertThat(invoice.get("status").asString()).isEqualTo("PAID");
                 assertThat(money(invoice, "total")).isEqualTo("1283.00");
                 JsonNode next = okBody(get("/v1/invoices/" + com.moneylog.core.card.domain.InvoiceIds.of(UUID.fromString(roundCard), LocalDate.of(2026, 11, 25))));
@@ -289,7 +280,6 @@ class InvoicePaymentsIT extends CardItBase {
         assertThat(invoice(NOV_CLOSING).get("status").asString()).isEqualTo("OVERDUE");
         mockMvc.perform(post("/v1/transactions/" + paymentId + "/void", "{\"reason\":\"de novo\"}")).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("TRANSACTION_ALREADY_VOIDED")).andExpect(ContractValidation.conforms());
-        // depois do estorno a fatura volta a poder ser paga
         assertThat(paid(NOV_CLOSING, "1283.00", "2026-11-08").get("status").asString()).isEqualTo("PAID");
     }
 

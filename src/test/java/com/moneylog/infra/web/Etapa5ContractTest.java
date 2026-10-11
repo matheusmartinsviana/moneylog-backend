@@ -20,10 +20,6 @@ import com.atlassian.oai.validator.report.ValidationReport;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T91: o contrato da Etapa 5 em si (sem Spring): os exemplos de {@code Goal}, {@code MonthlySummary} e {@code Projection} validam contra o próprio
- * contrato, o {@code amount} da reserva aceita só decimal com sinal e o {@code horizon} fora do enum é recusado pelo validador.
- */
 @DisplayName("Contrato da Etapa 5: exemplos, valor com sinal da reserva e horizonte (T91)")
 class Etapa5ContractTest {
 
@@ -32,7 +28,6 @@ class Etapa5ContractTest {
     private static final com.fasterxml.jackson.databind.ObjectMapper NULLS_KEPT = new com.fasterxml.jackson.databind.ObjectMapper();
     private static final String GOAL_ID = "5b0f6c3e-7e0a-4f6b-9d57-0e8f3a1c2b10";
 
-    /** O exemplo lido do YAML cru: o parser do swagger descarta os {@code null} dos exemplos, e os campos anuláveis obrigatórios precisam deles. */
     private static String example(String schemaName) throws Exception {
         var root = new com.fasterxml.jackson.dataformat.yaml.YAMLMapper().readTree(ContractValidation.SPEC_FILE.toFile());
         var examples = root.get("components").get("schemas").get(schemaName).get("examples");

@@ -15,7 +15,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceType;
 
-/** {@code Recurrence} do contrato. */
 public record RecurrenceResponse(UUID id, RecurrenceType type, Money amount, String description, Ref category, Ref account, Ref card,
                                  PaymentMethod method, Frequency frequency, int interval, IntervalUnit unit, LocalDate startDate,
                                  LocalDate endDate, Integer maxOccurrences, boolean active, LocalDate nextOccurrence,

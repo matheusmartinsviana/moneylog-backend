@@ -14,10 +14,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T188: {@code balances.inAccountsChange}. O Nubank do cenário base abre em 01/10 (20.000,00); a "Conta de setembro" abre em 01/09 com
- * 1.000,00: no último dia de setembro o saldo em contas é 1.000,00 e em 10/10 é 21.084,00 depois de uma receita de 84,00.
- */
 @DisplayName("Dashboard: variação do saldo em contas desde o fim do mês anterior (T188, redesign R4)")
 class InAccountsChangeIT extends E4ItBase {
 

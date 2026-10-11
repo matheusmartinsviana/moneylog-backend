@@ -37,7 +37,6 @@ import com.moneylog.infra.web.SliceResponse;
 
 import jakarta.validation.Valid;
 
-/** Compromissos acompanhados (ADR-014): empréstimo de terceiro e projeto de longo prazo. Só do usuário do token; sem efeito em contas. */
 @RestController
 @RequestMapping("/v1/commitments")
 @Validated
@@ -80,14 +79,12 @@ public class CommitmentController {
         return ResponseEntity.created(URI.create("/v1/commitments/" + created.commitment().id())).body(CommitmentResponse.of(created));
     }
 
-    /** Marca o item do cronograma como pago (acompanhamento; nenhuma conta é movimentada). */
     @PostMapping("/{id}/schedule/{position}/pay")
     public CommitmentResponse pay(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable int position,
                                   @Valid @RequestBody MarkPaidInput body) {
         return CommitmentResponse.of(markPaid.handle(new MarkScheduleItemPaidCommand(userId, id, position, body.paidOn(), body.version())));
     }
 
-    /** Atualiza o progresso informado de um empréstimo de terceiro. */
     @PostMapping("/{id}/progress")
     public CommitmentResponse progress(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody ProgressInput body) {
         return CommitmentResponse.of(progress.handle(new UpdateCommitmentProgressCommand(userId, id, body.installmentsPaid(),

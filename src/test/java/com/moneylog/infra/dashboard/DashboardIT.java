@@ -35,11 +35,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T29: {@code GET /v1/dashboard/summary} e {@code /upcoming}. Cenário de outubro de T28 (Nubank 20.000,00, XP, XP Invest;
- * despesa Pix 100,00, débito 40,00, receita 3.000,00, transferência 1.000,00, aplicação 500,00, reembolso 50,00, uma
- * despesa estornada de 30,00 e uma de 70,00 em 05/11), com o relógio avançável.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Dashboard real (T29)")
@@ -74,8 +69,6 @@ class DashboardIT {
         committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@moneylog.com"));
         bearer = auth.bearer(userId);
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
@@ -115,7 +108,6 @@ class DashboardIT {
                 + nubank + "\",\"categoryId\":\"" + category + "\",\"method\":\"" + method + "\"}");
     }
 
-    /** O cenário de outubro de T28 (a estornada é estornada pela API). */
     private void octoberScenario() throws Exception {
         nubank = account("Nubank", "CHECKING", "20000.00");
         xp = account("XP", "CHECKING", "0.00");
@@ -142,8 +134,6 @@ class DashboardIT {
         return mockMvc.perform(get("/v1/dashboard/summary" + query));
     }
 
-    // ---------------------------------------------------------------- CA1
-
     @Test
     @DisplayName("CA1: sem contas, hasAccounts é false e todos os valores são 0,00; só uma conta arquivada, hasAccounts é true")
     void deveInformarSeHaContas() throws Exception {
@@ -157,8 +147,6 @@ class DashboardIT {
         summary("").andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.hasAccounts").value(true));
     }
 
-    // ---------------------------------------------------------------- CA2, CA4
-
     @Test
     @DisplayName("CA2: com asOf=2026-10-31: em contas 22.410,00 (Nubank + XP), investimentos 500,00, comprometido 70,00 (a despesa de 05/11, S-258), available = em contas - 70,00, mês: receita 3.000,00, despesas 140,00 (Pix 100,00, débito 40,00), reembolsos 50,00, consumo 90,00, fluxo 3.050,00 / 640,00 / 2.410,00, investido 500,00, net 2.910,00")
     void deveResumirOMes() throws Exception {
@@ -168,7 +156,6 @@ class DashboardIT {
                 .andExpect(jsonPath("$.asOf").value("2026-10-31")).andExpect(jsonPath("$.isProjection").value(true))
                 .andExpect(jsonPath("$.hasAccounts").value(true)).andExpect(jsonPath("$.balances.inAccounts.amount").value("22410.00"))
                 .andExpect(jsonPath("$.balances.investments.amount").value("500.00")).andExpect(jsonPath("$.balances.available.amount").value("22340.00"))
-                // a despesa de 70,00 de 05/11 é futura em relação a 31/10: compromisso SCHEDULED_TRANSACTION (S-258), que abate o disponível e o projetado
                 .andExpect(jsonPath("$.balances.reserved.amount").value("0.00")).andExpect(jsonPath("$.balances.committed30d.amount").value("70.00"))
                 .andExpect(jsonPath("$.committed.d7.amount").value("70.00")).andExpect(jsonPath("$.committed.m12.amount").value("70.00"))
                 .andExpect(jsonPath("$.projected.d30.amount").value("22340.00")).andExpect(jsonPath("$.month.competence").value("2026-10"))
@@ -182,7 +169,6 @@ class DashboardIT {
                 .andExpect(jsonPath("$.month.investedNet.amount").value("500.00")).andExpect(jsonPath("$.month.net.amount").value("2910.00"))
                 .andExpect(jsonPath("$.netWorth.accounts.amount").value("22910.00")).andReturn();
 
-        // o mesmo número que a lista de registros devolve (T28 CA1)
         JsonNode list = body(mockMvc.perform(get("/v1/transactions?from=2026-10-01&to=2026-10-31")).andExpect(status().isOk()).andReturn());
         assertThat(list.get("totals").get("cashFlow")).isEqualTo(body(result).get("month").get("cashFlow"));
     }
@@ -194,7 +180,6 @@ class DashboardIT {
 
         summary("").andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.asOf").value("2026-10-10"))
                 .andExpect(jsonPath("$.isProjection").value(false)).andExpect(jsonPath("$.month.competence").value("2026-10"))
-                // hoje, 10/10: a despesa Uber (11/10) e a aplicação (15/10) ainda não aconteceram no saldo
                 .andExpect(jsonPath("$.balances.inAccounts.amount").value("22950.00")).andExpect(jsonPath("$.balances.investments.amount").value("0.00"));
         summary("?asOf=2026-10-11").andExpect(status().isOk()).andExpect(jsonPath("$.isProjection").value(true)).andExpect(ContractValidation.conforms());
         summary("?asOf=2026-10-10").andExpect(status().isOk()).andExpect(jsonPath("$.isProjection").value(false));
@@ -202,8 +187,6 @@ class DashboardIT {
                 .andExpect(jsonPath("$.month.consumption.amount").value("70.00")).andExpect(jsonPath("$.month.income.amount").value("0.00"));
         summary("?asOf=ontem").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED")).andExpect(ContractValidation.responseOnly());
     }
-
-    // ---------------------------------------------------------------- CA5
 
     @Test
     @DisplayName("CA5 + S-258: upcoming sem parâmetros devolve só as movimentações futuras do cenário (Uber 11/10, aplicação 15/10 e a conta de 05/11, como SCHEDULED_TRANSACTION), undated vazio; com from > to é 400")

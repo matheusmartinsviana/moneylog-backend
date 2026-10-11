@@ -21,7 +21,6 @@ public class ListNotesUseCaseImpl implements ListNotesUseCase {
         }
         NoteQuery effective = query;
         if (query.tag() != null) {
-            // a tag da busca é normalizada como as gravadas (minúsculas, sem acento); uma tag que não existe não casa com nada
             java.util.Optional<String> tag = NoteTags.normalize(query.tag());
             if (tag.isEmpty()) {
                 return Slice.empty();

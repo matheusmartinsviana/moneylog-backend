@@ -12,16 +12,6 @@ import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Lente de reservas das metas (D1 §2.9, S-147, S-148): o <b>único</b> cálculo de "reservado", usado pelo dashboard, pelo saldo da conta
- * e pela meta. Reserva lógica: não é lançamento, não muda saldo nem movimenta nada.
- *
- * <ul>
- *   <li>{@code byAccount} = Σ reservas líquidas (reserva − liberação) das metas <b>não arquivadas</b> com data ≤ {@code asOf}, por conta;</li>
- *   <li>{@code inCash} = Σ {@code byAccount} das contas {@code CASH} (as de investimento já estão fora do disponível, S-21);</li>
- *   <li>{@code uncovered} = contas cujo reservado passa do saldo (S-148): só sinaliza, nunca bloqueia.</li>
- * </ul>
- */
 public record GoalReserves(LocalDate asOf, Map<UUID, Money> byAccount, Money inCash, Set<UUID> uncovered) {
 
     public static GoalReserves at(FinancialRecords records, CashPosition position) {

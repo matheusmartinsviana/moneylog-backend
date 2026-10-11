@@ -5,6 +5,5 @@ import com.moneylog.core.finance.app.cards.usecase.CreateOngoingInstallmentsUseC
 
 public interface PreviewOngoingInstallmentsUseCase {
 
-    /** O que {@link CreateOngoingInstallmentsUseCase} gravaria, pelo mesmo caminho de código e sem gravar nem travar. */
     OngoingPreviewView handle(CreateOngoingInstallmentsCommand command);
 }

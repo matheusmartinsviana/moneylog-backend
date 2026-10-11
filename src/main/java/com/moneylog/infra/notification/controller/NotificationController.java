@@ -52,10 +52,6 @@ import com.moneylog.infra.notification.controller.NotificationDtos.UnreadCount;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * Central de notificações, lembretes, configurações, push e mensagem diária (Etapa 7). A central dentro do app é o canal garantido; o push fica
- * preparado e desligado. Todo endpoint filtra pelo usuário do token e nenhuma resposta é cacheada.
- */
 @RestController
 public class NotificationController {
 
@@ -103,9 +99,6 @@ public class NotificationController {
         this.time = time;
     }
 
-    // ------------------------------------------------------------------ central
-
-    /** {@code status=UNREAD} (padrão) ou {@code ALL}. */
     @GetMapping("/v1/notifications")
     public ResponseEntity<SliceResponse<NotificationResponse>> notifications(@CurrentUser UUID userId,
                                                                              @RequestParam(defaultValue = "UNREAD") ReadFilter status,
@@ -132,8 +125,6 @@ public class NotificationController {
         markAll.handle(userId);
         return ResponseEntity.noContent().build();
     }
-
-    // ------------------------------------------------------------------ lembretes
 
     @GetMapping("/v1/reminders")
     public SliceResponse<ReminderResponse> reminders(@CurrentUser UUID userId, @RequestParam(defaultValue = "false") boolean includeDone,
@@ -168,8 +159,6 @@ public class NotificationController {
                 body.link() == null ? null : body.link().id());
     }
 
-    // ------------------------------------------------------------------ configurações
-
     @GetMapping("/v1/settings/notifications")
     public SettingsDto settings(@CurrentUser UUID userId) {
         return SettingsDto.of(getSettings.handle(userId));
@@ -181,8 +170,6 @@ public class NotificationController {
                 LocalTime.parse(body.dailySummary().time()), body.dailySummary().frequency(), body.checkedKinds(), body.quiet(), body.push().enabled(),
                 body.displayName(), body.version())));
     }
-
-    // ------------------------------------------------------------------ push (preparado, desligado por padrão)
 
     @GetMapping("/v1/push/config")
     public PushConfigResponse pushConfig() {
@@ -202,8 +189,6 @@ public class NotificationController {
         unsubscribe.handle(userId, id);
         return ResponseEntity.noContent().build();
     }
-
-    // ------------------------------------------------------------------ mensagem diária
 
     @GetMapping("/v1/daily-message")
     public ResponseEntity<DailyMessageResponse> dailyMessage(@CurrentUser UUID userId) {

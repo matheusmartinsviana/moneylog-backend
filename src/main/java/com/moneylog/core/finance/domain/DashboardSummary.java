@@ -11,27 +11,11 @@ import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/**
- * Resumo do dashboard (D2 §4.4), montado só com as calculadoras de {@code core.finance}: os valores do mês são os
- * mesmos de {@link ConsumptionReport}, {@link EntryReport} e {@link CashFlowReport} para a competência de
- * {@code asOf} (PR 01 regra 10).
- *
- * <ul>
- *   <li>Disponível = em contas − comprometido em 30 dias − reservado (S-21); reservado = Σ reservas de metas em contas {@code CASH} com
- *       data ≤ {@code asOf} ({@link GoalReserves}, S-147): sem metas vale 0 e nada muda.</li>
- *   <li>Projetado(H) = em contas + entradas previstas(H) − saídas previstas(H), sempre rotulado como projeção.</li>
- *   <li>{@code month.net} = receitas − consumo (S-23).</li>
- * </ul>
- */
 public record DashboardSummary(LocalDate asOf, boolean isProjection, Balances balances, Map<Horizon, Money> committed,
                                Map<Horizon, Money> projected, ConsumptionReport month, CashFlowReport cashFlow, NetWorth netWorth) {
 
-    /** Horizontes da projeção (D2 §4.4). */
     public static final List<Horizon> PROJECTION_HORIZONS = List.of(Horizon.D30, Horizon.D90, Horizon.M6, Horizon.M12);
 
-    /**
-     * @param inAccountsChange variação do saldo em contas desde o último dia do mês anterior ({@code null} em projeção ou sem contas)
-     */
     public record Balances(Money inAccounts, Money investments, Money available, Money reserved, Money committed30d,
                            InAccountsChange inAccountsChange) {
 
@@ -40,20 +24,9 @@ public record DashboardSummary(LocalDate asOf, boolean isProjection, Balances ba
         }
     }
 
-    /**
-     * Variação de "em contas" (redesign R4, S-290): {@code previous} = {@code inAccounts} no último dia do mês anterior ({@code since}),
-     * calculado pelo <b>mesmo</b> {@link CashPosition#at} do saldo de hoje (exato por data: movimentação datada depois de {@code since} não
-     * entra); {@code amount} = {@code inAccounts} de {@code asOf} − {@code previous}; {@code percent} = {@code amount / |previous|} (4 casas,
-     * {@code null} se {@code previous} = 0). É variação de <b>contas</b>: aplicar em investimento a reduz (o dinheiro não saiu do patrimônio).
-     * O "disponível" não tem histórico (depende do comprometido, uma estimativa do futuro com o estado de hoje), por isso não há variação dele.
-     */
     public record InAccountsChange(Money previous, Money amount, BigDecimal percent, LocalDate since) {
     }
 
-    /**
-     * @param asOf  data do resumo (padrão: hoje no fuso do usuário)
-     * @param today hoje real; {@code asOf} depois de hoje marca o resumo como projeção
-     */
     public static DashboardSummary of(FinancialRecords records, Collection<RecurringTransaction> recurrences, LocalDate asOf,
                                       LocalDate today) {
         Ledger ledger = records.ledger();

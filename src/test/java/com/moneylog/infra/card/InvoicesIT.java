@@ -16,11 +16,6 @@ import com.moneylog.core.card.domain.InvoiceIds;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T54: cartão enriquecido, lista de faturas, fatura com itens e parcelas futuras. Cenário: as duas compras de 10/10 e 12/10
- * no Roxinho (1.200,00 em 6x e 1.083,00 à vista); relógio 10/10 e depois 30/10. O estado com pagamentos é semeado pelo
- * gateway (E3-13). Toda requisição e resposta valida contra o contrato.
- */
 @DisplayName("Faturas, cartão enriquecido e parcelas futuras (T54)")
 class InvoicesIT extends CardItBase {
 
@@ -58,7 +53,6 @@ class InvoicesIT extends CardItBase {
         assertThat(money(closed, "total")).isEqualTo("1283.00");
         assertThat(closed.get("payments")).isEmpty();
         assertThat(closed.get("items")).hasSize(2);
-        // mesma data: ordem por número da parcela e, empatando, por descrição (Mercado 1/1 antes de Notebook 1/6)
         JsonNode installment = closed.get("items").get(1);
         assertThat(installment.get("kind").asString()).isEqualTo("INSTALLMENT");
         assertThat(installment.get("description").asString()).isEqualTo("Notebook");

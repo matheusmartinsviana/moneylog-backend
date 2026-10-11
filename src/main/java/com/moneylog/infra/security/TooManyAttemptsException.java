@@ -2,7 +2,6 @@ package com.moneylog.infra.security;
 
 import java.time.Duration;
 
-/** Rate limit do login estourado: {@code 429} com {@code Retry-After}. */
 public class TooManyAttemptsException extends RuntimeException {
 
     private final transient Duration retryAfter;

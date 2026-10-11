@@ -37,11 +37,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T98 (QA), critério 5: exportação. CSV com injeção de fórmula (descrição, categoria, conta e cartão), aspas, ponto e vírgula, quebra de
- * linha, Unicode, {@code includeVoided}, cabeçalhos HTTP; backup completo (contagens contra o banco), sem segredos, sem chaves de
- * idempotência e sem dados de outro usuário.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: exportação CSV e backup JSON")
@@ -72,7 +67,6 @@ class GoalExportQaIT {
         b = world.new Actor("e5xb");
     }
 
-    /** CSV RFC 4180 com separador {@code ;}: aspas dobradas e quebras de linha dentro de aspas. */
     static List<List<String>> parse(String text) {
         List<List<String>> rows = new ArrayList<>();
         List<String> row = new ArrayList<>();
@@ -147,7 +141,6 @@ class GoalExportQaIT {
                 rejected.add(d + " -> " + r.status());
             }
         }
-        // tab, CR e quebra de linha na descrição
         for (String d : List.of("\\t=1+1", "\\r=1+1", "linha1\\nlinha2", "a\\u0000b")) {
             Res r = expense(a, d, a.nubank);
             System.out.println("QA-E5-CSV controle em descrição '" + d + "' -> " + r.status() + " " + r.code());
@@ -156,14 +149,12 @@ class GoalExportQaIT {
             }
         }
         assertThat(rejected).as("só caracteres de controle podem ser recusados").isEmpty();
-        // transações na conta e no cartão com nomes perigosos
         assertThat(expense(a, "na conta fórmula", formulaAccount).status()).isEqualTo(201);
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", "{\"type\":\"EXPENSE\",\"amount\":\"1.00\",\"date\":\"2026-10-05\",\"description\":\"cat+\",\"accountId\":\"" + a.nubank
                 + "\",\"categoryId\":\"" + plusCategory + "\",\"method\":\"PIX\"}", GoalQa.key()));
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", "{\"type\":\"EXPENSE\",\"amount\":\"2.00\",\"date\":\"2026-10-05\",\"description\":\"cat@\",\"accountId\":\"" + a.nubank
                 + "\",\"categoryId\":\"" + atCategory + "\",\"method\":\"PIX\"}", GoalQa.key()));
         CardQaWorld.ok(a.purchaseOn(minusCard, a.tech, "3.00", 1, "2026-10-05", "no cartão"));
-        // transferência: origem > destino com nomes perigosos
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", "{\"type\":\"TRANSFER\",\"amount\":\"4.00\",\"date\":\"2026-10-05\",\"description\":\"transf\",\"fromAccountId\":\"" + formulaAccount
                 + "\",\"toAccountId\":\"" + a.nubank + "\"}", GoalQa.key()));
 
@@ -196,7 +187,6 @@ class GoalExportQaIT {
                     "Pagamento de dívida", "Compra no cartão", "Pagamento de fatura", "Reembolso", "Ajuste");
         }
         assertThat(offenders).as("células que começam com =, +, - ou @ sem neutralização").isEmpty();
-        // ida e volta: a célula é a descrição original (com ' na frente se perigosa)
         Set<String> cells = new HashSet<>();
         rows.subList(1, rows.size()).forEach(r -> cells.add(r.get(2)));
         for (String d : descriptions) {
@@ -204,7 +194,6 @@ class GoalExportQaIT {
             boolean dangerous = !original.isEmpty() && "=+-@".indexOf(original.charAt(0)) >= 0;
             assertThat(cells).as("descrição '" + original + "'").contains(dangerous ? "'" + original : original);
         }
-        // conta, categoria e cartão perigosos
         Set<String> wheres = new HashSet<>();
         Set<String> categories = new HashSet<>();
         rows.subList(1, rows.size()).forEach(r -> {
@@ -213,13 +202,11 @@ class GoalExportQaIT {
         });
         assertThat(wheres).contains("'=HYPERLINK(\"http://x\")", "'-cartão", "'=HYPERLINK(\"http://x\") > Nubank");
         assertThat(categories).contains("'+cat;com ponto e vírgula", "'@categoria");
-        // cabeçalhos HTTP
         assertThat(result.getResponse().getContentType()).isEqualTo("text/csv;charset=UTF-8");
         assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("attachment; filename=\"moneylog-transactions-2026-10-01_2026-10-31.csv\"");
         System.out.println("QA-E5-CSV nosniff=" + result.getResponse().getHeader("X-Content-Type-Options") + " csp=" + result.getResponse().getHeader("Content-Security-Policy"));
         assertThat(result.getResponse().getHeader("X-Content-Type-Options")).as("nosniff num download").isEqualTo("nosniff");
-        // sem filtro de datas e com Accept-Language
         MvcResult en = csv(a, "", "en-US,en;q=0.9");
         assertThat(body(en).substring(1)).startsWith("Date;Type;Description;Category;Account/Card;Method;Amount;Status;Direction;Income month\r\n");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).doesNotContain("\r").doesNotContain("\n");
@@ -267,7 +254,6 @@ class GoalExportQaIT {
     @Test
     @DisplayName("backup: contagens batem com o banco (inclusive arquivados, estornados, inativos), sem segredos, sem chaves de idempotência, sem e-mail e sem nenhum dado de outro usuário; goals[].reservations soma o current")
     void backup() throws Exception {
-        // dados de A de todos os tipos
         String person = DebtQa.person(a, "João");
         CardQaWorld.ok(DebtQa.loan(a, "100.00", "2026-10-02", person, null));
         CardQaWorld.ok(a.purchase("600.00", 3, "2026-10-03", "Parcelada"));
@@ -279,14 +265,12 @@ class GoalExportQaIT {
         CardQaWorld.ok(GoalQa.reserveKey(a, goal, second, "10.00", LocalDate.of(2026, 10, 10), idemKey));
         CardQaWorld.ok(GoalQa.reserve(a, goal, a.nubank, "300.00", LocalDate.of(2026, 10, 10)));
         CardQaWorld.ok(GoalQa.reserve(a, goal, a.nubank, "-50.00", LocalDate.of(2026, 10, 12)));
-        // S-259: a conta só arquiva sem reserva ativa; libera os 10,00 antes (a reserva e a liberação seguem no backup)
         Res refused = a.call(HttpMethod.POST, "/v1/accounts/" + second + "/archive", null, null);
         assertThat(refused.status()).isEqualTo(422);
         assertThat(refused.code()).isEqualTo("ACCOUNT_HAS_RESERVATIONS");
         CardQaWorld.ok(GoalQa.reserve(a, goal, second, "-10.00", LocalDate.of(2026, 10, 10)));
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/accounts/" + second + "/archive", null, null));
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", "10.00", "Rec", a.food, DebtQa.accountTarget(a, "EXPENSE"), "MONTHLY", "2026-10-20", null), null));
-        // segredos plantados para A e dados de B
         String secretHash = "f".repeat(60) + "beef";
         jdbc.update("insert into refresh_tokens (id,user_id,family_id,token_hash,created_at,updated_at,expires_at) values (?,?,?,?,?,?,?)", UUID.randomUUID(), a.id, UUID.randomUUID(), secretHash,
                 Timestamp.from(Instant.parse("2026-10-10T12:00:00Z")), Timestamp.from(Instant.parse("2026-10-10T12:00:00Z")), Timestamp.from(Instant.parse("2026-11-10T12:00:00Z")));
@@ -303,7 +287,6 @@ class GoalExportQaIT {
         assertThat(backup.get("schemaVersion").asInt()).isEqualTo(1);
         assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("attachment; filename=\"moneylog-backup-2026-10-10.json\"");
-        // contagens contra o banco
         assertThat(backup.get("accounts")).hasSize((int) a.count("accounts"));
         assertThat(backup.get("cards")).hasSize((int) a.count("credit_cards"));
         assertThat(backup.get("transactions")).as("inclui a estornada").hasSize((int) a.count("transactions"));
@@ -324,7 +307,6 @@ class GoalExportQaIT {
             voided |= "VOIDED".equals(t.get("status").asString());
         }
         assertThat(voided).isTrue();
-        // segredos e privacidade
         String lower = text.toLowerCase();
         for (String forbidden : List.of(secretHash, idemKey, a.id.toString(), b.id.toString(), "despesa privada de b", "meta de b", "pessoa de b", b.nubank, bGoal, b.card, "jwt", "secret",
                 "password", "senha", "token", "idempot", "refresh", "@moneylog.com", "request_hash", "time_zone", "timezone")) {
@@ -335,7 +317,6 @@ class GoalExportQaIT {
         for (String key : keys) {
             assertThat(key.toLowerCase()).as("chave '" + key + "'").doesNotContainPattern("pass|hash|token|secret|idempot|email|jwt|userid|user_id");
         }
-        // a soma das reservas do backup = current da meta
         long net = 0;
         for (JsonNode g : backup.get("goals")) {
             if (g.get("id").asString().equals(goal)) {
@@ -345,7 +326,6 @@ class GoalExportQaIT {
             }
         }
         assertThat(net).as("10,00 reservados e liberados + 300,00 - 50,00").isEqualTo(25_000);
-        // saldo por conta recalculado do backup
         for (JsonNode account : backup.get("accounts")) {
             long sum = 0;
             for (JsonNode p : backup.get("ledgerPostings")) {
@@ -357,7 +337,6 @@ class GoalExportQaIT {
             long api = CardQaWorld.cents(a.getOk("/v1/accounts/" + account.get("id").asString()).get("currentBalance"));
             assertThat(sum).as("saldo recalculado de " + account.get("name").asString()).isEqualTo(api);
         }
-        // B vê só o seu e a data do nome do arquivo é a do dia em São Paulo
         String bText = b.get("/v1/exports/backup").text();
         assertThat(bText).doesNotContain(a.nubank).doesNotContain("Meta backup").doesNotContain("João");
     }
@@ -374,7 +353,6 @@ class GoalExportQaIT {
     @Test
     @DisplayName("BUG-QA-31: q com caractere de controle deve ser 400 no CSV (a lista e o entries têm o mesmo defeito)")
     void qComControle() throws Exception {
-        // URI pronto (já codificado): com o template String o MockMvc codifica o '%' de novo e o servidor veria o texto "%00", não o caractere NUL
         for (String q : List.of("a%00b", "a%0Ab", "a%09b", "%1Fa")) {
             MvcResult r = mvc.perform(MockMvcRequestBuilders.get(java.net.URI.create("/v1/exports/transactions.csv?q=" + q)).header(HttpHeaders.AUTHORIZATION, a.bearer)).andReturn();
             assertThat(r.getResponse().getStatus()).as("q=" + q).isEqualTo(400);

@@ -15,9 +15,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T77: dívida sem movimentação, edição, perdão e estorno do registro. Casos 8 do PR 01 ("eu devo 200", sem caixa nem consumo).
- */
 @DisplayName("Dívida sem movimentação, edição, perdão e estorno do registro (T77)")
 class DebtRecordsIT extends E4ItBase {
 
@@ -53,14 +50,12 @@ class DebtRecordsIT extends E4ItBase {
         assertThat(book("EXPENSE")).isZero();
         assertThat(ledgerTotal()).isZero();
 
-        // sem previsão: lista "sem data" e nada nos horizontes (S-145)
         JsonNode upcoming = upcoming(null);
         assertThat(upcoming.get("items")).isEmpty();
         assertThat(upcoming.get("undated")).hasSize(1);
         assertThat(upcoming.get("undated").get(0).get("kind").asString()).isEqualTo("DEBT_PAYABLE");
         assertThat(money(summary.get("committed"), "d30")).isEqualTo("0.00");
 
-        // com previsão, vira compromisso datado de saída
         JsonNode dated = payable("80.00", "2026-11-05");
         JsonNode next = upcoming("from=2026-10-10&to=2026-11-10");
         assertThat(next.get("items")).hasSize(1);
@@ -88,11 +83,9 @@ class DebtRecordsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
         assertThat(count("debts")).isEqualTo(1L);
         mockMvc.perform(post("/v1/debts", body).header("Idempotency-Key", "nao-e-uuid")).andExpect(status().isBadRequest());
-        // sem chave: comportamento anterior (cada chamada cria uma dívida)
         mockMvc.perform(post("/v1/debts", body)).andExpect(status().isCreated());
         mockMvc.perform(post("/v1/debts", body)).andExpect(status().isCreated());
         assertThat(count("debts")).isEqualTo(3L);
-        // outra chave com o mesmo corpo é outra dívida; a falha de validação não memoriza a chave
         String other = UUID.randomUUID().toString();
         mockMvc.perform(post("/v1/debts", body.replace("80.00", "0.00")).header("Idempotency-Key", other)).andExpect(status().isUnprocessableEntity());
         mockMvc.perform(post("/v1/debts", body).header("Idempotency-Key", other)).andExpect(status().isCreated());
@@ -129,7 +122,6 @@ class DebtRecordsIT extends E4ItBase {
         mockMvc.perform(post("/v1/recurrences", rec.replace("119.00", "120.00")).header("Idempotency-Key", rkey)).andExpect(status().isConflict())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
         assertThat(count("recurring_transactions")).isEqualTo(1L);
-        // escopos independentes: a mesma chave em outra rota não colide
         mockMvc.perform(post("/v1/people", person.replace("Carlos", "Dani")).header("Idempotency-Key", rkey)).andExpect(status().isCreated());
         mockMvc.perform(post("/v1/recurrences", rec)).andExpect(status().isCreated());
         assertThat(count("recurring_transactions")).isEqualTo(2L);
@@ -153,7 +145,6 @@ class DebtRecordsIT extends E4ItBase {
                 .andExpect(jsonPath("$.code").value("PERSON_ARCHIVED"));
         mockMvc.perform(post("/v1/debts", debtJson(UUID.randomUUID().toString(), "PAYABLE", "10.00", "2026-10-10", null, "Ninguém")))
                 .andExpect(status().isNotFound()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
-        // categoria só em PAYABLE (S-137)
         mockMvc.perform(post("/v1/debts", "{\"personId\":\"" + joao + "\",\"direction\":\"RECEIVABLE\",\"principal\":\"10.00\",\"date\":\"2026-10-10\","
                         + "\"description\":\"Com categoria\",\"categoryId\":\"" + food + "\"}")).andExpect(status().isUnprocessableEntity())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("DEBT_CATEGORY_NOT_ALLOWED"));
@@ -171,7 +162,6 @@ class DebtRecordsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("DEBT_REASON_REQUIRED"));
         mockMvc.perform(post("/v1/debts/" + id + "/cancel", voidBody("   "))).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("DEBT_REASON_REQUIRED"));
-        // paga 50 antes do perdão: o perdão zera só o que resta (150)
         created(payment("50.00", "2026-10-10", id));
 
         mockMvc.perform(post("/v1/debts/" + id + "/cancel", voidBody("a Maria me perdoou"))).andExpect(status().isOk())
@@ -189,7 +179,6 @@ class DebtRecordsIT extends E4ItBase {
 
         mockMvc.perform(post("/v1/debts/" + id + "/cancel", voidBody("de novo"))).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("DEBT_CLOSED"));
-        // quitada integralmente: o perdão não vale
         String settled = payable("100.00", null).get("id").asString();
         created(payment("100.00", "2026-10-10", settled));
         mockMvc.perform(post("/v1/debts/" + settled + "/cancel", voidBody("tarde"))).andExpect(status().isUnprocessableEntity())
@@ -218,7 +207,6 @@ class DebtRecordsIT extends E4ItBase {
         assertThat(upcoming("from=2026-10-10&to=2026-11-10").get("items")).isEmpty();
         mockMvc.perform(post("/v1/debts/" + id + "/void", voidBody("de novo"))).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("DEBT_CLOSED"));
-        // estornada a quitação, o registro já pode ser estornado
         mockMvc.perform(post("/v1/transactions/" + settlementTx + "/void", voidBody("engano"))).andExpect(status().isOk());
         mockMvc.perform(post("/v1/debts/" + withSettlement + "/void", voidBody("agora sim"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("VOIDED"));
@@ -245,7 +233,6 @@ class DebtRecordsIT extends E4ItBase {
 
         mockMvc.perform(put("/v1/debts/" + id, "{\"description\":\"Velha\",\"version\":0}")).andExpect(status().isConflict())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("VERSION_CONFLICT"));
-        // limpar a previsão manda a dívida para "sem data"
         mockMvc.perform(put("/v1/debts/" + id, "{\"description\":\"Sem data\",\"version\":1}")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.expectedDate").doesNotExist());
         assertThat(upcoming("from=2026-10-10&to=2027-12-31").get("undated")).hasSize(1);

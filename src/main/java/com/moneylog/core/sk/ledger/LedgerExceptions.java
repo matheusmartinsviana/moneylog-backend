@@ -3,10 +3,6 @@ package com.moneylog.core.sk.ledger;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Exceções do razão. Estendem {@link DomainException} direto: não são erro do usuário, são invariante interna quebrada
- * (bug), e por isso viram 500 sem vazar a mensagem.
- */
 public final class LedgerExceptions {
 
     private LedgerExceptions() {

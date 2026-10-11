@@ -19,28 +19,17 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Visão de lançamentos por competência (D1 §2.10, S-47): uma linha por posting do livro {@code EXPENSE} (ou
- * {@code INCOME}) da competência. A compra de 1.200 em 6x aparece em outubro como uma linha de 200 (1/6); o reembolso
- * aparece negativo. O consumo de uma dívida {@code PAYABLE} sem movimentação com categoria (S-137) é uma linha <b>sem
- * movimentação</b> ({@code debtId} preenchido, {@code transactionId} nulo), para a lista e o dashboard fecharem. A receita é lida pela
- * competência do posting (ADR-017): uma renda recebida em setembro e atribuída a outubro aparece em outubro, com {@code date} de setembro. Os totais são do filtro inteiro, calculados aqui: {@code total(CONSUMPTION, M)} =
- * {@code month.consumption} e {@code total(INCOME, M)} = {@code month.income}.
- */
 public record EntryReport(EntryLens lens, Competence competence, List<Line> lines, Money total, Map<UUID, Money> byCategory) {
 
-    /** Linha da visão: valor já no sentido da lente (consumo positivo, reembolso negativo; receita positiva). */
     public record Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal,
                        UUID categoryId, LocalDate date, Money amount, String description, UUID debtId, Competence competence) {
 
-        /** Linha cuja competência é o mês da data (tudo, menos a receita de outro mês, ADR-017). */
         public Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal,
                     UUID categoryId, LocalDate date, Money amount, String description, UUID debtId) {
             this(transactionId, installmentId, installmentNumber, installmentTotal, categoryId, date, amount, description, debtId,
                     Competence.from(date));
         }
 
-        /** Linha de movimentação (sem dívida). */
         public Line(UUID transactionId, UUID installmentId, Integer installmentNumber, Integer installmentTotal, UUID categoryId,
                     LocalDate date, Money amount, String description) {
             this(transactionId, installmentId, installmentNumber, installmentTotal, categoryId, date, amount, description, null);
@@ -51,24 +40,11 @@ public record EntryReport(EntryLens lens, Competence competence, List<Line> line
         return of(records, ledger, lens, competence, null);
     }
 
-    /**
-     * Mesma visão com um predicado sobre a movimentação de origem (S-79: os filtros {@code categoryId}, {@code accountId}
-     * e {@code method} viram o predicado; o total e o {@code byCategory} saem do filtro inteiro, não da página).
-     *
-     * @param filter {@code null} = todas as movimentações
-     */
     public static EntryReport of(FinancialRecords records, Ledger ledger, EntryLens lens, Competence competence,
                                  Predicate<Transaction> filter) {
-        // com filtro por movimentação, as linhas de dívida (que não têm conta nem meio de pagamento) ficam de fora
         return of(records, ledger, lens, competence, filter, filter == null ? null : categoryId -> false);
     }
 
-    /**
-     * Como {@link #of(FinancialRecords, Ledger, EntryLens, Competence, Predicate)}, com um predicado próprio para as linhas de
-     * dívida de consumo, que só têm categoria (S-137): {@code null} = todas.
-     *
-     * @param debtCategoryFilter decide pela categoria da linha de dívida
-     */
     public static EntryReport of(FinancialRecords records, Ledger ledger, EntryLens lens, Competence competence,
                                  Predicate<Transaction> filter, Predicate<UUID> debtCategoryFilter) {
         BookType book = lens == EntryLens.CONSUMPTION ? BookType.EXPENSE : BookType.INCOME;

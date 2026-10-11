@@ -24,7 +24,6 @@ class StatsTest {
         return out;
     }
 
-    /** Oráculo: mediana por ordenação, escrita de outro jeito (índice do meio em duas metades). */
     private static BigDecimal oracleMedian(List<BigDecimal> values) {
         List<BigDecimal> sorted = new ArrayList<>(values);
         Collections.sort(sorted);
@@ -93,7 +92,6 @@ class StatsTest {
             oneToTwenty.add(BigDecimal.valueOf(i));
         }
 
-        // posição 0,95 * 19 = 18,05 -> 19 + 0,05 * (20 - 19) = 19,05
         assertThat(Stats.percentile(oneToTwenty, 95)).isEqualByComparingTo("19.05");
         assertThat(Stats.percentile(oneToTwenty, 0)).isEqualByComparingTo("1");
         assertThat(Stats.percentile(oneToTwenty, 100)).isEqualByComparingTo("20");
@@ -104,7 +102,6 @@ class StatsTest {
     @DisplayName("CV: renda constante tem CV 0; [2000,4000,1500,4500] tem CV de 0,4249; média não positiva não tem CV")
     void deveCalcularOCoeficienteDeVariacao() {
         assertThat(Stats.coefficientOfVariation(series(3000, 3000, 3000, 3000))).isEqualByComparingTo("0");
-        // média 3000; variância populacional (1e6 + 1e6 + 2,25e6 + 2,25e6) / 4 = 1,625e6; desvio 1274,754878; CV 0,424918
         assertThat(Stats.coefficientOfVariation(series(2000, 4000, 1500, 4500))).isEqualByComparingTo("0.424918");
         assertThat(Stats.coefficientOfVariation(series(0, 0))).isNull();
     }

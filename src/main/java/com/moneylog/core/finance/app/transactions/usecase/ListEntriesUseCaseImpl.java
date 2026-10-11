@@ -21,11 +21,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Visão por competência (S-47, S-79): {@code EntryReport.of} sobre o {@link FinancialRecords} do carregamento único,
- * com os filtros como predicado. O total e o {@code byCategory} são do filtro inteiro; a página é um recorte das linhas
- * (data decrescente).
- */
 public class ListEntriesUseCaseImpl implements ListEntriesUseCase {
 
     private final FinancialRecordsGateway records;
@@ -61,8 +56,6 @@ public class ListEntriesUseCaseImpl implements ListEntriesUseCase {
                 .map(entry -> new CategoryTotal(category(categoriesById, entry.getKey()), entry.getValue()))
                 .sorted(Comparator.comparing((CategoryTotal t) -> t.amount()).reversed().thenComparing(t -> t.category().name()))
                 .toList();
-        // as linhas de dívida de consumo (S-137) não têm movimentação: vão à parte, completas (são poucas por mês), e entram no total.
-        // Só na PRIMEIRA página (S-238): quem concatena as páginas não duplica a linha, e os totais continuam do filtro inteiro
         List<EntryListing.DebtRow> debtRows = page.offset() > 0 ? List.of() : report.lines().stream().filter(line -> line.debtId() != null)
                 .sorted(Comparator.comparing(EntryReport.Line::date).reversed().thenComparing(EntryReport.Line::debtId))
                 .map(line -> new EntryListing.DebtRow(line, category(categoriesById, line.categoryId()))).toList();

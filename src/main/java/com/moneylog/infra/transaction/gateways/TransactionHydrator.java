@@ -18,14 +18,8 @@ import com.moneylog.infra.transaction.persistence.InstallmentEntity;
 import com.moneylog.infra.transaction.persistence.InstallmentRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionEntity;
 
-/**
- * Carrega o que o mapper precisa além da linha da movimentação: as parcelas da compra no cartão e as linhas de fatura
- * que ela e as parcelas referenciam (o domínio fala em {@code closingDate}, a linha em {@code invoice_id}). Sem
- * movimentação de cartão no lote, não faz nenhuma consulta (as leituras da Etapa 2 não mudam).
- */
 public class TransactionHydrator {
 
-    /** Parcelas por movimentação e linhas de fatura por id. */
     public record Extras(Map<UUID, List<InstallmentEntity>> installmentsByTransaction, Map<UUID, InvoiceRow> invoices) {
 
         public static final Extras NONE = new Extras(Map.of(), Map.of());
@@ -43,7 +37,6 @@ public class TransactionHydrator {
         this.invoices = invoices;
     }
 
-    /** Extras de um lote de movimentações (por id). */
     public Extras loadFor(UUID userId, Collection<TransactionEntity> entities) {
         if (entities.stream().noneMatch(e -> e.getCardId() != null)) {
             return Extras.NONE;
@@ -58,7 +51,6 @@ public class TransactionHydrator {
         return new Extras(group(rows), invoices.rowsByIds(userId, invoiceIds));
     }
 
-    /** Extras de todas as movimentações do usuário (carregamento único, S-79). */
     public Extras loadAll(UUID userId) {
         return new Extras(group(installments.findByUserId(userId)), invoices.rowsOfUser(userId));
     }

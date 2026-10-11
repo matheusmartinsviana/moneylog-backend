@@ -15,12 +15,10 @@ public final class CategoryTestFactory {
     private CategoryTestFactory() {
     }
 
-    /** "Alimentação", despesa, de sistema. */
     public static Category umaCategoriaDeDespesa() {
         return Category.createSystem(ALIMENTACAO_ID, USER_ID, "Alimentação", CategoryKind.EXPENSE);
     }
 
-    /** "Salário", receita, de sistema. */
     public static Category umaCategoriaDeReceita() {
         return Category.createSystem(SALARIO_ID, USER_ID, "Salário", CategoryKind.INCOME);
     }

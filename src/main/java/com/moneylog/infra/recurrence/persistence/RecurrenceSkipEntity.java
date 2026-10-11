@@ -9,7 +9,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Linha de {@code recurrence_skips}: uma ocorrência pulada. */
 @Entity
 @Table(name = "recurrence_skips")
 public class RecurrenceSkipEntity {

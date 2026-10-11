@@ -13,28 +13,12 @@ import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/**
- * Projeção determinística (D1 §2.8, PR 00 §19, S-152, S-155): série mensal de {@code em contas + entradas previstas − saídas previstas}
- * até o horizonte, vinda <b>só</b> dos compromissos ({@link CommitmentSchedule}: faturas com as parcelas aninhadas, dívidas datadas e
- * recorrências pendentes), <b>sempre</b> rotulada como projeção e com as premissas. Cada compromisso entra uma vez só.
- *
- * <ul>
- *   <li>Um ponto por mês-calendário, do mês de hoje ao mês do fim do horizonte. O 1º ponto traz os vencidos e o resto do mês corrente;
- *       o último vai até o fim do horizonte ({@code periodEnd}), então o {@code balance} dele é igual ao {@code projected} do dashboard
- *       para o mesmo horizonte (a mesma função: {@code D30} = {@code projected.d30}).</li>
- *   <li>{@code balance} = em contas + Σ entradas acumuladas − Σ saídas acumuladas até o fim do ponto.</li>
- *   <li>Meta e reserva são informação ({@code goals}): reserva não é saída e não muda a série.</li>
- *   <li>A tendência histórica ({@code trend}) é opcional, separada e rotulada estimativa; a série base não muda com ela.</li>
- * </ul>
- */
 public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, Money startingBalance, List<Point> series,
                          List<String> assumptions, Goals goals, Trend trend) {
 
-    /** Chaves traduzíveis das premissas (sem texto fixo). */
     public static final List<String> ASSUMPTIONS = List.of("ACTIVE_RECURRENCES", "REGISTERED_INVOICES_AND_INSTALLMENTS",
             "DEBTS_WITH_EXPECTED_DATE", "NO_NEW_SPENDING_TREND");
 
-    /** Horizontes aceitos (S-155). */
     public static final List<Horizon> HORIZONS = DashboardSummary.PROJECTION_HORIZONS;
 
     public Projection {
@@ -42,29 +26,21 @@ public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, 
         assumptions = List.copyOf(assumptions);
     }
 
-    /**
-     * @param periodEnd último dia coberto pelo ponto (o último ponto termina no fim do horizonte)
-     * @param inflows   entradas previstas no período
-     * @param outflows  saídas previstas no período
-     */
     public record Point(Competence competence, LocalDate periodEnd, Money inflows, Money outflows, Money balance) {
     }
 
     public record GoalInfo(UUID goalId, String name, Money current, Money target) {
     }
 
-    /** O que está reservado em metas (informativo; não é saída). */
     public record Goals(Money reserved, List<GoalInfo> items) {
         public Goals {
             items = List.copyOf(items);
         }
     }
 
-    /** Ponto da tendência: gasto novo estimado acumulado e o saldo da base menos esse gasto. */
     public record TrendPoint(Competence competence, Money estimatedSpending, Money balance) {
     }
 
-    /** Tendência opcional (S-152): sempre {@code estimate = true}. */
     public record Trend(boolean available, String reason, Money monthlyAverage, List<Competence> basedOn, List<TrendPoint> series) {
         public Trend {
             basedOn = List.copyOf(basedOn);
@@ -123,7 +99,6 @@ public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, 
         Competence current = Competence.from(today);
         List<TrendPoint> points = new ArrayList<>();
         for (Point point : base) {
-            // meses depois do corrente (o corrente já está em andamento); mês parcial no fim do horizonte conta inteiro (conservador)
             long ahead = java.time.temporal.ChronoUnit.MONTHS.between(current.value(), point.competence().value());
             Money spending = trend.average().times(ahead);
             points.add(new TrendPoint(point.competence(), spending, point.balance().subtract(spending)));

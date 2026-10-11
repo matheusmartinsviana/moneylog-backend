@@ -21,11 +21,6 @@ import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Monta o {@link InsightContext} de uma requisição fazendo <b>uma</b> leitura do razão ({@code FinancialRecordsGateway.load}, que já traz as
- * metas), <b>uma</b> de recorrências (reaproveitada pelo cálculo das metas) e, só se alguma meta for calculada, <b>uma</b> consulta de
- * instantâneos. Proibido ler por insight (ADR-008, ADR-019).
- */
 public final class InsightContextFactory {
 
     private final FinancialRecordsGateway records;
@@ -47,7 +42,6 @@ public final class InsightContextFactory {
         FinancialRecords loaded = records.load(userId);
         Collection<RecurringTransaction> recurrences = sources.recurrences(userId);
         Map<UUID, String> names = categories.list(userId, null, true).stream().collect(Collectors.toMap(Category::id, Category::name));
-        // as metas já vêm em loaded.goals(); o modelo de leitura reaproveita as recorrências desta requisição e não grava instantâneo
         GoalReadModel model = new GoalReadModel(u -> recurrences, snapshots, time);
         return new InsightContext(userId, time.today(), loaded, recurrences, names, () -> goalDetails(userId, loaded, model));
     }

@@ -43,15 +43,12 @@ class NoteTextPropertyTest {
             String renamed = WikilinkRewriter.rewrite(text, from, l -> l.target().equals("MacBook") ? "Notebook" : null);
             String back = WikilinkRewriter.rewrite(renamed, from, l -> l.target().equals("Notebook") ? "MacBook" : null);
             assertThat(back).as(text).isEqualTo(text);
-            // só os alvos mudaram: tirando os links, o resto é igual
             assertThat(stripLinks(renamed, from)).isEqualTo(stripLinks(text, from));
         }
     }
 
-    /** Trechos de código completos (cercado, inline e indentado) com links e tags que NÃO podem ser tocados. */
     private static final String[] CODE_PIECES = {"`[[MacBook]]` ", "``a [[MacBook]] `b` c`` ", "\n```\n[[MacBook]] #tag\n```\n", "\n~~~js\n[[MacBook|x]]\n~~~\n",
             "\n\n    [[MacBook]] indentado\n    [[MacBook#s]]\n\n", "\n\n\t[[MacBook]] com tab\n\n"};
-    /** Texto comum (sem crase e sem frontmatter): só {@code [[MacBook]]} puro muda no oráculo. */
     private static final String[] PLAIN_PIECES = {"texto simples ", "Revisão ", "\n", "\r\n", "#tag ", "[[MacBook]] ", "[[MacBook]]\n", "[[projetos/MG Tech|cliente]] ",
             "[[macbook#Seção|apelido]] ", "![[MacBook]] ", "[[ MacBook ]] ", "\\[[MacBook]] ", "[x](http://a.com/#f) ", "<b>[[Outro]]</b> ", "🙂 "};
 
@@ -67,19 +64,16 @@ class NoteTextPropertyTest {
                 boolean code = r.nextInt(3) == 0;
                 String piece = code ? CODE_PIECES[r.nextInt(CODE_PIECES.length)] : PLAIN_PIECES[r.nextInt(PLAIN_PIECES.length)];
                 text.append(piece);
-                // oráculo: o código fica como está; fora dele, a troca textual do alvo "MacBook" (com ou sem espaços/seção/alias/embed)
                 expected.append(code ? piece : oracleRename(piece));
             }
             String original = text.toString();
             String rewritten = WikilinkRewriter.rewrite(original, 0, l -> l.target().equalsIgnoreCase("MacBook") ? "Notebook" : null);
             assertThat(rewritten).as(original).isEqualTo(expected.toString());
-            // e voltar também devolve o original byte a byte
             assertThat(WikilinkRewriter.rewrite(rewritten, 0, l -> l.target().equals("Notebook") ? "MacBook" : null)).as(original).isEqualTo(
                     original.replace("[[macbook#", "[[MacBook#"));
         }
     }
 
-    /** Troca textual independente do parser: só o alvo, preservando espaços, seção, alias e embed; {@code \[[} escapado fica. */
     private static String oracleRename(String piece) {
         return piece.replace("[[MacBook]]", "[[Notebook]]").replace("[[MacBook|", "[[Notebook|").replace("[[ MacBook ]]", "[[ Notebook ]]")
                 .replace("[[macbook#", "[[Notebook#").replace("\\[[Notebook]]", "\\[[MacBook]]");
@@ -92,7 +86,6 @@ class NoteTextPropertyTest {
         List<LinkRef> refs = List.of(new LinkRef("GOAL", "9b1d7c2e-0000-4000-8000-000000000001", null, null), new LinkRef("MONTHLY_SUMMARY", null, "2026-10", null));
         for (int i = 0; i < 1000; i++) {
             String text = random(r);
-            // o texto que já tem a chave moneylog nunca é gravado (reservada); o resto, mesmo vazio ou "---" sem ser frontmatter, volta igual
             if (text.contains("moneylog")) {
                 continue;
             }

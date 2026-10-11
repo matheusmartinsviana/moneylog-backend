@@ -33,7 +33,6 @@ import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.DebtTransactions;
 
-/** T45: reidratação de {@link Debt} para o mapper da infra. */
 @DisplayName("Debt.restore (T45)")
 class DebtRestoreTest {
 
@@ -231,7 +230,6 @@ class DebtRestoreTest {
                     new DebtSettlement(SETTLEMENT_TX_ID, Money.of("10.00"), true)), aPagar.entries(), "repetida");
             assertInconsistente(recebivel.state(), List.of(new DebtSettlement(LOAN_TX_ID, Money.of("10.00"), true)),
                     recebivel.entries(), "origem");
-            // quitação inativa não conta no teto
             Debt ok = Debt.restore(aPagar.state(), List.of(new DebtSettlement(SETTLEMENT_TX_ID, Money.of("500.00"), false)),
                     aPagar.entries());
             assertThat(ok.status()).isEqualTo(DebtStatus.OPEN);
@@ -253,7 +251,6 @@ class DebtRestoreTest {
         }
     }
 
-    /** Copia o {@link DebtState} trocando campos. */
     private static final class DebtStateBuilder {
         private DebtState s;
 

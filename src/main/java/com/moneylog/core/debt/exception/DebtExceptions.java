@@ -7,9 +7,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/**
- * Exceções da feature pessoas e dívidas.
- */
 public final class DebtExceptions {
 
     private DebtExceptions() {
@@ -52,7 +49,6 @@ public final class DebtExceptions {
         }
     }
 
-    /** A descrição cabe na coluna {@code debts.description} (VARCHAR(200)). */
     public static class DebtDescriptionTooLongException extends BusinessRuleException {
         public DebtDescriptionTooLongException(int max) {
             super("DEBT_DESCRIPTION_TOO_LONG", "A descrição da dívida pode ter no máximo " + max + " caracteres.");
@@ -65,32 +61,24 @@ public final class DebtExceptions {
         }
     }
 
-    /** Ex.: LOAN_GIVEN ligado a PAYABLE, DEBT_PAYMENT ligado a RECEIVABLE. */
     public static class DebtDirectionMismatchException extends BusinessRuleException {
         public DebtDirectionMismatchException(DebtDirection expected, DebtDirection actual) {
             super("DEBT_DIRECTION_MISMATCH", "A movimentação exige uma dívida " + expected + ", mas a dívida é " + actual + ".");
         }
     }
 
-    /** Quitação acima do saldo devedor (D1 §4, invariante 7). */
     public static class SettlementExceedsOutstandingException extends BusinessRuleException {
         public SettlementExceedsOutstandingException() {
             super("DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING", "A quitação passa do saldo devedor da dívida.");
         }
     }
 
-    /**
-     * Operação recusada pelo estado da dívida, com {@code code} estável: {@code DEBT_CLOSED},
-     * {@code DEBT_HAS_SETTLEMENTS}, {@code DEBT_ALREADY_HAS_ORIGIN}, {@code DEBT_ALREADY_SETTLED},
-     * {@code DEBT_HAS_ORIGIN_TRANSACTION}.
-     */
     public static class DebtOperationRefusedException extends BusinessRuleException {
         public DebtOperationRefusedException(String code, String message) {
             super(code, message);
         }
     }
 
-    /** Só a dívida {@code PAYABLE} nasce de consumo (S-137): "gasto que alguém pagou por você". */
     public static class DebtCategoryNotAllowedException extends BusinessRuleException {
         public DebtCategoryNotAllowedException() {
             super("DEBT_CATEGORY_NOT_ALLOWED", "Só a dívida que você deve (PAYABLE) pode ter categoria de gasto.");
@@ -103,14 +91,12 @@ public final class DebtExceptions {
         }
     }
 
-    /** Dívida com credor livre ("outras dívidas", P1): informe a pessoa ou o nome do credor, nunca os dois, e só em PAYABLE. */
     public static class DebtCreditorInvalidException extends BusinessRuleException {
         public DebtCreditorInvalidException(String reason) {
             super("DEBT_CREDITOR_INVALID", "Credor da dívida inválido: " + reason);
         }
     }
 
-    /** Estado gravado de uma dívida inconsistente ao reidratar ({@code Debt.restore}): dado corrompido, vira 500. */
     public static class DebtStateInconsistentException extends DomainException {
         public DebtStateInconsistentException(String reason) {
             super("DEBT_STATE_INCONSISTENT", "Estado gravado da dívida inconsistente: " + reason);

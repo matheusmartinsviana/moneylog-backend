@@ -15,7 +15,6 @@ import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.infra.goal.persistence.GoalEntity;
 import com.moneylog.infra.goal.persistence.GoalReservationEntity;
 
-/** {@code Goal} ⇄ {@code GoalEntity} + {@code GoalReservationEntity}. A reidratação usa {@link Goal#restore}. */
 public final class GoalRepositoryMapper {
 
     private GoalRepositoryMapper() {

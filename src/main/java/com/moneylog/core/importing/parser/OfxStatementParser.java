@@ -19,15 +19,8 @@ import com.moneylog.core.importing.parser.ParsedStatement.Skipped;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Parser de OFX 1.x (SGML, tags sem fechamento) e 2.x (XML) (T123, S-169). Lê por varredura de tags, <b>sem parser XML</b>: não existe resolução de
- * entidade externa (XXE) nem expansão de entidade; um {@code <!DOCTYPE>} ou {@code <!ENTITY>} é recusado de saída. Extrai {@code STMTTRN}:
- * {@code DTPOSTED} (com ou sem fuso), {@code TRNAMT} com sinal, {@code FITID} e {@code MEMO}/{@code NAME}. Extrato de cartão
- * ({@code CREDITCARDMSGSRSV1}) é reconhecido; o {@code ACCTID} nunca é lido nem guardado. Moeda diferente de BRL é recusada (S-2).
- */
 public final class OfxStatementParser {
 
-    /** Cabe em {@code import_lines.fit_id VARCHAR(100)}; acima disso a linha é ignorada com motivo. */
     static final int MAX_FIT_ID_LENGTH = 100;
     private static final Pattern STMTTRN = Pattern.compile("<STMTTRN>(.*?)(?=</STMTTRN>|<STMTTRN>|</BANKTRANLIST>|</OFX>|$)", Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
     private static final Set<String> GENERIC_NAMES = Set.of("", "PAGAMENTO", "COMPRA", "TRANSFERENCIA", "TRANSFERÊNCIA", "DEBITO", "DÉBITO",
@@ -98,7 +91,6 @@ public final class OfxStatementParser {
         return new ParsedStatement(Format.OFX, card, rows, skipped);
     }
 
-    /** Valor da primeira ocorrência de {@code <TAG>valor} (SGML: até a próxima tag ou quebra de linha; XML: até {@code </TAG>}). */
     static Optional<String> leaf(String text, String tag) {
         Matcher m = Pattern.compile("<" + tag + ">([^<\\r\\n]*)", Pattern.CASE_INSENSITIVE).matcher(text);
         return m.find() ? Optional.of(unescape(m.group(1)).strip()) : Optional.empty();
@@ -108,7 +100,6 @@ public final class OfxStatementParser {
         return s.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&apos;", "'").replace("&amp;", "&");
     }
 
-    /** {@code 20261015}, {@code 20261015120000}, {@code 20261015120000[-3:BRT]}: usa só a data (os 8 primeiros dígitos). */
     static Optional<java.time.LocalDate> ofxDate(String raw) {
         if (raw == null || raw.length() < 8 || !raw.substring(0, 8).matches("\\d{8}")) {
             return Optional.empty();
@@ -116,7 +107,6 @@ public final class OfxStatementParser {
         return DateParser.parse(raw.substring(0, 8));
     }
 
-    /** TRNAMT: ponto ou vírgula decimal, sinal explícito. */
     static Optional<Long> ofxCents(String raw) {
         String text = raw.strip();
         if (!text.matches("[+-]?[0-9]+([.,][0-9]{1,2})?")) {

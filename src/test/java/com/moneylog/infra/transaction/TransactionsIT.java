@@ -34,10 +34,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T26a: criar e consultar movimentações. Cenário: Nubank (CHECKING 20.000,00), XP (CHECKING 0), XP Invest (INVESTMENT 0),
- * relógio em 10/10/2026. Cada teste usa um usuário novo.
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Movimentações: criar e consultar (T26a)")
@@ -73,8 +69,6 @@ class TransactionsIT {
         food = category("Alimentação", CategoryKind.EXPENSE);
         salary = category("Salário", CategoryKind.INCOME);
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
@@ -130,8 +124,6 @@ class TransactionsIT {
         return body(createTx(json).andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andReturn());
     }
 
-    // ---------------------------------------------------------------- CA1, CA8, CA9
-
     @Test
     @DisplayName("CA1/CA9: despesa Pix de 100,00 devolve 201 + Location + impacto e flags; a Nubank passa a 19.900,00 pelo mesmo carregamento")
     void deveCriarDespesa() throws Exception {
@@ -183,8 +175,6 @@ class TransactionsIT {
                 .andExpect(jsonPath("$.voidBlockedBy").value("ACCOUNT_ARCHIVED"));
     }
 
-    // ---------------------------------------------------------------- CA2, CA3
-
     @Test
     @DisplayName("CA2: transferência Nubank → XP: caixa, consumo e patrimônio zerados; saldos 18.900,00 e 1.000,00")
     void deveCriarTransferencia() throws Exception {
@@ -222,8 +212,6 @@ class TransactionsIT {
         assertThat(balance(nubank)).isEqualTo("14000.00");
         assertThat(balance(xpInvest)).isEqualTo("6000.00");
     }
-
-    // ---------------------------------------------------------------- CA4
 
     @Test
     @DisplayName("CA4: receita de 3.000,00 em Salário; categoria de despesa em receita é 422 CATEGORY_KIND_MISMATCH")
@@ -267,8 +255,6 @@ class TransactionsIT {
                 .andExpect(jsonPath("$.impact.netWorth.amount").value("-25.00"));
     }
 
-    // ---------------------------------------------------------------- CA5, CA6, CA7
-
     @Test
     @DisplayName("CA5: pagamento de fatura (só pelo endpoint da fatura) é 422 TRANSACTION_TYPE_NOT_AVAILABLE e nada é gravado; reembolso com cartão inexistente é 404 CARD_NOT_FOUND (T56); os tipos de dívida (Etapa 4) exigem o corpo completo: 400")
     void deveRecusarTiposIndisponiveis() throws Exception {
@@ -276,7 +262,6 @@ class TransactionsIT {
             createTx("{\"type\":\"" + type + "\"}").andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.code").value("TRANSACTION_TYPE_NOT_AVAILABLE")).andExpect(ContractValidation.conforms());
         }
-        // Etapa 4: os tipos de dívida têm schema próprio; o corpo mínimo do contrato antigo (só o type) não basta mais: 400
         for (String type : new String[] {"LOAN_GIVEN", "MONEY_RECEIVED", "DEBT_PAYMENT"}) {
             createTx("{\"type\":\"" + type + "\"}").andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
@@ -284,7 +269,6 @@ class TransactionsIT {
         createTx("{\"type\":\"REFUND\",\"amount\":\"5.00\",\"date\":\"2026-10-10\",\"description\":\"No cartão\",\"categoryId\":\"" + food
                 + "\",\"cardId\":\"" + UUID.randomUUID() + "\"}").andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CARD_NOT_FOUND")).andExpect(ContractValidation.conforms());
-        // conta e cartão juntos (ou nenhum dos dois) não passa nem pelo contrato: 400, não 422
         createTx("{\"type\":\"REFUND\",\"amount\":\"5.00\",\"date\":\"2026-10-10\",\"description\":\"Ambos\",\"accountId\":\"" + nubank
                 + "\",\"categoryId\":\"" + food + "\",\"cardId\":\"" + UUID.randomUUID() + "\"}").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED")).andExpect(ContractValidation.responseOnly());

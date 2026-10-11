@@ -8,7 +8,6 @@ import com.moneylog.core.sk.money.Money;
 
 public interface UpdateCommitmentProgressUseCase {
 
-    /** Atualiza o que o usuário informou de um empréstimo de terceiro (parcelas pagas, valor pago, próximo vencimento, observações). */
     CommitmentView handle(UpdateCommitmentProgressCommand command);
 
     record UpdateCommitmentProgressCommand(UUID userId, UUID id, int installmentsPaid, Money paidAmount, LocalDate nextDueDate,

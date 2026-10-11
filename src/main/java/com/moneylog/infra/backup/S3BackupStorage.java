@@ -38,11 +38,6 @@ import com.moneylog.core.backup.app.BackupException;
 import com.moneylog.core.backup.app.BackupStorage;
 import com.moneylog.core.backup.app.StoredBackup;
 
-/**
- * Backup no S3 com JDK puro: endereçamento por path ({@code endpoint/bucket/key}) e assinatura AWS Signature V4, sem SDK (mesma linha do
- * WebPush: poucas linhas, nenhuma dependência nova). O endpoint é configurável, o que permite testar contra um S3 falso local.
- * Nenhuma credencial é gravada: vêm de {@link S3CredentialsProvider} (variáveis de ambiente ou role da instância).
- */
 public class S3BackupStorage implements BackupStorage {
 
     private static final DateTimeFormatter AMZ_DATE = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'").withZone(ZoneOffset.UTC);
@@ -137,8 +132,6 @@ public class S3BackupStorage implements BackupStorage {
             throw new BackupException("interrompido ao apagar o backup do S3", e);
         }
     }
-
-    // ---- assinatura SigV4 ----
 
     private HttpRequest.Builder request(String method, String path, Map<String, String> query, String payloadHash) {
         Instant now = clock.instant();

@@ -32,12 +32,9 @@ class MonthlyInsightsTest {
 
     private static final Competence SEP = Competence.of(2026, 9);
 
-    /** 3 meses fechados com renda 5.000,00 e consumo 4.500,00 (poupança de 10% em cada). */
     private static List<MonthSnapshot> savers() {
         return closed(SEP, 3, "5000.00", "4500.00");
     }
-
-    // ---------------------------------------------------------------- SAVINGS_RATE
 
     @Test
     @DisplayName("renda 5.000 e consumo 4.000 com média de 10% nos 3 fechados: s = 20%, Δpp = +10 e sai POSITIVE")
@@ -87,14 +84,11 @@ class MonthlyInsightsTest {
     @Test
     @DisplayName("renda com valor decimal: -5 pontos exatos já é ATTENTION (limite inclusivo)")
     void deveSerInclusivoNoLimiteDeCincoPontos() {
-        // média 10%; mês com 5,00% de poupança: 5000 - 4750 = 250 -> 5% -> Δpp = -5
         Insight insight = only(closedMonth(SEP).current(snapshot(SEP, "5000.00", "4750.00")).history(savers()).run(), "SAVINGS_RATE");
 
         assertThat(insight.params().get("deltaPp")).isEqualTo("-5.00");
         assertThat(insight.severity()).isEqualTo(Severity.ATTENTION);
     }
-
-    // ---------------------------------------------------------------- MONTH_PROJECTION
 
     private static InsightFacts.Builder october(int day) {
         return month(OCT, LocalDate.of(2026, 10, day));
@@ -173,8 +167,6 @@ class MonthlyInsightsTest {
         assertThat(insufficient(sink, "MONTH_PROJECTION", Reason.PARTIAL_MONTH)).isTrue();
     }
 
-    // ---------------------------------------------------------------- SPEND_VS_BASELINE
-
     private static List<MonthSnapshot> sixMonths() {
         long[] cents = {4000, 4100, 3900, 4050, 3950, 4000};
         List<MonthSnapshot> list = new ArrayList<>();
@@ -228,15 +220,12 @@ class MonthlyInsightsTest {
     @Test
     @DisplayName("mês corrente usa o fechamento projetado, não o parcial; antes do dia 10 não emite")
     void deveUsarOFechamentoProjetadoNoMesCorrente() {
-        // projeta 3.100 contra mediana 1.000: alto
         InsightSink sink = october(20).current(snapshot(OCT, "3000.00", "2000.00")).history(closed(OCT, 6, "3000.00", "1000.00"))
                 .budget("3000.00", "2000.00", "0.00", "0.00", "0.00").daily(constant(20, "100.00")).run();
 
         Insight insight = only(sink, "SPEND_VS_BASELINE");
         assertThat(insight.params()).containsEntry("amount", "3100.00").containsEntry("projected", "true");
     }
-
-    // ---------------------------------------------------------------- CATEGORY_DELTA
 
     private static final UUID FOOD = UUID.fromString("00000000-0000-0000-0000-0000000000f0");
     private static final UUID FUN = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
@@ -311,7 +300,6 @@ class MonthlyInsightsTest {
         Insight insight = only(withCategories(cat(SEP, FOOD, "400.00"), history).run(), "CATEGORY_DELTA");
 
         assertThat(insight.params()).containsEntry("previous", "300.00").containsEntry("deltaAmount", "100.00");
-        // categoria líquida negativa no mês consultado não gera insight
         assertThat(has(withCategories(snapshot(SEP, "5000.00", "-80.00", Map.of(FOOD, brl("-80.00"))), history).run(), "CATEGORY_DELTA")).isFalse();
     }
 
@@ -322,7 +310,6 @@ class MonthlyInsightsTest {
 
         assertThat(insight.params()).containsEntry("deltaAmount", "184.50").containsEntry("deltaPercent", "36.9").containsEntry("baseline", "PREVIOUS_MONTH");
         assertThat(insight.severity()).isEqualTo(Severity.ATTENTION);
-        // 10% e R$ 50,00 exatos
         assertThat(has(withCategories(cat(SEP, FOOD, "550.00"), categoryHistory(FOOD, "500.00")).run(), "CATEGORY_DELTA")).isTrue();
         assertThat(has(withCategories(cat(SEP, FOOD, "549.99"), categoryHistory(FOOD, "500.00")).run(), "CATEGORY_DELTA")).isFalse();
     }
@@ -343,8 +330,6 @@ class MonthlyInsightsTest {
     void naoDeveEmitirSemHistorico() {
         assertThat(insufficient(withCategories(cat(SEP, FOOD, "900.00"), List.of()).run(), "CATEGORY_DELTA", Reason.HISTORY)).isTrue();
     }
-
-    // ---------------------------------------------------------------- FREE_MONEY
 
     @Test
     @DisplayName("dinheiro livre = recebido − gasto − a acontecer − reservado: 5.000 − 2.000 − (500 + 300) − 200 = 2.000 (INFO)")
@@ -370,8 +355,6 @@ class MonthlyInsightsTest {
         assertThat(has(none, "FREE_MONEY")).isFalse();
         assertThat(insufficient(none, "FREE_MONEY", Reason.NO_INCOME)).isTrue();
     }
-
-    // ---------------------------------------------------------------- COMMITMENT_INDEX e DEBT_SERVICE
 
     @Test
     @DisplayName("fixos 1.500 + parcelas 900 com renda 4.000: índice 60%, ATTENTION; a parcela entra uma vez só")
@@ -412,8 +395,6 @@ class MonthlyInsightsTest {
                 Reason.NO_INCOME)).isTrue();
     }
 
-    // ---------------------------------------------------------------- INSTALLMENT_LOAD
-
     @Test
     @DisplayName("parcelas com pico no mês 4: ATTENTION informa peakMonth = mês + 4 e o aumento")
     void deveAcharOPicoDeParcelas() {
@@ -441,8 +422,6 @@ class MonthlyInsightsTest {
         assertThat(has(october(10).load("50.00", "50.00", "50.00", "50.00", "99.00", "50.00", "50.00", "50.00", "50.00", "50.00", "50.00", "50.00")
                 .run(), "INSTALLMENT_LOAD")).isFalse();
     }
-
-    // ---------------------------------------------------------------- EMERGENCY_COVERAGE
 
     private static List<MonthSnapshot> essentials(String essential) {
         return closed(OCT, 3, "5000.00", "4000.00").stream()
@@ -479,8 +458,6 @@ class MonthlyInsightsTest {
         assertThat(has(past, "EMERGENCY_COVERAGE")).isFalse();
     }
 
-    // ---------------------------------------------------------------- INCOME_STABILITY
-
     private static List<MonthSnapshot> incomes(String... values) {
         List<MonthSnapshot> list = new ArrayList<>();
         for (int i = 0; i < values.length; i++) {
@@ -498,8 +475,6 @@ class MonthlyInsightsTest {
         assertThat(insight.params()).containsEntry("cv", "0.4249").containsEntry("average", "3000.00");
         assertThat(insufficient(october(10).history(incomes("2000.00", "4000.00", "1500.00")).run(), "INCOME_STABILITY", Reason.HISTORY)).isTrue();
     }
-
-    // ---------------------------------------------------------------- GOAL_PACE
 
     @Test
     @DisplayName("meta fora do ritmo: ATTENTION com o ritmo necessário vindo do plano (não recalculado); no ritmo com sequência de 3: POSITIVE")
@@ -520,8 +495,6 @@ class MonthlyInsightsTest {
         assertThat(insufficient(october(10).goals(new MonthFacts.GoalFact(UUID.randomUUID(), "X", false, false, brl("0.00"), brl("0.00"), 0, 0))
                 .run(), "GOAL_PACE", Reason.NO_PLAN)).isTrue();
     }
-
-    // ---------------------------------------------------------------- CONCENTRATION
 
     private static MonthSnapshot categories(String... amounts) {
         Map<UUID, Money> map = new java.util.HashMap<>();
@@ -550,8 +523,6 @@ class MonthlyInsightsTest {
         assertThat(new BigDecimal(insight.params().get("top3"))).isLessThanOrEqualTo(new BigDecimal(insight.params().get("total")));
     }
 
-    // ---------------------------------------------------------------- CARD_LIMIT_USAGE
-
     @Test
     @DisplayName("uso do limite: 70% ATTENTION, 90% ALERT; cartão sem limite não emite")
     void deveCalcularOUsoDoLimite() {
@@ -573,8 +544,6 @@ class MonthlyInsightsTest {
         assertThat(has(onlyUnlimited, "CARD_LIMIT_USAGE")).isFalse();
         assertThat(insufficient(onlyUnlimited, "CARD_LIMIT_USAGE", Reason.NO_LIMIT)).isTrue();
     }
-
-    // ---------------------------------------------------------------- mês futuro e determinismo
 
     @Test
     @DisplayName("mês futuro: nada é calculado (insufficient ALL FUTURE_MONTH)")

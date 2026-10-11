@@ -5,10 +5,6 @@ import java.util.List;
 
 import tools.jackson.databind.JsonNode;
 
-/**
- * T61 (QA): as invariantes financeiras do cartão, conferidas a partir da API e do SQL do razão. Devolve a lista de
- * violações (vazia = tudo certo) para o teste decidir a mensagem.
- */
 final class CardInvariants {
 
     private CardInvariants() {
@@ -53,7 +49,6 @@ final class CardInvariants {
         if (available != limit + book) {
             v.add("availableLimit " + available + " != limite + livro CARD " + (limit + book));
         }
-        // totalCommitted do cartão = Σ outstanding das faturas nem PAID nem FUTURE (S-129); a corrente conta
         JsonNode current = card.get("currentInvoice");
         long expectedTotalCommitted = totalCommitted;
         boolean currentListed = invoices.stream().anyMatch(i -> i.get("id").asString().equals(current.get("id").asString()));

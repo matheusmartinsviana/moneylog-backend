@@ -15,7 +15,6 @@ import com.moneylog.core.note.domain.Note;
 import com.moneylog.core.note.domain.NoteLink;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Monta a {@link NoteView}: busca de uma vez o rótulo e o estado dos alvos dos vínculos. */
 public final class NoteViewAssembler {
 
     private final NoteTargetGateway targets;

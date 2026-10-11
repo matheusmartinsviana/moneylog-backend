@@ -26,10 +26,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T190 (QA independente): limite de taxa da busca (120/min) com o limite REAL da exportação (6/min) ligado, para provar que os dois contadores
- * não se misturam nos dois sentidos, que 401 não consome, que a validação vem depois do limite e que a janela é deslizante.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @TestPropertySource(properties = "moneylog.export.rate-limit.max-requests=6")
@@ -65,11 +61,9 @@ class RedesignFase0SearchLimitsQaIT {
         Actor a = world.new Actor("lim");
         Actor b = world.new Actor("limb");
 
-        // 401 sem token não consome a cota de ninguém
         for (int i = 0; i < 200; i++) {
             assertThat(mvc.perform(MockMvcRequestBuilders.get("/v1/search").param("q", "abc")).andReturn().getResponse().getStatus()).isEqualTo(401);
         }
-        // 120 buscas (60 válidas e 60 inválidas: o limite vem antes da validação)
         for (int i = 0; i < 60; i++) {
             assertThat(search(a, "abc")).isEqualTo(200);
             assertThat(search(a, "a")).as("q inválido responde 400 e consome").isEqualTo(400);
@@ -80,16 +74,13 @@ class RedesignFase0SearchLimitsQaIT {
         assertThat(retry).isNotNull();
         assertThat(Long.parseLong(retry)).isBetween(0L, 60L);
         assertThat(blocked.getResponse().getHeader("Cache-Control")).as("429 não deve ser cacheável").isNotNull();
-        // a exportação do mesmo usuário continua inteira (6) e só o 7º é barrado
         List<Integer> exports = new ArrayList<>();
         for (int i = 0; i < 7; i++) {
             exports.add(export(a));
         }
         assertThat(exports).containsExactly(200, 200, 200, 200, 200, 200, 429);
-        // a busca segue barrada (cota própria esgotada) e a de outro usuário livre
         assertThat(search(a, "abc")).isEqualTo(429);
         assertThat(search(b, "abc")).isEqualTo(200);
-        // b: 6 exportações esgotam a exportação, mas a busca dele segue livre (120)
         for (int i = 0; i < 6; i++) {
             assertThat(export(b)).isEqualTo(200);
         }
@@ -97,7 +88,6 @@ class RedesignFase0SearchLimitsQaIT {
         for (int i = 0; i < 100; i++) {
             assertThat(search(b, "abc")).as("busca " + i + " de b").isEqualTo(200);
         }
-        // janela deslizante: 59 s depois ainda barrado; 61 s depois liberado (renova o token pelo relógio)
         clock.advance(Duration.ofSeconds(30));
         a.bearer = world.auth.bearer(a.id);
         assertThat(search(a, "abc")).isEqualTo(429);

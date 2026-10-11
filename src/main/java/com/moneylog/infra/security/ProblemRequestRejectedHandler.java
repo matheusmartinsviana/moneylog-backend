@@ -17,12 +17,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import com.moneylog.infra.web.TraceIdFilter;
 
-/**
- * BUG-QA-32 (S-261): o firewall HTTP do Spring Security recusa antes do controlador caminhos com {@code %00}, {@code %2F}, dígitos não ASCII
- * e semelhantes, e o tratador padrão devolvia {@code 400} <b>sem corpo</b>. Aqui a recusa vira {@code 400} em {@code application/problem+json}
- * com {@code code} e {@code traceId}, como todo erro da API: em {@code /v1/summaries/...} é {@code SUMMARY_MONTH_INVALID} (o mês do caminho
- * é inválido), nas demais rotas {@code VALIDATION_FAILED}. A mensagem do firewall e o caminho recusado nunca vão para o corpo.
- */
 public class ProblemRequestRejectedHandler implements RequestRejectedHandler {
 
     private final ObjectMapper mapper;
@@ -34,7 +28,6 @@ public class ProblemRequestRejectedHandler implements RequestRejectedHandler {
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, RequestRejectedException rejected) throws IOException {
         boolean summary = request.getRequestURI() != null && request.getRequestURI().startsWith("/v1/summaries/");
-        // a busca recusada pelo firewall (um termo com caractere de controle codificado) é o mesmo erro do controlador: o código estável do contrato
         boolean search = request.getRequestURI() != null && request.getRequestURI().equals("/v1/search");
         String code = summary ? "SUMMARY_MONTH_INVALID" : search ? "SEARCH_QUERY_INVALID" : "VALIDATION_FAILED";
         Map<String, Object> issue = new LinkedHashMap<>();

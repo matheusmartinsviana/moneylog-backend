@@ -23,13 +23,6 @@ import com.moneylog.core.sk.ledger.BookRef;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * C1 / BUG-QA-06 (D1 §2.5.1 regra 6, S-42): mudar o dia de fechamento realoca as parcelas e os créditos das faturas
- * FUTURE ("k-ésimo ciclo → k-ésimo ciclo"; item datado pela regra 2) e a cadeia nunca perde item em silêncio.
- *
- * <p>Cenário: Roxinho fecha 25 e vence 5. Em 15/10/2026 (fatura corrente fecha 25/10) o fechamento muda para 10 e o
- * vencimento para 20; a regra nova vale a partir das faturas que fecham em novembro.
- */
 @DisplayName("Mudança de dia do cartão com realocação (C1, S-42)")
 class CardBillingChangesTest {
 
@@ -39,7 +32,6 @@ class CardBillingChangesTest {
         return LocalDate.parse(iso);
     }
 
-    /** 6x de 1.200 em 10/10, 1.083 à vista em 12/10, compra datada de 20/11 (FUTURE), reembolso de 01/11 e antecipação. */
     private static FinanceScenarioFactory cenario() {
         FinanceScenarioFactory s = umCenarioBase();
         s.caso2CompraParcelada();
@@ -95,7 +87,6 @@ class CardBillingChangesTest {
         assertThat(parcelada.installments()).extracting(TransactionInstallment::invoiceClosingDate).containsExactly(
                 d("2026-10-25"), d("2026-11-10"), d("2026-12-10"), d("2027-01-10"), d("2027-02-10"), d("2027-03-10"));
         assertThat(aVista.installments().getFirst().invoiceClosingDate()).isEqualTo(d("2026-10-25"));
-        // 20/11 com fechamento 10: a primeira fatura que fecha depois de 20/11 é a de 10/12 (regra 2)
         assertThat(futura.installments().getFirst().invoiceClosingDate()).isEqualTo(d("2026-12-10"));
         assertThat(reembolso.invoiceClosingDate()).isEqualTo(d("2026-11-10"));
         assertThat(pagamento.invoiceClosingDate()).isEqualTo(d("2026-10-25"));
@@ -104,8 +95,8 @@ class CardBillingChangesTest {
         InvoiceChain chain = s.chain();
         assertThat(chain.invoice(d("2026-10-25")).dueDate()).isEqualTo(d("2026-11-05"));
         assertThat(chain.invoice(d("2026-11-10")).dueDate()).isEqualTo(d("2026-11-20"));
-        assertThat(chain.invoice(d("2026-11-10")).total()).isEqualTo(Money.of("150.00")); // parcela 2 (200) − crédito (50)
-        assertThat(chain.invoice(d("2026-12-10")).total()).isEqualTo(Money.of("500.00")); // parcela 3 (200) + viagem (300)
+        assertThat(chain.invoice(d("2026-11-10")).total()).isEqualTo(Money.of("150.00"));
+        assertThat(chain.invoice(d("2026-12-10")).total()).isEqualTo(Money.of("500.00"));
         assertThat(parcelada.postings()).hasSize(12);
         assertThat(s.roxinho.closingDay()).isEqualTo(10);
         assertThat(s.roxinho.dueDay()).isEqualTo(20);
@@ -173,7 +164,7 @@ class CardBillingChangesTest {
         Transaction compra = s.caso2CompraParcelada();
         Transaction pagamentoFuturoInconsistente = CardTransactions.invoicePayment(s.header(d("2026-10-14"), "Fatura"), Money.of("10.00"),
                 s.nubank, s.roxinho, d("2026-10-25"), s.chain(), d("2026-10-14"));
-        pagamentoFuturoInconsistente.reallocateInvoice(d("2026-11-25")); // simula um pagamento gravado numa fatura FUTURE
+        pagamentoFuturoInconsistente.reallocateInvoice(d("2026-11-25"));
         s.transactions.add(pagamentoFuturoInconsistente);
 
         assertThatThrownBy(() -> CardBillingChanges.changeBillingDays(s.roxinho, s.transactions, 10, 20, HOJE))

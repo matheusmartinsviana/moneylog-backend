@@ -19,13 +19,8 @@ import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Lista as faturas de um cartão sobre a cadeia montada por {@code CardInvoices.chainFor} com as movimentações carregadas
- * (S-79, S-135): nenhum cálculo de fatura em SQL. A paginação é em memória, sobre no máximo algumas dezenas de faturas.
- */
 public class ListInvoicesUseCaseImpl implements ListInvoicesUseCase {
 
-    /** Quantos meses à frente da corrente a lista padrão olha (S-131). */
     static final int DEFAULT_MONTHS_AHEAD = 12;
 
     private final FinancialRecordsGateway records;
@@ -61,7 +56,6 @@ public class ListInvoicesUseCaseImpl implements ListInvoicesUseCase {
         return new Slice<>(all.subList(from, to), to < all.size());
     }
 
-    /** Da primeira fatura com item até a última {@code FUTURE} com item (no máximo 12 meses à frente), sempre com a corrente. */
     private static List<CreditCardInvoice> defaultWindow(InvoiceChain chain, LocalDate today) {
         CreditCardInvoice current = chain.current(today);
         LocalDate limit = YearMonth.from(current.closingDate()).plusMonths(DEFAULT_MONTHS_AHEAD).atEndOfMonth();
@@ -78,10 +72,6 @@ public class ListInvoicesUseCaseImpl implements ListInvoicesUseCase {
         return result;
     }
 
-    /**
-     * As faturas com movimento no intervalo mais as vazias do calendário dentro da janela que o id resolve
-     * (ADR-006 §6: hoje − 24 meses a hoje + 36 meses), para todo id devolvido resolver em {@code GET /v1/invoices/{id}}.
-     */
     private static List<CreditCardInvoice> explicitWindow(InvoiceChain chain, LocalDate today, LocalDate from, LocalDate to) {
         Map<LocalDate, CreditCardInvoice> found = new TreeMap<>();
         for (CreditCardInvoice invoice : chain.invoices()) {

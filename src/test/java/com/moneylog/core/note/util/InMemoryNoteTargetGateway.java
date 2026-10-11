@@ -7,7 +7,6 @@ import java.util.UUID;
 
 import com.moneylog.core.note.app.gateways.NoteTargetGateway;
 
-/** Alvos de vínculo em memória: {@link #add} registra o que "existe" para o usuário. */
 public class InMemoryNoteTargetGateway implements NoteTargetGateway {
 
     private final Map<UUID, Map<TargetRef, TargetInfo>> byUser = new HashMap<>();
@@ -17,7 +16,6 @@ public class InMemoryNoteTargetGateway implements NoteTargetGateway {
         this(null);
     }
 
-    /** Com um vault: as notas dele também existem como alvo (tipo NOTE). */
     public InMemoryNoteTargetGateway(InMemoryNoteGateway notes) {
         this.notes = notes;
     }

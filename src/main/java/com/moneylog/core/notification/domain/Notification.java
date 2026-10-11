@@ -6,10 +6,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Notificação da central. Só muda lida/arquivada; nunca é apagada em silêncio (S-179). O push só é enviado se {@code pushEligible} (fora da janela de
- * silêncio e com push ligado na criação) e ainda não foi enviado.
- */
 public final class Notification {
 
     private final UUID id;
@@ -42,14 +38,12 @@ public final class Notification {
         return new Notification(id, userId, draft, createdAt, pushEligible, readAt, archived, pushSentAt);
     }
 
-    /** Idempotente: marcar de novo uma lida mantém o instante original. */
     public void markRead(Instant now) {
         if (readAt == null) {
             readAt = now;
         }
     }
 
-    /** Lida há mais de {@code days} dias sai da central (arquivada), sem apagar (S-179). */
     public boolean shouldArchive(Instant now, int days) {
         return !archived && readAt != null && readAt.isBefore(now.minusSeconds(days * 86_400L));
     }

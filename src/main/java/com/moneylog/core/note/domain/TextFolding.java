@@ -3,7 +3,6 @@ package com.moneylog.core.note.domain;
 import java.text.Normalizer;
 import java.util.Locale;
 
-/** Comparação sem caixa e sem acento, como o Obsidian resolve nomes (S-158). */
 public final class TextFolding {
 
     private TextFolding() {

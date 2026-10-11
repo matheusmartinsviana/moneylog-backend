@@ -50,10 +50,6 @@ import com.moneylog.infra.notification.jobs.NotificationJob;
 import com.moneylog.infra.notification.push.NoopPushSender;
 import com.moneylog.infra.notification.push.WebPushSender;
 
-/**
- * Ligação das notificações (Etapa 7): gateways em JDBC, casos de uso transacionais, o job idempotente e o push atrás de {@link PushSender}
- * ({@code NoopPushSender} por padrão; {@code WebPushSender} só com {@code moneylog.push.enabled=true} e as chaves VAPID, senão o app não sobe).
- */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 public class NotificationConfig {
@@ -78,7 +74,6 @@ public class NotificationConfig {
         return new PushSubscriptionGatewayImpl(jdbc);
     }
 
-    /** S-173: o app NÃO sobe com push ligado e sem chaves (erro claro), como o {@code JWT_SECRET}. */
     @Bean
     PushSender pushSender(@Value("${moneylog.push.enabled:false}") boolean enabled, @Value("${moneylog.push.vapid-public:}") String publicKey,
                           @Value("${moneylog.push.vapid-private:}") String privateKey, @Value("${moneylog.push.vapid-subject:}") String subject,
@@ -99,8 +94,6 @@ public class NotificationConfig {
         return new GenerationContextLoader(records, sources, goals, reminders, settings, time);
     }
 
-    // ---- central
-
     @Bean
     ListNotificationsUseCase listNotificationsUseCase(NotificationGateway notifications, PlatformTransactionManager tm) {
         return TransactionalProxies.readOnly(ListNotificationsUseCase.class, new NotificationUseCasesImpl.ListNotifications(notifications), tm);
@@ -120,8 +113,6 @@ public class NotificationConfig {
     MarkAllNotificationsReadUseCase markAllNotificationsReadUseCase(NotificationGateway notifications, TimeProvider time, PlatformTransactionManager tm) {
         return TransactionalProxies.required(MarkAllNotificationsReadUseCase.class, new NotificationUseCasesImpl.MarkAllRead(notifications, time), tm);
     }
-
-    // ---- lembretes
 
     @Bean
     CreateReminderUseCase createReminderUseCase(ReminderGateway reminders, IdGenerator ids, TimeProvider time, PlatformTransactionManager tm) {
@@ -148,8 +139,6 @@ public class NotificationConfig {
         return TransactionalProxies.required(SnoozeReminderUseCase.class, new NotificationUseCasesImpl.SnoozeReminder(reminders), tm);
     }
 
-    // ---- configurações
-
     @Bean
     GetNotificationSettingsUseCase getNotificationSettingsUseCase(NotificationSettingsGateway settings, PlatformTransactionManager tm) {
         return TransactionalProxies.readOnly(GetNotificationSettingsUseCase.class, new NotificationUseCasesImpl.GetSettings(settings), tm);
@@ -159,8 +148,6 @@ public class NotificationConfig {
     SaveNotificationSettingsUseCase saveNotificationSettingsUseCase(NotificationSettingsGateway settings, PlatformTransactionManager tm) {
         return TransactionalProxies.required(SaveNotificationSettingsUseCase.class, new NotificationUseCasesImpl.SaveSettings(settings), tm);
     }
-
-    // ---- geração, push, mensagem diária
 
     @Bean
     GenerateNotificationsUseCase generateNotificationsUseCase(GenerationContextLoader loader, NotificationGateway notifications, IdGenerator ids,
@@ -177,7 +164,6 @@ public class NotificationConfig {
     @Bean
     DispatchPushUseCase dispatchPushUseCase(NotificationGateway notifications, PushSubscriptionGateway subscriptions, PushSender sender,
                                             TimeProvider time, @Value("${moneylog.push.include-amounts:false}") boolean includeAmounts) {
-        // sem transação ao redor do envio de rede: cada gravação do gateway é curta; a falha de um envio não segura conexão do pool
         return new NotificationUseCasesImpl.DispatchPush(notifications, subscriptions, sender, time, includeAmounts);
     }
 

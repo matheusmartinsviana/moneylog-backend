@@ -35,7 +35,6 @@ import com.moneylog.infra.card.controller.CardRequests.CardUpdate;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/** Cartões (D1 §2.5): CRUD, arquivar e desarquivar. Todos os números (limite, fatura corrente) são calculados no backend. */
 @RestController
 @RequestMapping("/v1/cards")
 public class CardController {
@@ -60,7 +59,6 @@ public class CardController {
         this.list = list;
     }
 
-    /** {@code status} padrão {@code ACTIVE} (S-126). */
     @GetMapping
     public SliceResponse<CardResponse> list(@CurrentUser UUID userId, @RequestParam(required = false) CardStatus status,
                                             PageQuery page) {
@@ -89,7 +87,6 @@ public class CardController {
                                            @jakarta.validation.constraints.NotNull Long version) {
     }
 
-    /** Marca se o fechamento está confirmado por documento (ADR-014); desconhecido = {@code false}. Não muda o calendário. */
     @PostMapping("/{id}/closing-confirmation")
     public CardResponse closingConfirmation(@CurrentUser UUID userId, @PathVariable UUID id,
                                             @Valid @RequestBody ClosingConfirmationInput body) {

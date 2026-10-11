@@ -5,10 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Registro de cada análise (S-183, PR 00 §27). Guarda o que foi enviado ({@code redactedPayload}, apagado após a retenção), o hash, o uso de
- * tokens e o resultado. {@code DENIED} nunca carrega payload. Nunca guarda a chave, cabeçalhos nem a resposta bruta do provedor.
- */
 public record AiAnalysis(UUID id, UUID userId, UUID previewId, UUID idempotencyKey, AiPurpose purpose, String period, String provider, String model,
                          AiStatus status, String redactedPayload, String payloadHash, int inputTokens, int outputTokens, long durationMs,
                          String resultText, String caveat, List<String> factRefs, String failureReason, Instant createdAt, Instant payloadPurgedAt) {
@@ -27,7 +23,6 @@ public record AiAnalysis(UUID id, UUID userId, UUID previewId, UUID idempotencyK
         return inputTokens + outputTokens;
     }
 
-    /** Explícito para o front e a documentação: nada de texto da IA quando o aterramento falhou. */
     public boolean hasResult() {
         return status == AiStatus.COMPLETED && resultText != null;
     }

@@ -21,11 +21,6 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.infra.debt.E4ItBase;
 
-/**
- * A2 da revisão da Etapa 5 (S-252, S-259): concorrência da reserva de meta com o arquivamento da conta, com a liberação e entre metas
- * diferentes na mesma conta, com {@link CountDownLatch}. A ordem global de travas é <b>meta antes de conta</b>; uma inversão vira deadlock
- * (409 {@code CONFLICT}) e estes testes exigem que isso nunca aconteça (nunca 5xx, nunca 409) e que o estado final seja coerente.
- */
 @DisplayName("Metas: concorrência de reserva × arquivar conta, × liberação e entre metas na mesma conta (A2, S-252)")
 class GoalLockConcurrencyIT extends E4ItBase {
 
@@ -61,7 +56,6 @@ class GoalLockConcurrencyIT extends E4ItBase {
         };
     }
 
-    /** Código de erro do corpo como número estável (hash do texto) só para comparar; 0 = sem corpo de erro. */
     private int code(String json) {
         try {
             JsonNode node = objectMapper.readTree(json);

@@ -59,7 +59,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionTypeNotAvailableException;
 
-/** Compra no cartão, à vista e parcelada (T53), pelo cenário base de D1 §3 (Roxinho fecha 25 e vence 5; relógio 10/10/2026). */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Casos de uso: compra no cartão (T53)")
@@ -238,7 +237,6 @@ class CardPurchaseUseCaseTest {
         assertThat(later.cardInfo().installments().stream().map(InstallmentView::status).toList())
                 .containsExactly(InstallmentStatus.PAID, InstallmentStatus.OVERDUE, InstallmentStatus.PENDING, InstallmentStatus.PENDING,
                         InstallmentStatus.PENDING, InstallmentStatus.PENDING);
-        // em 10/12: as faturas de 25/10, 25/11 e a corrente (25/12) já não são FUTURE; restam 25/01, 25/02 e 25/03
         assertThat(later.impact().commitment()).isEqualTo(Money.of("600.00"));
     }
 

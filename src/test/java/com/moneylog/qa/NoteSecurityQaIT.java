@@ -36,12 +36,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 5: segurança e contrato das rotas de notas e do vault. Isolamento entre usuários em TODAS as rotas (inclusive vínculos,
- * backlinks, busca, tags, exportação e importação), sem token, campos desconhecidos, caracteres de controle, cabeçalhos ({@code nosniff},
- * {@code Content-Type}), limite de taxa de exportar/importar, nenhum corpo de nota interpretado, {@code LIKE}/{@code unaccent}/injeção de SQL e
- * {@code code} de erro dentro da tabela do contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: segurança e contrato das notas e do vault")
@@ -76,8 +70,6 @@ class NoteSecurityQaIT {
         return mvc.perform(as.req(m, url, body)).andReturn();
     }
 
-    // ------------------------------------------------------------------------------------------------ isolamento
-
     @Test
     @DisplayName("isolamento: com a nota, o alvo e o vínculo do usuário A, o usuário B recebe 404 idêntico ao de um UUID aleatório em TODA rota, e nada de A aparece em lista, busca, tags, backlinks, vínculos, exportação ou importação")
     void isolamento() throws Exception {
@@ -101,13 +93,11 @@ class NoteSecurityQaIT {
             assertThat(x.get("code").asString()).isEqualTo(y.get("code").asString()).isEqualTo("NOTE_NOT_FOUND");
             assertThat(mine.getResponse().getContentAsString()).as("a resposta não vaza o id do dono").doesNotContain(secret);
         }
-        // A não foi tocada por B
         JsonNode untouched = NoteQa.get(a, noteA);
         assertThat(untouched.get("version").asLong()).isZero();
         assertThat(untouched.get("body").asString()).contains(secret);
         assertThat(untouched.get("trashedAt").isNull()).isTrue();
 
-        // B lista, busca, vê tags e vínculos: nada de A
         for (String url : new String[] {"/v1/notes", "/v1/notes?q=" + secret, "/v1/notes?tag=tag-secreta", "/v1/notes?status=TRASHED", "/v1/notes?folder=segredo", "/v1/notes/tags",
                 "/v1/links?targetType=GOAL&targetId=" + goalA, "/v1/links?targetType=NOTE&targetId=" + noteA, "/v1/links?targetType=MONTHLY_SUMMARY&targetKey=2026-10",
                 "/v1/notes?linkedType=GOAL&linkedId=" + goalA}) {
@@ -118,7 +108,6 @@ class NoteSecurityQaIT {
                 assertThat(r.node().get("items")).as(url).isEmpty();
             }
         }
-        // B tenta vincular a entidade e a nota de A: 422, igual ao de uma entidade que não existe
         for (String[] t : new String[][] {{"GOAL", goalA}, {"NOTE", noteA}, {"ACCOUNT", a.nubank}, {"CARD", a.card}}) {
             String bn = NoteQa.createOk(w, b, "b-" + t[0] + ".md", "x");
             Res mine = b.call(HttpMethod.PUT, "/v1/notes/" + bn + "/links", "{\"links\":[" + NoteQa.link(t[0], t[1]) + "],\"version\":0}", null);
@@ -128,7 +117,6 @@ class NoteSecurityQaIT {
         }
         assertThat(jdbc.queryForObject("select count(*) from note_links where user_id = ? and (target_goal_id is not null or target_note_id is not null or target_account_id is not null or target_card_id is not null)", Long.class, b.id)).isZero();
 
-        // exportação de B não traz nada de A; importação em B de um zip com vínculos para ids de A vira pendente, sem rótulo de A
         byte[] exportB = NoteQa.export(w, b);
         assertThat(new String(exportB, StandardCharsets.ISO_8859_1)).doesNotContain(secret);
         String zipText = "---\nmoneylog:\n  links:\n    - { type: GOAL, id: " + goalA + " }\n    - { type: ACCOUNT, id: " + a.nubank + " }\n---\ncorpo";
@@ -142,7 +130,6 @@ class NoteSecurityQaIT {
             assertThat(l.has("target") && !l.get("target").isNull() && l.get("target").has("label") && !l.get("target").get("label").isNull()).as("pendente não traz rótulo do alvo de A").isFalse();
         }
         assertThat(view.toString()).doesNotContain("Meta secreta").doesNotContain("Nubank");
-        // A continua vendo só o seu
         assertThat(a.get("/v1/notes").node().get("items").size()).isEqualTo(2);
     }
 
@@ -171,7 +158,6 @@ class NoteSecurityQaIT {
                 assertThat(r.getResponse().getStatus()).as("%s %s com '%s'", route[0], route[1], token).isEqualTo(401);
                 assertThat(r.getResponse().getContentAsString()).doesNotContain("x.md");
             }
-            // token válido de um usuário que não existe no banco: nunca 5xx e nunca dados
             var req = MockMvcRequestBuilders.request(HttpMethod.valueOf(route[0]), route[1]).header(HttpHeaders.AUTHORIZATION, ghost);
             if (route[2] != null) {
                 req.contentType(MediaType.APPLICATION_JSON).content(route[2]);
@@ -221,20 +207,16 @@ class NoteSecurityQaIT {
             assertThat(res.status()).as("%s -> %s", label, res).isEqualTo(400);
             assertThat(res.code()).as(label).isEqualTo("VALIDATION_FAILED");
         }
-        // caminho inválido é 422 (domínio), nunca 400/500
         for (String path : new String[] {"../x.md", "/x.md", "a\\\\b.md", "x.txt", ".md", "con.md", "a/./b.md", "a<b.md", "x.md ", "\u202eabc.md"}) {
             Res res = a.raw(HttpMethod.POST, "/v1/notes", "{\"path\":" + NoteQa.json(w, path) + ",\"body\":\"x\"}", null);
             assertThat(res.status()).as(path).isEqualTo(422);
             assertThat(res.code()).isEqualTo("NOTE_PATH_INVALID");
         }
-        // tab e CRLF são texto da nota
         Res ok = NoteQa.create(w, a, "tab.md", "a\tb\r\nc\r\n");
         assertThat(ok.status()).isEqualTo(201);
         assertThat(ok.node().get("body").asString()).isEqualTo("a\tb\r\nc\r\n");
         assertThat(a.count("notes")).isEqualTo(2);
     }
-
-    // ------------------------------------------------------------------------------------------------ cabeçalhos e conteúdo
 
     @Test
     @DisplayName("cabeçalhos: nosniff e Content-Type certos em todas as respostas (JSON, problem+json, zip com attachment e no-store); HTML/JS na nota sai escapado dentro do JSON, nunca como text/html, nem com Accept: text/html")
@@ -267,14 +249,11 @@ class NoteSecurityQaIT {
         MvcResult imp = send(a, HttpMethod.POST, "/v1/vault/import", null);
         assertThat(imp.getResponse().getStatus()).isIn(400, 415);
         assertThat(imp.getResponse().getHeader("X-Content-Type-Options")).isEqualTo("nosniff");
-        // Origin hostil numa rota Bearer: nunca reflete CORS
         MvcResult cors = mvc.perform(MockMvcRequestBuilders.get("/v1/notes/" + id).header(HttpHeaders.AUTHORIZATION, a.bearer).header(HttpHeaders.ORIGIN, "https://evil.example")).andReturn();
         assertThat(cors.getResponse().getHeader("Access-Control-Allow-Origin")).isNull();
         MvcResult pre = mvc.perform(MockMvcRequestBuilders.options("/v1/notes").header(HttpHeaders.ORIGIN, "https://evil.example").header("Access-Control-Request-Method", "POST")).andReturn();
         assertThat(pre.getResponse().getHeader("Access-Control-Allow-Origin")).isNull();
     }
-
-    // ------------------------------------------------------------------------------------------------ busca: LIKE, unaccent, SQL
 
     @Test
     @DisplayName("busca: % _ \\ são literais; unaccent/caixa; injeção de SQL em q, tag, folder e sort vira texto ou 400, nunca 5xx nem vazamento; as tabelas seguem de pé")
@@ -332,8 +311,6 @@ class NoteSecurityQaIT {
         MvcResult r = mvc.perform(a.req(HttpMethod.GET, "/v1/notes", null).queryParam(key, value).queryParam("pageSize", "50")).andReturn();
         return NoteQa.finish(w, r, "GET /v1/notes?" + key);
     }
-
-    // ------------------------------------------------------------------------------------------------ contrato
 
     @Test
     @DisplayName("contrato: toda resposta das rotas de notas (sucesso e erro) bate com o OpenAPI e todo 'code' de erro está na tabela do contrato")

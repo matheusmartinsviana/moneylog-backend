@@ -7,10 +7,8 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.HexFormat;
 
-/** Código de uso único do primeiro acesso (ADR-015): 256 bits aleatórios; só o SHA-256 vai para o banco. */
 public final class SetupCode {
 
-    /** Tamanho mínimo de um código informado pelo operador (variável de ambiente ou secret). */
     public static final int MIN_PROVIDED_LENGTH = 16;
 
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -24,7 +22,6 @@ public final class SetupCode {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    /** SHA-256 em hexadecimal. O código tem entropia alta, então um hash rápido basta (não é senha escolhida). */
     public static String hash(String code) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(code.strip().getBytes(StandardCharsets.UTF_8));
@@ -34,7 +31,6 @@ public final class SetupCode {
         }
     }
 
-    /** Comparação em tempo constante entre dois hashes hexadecimais. */
     public static boolean sameHash(String a, String b) {
         if (a == null || b == null) {
             return false;

@@ -13,7 +13,6 @@ import com.moneylog.core.sk.time.DayOfMonthRule;
 import com.moneylog.infra.card.persistence.BillingRuleEntity;
 import com.moneylog.infra.card.persistence.CardEntity;
 
-/** {@code CreditCard} ⇄ {@code CardEntity} + {@code BillingRuleEntity}. */
 public final class CardRepositoryMapper {
 
     private CardRepositoryMapper() {

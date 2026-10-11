@@ -25,7 +25,6 @@ import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Persistência por JDBC das tabelas {@code tracked_commitments} e {@code tracked_commitment_items} (V8.06). Sempre filtra por usuário. */
 public class CommitmentGatewayImpl implements CommitmentGateway {
 
     private final JdbcTemplate jdbc;

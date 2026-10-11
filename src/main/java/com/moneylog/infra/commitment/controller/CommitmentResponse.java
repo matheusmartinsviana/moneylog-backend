@@ -12,10 +12,6 @@ import com.moneylog.core.commitment.domain.ScheduleItemType;
 import com.moneylog.core.commitment.domain.TrackedCommitment;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * {@code Commitment} do contrato (ADR-014). Os derivados (pago, saldo nominal, progresso, próximo vencimento, pendente por mês) vêm do
- * agregado: o front só exibe. Compromisso de terceiro: {@code total}, {@code nominalBalance} e {@code progress} ficam {@code null}.
- */
 public record CommitmentResponse(UUID id, CommitmentKind kind, String name, String counterparty, String notes, Money total, Money paid,
                                  Money nominalBalance, String progress, Integer installmentsTotal, Integer installmentsPaid,
                                  Integer remainingInstallments, LocalDate nextDueDate, Money directPending, Money financingPending,

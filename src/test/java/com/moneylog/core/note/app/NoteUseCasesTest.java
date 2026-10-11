@@ -118,8 +118,6 @@ class NoteUseCasesTest {
         return view.note().value().id();
     }
 
-    // ------------------------------------------------------------------ criar
-
     @Test
     @DisplayName("T108 CA1: cria a nota (versão 0) com tags e wikilinks; a trava do vault vem antes de qualquer gravação")
     void deveCriar() {
@@ -188,8 +186,6 @@ class NoteUseCasesTest {
         new EmptyTrashUseCaseImpl(notes).handle(new EmptyTrashCommand(USER));
         assertThatThrownBy(() -> create.handle(command)).isInstanceOf(NoteNotFoundException.class);
     }
-
-    // ------------------------------------------------------------------ vínculos explícitos
 
     @Test
     @DisplayName("T109 CA1/CA2: vínculo a transação do usuário, meta arquivada (S-164) e mês válido; a visão traz rótulo e estado do alvo")
@@ -263,8 +259,6 @@ class NoteUseCasesTest {
                 .isInstanceOf(NoteLinkInvalidException.class);
     }
 
-    // ------------------------------------------------------------------ editar
-
     @Test
     @DisplayName("T108 CA3: PUT com a versão certa grava e sobe a versão; versão velha é VERSION_CONFLICT; recalcula tags e wikilinks e mantém os explícitos")
     void deveEditarComVersao() {
@@ -279,8 +273,6 @@ class NoteUseCasesTest {
         assertThatThrownBy(() -> update.handle(new UpdateNoteCommand(USER, NoteTestKit.id(404), "z", 0))).isInstanceOf(NoteNotFoundException.class);
     }
 
-    // ------------------------------------------------------------------ mover
-
     @Test
     @DisplayName("T110 CA1: renomear reviews/2026-10.md para reviews/outubro.md reescreve [[2026-10]], [[reviews/2026-10]] e [[2026-10|alias]], preservando alias e seção; rewrittenNotes lista as notas")
     void deveReescreverOsLinks() {
@@ -294,7 +286,6 @@ class NoteUseCasesTest {
         assertThat(result.note().note().value().path().value()).isEqualTo("reviews/outubro.md");
         assertThat(result.note().note().value().title()).isEqualTo("outubro");
         assertThat(result.note().note().version()).isEqualTo(1);
-        // os links reescritos seguem resolvendo para a nota movida
         assertThat(notes.get(idOf(a)).wikilinks()).allMatch(l -> idOf(review).equals(l.targetId()));
     }
 
@@ -308,7 +299,7 @@ class NoteUseCasesTest {
         int readBefore = notes.wikilinkRowsRead();
         NoteView alvo = created("pasta/Alvo.md", "x");
         assertThat(notes.nameKeyQueries()).containsExactly(java.util.Set.of("alvo"));
-        assertThat(notes.wikilinkRowsRead() - readBefore).isEqualTo(50);   // só os [[Alvo]], nenhum dos [[nadaN]]
+        assertThat(notes.wikilinkRowsRead() - readBefore).isEqualTo(50);
         assertThat(notes.get(NoteTestKit.id(1)).wikilinks().get(1).targetId()).isEqualTo(idOf(alvo));
         MoveNoteResult moved = move.handle(new MoveNoteCommand(USER, idOf(alvo), "pasta/Outro.md", 0));
         assertThat(notes.nameKeyQueries().get(1)).containsExactlyInAnyOrder("alvo", "outro");
@@ -345,10 +336,8 @@ class NoteUseCasesTest {
         NoteView leitorC = created("leitorC.md", "[[Outra]]");
         assertThat(notes.get(idOf(leitorB)).wikilinks()).extracting(NoteLink::targetId).containsExactly(idOf(cafe));
         move.handle(new MoveNoteCommand(USER, idOf(outra), "Cafe.md", 0));
-        // o link que apontava para a nota renomeada continua apontando para ela (e não para Café, só equivalente)
         assertThat(notes.get(idOf(leitorC)).body()).isEqualTo("[[Cafe]]");
         assertThat(notes.get(idOf(leitorC)).wikilinks()).extracting(NoteLink::targetId).containsExactly(idOf(outra));
-        // [[Café]] segue na nota escrita exatamente assim; [[Cafe]], escrito exatamente como a nota renomeada, passa a ser dela
         assertThat(notes.get(idOf(leitorA)).wikilinks()).extracting(NoteLink::targetId).containsExactly(idOf(cafe));
         assertThat(notes.get(idOf(leitorB)).wikilinks()).extracting(NoteLink::targetId).containsExactly(idOf(outra));
     }
@@ -448,8 +437,6 @@ class NoteUseCasesTest {
         assertThat(notes.get(idOf(leitor)).wikilinks().get(0).targetId()).isEqualTo(idOf(nota));
     }
 
-    // ------------------------------------------------------------------ lixeira
-
     @Test
     @DisplayName("T108 CA4: trash tira a nota do índice e deixa pendentes os links para ela; restore devolve e resolve de novo; restore com caminho ocupado é NOTE_PATH_TAKEN")
     void deveTratarALixeira() {
@@ -483,8 +470,6 @@ class NoteUseCasesTest {
         assertThat(notes.all()).extracting(Note::id).containsExactly(idOf(b));
         assertThat(new EmptyTrashUseCaseImpl(notes).handle(new EmptyTrashCommand(OTHER_USER))).isZero();
     }
-
-    // ------------------------------------------------------------------ leitura
 
     @Test
     @DisplayName("T108 CA6: GET devolve a nota (também na lixeira); de outro usuário é NOTE_NOT_FOUND")

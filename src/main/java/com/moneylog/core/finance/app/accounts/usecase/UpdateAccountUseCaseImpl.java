@@ -21,7 +21,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 
 public class UpdateAccountUseCaseImpl implements UpdateAccountUseCase {
 
-    /** Motivo gravado ao desativar o par de abertura substituído. */
     public static final String OPENING_CORRECTED = "OPENING_CORRECTED";
 
     private final AccountGateway accounts;

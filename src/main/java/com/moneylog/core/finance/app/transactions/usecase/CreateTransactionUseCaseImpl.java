@@ -25,7 +25,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.Transaction
 
 public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
 
-    /** Validade da chave (S-72): depois disso ela é sobrescrita pela próxima criação. */
     public static final Duration IDEMPOTENCY_VALIDITY = Duration.ofHours(24);
 
     private final TransactionGateway transactions;
@@ -37,14 +36,12 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
     private final TimeProvider time;
     private final DebtGateway debts;
 
-    /** Sem dívidas (Etapas 2 e 3). */
     public CreateTransactionUseCaseImpl(TransactionGateway transactions, AccountTransactionFactory factory,
                                         LedgerWriteGateway ledger, IdGenerator ids, TransactionDetailsAssembler assembler,
                                         IdempotencyGateway idempotency, TimeProvider time) {
         this(transactions, factory, ledger, ids, assembler, idempotency, time, null);
     }
 
-    /** Com dívidas (Etapa 4): as dívidas que nascem com a movimentação são gravadas antes dela. */
     @SuppressWarnings("java:S107")
     public CreateTransactionUseCaseImpl(TransactionGateway transactions, AccountTransactionFactory factory,
                                         LedgerWriteGateway ledger, IdGenerator ids, TransactionDetailsAssembler assembler,
@@ -82,7 +79,6 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
     private TransactionDetails create(CreateTransactionCommand command, UUID id, TransactionOrigin origin) {
         BuiltTransaction built = factory.buildWithEffects(command, id, origin, null);
         Transaction transaction = built.transaction();
-        // a dívida que nasce com a movimentação entra antes dela (a movimentação aponta para a dívida; a FK da origem é diferida)
         for (Debt debt : built.newDebts()) {
             if (debts == null) {
                 throw new IllegalStateException("a movimentação cria dívida mas o caso de uso não tem a porta de dívidas");
@@ -94,11 +90,9 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
         return assembler.assemble(saved);
     }
 
-    /** {@code null} = a chave é nossa (primeira vez ou vencida); senão, o que ela guardou. */
     private Claim claimOrFind(CreateTransactionCommand command, UUID key, UUID resourceId) {
         String hash = CanonicalCommandHash.of(command);
         Instant now = time.now();
-        // a chave some entre o claim recusado e o find só se a transação que a segurava deu rollback: tenta de novo
         for (int attempt = 0; attempt < 3; attempt++) {
             if (idempotency.claim(command.userId(), IDEMPOTENCY_SCOPE, key, hash, resourceId, now, now.minus(IDEMPOTENCY_VALIDITY))) {
                 return null;
@@ -115,7 +109,6 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
         if (!existing.requestHash().equals(CanonicalCommandHash.of(command))) {
             throw new IdempotencyKeyReusedException();
         }
-        // o replay devolve o estado ATUAL do recurso (S-87), não uma cópia da primeira resposta
         return transactions.findById(command.userId(), existing.resourceId()).map(assembler::assemble)
                 .orElseThrow(() -> new TransactionNotFoundException(existing.resourceId()));
     }

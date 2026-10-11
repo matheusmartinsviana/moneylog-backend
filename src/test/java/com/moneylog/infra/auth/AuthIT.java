@@ -49,7 +49,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.infra.web.WebFoundationSamples;
 
-/** T22b CA1 a CA11: dono, login, refresh rotativo com tolerância, logout, rate limit e proteção das rotas. */
 @IntegrationTest
 @Import({MutableClockConfig.class, WebFoundationSamples.class})
 @RecordApplicationEvents
@@ -94,7 +93,6 @@ class AuthIT {
         ensureOwner.handle(new EnsureOwnerCommand(OWNER_EMAIL));
     }
 
-    /** Um IP novo por teste: o rate limit é por IP e o contexto é compartilhado. */
     private static String novoIp() {
         return "198.51.100." + IPS.incrementAndGet();
     }
@@ -156,7 +154,6 @@ class AuthIT {
             assertThat(events.stream(OwnerCreated.class)).isEmpty();
             assertThat(output.getAll()).contains("o***@moneylog.com").contains("n***@moneylog.com")
                     .doesNotContain("novo@moneylog.com").doesNotContain("owner@moneylog.com");
-            // o token do mesmo id continua valendo e login com o e-mail novo funciona
             mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/test/me")
                             .header("Authorization", bearer))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.userId").value(id.toString()));
@@ -213,7 +210,6 @@ class AuthIT {
             mockMvc.perform(login(OWNER_EMAIL, PASSWORD, ip)).andExpect(status().isTooManyRequests())
                     .andExpect(jsonPath("$.code").value("TOO_MANY_ATTEMPTS"))
                     .andExpect(header().string("Retry-After", "900")).andExpect(ContractValidation.conforms());
-            // outro IP não é afetado e, passada a janela, o IP volta a poder tentar
             mockMvc.perform(login(OWNER_EMAIL, PASSWORD, novoIp())).andExpect(status().isOk());
             clock.advance(Duration.ofMinutes(16));
             mockMvc.perform(login(OWNER_EMAIL, PASSWORD, ip)).andExpect(status().isOk());

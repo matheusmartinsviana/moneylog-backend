@@ -9,11 +9,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
-/**
- * Backup e restauração (T176): {@code pg_dump} (porta {@link DatabaseDumper}) -> cifra opcional -> {@link BackupStorage} sob um
- * prefixo por data -> retenção. A restauração baixa, descriptografa TUDO para um arquivo temporário e só então chama o
- * {@code pg_restore}: chave errada falha antes de tocar no banco.
- */
 public class BackupService {
 
     private static final DateTimeFormatter DAY_PATH = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneOffset.UTC);
@@ -36,7 +31,6 @@ public class BackupService {
         this.clock = clock;
     }
 
-    /** Faz o backup, aplica a retenção e devolve a chave gravada. */
     public String backup() {
         Path work = tempDir();
         try {
@@ -58,7 +52,6 @@ public class BackupService {
         }
     }
 
-    /** Restaura o backup {@code key} no banco do {@link DatabaseDumper} (que deve estar vazio). */
     public void restore(String key) {
         if (!key.startsWith(prefix)) {
             throw new BackupException("chave fora do prefixo de backup do app");
@@ -79,7 +72,6 @@ public class BackupService {
         }
     }
 
-    /** Backups do app, do mais novo para o mais antigo. */
     public List<StoredBackup> list() {
         return storage.list(prefix).stream().sorted((a, b) -> b.lastModified().compareTo(a.lastModified())).toList();
     }
@@ -110,7 +102,6 @@ public class BackupService {
         try (var files = Files.walk(dir)) {
             files.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
         } catch (IOException ignored) {
-            // melhor esforço
         }
     }
 }

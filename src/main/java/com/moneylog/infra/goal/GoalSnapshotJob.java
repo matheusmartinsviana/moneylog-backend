@@ -10,11 +10,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import com.moneylog.core.finance.app.goals.usecase.RecordGoalSnapshotsUseCase;
 import com.moneylog.core.goal.app.gateways.GoalSnapshotGateway;
 
-/**
- * Job diário dos instantâneos da medida das metas (ADR-016): às 23:55 em {@code America/Sao_Paulo}, para o último valor do dia entrar no
- * mês. <b>Idempotente</b> (um registro por meta e mês, atualizado até o mês fechar): reexecutar ou reiniciar não duplica. A falha de um
- * usuário é registrada (sem dados) e os demais seguem. Uma instância só (ADR-001).
- */
 public class GoalSnapshotJob {
 
     private static final Logger log = LoggerFactory.getLogger(GoalSnapshotJob.class);
@@ -32,7 +27,6 @@ public class GoalSnapshotJob {
         runOnce();
     }
 
-    /** Uma passada completa; devolve quantos instantâneos foram gravados. Público para o teste chamar sem esperar o agendador. */
     public int runOnce() {
         int recorded = 0;
         List<UUID> users = snapshots.userIdsWithTrackedGoals();

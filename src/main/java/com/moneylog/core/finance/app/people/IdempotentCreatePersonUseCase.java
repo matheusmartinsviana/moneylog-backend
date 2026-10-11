@@ -16,11 +16,6 @@ import com.moneylog.core.transaction.app.IdempotentClaim;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 
-/**
- * Criação de pessoa com {@code Idempotency-Key} opcional (S-244). Fica em {@code core.finance} porque a idempotência vive em
- * {@code core.transaction}, que já depende de {@code core.debt} (sem ciclo entre features). Sem chave, delega direto; com chave, reivindica
- * na mesma transação da criação e o replay devolve a pessoa atual.
- */
 public class IdempotentCreatePersonUseCase implements CreatePersonUseCase {
 
     private final CreatePersonUseCase delegate;
@@ -48,7 +43,6 @@ public class IdempotentCreatePersonUseCase implements CreatePersonUseCase {
         }
         String hash = IdempotentClaim.hash("name=" + (command.name() == null ? "-" : command.name().strip()) + ";notes="
                 + (command.notes() == null ? "-" : command.notes().strip()) + ";");
-        // o id é reservado antes, para a chave apontar para a pessoa que esta mesma transação cria
         UUID reserved = ids.next();
         Claim existing = IdempotentClaim.claimOrFind(idempotency, command.userId(), IDEMPOTENCY_SCOPE, command.idempotencyKey(), hash, reserved,
                 time.now());

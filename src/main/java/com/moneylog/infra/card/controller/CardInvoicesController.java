@@ -19,7 +19,6 @@ import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/** Faturas e parcelas futuras de um cartão (leituras; os números vêm todos da cadeia de faturas do backend). */
 @RestController
 @RequestMapping("/v1/cards/{id}")
 public class CardInvoicesController {
@@ -32,7 +31,6 @@ public class CardInvoicesController {
         this.future = future;
     }
 
-    /** Por {@code closingDate}, ordem decrescente; sem {@code from}/{@code to}, a janela padrão de S-131. */
     @GetMapping("/invoices")
     public SliceResponse<InvoiceResponse> invoices(@CurrentUser UUID userId, @PathVariable UUID id,
                                                    @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

@@ -10,7 +10,6 @@ import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceType;
 
-/** {@code Occurrence} do contrato. */
 public record OccurrenceResponse(UUID recurrenceId, LocalDate date, OccurrenceStatus status, boolean overdue, RecurrenceType type,
                                  FlowDirection direction, Money amount, String description, UUID categoryId, UUID accountId,
                                  UUID cardId, UUID transactionId) {
@@ -21,10 +20,6 @@ public record OccurrenceResponse(UUID recurrenceId, LocalDate date, OccurrenceSt
                 v.amount(), r.description(), r.categoryId(), r.accountId(), r.cardId(), v.transactionId());
     }
 
-    /**
-     * {@code OccurrenceSlice} do contrato: os mesmos {@code items}/{@code hasNext} das demais listas e {@code overdueTruncated} (S-240):
-     * havia mais ocorrências pendentes vencidas que o limite por chamada, e só as mais recentes vêm.
-     */
     public record Slice(java.util.List<OccurrenceResponse> items, boolean hasNext, boolean overdueTruncated) {
 
         public static Slice of(com.moneylog.core.recurrence.app.OccurrenceListing listing) {

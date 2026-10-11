@@ -7,10 +7,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-/**
- * Retenção (T176 CA3): mantém todos os backups dos {@code keepDays} dias mais recentes que TÊM backup (em UTC) e devolve o
- * resto para apagar. Só enxerga o que o chamador listou (o prefixo do app), então nunca toca em objetos de outros donos.
- */
 public final class BackupRetention {
 
     private BackupRetention() {

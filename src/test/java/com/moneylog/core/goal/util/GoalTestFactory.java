@@ -10,7 +10,6 @@ import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.goal.domain.GoalPriority;
 import com.moneylog.core.sk.money.Money;
 
-/** Metas dos testes: a "Reserva de emergência" do cenário da Etapa 5 (alvo 20.000,00, prazo 31/12/2027, prioridade HIGH). */
 public final class GoalTestFactory {
 
     public static final UUID GOAL_ID = UUID.fromString("00000000-0000-0000-0000-00000000e001");

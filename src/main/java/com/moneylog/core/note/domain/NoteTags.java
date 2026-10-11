@@ -5,10 +5,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * Tags da nota (S-165): as de {@code tags:} do frontmatter e as {@code #tag} do corpo fora de código, normalizadas em minúsculas e sem
- * acento. {@code # título} (com espaço) não é tag; {@code #123} (só números) também não.
- */
 public final class NoteTags {
 
     public static final int MAX_LENGTH = 50;
@@ -16,7 +12,6 @@ public final class NoteTags {
     private NoteTags() {
     }
 
-    /** Normaliza uma tag escrita ({@code #Revisão Mensal} vira {@code revisao-mensal}); vazio se não é uma tag válida. */
     public static Optional<String> normalize(String raw) {
         if (raw == null) {
             return Optional.empty();
@@ -33,11 +28,6 @@ public final class NoteTags {
         return Optional.of(folded);
     }
 
-    /**
-     * Tags do texto: as do frontmatter ({@code frontmatterTags}) e as {@code #tag} de {@code from} em diante, sem as que estão em código
-     * nem dentro de wikilinks ({@code [[nota#seção]]}). O limite de {@link NoteLimits#MAX_TAGS} vale para o conjunto final (frontmatter
-     * primeiro, corpo depois). {@code wikilinks} precisa estar em ordem crescente e sem sobreposição, como o {@link WikilinkParser} devolve.
-     */
     public static Set<String> extract(String text, int from, List<String> frontmatterTags, List<Wikilink> wikilinks) {
         Set<String> tags = new LinkedHashSet<>();
         for (String raw : frontmatterTags) {
@@ -61,7 +51,6 @@ public final class NoteTags {
                 i = Math.max(i, range[1]);
                 continue;
             }
-            // os wikilinks vêm em ordem e sem sobreposição, e o # só avança: um ponteiro basta (custo linear, não quadrático)
             while (nextLink < wikilinks.size() && wikilinks.get(nextLink).end() <= hash) {
                 nextLink++;
             }
@@ -83,7 +72,6 @@ public final class NoteTags {
         return tags;
     }
 
-    /** O {@code #} abre tag no começo do texto, depois de espaço ou de {@code (}; e é seguido de caractere de tag. */
     private static boolean startsTag(String text, int hash, int from) {
         if (hash > from) {
             char before = text.charAt(hash - 1);

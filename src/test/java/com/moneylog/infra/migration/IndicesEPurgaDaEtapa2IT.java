@@ -18,7 +18,6 @@ import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCase.Purge
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 
-/** B5 (índices da V2.05) e B7 (coluna do início da família da V2.06 e limpeza dos expirados). */
 @IntegrationTest
 @DisplayName("Índices da V2.05 e refresh tokens da V2.06 (B5, B7)")
 class IndicesEPurgaDaEtapa2IT {

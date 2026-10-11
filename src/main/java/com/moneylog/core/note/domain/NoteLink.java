@@ -6,15 +6,6 @@ import java.util.regex.Pattern;
 
 import com.moneylog.core.note.exception.NoteExceptions.NoteLinkInvalidException;
 
-/**
- * Vínculo de uma nota (D1 §5, S-160). Duas origens:
- * <ul>
- *   <li>{@code WIKILINK}: alvo sempre {@code NOTE}; {@code text} é o alvo como escrito e {@code targetId} a nota resolvida (ou {@code null}
- *       = pendente). Recalculado quando o corpo muda ou o vault muda de forma.</li>
- *   <li>{@code EXPLICIT}: tipo + {@code targetId} (ou {@code targetKey} no resumo mensal). Alvo que não existe (só vem de importação)
- *       fica <b>pendente</b>: {@code targetId} e {@code targetKey} nulos e o valor original em {@code text}. Nunca há dupla referência.</li>
- * </ul>
- */
 public record NoteLink(LinkOrigin origin, NoteLinkType type, UUID targetId, String targetKey, String text, String alias, String section,
                        boolean embed, String context) {
 
@@ -53,13 +44,11 @@ public record NoteLink(LinkOrigin origin, NoteLinkType type, UUID targetId, Stri
         return key != null && MONTH.matcher(key).matches();
     }
 
-    /** Wikilink do corpo; {@code resolved} nulo = pendente. */
     public static NoteLink wikilink(Wikilink link, UUID resolved, String context) {
         return new NoteLink(LinkOrigin.WIKILINK, NoteLinkType.NOTE, resolved, null, link.target(), cap(link.alias()), cap(link.section()), link.embed(),
                 context);
     }
 
-    /** Vínculo explícito já validado contra um alvo existente. */
     public static NoteLink explicit(NoteLinkType type, UUID targetId) {
         return new NoteLink(LinkOrigin.EXPLICIT, type, Objects.requireNonNull(targetId, "targetId"), null, null, null, null, false, null);
     }
@@ -69,7 +58,6 @@ public record NoteLink(LinkOrigin origin, NoteLinkType type, UUID targetId, Stri
                 null);
     }
 
-    /** Vínculo explícito para um alvo que não existe (importação): guarda o valor original para a exportação devolvê-lo. */
     public static NoteLink pending(NoteLinkType type, String raw) {
         return new NoteLink(LinkOrigin.EXPLICIT, type, null, null, Objects.requireNonNull(raw, "raw"), null, null, false, null);
     }
@@ -85,17 +73,14 @@ public record NoteLink(LinkOrigin origin, NoteLinkType type, UUID targetId, Stri
         return targetId != null || targetKey != null ? State.RESOLVED : State.PENDING;
     }
 
-    /** Wikilink com outra resolução (ou nenhuma). */
     public NoteLink withTarget(UUID resolved) {
         return new NoteLink(origin, type, resolved, targetKey, text, alias, section, embed, context);
     }
 
-    /** Identidade de um wikilink pelo alvo escrito: sem {@code .md}, sem caixa e sem acento. */
     public static String wikilinkIdentity(String target) {
         return "W:" + TextFolding.fold(Wikilink.withoutExtension(target));
     }
 
-    /** Chave que identifica o mesmo vínculo (para tirar duplicatas). */
     public String identity() {
         if (origin == LinkOrigin.WIKILINK) {
             return wikilinkIdentity(text);

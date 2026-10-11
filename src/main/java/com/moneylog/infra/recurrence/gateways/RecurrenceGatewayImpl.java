@@ -28,11 +28,6 @@ import com.moneylog.infra.recurrence.persistence.RecurrenceSkipRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa.RealizedRow;
 
-/**
- * {@link RecurrenceGateway} sobre JPA. As ocorrências realizadas <b>não são gravadas aqui</b>: derivam das movimentações ativas com
- * origem em recorrência (S-49), então o estorno da movimentação devolve a ocorrência às pendentes; as puladas ficam em
- * {@code recurrence_skips}.
- */
 public class RecurrenceGatewayImpl implements RecurrenceGateway {
 
     private final RecurrenceRepositoryJpa repository;

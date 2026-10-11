@@ -5,15 +5,10 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Quais endpoints de push o servidor aceita chamar (A3, anti-SSRF): só os serviços de push dos navegadores, por HTTPS na porta 443, sem usuário
- * na URL, sem IP literal e sem porta atípica. A lista é fechada; novo serviço entra por mudança de código, não por configuração do usuário.
- */
 public final class PushEndpointPolicy {
 
     public static final int MAX_LENGTH = 500;
 
-    /** Host exato ou, quando começa com ponto, qualquer subdomínio dele. */
     private static final List<String> ALLOWED = List.of("fcm.googleapis.com", ".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com");
 
     private PushEndpointPolicy() {

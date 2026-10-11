@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/** Linha de {@code persons}. */
 @Entity
 @Table(name = "persons")
 public class PersonEntity {
@@ -52,7 +51,6 @@ public class PersonEntity {
         this.updatedAt = now;
     }
 
-    /** {@code updated_at} sobe a cada gravação (mesmo com o relógio parado): a linha sempre fica "suja" e a versão sempre sobe. */
     public void apply(String newName, String newNotes, boolean newArchived, Instant now) {
         this.name = newName;
         this.notes = newNotes;

@@ -15,7 +15,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Corpos de entrada de {@code /v1/recurrences} (contrato: {@code RecurrenceInput}, {@code RecurrenceUpdate}, ...). */
 public final class RecurrenceRequests {
 
     public static final String AMOUNT_PATTERN = "^\\d{1,13}(\\.\\d{1,2})?$";
@@ -23,7 +22,6 @@ public final class RecurrenceRequests {
     private RecurrenceRequests() {
     }
 
-    /** {@code RecurrenceType} do contrato: só os três tipos que uma recorrência pode gerar. */
     public enum RecurrenceType {
         EXPENSE,
         INCOME,

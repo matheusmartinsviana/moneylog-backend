@@ -35,16 +35,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T82 (QA), critério 2: operações aleatórias com sementes fixas sobre o ciclo completo da Etapa 4 (empréstimo, recebimento,
- * captação, pagamento, dívida sem movimentação com e sem categoria, perdão, estorno do registro, despesa dividida de 1 a 20 partes,
- * reembolso da despesa dividida, estornos de qualquer movimentação, compras e reembolsos no cartão, pagamento de fatura,
- * mudança de dias, recorrências em conta e cartão realizadas, puladas, estornadas, desativadas, e passagem do tempo).
- * A cada lote: o razão fecha em zero; dívida nunca negativa nem quitada acima do principal; livros RECEIVABLE/PAYABLE = Σ saldo
- * em aberto; nada de dívida/devolução vira despesa ou receita; consumo por categoria e por competência nunca negativo e igual ao
- * razão; pessoa = Σ dívidas; saldo da conta = razão; dashboard = lista = entries; Σ saídas do /upcoming = faturas + ocorrências +
- * dívidas datadas; nenhuma ocorrência realizada duas vezes; todo {@code code} está na tabela do contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: propriedade do ciclo de dívidas, divisão e recorrências")
@@ -127,8 +117,6 @@ class DebtPropertyQaIT {
         assertThat(violations).as("violações").isEmpty();
     }
 
-    // ------------------------------------------------------------------------------------------------ operações
-
     private static String pick(Random rnd, List<String> list) {
         return list.get(rnd.nextInt(list.size()));
     }
@@ -193,7 +181,6 @@ class DebtPropertyQaIT {
             r = rnd.nextInt(3) == 0 ? DebtQa.voidDebt(a, id) : DebtQa.cancelDebt(a, id);
             what = "perdão/estorno do registro";
         } else if (roll < 60) {
-            // despesa dividida: 1 a 20 partes; soma sempre menor que o total (sobram centavos), às vezes bem justa
             int n = rnd.nextInt(5) == 0 ? 1 + rnd.nextInt(20) : 1 + rnd.nextInt(4);
             long total = Math.max(n + 1, 100 + rnd.nextInt(120_000));
             List<String> shares = new ArrayList<>();
@@ -322,14 +309,10 @@ class DebtPropertyQaIT {
         return out;
     }
 
-    // ------------------------------------------------------------------------------------------------ invariantes
-
-    /** Competência (ou categoria) com consumo mensal negativo por reembolso em mês posterior ao da despesa: comportamento esperado do domínio, só registrado. */
     private final Set<String> monthlyNegatives = new TreeSet<>();
 
     private void verify(Actor a, List<String> v, String label) throws Exception {
         List<String> found = new ArrayList<>();
-        // consumo de cada despesa/compra (a própria + reembolsos ativos ligados) nunca negativo
         for (Map<String, Object> m : jdbc.queryForList("""
                 select p.id::text as id, sum(lp.amount_cents) as consumption from transactions p
                 join ledger_postings lp on lp.active and lp.book_type = 'EXPENSE'
@@ -337,7 +320,6 @@ class DebtPropertyQaIT {
                 where p.user_id = ? and p.status = 'ACTIVE' and p.type in ('EXPENSE','CARD_PURCHASE') group by p.id having sum(lp.amount_cents) < 0""", a.id)) {
             found.add("consumo negativo na despesa/compra " + m.get("id") + ": " + m.get("consumption"));
         }
-        // 1. razão
         if (a.ledgerSum() != 0) {
             found.add("razão não fecha em zero: " + a.ledgerSum());
         }
@@ -346,7 +328,6 @@ class DebtPropertyQaIT {
         }
         found.addAll(CardInvariants.check(a, a.card));
 
-        // 2. dívidas
         List<JsonNode> debts = DebtQa.debts(a);
         long recvOut = 0;
         long payOut = 0;
@@ -373,7 +354,6 @@ class DebtPropertyQaIT {
             if (("CANCELED".equals(status) || "VOIDED".equals(status)) && outstanding != 0) {
                 found.add("dívida " + status + " " + id + " com saldo " + outstanding);
             }
-            // quitações ativas somam o settled
             long sumSettlements = 0;
             for (JsonNode s : d.get("settlements")) {
                 if (s.get("active").asBoolean()) {
@@ -402,7 +382,6 @@ class DebtPropertyQaIT {
             found.add("livro PAYABLE " + payBook + " != −Σ saldo a pagar " + (-payOut));
         }
 
-        // 3. pessoa: net = Σ dívidas abertas; lista = detalhe
         for (JsonNode p : DebtQa.all(a, "/v1/people")) {
             String pid = p.get("id").asString();
             long net = CardQaWorld.cents(p.get("net"));
@@ -427,7 +406,6 @@ class DebtPropertyQaIT {
             }
         }
 
-        // 4. dívida/devolução nunca vira despesa ou receita
         Long leaked = jdbc.queryForObject("select count(*) from ledger_postings lp join transactions t on t.id = lp.transaction_id where lp.user_id = ? and lp.active "
                 + "and lp.book_type in ('INCOME') and t.type in ('LOAN_GIVEN','MONEY_RECEIVED','DEBT_PAYMENT')", Long.class, a.id);
         Long leakedExpense = jdbc.queryForObject("select count(*) from ledger_postings lp join transactions t on t.id = lp.transaction_id where lp.user_id = ? and lp.active "
@@ -436,7 +414,6 @@ class DebtPropertyQaIT {
             found.add("movimentação de dívida gerou lançamento de receita/despesa: INCOME " + leaked + " EXPENSE " + leakedExpense);
         }
 
-        // 5. consumo por competência: nunca negativo, = razão, = entries (lista), por categoria também
         List<String> competences = jdbc.queryForList("select distinct competence from ledger_postings where user_id = ? and active and book_type = 'EXPENSE' order by 1",
                 String.class, a.id);
         for (String c : competences) {
@@ -477,7 +454,6 @@ class DebtPropertyQaIT {
             }
         }
 
-        // 6. dashboard x lista x conta
         LocalDate today = today();
         JsonNode summary = a.getOk("/v1/dashboard/summary");
         JsonNode month = summary.get("month");
@@ -524,11 +500,9 @@ class DebtPropertyQaIT {
         }
         long equity = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active and book_type in ('ACCOUNT','RECEIVABLE','PAYABLE','CARD')",
                 Long.class, a.id);
-        // patrimônio = Σ livros de ativos e passivos (tudo mais fecha em zero com EXPENSE/INCOME/EQUITY em contrapartida) (abertura inclusa)
         long ledgerNetWorth = equity;
         long ledgerNetWorthToday = ledgerNetWorth;
         if (CardQaWorld.cents(nw.get("total")) != ledgerNetWorthToday) {
-            // pode diferir só por lançamentos futuros (data efetiva depois de hoje): reconferir só com data <= hoje
             long upToToday = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active "
                     + "and book_type in ('ACCOUNT','RECEIVABLE','PAYABLE','CARD') and effective_date <= ?", Long.class, a.id, java.sql.Date.valueOf(today));
             if (CardQaWorld.cents(nw.get("total")) != upToToday) {
@@ -536,7 +510,6 @@ class DebtPropertyQaIT {
             }
         }
 
-        // 7. ocorrências: nenhuma realizada duas vezes; REALIZED = movimentação ativa; /upcoming = faturas + ocorrências + dívidas datadas
         Long dup = jdbc.queryForObject("select count(*) from (select recurrence_id, occurrence_date from transactions where user_id = ? and status = 'ACTIVE' "
                 + "and recurrence_id is not null group by 1, 2 having count(*) > 1) t", Long.class, a.id);
         if (dup != null && dup > 0) {
@@ -581,7 +554,6 @@ class DebtPropertyQaIT {
                 expectedByKey.merge("DEBT|" + d.get("id").asString(), o, Long::sum);
             }
         }
-        // S-258: movimentações ativas com data depois de hoje são compromissos; o oráculo vem direto do razão (efeito líquido por movimentação e data nas contas de caixa)
         for (Map<String, Object> row : jdbc.queryForList("select lp.transaction_id::text tx, lp.effective_date d, sum(lp.amount_cents) net from ledger_postings lp "
                 + "join accounts ac on ac.id = lp.book_id where lp.user_id = ? and lp.active and lp.source_type = 'TRANSACTION' and lp.book_type = 'ACCOUNT' "
                 + "and ac.type <> 'INVESTMENT' and lp.effective_date > ? and lp.effective_date <= ? group by lp.transaction_id, lp.effective_date having sum(lp.amount_cents) <> 0",
@@ -628,7 +600,6 @@ class DebtPropertyQaIT {
         if (sumItems != upOut) {
             found.add("Σ itens OUT " + sumItems + " != totals.out " + upOut);
         }
-        // undated: dívidas abertas sem expectedDate
         Set<String> undatedExpected = new TreeSet<>();
         for (JsonNode d : debts) {
             String status = d.get("status").asString();

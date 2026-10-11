@@ -17,11 +17,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * Base dos ITs da Etapa 6 (notas e vault). Cenário financeiro padrão do {@link E4ItBase} (Nubank 20.000,00, cartão Roxinho, João e Maria,
- * relógio 10/10/2026) mais uma meta, uma dívida e as compras do notebook (a transação ligada à nota "Revisão de outubro"). Toda
- * requisição e resposta é validada contra o contrato.
- */
 abstract class NotesItBase extends E4ItBase {
 
     protected String notebookId;
@@ -40,8 +35,6 @@ abstract class NotesItBase extends E4ItBase {
         invoiceId = jdbc.queryForObject("SELECT id FROM credit_card_invoices WHERE user_id = ? LIMIT 1", String.class, userId);
     }
 
-    // ---------------------------------------------------------------- requisições
-
     protected MockHttpServletRequestBuilder delete(String url) {
         return MockMvcRequestBuilders.delete(url).header(HttpHeaders.AUTHORIZATION, bearer);
     }
@@ -59,8 +52,6 @@ abstract class NotesItBase extends E4ItBase {
         committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
         return auth.bearer(other);
     }
-
-    // ---------------------------------------------------------------- JSON
 
     protected String json(String text) throws Exception {
         return objectMapper.writeValueAsString(text);
@@ -81,8 +72,6 @@ abstract class NotesItBase extends E4ItBase {
     protected static String monthLink(String key) {
         return "{\"type\":\"MONTHLY_SUMMARY\",\"key\":\"" + key + "\"}";
     }
-
-    // ---------------------------------------------------------------- chamadas conferidas contra o contrato
 
     protected JsonNode createNote(String path, String body) throws Exception {
         return createdBody(post("/v1/notes", noteJson(path, body)));
@@ -120,7 +109,6 @@ abstract class NotesItBase extends E4ItBase {
         return okBody(get("/v1/notes" + (query == null || query.isEmpty() ? "" : "?" + query)));
     }
 
-    /** Busca com o termo cru (o MockMvc codifica; "%25" numa URL já codificada seria codificado de novo). */
     protected JsonNode search(String q) throws Exception {
         return okBody(get("/v1/notes").queryParam("q", q));
     }

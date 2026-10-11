@@ -79,7 +79,6 @@ public class CategoryGatewayImpl implements CategoryGateway {
         return flush(repository.save(entity), name);
     }
 
-    /** Descarrega agora: o índice único parcial dos nomes ativos é a rede de segurança contra a corrida (409). */
     private Category flush(CategoryEntity entity, String name) {
         try {
             repository.saveAndFlush(entity);

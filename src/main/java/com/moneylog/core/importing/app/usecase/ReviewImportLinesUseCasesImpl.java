@@ -29,7 +29,6 @@ import com.moneylog.core.importing.exception.ImportingExceptions.InvalidImportLi
 import com.moneylog.core.importing.exception.ImportingExceptions.InvalidImportLineTransitionException;
 import com.moneylog.core.sk.id.IdGenerator;
 
-/** Implementações da revisão das linhas (T125). */
 public final class ReviewImportLinesUseCasesImpl {
 
     private ReviewImportLinesUseCasesImpl() {
@@ -68,7 +67,6 @@ public final class ReviewImportLinesUseCasesImpl {
                             throw new InvalidImportLineException("transferência só existe em extrato de conta.");
                         }
                         line.acceptAsTransfer(command.asTransferCounterpartAccountId());
-                        // A1: a outra ponta já é entrada/saída ativa; transferir contaria o valor duas vezes (PR 01)
                         if (existing.hasActiveOppositeLeg(command.userId(), batch.accountId(), line.line().direction(), line.line().amount(),
                                 line.line().date())) {
                             throw new ImportTransferLegAlreadyRecordedException();
@@ -90,7 +88,6 @@ public final class ReviewImportLinesUseCasesImpl {
             return line;
         }
 
-        /** M2: a categoria precisa ser do usuário (404), estar ativa e combinar com a direção da linha (422); nunca chega ao banco para virar 500. */
         private void validateCategory(ReviewImportLineCommand command, ImportBatchLine line) {
             Category category = categories.findById(command.userId(), command.categoryId())
                     .orElseThrow(() -> new CategoryNotFoundException(command.categoryId()));

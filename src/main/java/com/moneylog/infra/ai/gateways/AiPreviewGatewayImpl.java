@@ -20,7 +20,6 @@ import com.moneylog.core.ai.domain.AiFacts;
 import com.moneylog.core.ai.domain.AiPreview;
 import com.moneylog.core.ai.domain.AiPurpose;
 
-/** Prévias de IA em JDBC. Toda consulta filtra pelo usuário. */
 public class AiPreviewGatewayImpl implements AiPreviewGateway {
 
     private static final TypeReference<Map<String, String>> FACTS = new TypeReference<>() {

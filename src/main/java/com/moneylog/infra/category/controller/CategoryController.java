@@ -32,7 +32,6 @@ import com.moneylog.infra.category.controller.CategoryRequests.CategoryInput;
 import com.moneylog.infra.category.controller.CategoryRequests.CategoryUpdate;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Categorias (S-70): criar, renomear, arquivar e desarquivar. Nenhuma é apagada (não existe {@code DELETE}). */
 @RestController
 @RequestMapping("/v1/categories")
 public class CategoryController {

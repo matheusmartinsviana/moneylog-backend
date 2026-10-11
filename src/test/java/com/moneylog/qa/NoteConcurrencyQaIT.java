@@ -37,12 +37,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 3 (concorrência): renomear duas notas que se referenciam, caminho igual com caixa diferente, importação x edição x
- * lixeira, e a trava {@code pg_advisory_xact_lock} por usuário contra operações financeiras (reserva de meta, pagamento de fatura, mudança do
- * calendário que remove fatura vazia e derruba o vínculo em cascata). Toda falha de trava é 409 CONFLICT, nunca 500; nenhum deadlock (tudo
- * termina); sem link órfão.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: concorrência das notas com a trava por usuário e com operações financeiras")
@@ -114,7 +108,6 @@ class NoteConcurrencyQaIT {
 
     private void assertNoOrphans() {
         assertThat(jdbc.queryForObject("select count(*) from note_links l join notes t on t.id = l.target_note_id where l.user_id = ? and l.origin = 'WIKILINK' and t.deleted_at is not null", Long.class, a.id)).isZero();
-        // todo wikilink gravado resolve como o nome manda: se resolvido, o alvo existe e está ativo; se pendente, nenhuma nota ativa tem esse nome
         List<String> wrong = jdbc.queryForList("""
                 select s.path || ' -> [[' || l.target_text || ']]' from note_links l join notes s on s.id = l.note_id
                 where l.user_id = ? and l.origin = 'WIKILINK' and l.target_note_id is null
@@ -122,8 +115,6 @@ class NoteConcurrencyQaIT {
                       and lower(regexp_replace(n.path, '^.*/', '')) = lower(l.target_text) || '.md' and l.target_text not like '%/%')""", String.class, a.id);
         assertThat(wrong).as("links pendentes cujo alvo existe").isEmpty();
     }
-
-    // ------------------------------------------------------------------------------------------------ renomear
 
     @Test
     @DisplayName("renomear A e B ao mesmo tempo (A cita B e B cita A): só 200 ou 409 (a versão de B mudou pela reescrita); repetir com a versão nova termina; os dois links ficam resolvidos e reescritos, 12 rodadas")
@@ -225,7 +216,6 @@ class NoteConcurrencyQaIT {
             }
             assertNoOrphans();
             assertThat(jdbc.queryForObject("select count(*) from (select path_key from notes where user_id = ? and deleted_at is null group by path_key having count(*) > 1) d", Long.class, a.id)).isZero();
-            // o rate limit (6 por minuto) acaba com as próximas rodadas: avança o relógio
             clock.set(clock.instant().plusSeconds(120));
             a.bearer = auth.bearer(a.id);
         }
@@ -247,8 +237,6 @@ class NoteConcurrencyQaIT {
             assertThat(r.status()).isIn(200, 201, 409, 422);
         }
     }
-
-    // ------------------------------------------------------------------------------------------------ com finanças
 
     @Test
     @DisplayName("nota (vinculada a meta, fatura e transação) x reserva de meta x pagamento de fatura x editar/mover, 15 rodadas: tudo termina em 90 s (sem deadlock), só 200/201/409 CONFLICT/422, sem 5xx; a reserva e o pagamento valem")

@@ -21,7 +21,6 @@ import com.moneylog.infra.note.controller.NoteResponses.NoteSummaryResponse;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/** Notas ligadas a uma entidade (bloco "Notas vinculadas" das telas financeiras): só notas ativas. */
 @RestController
 @RequestMapping("/v1/links")
 @Validated

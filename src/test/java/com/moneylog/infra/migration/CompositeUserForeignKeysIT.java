@@ -22,10 +22,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.moneylog.util.IntegrationTest;
 
-/**
- * T46 (S-76): a migração {@code V2.00} troca as FKs simples entre tabelas de negócio por FKs compostas
- * {@code (coluna, user_id)}, e o banco passa a recusar uma linha do usuário A que aponte para um registro do usuário B.
- */
 @IntegrationTest
 @DisplayName("FKs compostas (id, user_id) (T46, S-76)")
 class CompositeUserForeignKeysIT {
@@ -33,12 +29,10 @@ class CompositeUserForeignKeysIT {
     private static final Timestamp NOW = Timestamp.from(Instant.parse("2026-10-10T12:00:00Z"));
     private static final Date DAY = Date.valueOf(LocalDate.of(2026, 10, 10));
 
-    /** Tabelas pai e a constraint {@code UNIQUE (id, user_id)} de cada uma (CA1). */
     private static final List<String> PARENT_UNIQUES = List.of(
             "uq_accounts_id_user", "uq_categories_id_user", "uq_credit_cards_id_user", "uq_credit_card_invoices_id_user",
             "uq_persons_id_user", "uq_debts_id_user", "uq_transactions_id_user", "uq_transaction_installments_id_user");
 
-    /** FK composta nova → definição esperada (CA2). */
     private static final List<String[]> COMPOSITE_FKS = List.of(
             new String[] {"fk_credit_cards_default_payment_account_id_user", "FOREIGN KEY (default_payment_account_id, user_id) REFERENCES accounts(id, user_id)"},
             new String[] {"fk_credit_card_invoices_card_id_user", "FOREIGN KEY (card_id, user_id) REFERENCES credit_cards(id, user_id)"},
@@ -57,7 +51,6 @@ class CompositeUserForeignKeysIT {
             new String[] {"fk_ledger_postings_transaction_id_user", "FOREIGN KEY (transaction_id, user_id) REFERENCES transactions(id, user_id)"},
             new String[] {"fk_ledger_postings_installment_id_user", "FOREIGN KEY (installment_id, user_id) REFERENCES transaction_installments(id, user_id)"});
 
-    /** FKs simples antigas, substituídas (CA2/CA4). */
     private static final List<String> REPLACED_FKS = List.of(
             "fk_credit_cards_default_account", "fk_credit_card_invoices_card", "fk_debts_person", "fk_debts_origin_transaction",
             "fk_transactions_account", "fk_transactions_counterpart_account", "fk_transactions_card", "fk_transactions_category",
@@ -72,8 +65,6 @@ class CompositeUserForeignKeysIT {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
-
-    // ---------------------------------------------------------------- CA1, CA2, CA4: nomes e definições
 
     @Test
     @DisplayName("CA1: cada tabela pai tem uq_<tabela>_id_user em (id, user_id)")
@@ -100,12 +91,10 @@ class CompositeUserForeignKeysIT {
                 "SELECT conname FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace WHERE n.nspname = 'public'",
                 String.class);
         assertThat(names).doesNotContainAnyElementsOf(REPLACED_FKS);
-        // as únicas FKs de uma coluna que sobram são as para users (já são do próprio user_id)
         List<String> simples = jdbc.queryForList("""
                 SELECT conname || ' -> ' || confrelid::regclass::text FROM pg_constraint
                 WHERE contype = 'f' AND array_length(conkey, 1) = 1 AND confrelid::regclass::text <> 'users'""", String.class);
         assertThat(simples).isEmpty();
-        // a regra de faturas do cartão (V1.03) já era composta e continua
         assertThat(constraintDef("fk_credit_card_billing_rules_card"))
                 .isEqualTo("FOREIGN KEY (card_id, user_id) REFERENCES credit_cards(id, user_id)");
     }
@@ -129,8 +118,6 @@ class CompositeUserForeignKeysIT {
         assertThat(sql).doesNotContain("DROP TABLE").doesNotContain("DROP COLUMN").doesNotContain("DELETE ")
                 .doesNotContain("TRUNCATE");
     }
-
-    // ---------------------------------------------------------------- CA3: o banco recusa referência de outro usuário
 
     @Test
     @DisplayName("CA3: movimentação do usuário A apontando para conta, contrapartida, cartão, categoria, fatura, dívida ou original do usuário B é recusada")
@@ -245,8 +232,6 @@ class CompositeUserForeignKeysIT {
         });
     }
 
-    // ---------------------------------------------------------------- helpers
-
     private void insertBatch(long user, UUID id) {
         jdbc.update("""
                 INSERT INTO import_batches (id, user_id, account_id, format, file_sha256, status, created_at, updated_at)
@@ -277,7 +262,6 @@ class CompositeUserForeignKeysIT {
         });
     }
 
-    /** O Postgres aborta a transação depois da violação; por isso cada violação fica num savepoint. */
     private void assertViolation(Runnable insert, String constraint) {
         jdbc.execute("SAVEPOINT before_violation");
         assertThatThrownBy(insert::run)
@@ -290,7 +274,6 @@ class CompositeUserForeignKeysIT {
         return jdbc.queryForObject("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?", String.class, name);
     }
 
-    /** Um usuário com conta (1 e 2), categoria (3), cartão (4), fatura (5), pessoa (6), despesa (7), compra parcelada (8), parcela (9) e dívida (10). */
     private void seed(long user) {
         jdbc.update("INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)", uid(user),
                 "owner" + user + "@moneylog.test", NOW, NOW);

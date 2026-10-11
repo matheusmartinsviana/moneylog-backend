@@ -13,10 +13,6 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T78: divisão de despesa (D1 §2.6.1, S-40, S-137) e dívida {@code PAYABLE} sem movimentação com categoria. É a task que mexe no razão:
- * os casos de D1 §2.6.1 (caixa × consumo × patrimônio) e a regra do PR 01 de que a devolução nunca é receita.
- */
 @DisplayName("Divisão de despesa e dívida de consumo (T78)")
 class ExpenseSharesIT extends E4ItBase {
 
@@ -51,7 +47,6 @@ class ExpenseSharesIT extends E4ItBase {
         assertThat(debt.get("originTransactionId").asString()).isEqualTo(tx.get("id").asString());
         assertThat(debt.get("origin").asString()).isEqualTo("WITH_MOVEMENT");
 
-        // a mesma conta, por todas as lentes: dashboard, lançamentos por competência, lista e saldo
         assertThat(accountBalance()).isEqualTo("19800.00");
         JsonNode summary = summary();
         assertThat(money(summary.get("month"), "consumption")).isEqualTo("100.00");
@@ -66,7 +61,6 @@ class ExpenseSharesIT extends E4ItBase {
         assertThat(book("EXPENSE")).isEqualTo(10_000L);
         assertThat(book("RECEIVABLE")).isEqualTo(10_000L);
         assertThat(ledgerTotal()).isZero();
-        // a cobrança do João entra nos compromissos (entrada), sem dupla contagem com o consumo
         JsonNode upcoming = upcoming("from=2026-10-10&to=2026-11-10");
         assertThat(upcoming.get("items")).hasSize(1);
         assertThat(upcoming.get("items").get(0).get("kind").asString()).isEqualTo("DEBT_RECEIVABLE");
@@ -90,7 +84,6 @@ class ExpenseSharesIT extends E4ItBase {
         assertThat(accountBalance()).isEqualTo("19900.00");
         assertThat(book("INCOME")).isZero();
         assertThat(ledgerTotal()).isZero();
-        // a despesa agora tem quitação ativa: não se estorna, e a flag antecipa
         JsonNode origin = okBody(get("/v1/transactions/" + tx.get("id").asString()));
         assertThat(origin.get("voidable").asBoolean()).isFalse();
         assertThat(origin.get("voidBlockedBy").asString()).isEqualTo("DEBT_HAS_SETTLEMENTS");
@@ -170,7 +163,6 @@ class ExpenseSharesIT extends E4ItBase {
                 .andExpect(jsonPath("$.code").value("TRANSACTION_NOT_EDITABLE"));
         mockMvc.perform(put("/v1/transactions/" + id, edit.replace("\"version\":0", "\"shares\":[" + share("10.00", maria) + "],\"version\":1")))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("TRANSACTION_NOT_EDITABLE"));
-        // S-241: repetir as mesmas partes (como o contrato diz) é aceito e não muda nada; outra pessoa ou outro valor segue 422
         String ledgerBefore = String.valueOf(book("RECEIVABLE"));
         mockMvc.perform(put("/v1/transactions/" + id, edit.replace("\"version\":0", "\"shares\":[" + share("100.00", joao) + "],\"version\":1")))
                 .andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.shares.length()").value(1))
@@ -210,14 +202,12 @@ class ExpenseSharesIT extends E4ItBase {
         createdBody(post("/v1/debts", "{\"personId\":\"" + maria + "\",\"direction\":\"PAYABLE\",\"principal\":\"200.00\","
                 + "\"date\":\"2026-10-10\",\"description\":\"sem categoria\"}"));
         assertThat(money(summary().get("month"), "consumption")).isEqualTo("80.00");
-        // categoria de receita, de outro tipo ou inexistente
         mockMvc.perform(post("/v1/debts", "{\"personId\":\"" + maria + "\",\"direction\":\"PAYABLE\",\"principal\":\"10.00\",\"date\":\"2026-10-10\","
                         + "\"description\":\"x\",\"categoryId\":\"" + salary + "\"}")).andExpect(status().isUnprocessableEntity())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("CATEGORY_KIND_MISMATCH"));
         mockMvc.perform(post("/v1/debts", "{\"personId\":\"" + maria + "\",\"direction\":\"PAYABLE\",\"principal\":\"10.00\",\"date\":\"2026-10-10\","
                         + "\"description\":\"x\",\"categoryId\":\"" + UUID.randomUUID() + "\"}")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND"));
-        // perdoada, a dívida mantém o consumo (já aconteceu); estornado o registro, o consumo some
         mockMvc.perform(post("/v1/debts/" + debt.get("id").asString() + "/cancel", voidBody("perdão"))).andExpect(status().isOk());
         assertThat(money(summary().get("month"), "consumption")).isEqualTo("80.00");
         String other = createdBody(post("/v1/debts", "{\"personId\":\"" + joao + "\",\"direction\":\"PAYABLE\",\"principal\":\"30.00\","
@@ -247,7 +237,6 @@ class ExpenseSharesIT extends E4ItBase {
             assertThat(ledgerTotal()).isZero();
             assertThat(money(summary().get("month"), "consumption")).isEqualTo(String.format("%d.%02d", expectedConsumption / 100, expectedConsumption % 100));
             if (c.length == 3 && c[0] == 1_001) {
-                // estorna a segunda despesa: o consumo dela sai
                 mockMvc.perform(post("/v1/transactions/" + tx.get("id").asString() + "/void", voidBody("x"))).andExpect(status().isOk());
                 expectedConsumption -= total - sum;
             }

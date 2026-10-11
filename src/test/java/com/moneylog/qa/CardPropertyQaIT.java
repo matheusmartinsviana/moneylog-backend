@@ -31,12 +31,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T61 (QA), critério 2: operações aleatórias com sementes fixas sobre o ciclo do cartão (compra, reembolso, pagamento parcial,
- * a maior, antecipado e total, estorno, cancelamento de parcelas, mudança de dias, passagem do tempo). Depois de cada lote:
- * o razão fecha em zero, o livro CARD bate com Σ outstanding − crédito, o consumo de cada compra nunca é negativo, nenhuma
- * fatura PAID recebe item novo, e o dashboard concorda com a lista de faturas e com o cartão.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T61: propriedade do ciclo do cartão")
@@ -181,7 +175,6 @@ class CardPropertyQaIT {
             a.at(clock.instant().plusSeconds(days * 86_400L));
             return "tempo +" + days + "d";
         } else {
-            // tentativas inválidas: pagar fatura inexistente, valor zero, estornar desconhecida
             r = switch (rnd.nextInt(3)) {
                 case 0 -> a.pay(UUID.randomUUID(), "10.00", today.toString(), null);
                 case 1 -> a.raw(HttpMethod.POST, "/v1/invoices/" + a.invoiceId(today.plusMonths(1)) + "/payments", "{\"accountId\":\"" + a.nubank
@@ -203,7 +196,6 @@ class CardPropertyQaIT {
         for (String v : CardInvariants.check(a, a.card)) {
             violations.add(label + ": " + v);
         }
-        // consumo por compra nunca negativo: Σ EXPENSE da compra e dos reembolsos ativos ligados a ela
         List<Map<String, Object>> negative = jdbc.queryForList("""
                 select p.id::text as id, sum(lp.amount_cents) as consumption from transactions p
                 join ledger_postings lp on lp.active and lp.book_type = 'EXPENSE'
@@ -211,7 +203,6 @@ class CardPropertyQaIT {
                 where p.user_id = ? and p.type = 'CARD_PURCHASE' group by p.id having sum(lp.amount_cents) < 0""", a.id);
         negative.forEach(m -> violations.add(label + ": consumo negativo na compra " + m.get("id") + ": " + m.get("consumption")));
 
-        // PAID nunca recebe item novo
         List<JsonNode> invoices = a.invoices();
         Set<String> paidNow = new TreeSet<>();
         for (JsonNode summary : invoices) {
@@ -230,7 +221,6 @@ class CardPropertyQaIT {
             }
         }
 
-        // dashboard x lista x cartão
         LocalDate today = today();
         JsonNode upcoming = a.getOk("/v1/dashboard/upcoming?from=" + today + "&to=" + today.plusYears(3));
         long expectedOut = 0;

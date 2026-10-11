@@ -11,7 +11,6 @@ import com.moneylog.core.backup.app.BackupException;
 import com.moneylog.core.backup.app.BackupStorage;
 import com.moneylog.core.backup.app.StoredBackup;
 
-/** Backup em diretório local (padrão). Recusa chave que escape da raiz (path traversal). */
 public class LocalDirBackupStorage implements BackupStorage {
 
     private final Path root;

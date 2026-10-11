@@ -83,7 +83,6 @@ class AiGuardTest {
         assertThat(guard.usage(USER).circuit()).isEqualTo(AiGuard.Circuit.CLOSED);
         guard.acquire(USER, 10);
         guard.release(true);
-        // uma falha depois da sondagem bem-sucedida não reabre
         guard.acquire(USER, 10);
         guard.release(false);
         assertThat(guard.usage(USER).circuit()).isEqualTo(AiGuard.Circuit.CLOSED);
@@ -115,7 +114,6 @@ class AiGuardTest {
                     guard.acquire(USER, 10);
                     allowed.incrementAndGet();
                 } catch (AiRateLimitedException expected) {
-                    // bloqueada
                 }
             });
         }

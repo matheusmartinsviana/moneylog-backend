@@ -9,7 +9,6 @@ import com.moneylog.core.sk.page.Slice;
 
 public interface ListCardsUseCase {
 
-    /** Ordem {@code name asc}; {@code status} nulo = {@code ACTIVE} (S-126). Números do mesmo carregamento do dashboard (S-79). */
     Slice<CardDetails> handle(ListCardsQuery query);
 
     record ListCardsQuery(UUID userId, CardStatus status, PageQuery page) {

@@ -6,7 +6,6 @@ import com.moneylog.core.category.domain.Category;
 
 public interface ArchiveCategoryUseCase {
 
-    /** Arquiva (nenhuma categoria é apagada). */
     Category handle(ArchiveCategoryCommand command);
 
     record ArchiveCategoryCommand(UUID userId, UUID categoryId) {

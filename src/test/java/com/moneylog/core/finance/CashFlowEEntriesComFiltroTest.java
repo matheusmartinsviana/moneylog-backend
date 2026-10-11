@@ -19,7 +19,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** T28 CA8: {@code between} com predicado, {@code forAccount} e {@code EntryReport.of} com predicado (S-79). */
 @DisplayName("Fluxo de caixa e lançamentos com filtro (T28 CA8, S-79)")
 class CashFlowEEntriesComFiltroTest {
 
@@ -63,7 +62,6 @@ class CashFlowEEntriesComFiltroTest {
     void naoDeveContarEstornadaNemSaldoInicial() {
         CashFlowReport tudo = CashFlowReport.between(records, ledger, LocalDate.MIN, LocalDate.MAX);
 
-        // 3.050 (receita + reembolso) entrada; 640 + 70 (novembro) saída; a estornada de 30 e os 20.000 iniciais ficam fora
         assertThat(tudo.in()).isEqualTo(Money.of("3050.00"));
         assertThat(tudo.out()).isEqualTo(Money.of("710.00"));
         assertThat(CashFlowReport.between(records, ledger, FROM, TO, t -> t.id().equals(s.estornada.id())).count()).isZero();

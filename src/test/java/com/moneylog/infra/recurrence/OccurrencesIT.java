@@ -26,10 +26,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T80: realizar e pular ocorrências (conta e cartão), com idempotência e a regra S-49 (estornar a movimentação reabre a ocorrência).
- * Cenário: Internet de 119,00 todo dia 10 (Nubank, PIX) com início 10/10; assinatura de 49,90 no Roxinho com início 15/09; relógio 10/10.
- */
 @DisplayName("Realizar e pular ocorrências de recorrência (T80)")
 class OccurrencesIT extends E4ItBase {
 
@@ -78,7 +74,6 @@ class OccurrencesIT extends E4ItBase {
         assertThat(window.get("items").get(0).get("status").asString()).isEqualTo("REALIZED");
         assertThat(window.get("items").get(0).get("transactionId").asString()).isEqualTo(tx.get("id").asString());
         assertThat(window.get("items").get(1).get("status").asString()).isEqualTo("PENDING");
-        // a ocorrência saiu dos compromissos e virou consumo e caixa, uma vez só: o disponível não muda
         assertThat(money(summary().get("committed"), "d30")).isEqualTo("0.00");
         JsonNode summary = summary();
         assertThat(money(summary.get("month"), "consumption")).isEqualTo("119.00");
@@ -159,7 +154,6 @@ class OccurrencesIT extends E4ItBase {
                 .andExpect(jsonPath("$.installments[0].invoiceDueDate").value("2026-11-05")).andReturn();
         assertThat(body(result).get("impact").get("cash").get("amount").asString()).isEqualTo("0.00");
 
-        // a ocorrência de 15/10 saiu das previsões; a fatura de 05/11 passou a carregar os 49,90 e a de 15/11 continua pendente
         assertThat(upcoming("from=2026-10-10&to=2026-10-31").get("items")).isEmpty();
         JsonNode window = upcoming("from=2026-10-10&to=2026-11-20");
         assertThat(window.get("items")).hasSize(2);
@@ -178,7 +172,6 @@ class OccurrencesIT extends E4ItBase {
         created("{\"type\":\"CARD_PURCHASE\",\"amount\":\"100.00\",\"date\":\"2026-10-10\",\"description\":\"Mercado\",\"cardId\":\"" + card
                 + "\",\"categoryId\":\"" + food + "\",\"installments\":1}");
         advanceTo(OCT_27);
-        // fatura de 25/10 fechada e não paga: a ocorrência de 15/10 entra nela, como lançamento tardio
         realize(id, "2026-10-15", null).andExpect(status().isCreated()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.installments[0].lateEntry").value(true)).andExpect(jsonPath("$.installments[0].invoiceReferenceMonth").value("2026-11"));
         JsonNode closed = okBody(get("/v1/cards/" + card + "/invoices"));
@@ -192,7 +185,6 @@ class OccurrencesIT extends E4ItBase {
         assertThat(invoice.get("status").asString()).isEqualTo("CLOSED");
         assertThat(money(invoice, "total")).isEqualTo("149.90");
 
-        // paga a fatura (149,90): a ocorrência de 15/11 realizada depois vai para a corrente (fecha 25/11), nunca para a paga
         mockMvc.perform(post("/v1/invoices/" + invoice.get("id").asString() + "/payments", "{\"accountId\":\"" + nubank + "\",\"amount\":\"149.90\","
                         + "\"date\":\"2026-10-27\"}").header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.status").value("PAID"));

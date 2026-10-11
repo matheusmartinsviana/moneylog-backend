@@ -9,10 +9,6 @@ import java.util.UUID;
 import com.moneylog.core.notification.exception.NotificationExceptions.InvalidNotificationSettingsException;
 import com.moneylog.core.sk.text.PlainText;
 
-/**
- * Configuração de notificações do usuário (S-175). Padrão: tudo ligado na central, push desligado, resumo diário às 08:00 todo dia, silêncio
- * 22:00 a 07:00. Sem setters públicos: {@link #update} valida e devolve a nova versão lógica.
- */
 public final class NotificationSettings {
 
     public static final LocalTime DEFAULT_SUMMARY_TIME = LocalTime.of(8, 0);
@@ -56,7 +52,6 @@ public final class NotificationSettings {
         return new NotificationSettings(userId, summaryEnabled, summaryTime, frequency, kinds, quietHours, pushEnabled, displayName, version);
     }
 
-    /** Substitui as preferências (a versão avança na gravação). */
     public void update(boolean newSummaryEnabled, LocalTime newSummaryTime, SummaryFrequency newFrequency, Map<NotificationKind, Boolean> newKinds,
                        QuietHours newQuietHours, boolean newPushEnabled, String newDisplayName) {
         this.summaryEnabled = newSummaryEnabled;
@@ -83,7 +78,6 @@ public final class NotificationSettings {
         return trimmed;
     }
 
-    /** O resumo diário tem chave própria; os demais tipos, a lista. Lembrete manual e agrupado nunca são desligados. */
     public boolean isEnabled(NotificationKind kind) {
         if (kind == NotificationKind.DAILY_SUMMARY) {
             return summaryEnabled && summaryFrequency != SummaryFrequency.OFF;
@@ -119,7 +113,6 @@ public final class NotificationSettings {
         return pushEnabled;
     }
 
-    /** {@code null} = sem nome (a mensagem diária sai só "Bom dia."). */
     public String displayName() {
         return displayName;
     }

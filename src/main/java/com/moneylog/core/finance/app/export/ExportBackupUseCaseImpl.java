@@ -15,7 +15,6 @@ import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Backup (T97): o mesmo {@link FinancialRecords} dos demais casos de uso mais o que não faz parte dele (categorias, pessoas, recorrências). */
 public class ExportBackupUseCaseImpl implements ExportBackupUseCase {
 
     private final FinancialRecordsGateway records;
@@ -45,7 +44,6 @@ public class ExportBackupUseCaseImpl implements ExportBackupUseCase {
         UUID userId = query.userId();
         FinancialRecords loaded = records.load(userId);
         if (loaded.transactions().size() > maxTransactions) {
-            // antes de montar o DTO e a árvore JSON (2 a 5 vezes o tamanho do razão): nada é escrito
             throw new ExportTooLargeException(loaded.transactions().size(), maxTransactions);
         }
         return new BackupSnapshot(BackupSnapshot.SCHEMA_VERSION, time.now(), loaded.accounts(), categories.list(userId, null, true),

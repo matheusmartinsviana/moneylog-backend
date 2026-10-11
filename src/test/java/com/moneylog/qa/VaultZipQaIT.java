@@ -36,11 +36,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 2: zips hostis e malformados contra a importação do vault, pela API. Zip slip em todas as formas, zip bomb, entradas
- * repetidas e conflitos de caixa/acento/Unicode, nomes reservados do Windows, texto que não é UTF-8, YAML malicioso, multipart fora do padrão,
- * zip truncado e corrompido. Em toda recusa nada pode ter sido gravado; nunca 5xx.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: importação do vault com zips hostis")
@@ -87,8 +82,6 @@ class VaultZipQaIT {
         return jdbc.queryForList("select path from notes where user_id = ? order by path", String.class, a.id);
     }
 
-    // ------------------------------------------------------------------------------------------------ zip slip
-
     @Test
     @DisplayName("zip slip: .., ., absoluto, unidade, \\, controle, em qualquer entrada (até em arquivo que seria ignorado): 422 VAULT_IMPORT_INVALID e NADA gravado, nem as notas boas do mesmo zip")
     void zipSlipRecusado() throws Exception {
@@ -123,7 +116,6 @@ class VaultZipQaIT {
             }
         }
         assertThat(paths()).doesNotContain("x.md");
-        // nomes reservados do Windows e caracteres proibidos são ignorados, nunca importados
         assertThat(paths()).noneMatch(p -> p.toLowerCase().matches("(.*/)?(con|aux|nul|com[1-9]|lpt[1-9])(\\..*)?\\.md"));
         assertThat(paths()).noneMatch(p -> p.matches(".*[:*?<>|\"].*"));
         assertThat(r.node().get("ignoredFiles").size()).isGreaterThan(10);
@@ -148,7 +140,6 @@ class VaultZipQaIT {
         Res r = up(new RawZip().add(big, "x").add("ok.md", "y").bytes(), null);
         assertThat(r.status()).isEqualTo(200);
         assertThat(r.node().get("created").asInt()).isEqualTo(1);
-        // amplificação: 140 nomes de 60 KB (zip de ~17 MB) viram uma resposta com ~2 x 18 MB (ignoredFiles + warnings)
         RawZip many = new RawZip();
         for (int i = 0; i < 140; i++) {
             many.add(String.format("%05d-", i) + "b".repeat(60_000) + ".md", "");
@@ -161,8 +152,6 @@ class VaultZipQaIT {
         assertThat(big2.status()).isIn(200, 422);
         assertThat(big2.text().length()).as("a resposta não deve ser maior que o zip enviado").isLessThanOrEqualTo(bytes.length + 1_000_000);
     }
-
-    // ------------------------------------------------------------------------------------------------ zip bomb e limites
 
     @Test
     @DisplayName("zip bomb: 350 MB de zeros numa nota; 1.600 notas de 199 KB (311 MB); 5.501 entradas: 422 VAULT_IMPORT_TOO_LARGE e nada gravado; 2.000 entradas passam")
@@ -213,8 +202,6 @@ class VaultZipQaIT {
         r.node().get("ignoredFiles").forEach(n -> ignored.add(n.asString()));
         assertThat(ignored).containsExactlyInAnyOrder("backup.zip", "disfarce.md");
     }
-
-    // ------------------------------------------------------------------------------------------------ duplicadas e conflitos
 
     @Test
     @DisplayName("entradas repetidas no zip (mesmo nome, só caixa, NFC x NFD, extensão .MD): SKIP importa a primeira e lista as outras; RENAME guarda TODAS com 'nome (2).md', sem perder conteúdo")
@@ -287,7 +274,6 @@ class VaultZipQaIT {
         assertThat(r.code()).isEqualTo("NOTE_LIMIT_REACHED");
         assertThat(notes()).isEqualTo(before + 4995);
         assertThat(jdbc.queryForObject("select count(*) from notes where user_id = ? and path like 'novas/%'", Long.class, a.id)).isZero();
-        // cabem 5
         Zip five = new Zip();
         for (int i = 0; i < 5; i++) {
             five.add("novas/" + i + ".md", "n" + i);
@@ -299,8 +285,6 @@ class VaultZipQaIT {
     private void committed(Runnable work) {
         new org.springframework.transaction.support.TransactionTemplate(tm).executeWithoutResult(s -> work.run());
     }
-
-    // ------------------------------------------------------------------------------------------------ texto e codificação
 
     @Test
     @DisplayName("não UTF-8: conteúdo Latin-1, UTF-16 e controle: ignorados com aviso e listados; BOM é removido")
@@ -318,7 +302,6 @@ class VaultZipQaIT {
     @Test
     @DisplayName("BUG-QA-04: nome de entrada em CP1252 sem flag UTF-8 importa (ao menos as demais notas) em vez de derrubar o zip")
     void nomeCp1252() throws Exception {
-        // nome em CP1252 sem o flag EFS: é o que o Explorer do Windows (versões antes do 11) e muitos zips antigos geram para "Revisão.md"
         byte[] cp1252Name = "Revisão.md".getBytes(java.nio.charset.Charset.forName("windows-1252"));
         Res w1252 = up(new RawZip().addRaw(cp1252Name, "corpo".getBytes(StandardCharsets.UTF_8), false).add("ok2.md", "ok").bytes(), null);
         System.out.println("QA-E6-ZIP nome CP1252 sem flag UTF-8: " + w1252);
@@ -366,7 +349,6 @@ class VaultZipQaIT {
             assertThat(r.node().get("created").asInt() + r.node().get("ignoredFiles").size()).as(p.getKey()).isEqualTo(1);
         }
         System.out.println("QA-E6-ZIP YAML: pior tempo " + worst + " ms em " + payloads.size() + " payloads");
-        // S-273: o que não é um mapa YAML válido e seguro é corpo e fica byte a byte; nada é interpretado (só texto) e nada some em silêncio
         assertThat(jdbc.queryForObject("select count(*) from notes where user_id = ? and body like '---%' and body like '%corpo da nota'", Long.class, a.id))
                 .as("todos os payloads viram nota com o texto original").isEqualTo((long) payloads.size());
         assertThat(jdbc.queryForList("select body from notes where user_id = ? and body like '%!!python%'", String.class, a.id)).hasSize(1)
@@ -425,8 +407,6 @@ class VaultZipQaIT {
         assertThat(body).as("a importação descarta o texto entre as réguas").contains("Ata da reunião");
     }
 
-    // ------------------------------------------------------------------------------------------------ multipart fora do padrão
-
     @Test
     @DisplayName("multipart: sem a parte 'file' (400), arquivo vazio (422 VAULT_IMPORT_INVALID), campos extras ignorados, parte com outro nome, JSON no lugar do multipart (415), GET (405), arquivo que não é zip")
     void multipartFora() throws Exception {
@@ -474,8 +454,6 @@ class VaultZipQaIT {
             }
         }
     }
-
-    // ------------------------------------------------------------------------------------------------ truncado e corrompido
 
     @Test
     @DisplayName("zip truncado em ~120 pontos: ou 422 VAULT_IMPORT_INVALID, ou (corte só no diretório central) as 40 notas completas. Importar MENOS notas sem erro é perda silenciosa")
@@ -546,8 +524,6 @@ class VaultZipQaIT {
         System.out.println("QA-E6-ZIP corrompido: " + statuses);
     }
 
-    // ------------------------------------------------------------------------------------------------ pastas especiais
-
     @Test
     @DisplayName(".obsidian/, .trash/, __MACOSX/, anexos, canvas, .DS_Store, Thumbs.db e pastas vazias: só os .md importam; o resto é listado; CRLF e CR sozinho preservados byte a byte")
     void pastasEspeciais() throws Exception {
@@ -580,9 +556,7 @@ class VaultZipQaIT {
     @Test
     @DisplayName("entrada STORED com tamanho declarado mentindo e descompressão que passa do declarado: a contagem é pelos bytes lidos, não pelo cabeçalho")
     void cabecalhoMente() throws Exception {
-        // zip normal de 100 KB de zeros...
         byte[] zip = new RawZip().addZeros("a.md", 100L * 1024).bytes();
-        // ...com o tamanho descomprimido do cabeçalho trocado por 1 byte (o JDK ignora e o leitor conta pelo fluxo)
         java.nio.ByteBuffer.wrap(zip).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(22, 1);
         Res r = up(zip, null);
         assertThat(r.status()).isIn(200, 422);

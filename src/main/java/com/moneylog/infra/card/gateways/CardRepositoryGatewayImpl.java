@@ -26,7 +26,6 @@ import com.moneylog.infra.card.persistence.CardEntity;
 import com.moneylog.infra.card.persistence.CardRepositoryJpa;
 import com.moneylog.infra.persistence.OffsetLimit;
 
-/** {@link CardGateway} sobre JPA: a linha do cartão e as regras de fechamento/vencimento são gravadas juntas. */
 public class CardRepositoryGatewayImpl implements CardGateway {
 
     private final CardRepositoryJpa cards;
@@ -70,7 +69,6 @@ public class CardRepositoryGatewayImpl implements CardGateway {
         return CardRepositoryMapper.toPersisted(saved, savedRules);
     }
 
-    /** Alinha as regras gravadas às do domínio: atualiza os dias, insere as novas e remove as que o domínio descartou. */
     private List<BillingRuleEntity> syncRules(CardEntity card, CreditCard domain, Instant now) {
         Map<String, BillingRuleEntity> stored = new HashMap<>();
         rules.findByUserIdAndCardId(card.getUserId(), card.getId()).forEach(rule -> stored.put(rule.getEffectiveFrom(), rule));

@@ -32,7 +32,6 @@ public class CancelDebtUseCaseImpl implements CancelDebtUseCase {
 
     @Override
     public DebtView handle(CancelDebtCommand command) {
-        // quitar e perdoar a mesma dívida se serializam: o saldo que o perdão zera é o lido sob a trava
         debts.lockForUpdate(command.userId(), command.debtId());
         Versioned<Debt> current = debts.findById(command.userId(), command.debtId())
                 .orElseThrow(() -> new DebtNotFoundException(command.debtId()));

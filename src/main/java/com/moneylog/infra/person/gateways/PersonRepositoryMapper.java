@@ -4,7 +4,6 @@ import com.moneylog.core.debt.domain.Person;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.infra.person.persistence.PersonEntity;
 
-/** {@code Person} ⇄ {@code PersonEntity}. */
 public final class PersonRepositoryMapper {
 
     private PersonRepositoryMapper() {

@@ -3,10 +3,6 @@ package com.moneylog.core.importing.domain;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 
-/**
- * Procura a perna oposta de uma possível transferência (S-167): outra conta do usuário com o mesmo valor, direção oposta e data a no máximo 1 dia.
- * <b>Não decide</b>: só avisa. Quem decide é o usuário (a regra de pareamento automático está em aberto).
- */
 public final class TransferPairMatcher {
 
     public static final long WINDOW_DAYS = 1;

@@ -27,10 +27,6 @@ import com.moneylog.core.recurrence.domain.MonthlyEstimate;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * ADR-016: para cenários aleatórios (compras, pagamentos, dívidas, transferências, estornos), o valor ATUAL de cada medida das metas é
- * exatamente o da fonte da tela correspondente (visão de dívidas, dashboard, resumo de recorrências) e as fontes são lidas uma vez só.
- */
 @DisplayName("Medidas das metas = fonte de cada tela (ADR-016, PR 01 regra 10)")
 class GoalMetricSourcesPropertyTest {
 

@@ -26,21 +26,6 @@ import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoInvalidImageExce
 import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoTooLargeException;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoUnsupportedTypeException;
 
-/**
- * Higieniza e reduz a foto enviada (ADR-018). Em ordem:
- * <ol>
- *   <li>tamanho do arquivo;</li>
- *   <li><b>magic bytes</b> (JPEG {@code FFD8FF}, PNG {@code 89504E470D0A1A0A}); nome, extensão e MIME do cliente nunca entram;</li>
- *   <li>dimensões lidas do <b>cabeçalho</b> (o {@code ImageReader} lê só SOF/IHDR) e comparadas com os tetos antes de decodificar: um PNG de
- *       poucos KB que declara 60000 x 60000 é recusado sem alocar nada (decompression bomb);</li>
- *   <li>decodificação (uma por vez: o semáforo protege o heap da instância pequena), com subamostragem na leitura quando a imagem é bem
- *       maior que a exibição; qualquer aviso do decodificador (arquivo truncado) é imagem inválida;</li>
- *   <li>orientação EXIF aplicada (senão a foto do celular gira) e, em seguida, descartada: o resultado é <b>sempre recodificado</b> em JPEG
- *       sem metadados (sem EXIF/GPS, sem payload anexado, sem polyglot). PNG com transparência é achatado sobre fundo branco.</li>
- * </ol>
- * Saem a exibição (até 1280 px no maior lado) e a miniatura (até 320 px), sem ampliar. Java puro: só {@code ImageIO} da JDK. Aritmética
- * inteira nas dimensões.
- */
 public final class PhotoImagePipeline {
 
     public static final int DISPLAY_MAX_SIDE = 1280;
@@ -91,8 +76,6 @@ public final class PhotoImagePipeline {
         }
     }
 
-    // ------------------------------------------------------------------ tipo e cabeçalho
-
     private static Format detect(byte[] b) {
         if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
             return Format.JPEG;
@@ -117,7 +100,6 @@ public final class PhotoImagePipeline {
         return readers.next();
     }
 
-    /** Largura e altura do cabeçalho, sem decodificar os pixels. */
     private static int[] readHeaderSize(byte[] raw, Format format) {
         ImageReader reader = reader(format);
         try (ImageInputStream in = new MemoryCacheImageInputStream(new ByteArrayInputStream(raw))) {
@@ -130,8 +112,6 @@ public final class PhotoImagePipeline {
         }
     }
 
-    // ------------------------------------------------------------------ decodificação
-
     private static BufferedImage decode(byte[] raw, Format format, int width, int height) {
         ImageReader reader = reader(format);
         boolean[] warned = {false};
@@ -140,7 +120,6 @@ public final class PhotoImagePipeline {
         try (ImageInputStream in = new MemoryCacheImageInputStream(new ByteArrayInputStream(raw))) {
             reader.setInput(in, true, true);
             ImageReadParam param = reader.getDefaultReadParam();
-            // só reduz na leitura quando a imagem tem ao menos o dobro da exibição: o resto é média de área no redimensionamento
             int step = Math.max(1, Math.max(width, height) / (2 * DISPLAY_MAX_SIDE));
             if (step > 1) {
                 param.setSourceSubsampling(step, step, 0, 0);
@@ -157,9 +136,6 @@ public final class PhotoImagePipeline {
         return image;
     }
 
-    // ------------------------------------------------------------------ redimensionamento
-
-    /** Aplica a orientação e reduz para caber em {@code maxSide} no maior lado (nunca amplia). Sempre devolve {@code TYPE_INT_RGB}. */
     private static BufferedImage fit(BufferedImage source, int orientation, int maxSide) {
         boolean swap = orientation >= 5;
         int orientedWidth = swap ? source.getHeight() : source.getWidth();
@@ -172,7 +148,6 @@ public final class PhotoImagePipeline {
             targetHeight = Math.max(1L, (long) orientedHeight * maxSide / longSide);
         }
         BufferedImage current = source;
-        // reduções por metade até ficar a menos de 2x do alvo (qualidade melhor que um salto único)
         while (Math.max(current.getWidth(), current.getHeight()) >= 2 * Math.max(targetWidth, targetHeight)
                 && current.getWidth() >= 2 && current.getHeight() >= 2) {
             current = draw(current, 1, current.getWidth() / 2, current.getHeight() / 2);
@@ -182,7 +157,6 @@ public final class PhotoImagePipeline {
         return draw(current, orientation, drawWidth, drawHeight);
     }
 
-    /** Desenha {@code source} em {@code scaledWidth x scaledHeight} (antes da rotação) e gira conforme a orientação EXIF. */
     private static BufferedImage draw(BufferedImage source, int orientation, int scaledWidth, int scaledHeight) {
         boolean swap = orientation >= 5;
         BufferedImage out = new BufferedImage(swap ? scaledHeight : scaledWidth, swap ? scaledWidth : scaledHeight, BufferedImage.TYPE_INT_RGB);
@@ -200,7 +174,6 @@ public final class PhotoImagePipeline {
         return out;
     }
 
-    /** Transformação que leva a imagem {@code w x h} (como gravada) para a postura correta, conforme a tag EXIF de 1 a 8. */
     static AffineTransform orientationTransform(int orientation, int w, int h) {
         return switch (orientation) {
             case 2 -> new AffineTransform(-1, 0, 0, 1, w, 0);
@@ -214,9 +187,6 @@ public final class PhotoImagePipeline {
         };
     }
 
-    // ------------------------------------------------------------------ codificação
-
-    /** JPEG sem metadados (nenhum EXIF, GPS, comentário nem miniatura embutida). */
     private static byte[] encode(BufferedImage image) {
         Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
         if (!writers.hasNext()) {
@@ -227,7 +197,7 @@ public final class PhotoImagePipeline {
         try (MemoryCacheImageOutputStream out = new MemoryCacheImageOutputStream(bytes)) {
             ImageWriteParam param = writer.getDefaultWriteParam();
             param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
-            param.setCompressionQuality(0.82f); // literal no ponto de uso: o core não declara campo de ponto flutuante
+            param.setCompressionQuality(0.82f);
             writer.setOutput(out);
             writer.write(null, new IIOImage(image, null, null), param);
         } catch (IOException | RuntimeException e) {

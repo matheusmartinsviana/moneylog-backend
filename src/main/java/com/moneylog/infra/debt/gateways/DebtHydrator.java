@@ -18,10 +18,6 @@ import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa.DebtLinkRow;
 
-/**
- * Reidrata dívidas em lote (sem consulta por item): as movimentações ligadas a elas (origem e quitações) e os lançamentos
- * próprios (reconhecimento e perdão). {@link #loadAll} é o carregamento único dos registros financeiros (S-79).
- */
 public class DebtHydrator {
 
     private static final Set<PostingSourceType> OWN_ENTRIES = Set.of(PostingSourceType.DEBT_RECOGNITION, PostingSourceType.DEBT_CANCELLATION);
@@ -43,7 +39,6 @@ public class DebtHydrator {
                 entries(postings.findBySources(userId, OWN_ENTRIES, ids)));
     }
 
-    /** Todas as dívidas do usuário, com o que as liga às movimentações e ao razão. */
     public List<Debt> loadAll(UUID userId, List<DebtEntity> entities) {
         if (entities.isEmpty()) {
             return List.of();

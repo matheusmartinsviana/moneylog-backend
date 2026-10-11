@@ -10,7 +10,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 
 import java.util.List;
 
-/** Prévia da mudança de dias (S-128): lê o carregamento único e calcula em cópias; nada é gravado nem travado. */
 public class PreviewBillingChangeUseCaseImpl implements PreviewBillingChangeUseCase {
 
     private final FinancialRecordsGateway records;

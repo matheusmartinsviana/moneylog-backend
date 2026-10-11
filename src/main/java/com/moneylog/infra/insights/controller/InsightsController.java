@@ -43,11 +43,6 @@ import com.moneylog.infra.web.QueryDates;
 import com.moneylog.infra.web.QueryMonths;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * Insights calculados (ADR-019): fórmulas sobre o razão, sem IA, sem provedor e offline. Todo endpoint filtra pelo usuário do token e nenhuma
- * resposta é cacheada. {@code GET /v1/insights} é o alias do mensal (mesmos {@code type}, {@code key}, {@code params} e {@code factRefs}
- * de antes, mais os campos novos), para não quebrar clientes antigos.
- */
 @RestController
 public class InsightsController {
 
@@ -78,10 +73,6 @@ public class InsightsController {
         this.time = time;
     }
 
-    /**
-     * Alias para clientes antigos (contrato 2.8.0): o mês calculado de hoje, mas só {@code CATEGORY_DELTA} e {@code CARD_COMMITTED} e só os cinco campos
-     * originais, paginado por {@code page}/{@code pageSize}. Quem quer o catálogo inteiro usa {@code /v1/insights/monthly}.
-     */
     @GetMapping("/v1/insights")
     public ResponseEntity<SliceResponse<InsightDtos.LegacyInsightResponse>> insights(@CurrentUser UUID userId,
                                                                                     @RequestParam(required = false) String month, PageQuery page) {
@@ -150,7 +141,6 @@ public class InsightsController {
                 return value;
             }
         } catch (NumberFormatException e) {
-            // cai no erro abaixo
         }
         throw new InvalidPathValueException(INSIGHTS_LIMIT_INVALID, "limit", "limit deve ser um inteiro entre 1 e " + MAX_LIMIT + ".");
     }

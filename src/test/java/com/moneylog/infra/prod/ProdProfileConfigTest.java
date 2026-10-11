@@ -13,7 +13,6 @@ import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Configuration;
 
-/** Perfil prod (T175): carrega só a configuração (sem autoconfig), para provar o que o perfil define e os segredos por arquivo. */
 @DisplayName("Perfil prod: configuração e segredos por arquivo")
 class ProdProfileConfigTest {
 

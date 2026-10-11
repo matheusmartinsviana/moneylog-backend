@@ -9,7 +9,6 @@ import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCas
 import com.moneylog.core.finance.domain.SpendingByCategory;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code SpendingByCategory} do contrato (S-286): {@code share} já arredondado no backend (4 casas); o front não normaliza. */
 public record SpendingByCategoryResponse(String basis, LocalDate from, LocalDate to, Money total, Money base, List<Item> items, Other other) {
 
     public record CategoryRef(UUID id, String name) {

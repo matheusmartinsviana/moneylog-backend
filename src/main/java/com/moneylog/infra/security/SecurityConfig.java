@@ -43,12 +43,6 @@ import com.moneylog.core.auth.app.gateways.TokenIssuer;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Segurança da API (ADR-003): stateless, JWT HS256 validado pelo Resource Server do Spring (Nimbus), CSRF desligado
- * (a API usa {@code Bearer}, não cookie; o refresh em cookie confere o {@code Origin}), sem CORS. Rotas públicas: as
- * de {@code /v1/auth} (login, refresh, logout, setup-password e status), o health e o Swagger (que só existe no perfil {@code dev}: fora dele as rotas respondem
- * {@code 404}). Falhas de autenticação viram {@code ProblemDetail 401} pelo mesmo {@code GlobalExceptionHandler}.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
 @EnableConfigurationProperties({MoneylogSecurityProperties.class, MoneylogAuthProperties.class, MoneylogOwnerProperties.class})
@@ -81,7 +75,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** BUG-QA-32: recusa do firewall HTTP em problem+json (o tratador padrão devolvia 400 sem corpo). */
     @Bean
     RequestRejectedHandler requestRejectedHandler(ObjectMapper mapper) {
         return new ProblemRequestRejectedHandler(mapper);
@@ -99,7 +92,6 @@ public class SecurityConfig {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         JwtTimestampValidator timestamps = new JwtTimestampValidator(Duration.ZERO);
         timestamps.setClock(clock);
-        // exp, sub e iat são obrigatórios (B6): o JwtTimestampValidator sozinho aceita um token sem exp, que nunca expira.
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<Jwt>(
                 new JwtClaimValidator<Object>(JwtClaimNames.EXP, Objects::nonNull),
                 new JwtClaimValidator<Object>(JwtClaimNames.SUB, Objects::nonNull),

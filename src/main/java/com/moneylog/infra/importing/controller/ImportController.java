@@ -61,10 +61,6 @@ import com.moneylog.infra.importing.controller.ImportResponses.UndoneResponse;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * Importação de extrato CSV/OFX (Etapa 7): o upload só <b>prepara</b> o lote; nada vira movimentação até {@code apply}. Todo endpoint filtra pelo
- * usuário do token. Escritas devolvem o recurso (upload: {@code 201} + {@code Location}).
- */
 @RestController
 public class ImportController {
 
@@ -167,7 +163,6 @@ public class ImportController {
         return AppliedResponse.of(apply.handle(new ApplyImportBatchCommand(userId, id, idempotencyKey)));
     }
 
-    /** Descarta um lote ainda em revisão (nada foi aplicado). Lote aplicado/desfeito: 422. */
     @DeleteMapping("/v1/imports/{id}")
     public ResponseEntity<Void> discardByDelete(@CurrentUser UUID userId, @PathVariable UUID id) {
         discard.handle(userId, id);

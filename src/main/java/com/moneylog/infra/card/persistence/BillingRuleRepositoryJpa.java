@@ -17,7 +17,6 @@ public interface BillingRuleRepositoryJpa extends JpaRepository<BillingRuleEntit
 
     List<BillingRuleEntity> findByUserId(UUID userId);
 
-    /** Os dias da regra mais recente, por projeção escalar: não carrega entidade, então não deixa estado velho no contexto. */
     interface DaysView {
         int getClosingDay();
 

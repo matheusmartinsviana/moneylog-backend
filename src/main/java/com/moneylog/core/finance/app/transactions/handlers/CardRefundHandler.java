@@ -19,16 +19,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/**
- * Reembolso/crédito no cartão (T56): {@code CARD +X / EXPENSE(cat) −X} na competência do reembolso (S-10), como crédito na
- * fatura do período, com lançamento tardio e redirecionamento da fatura paga para a corrente (S-14, S-18). O crédito pode
- * deixar a fatura negativa: o excedente vira crédito transportado. A despesa/compra de origem, se houver, é a mesma regra
- * do reembolso em conta (mesma categoria, teto do cobrado, S-9, S-52). Carrega só a cadeia <b>deste</b> cartão (S-135); as
- * travas (movimentação de origem → cartão) são declaradas pelo handler de {@code REFUND}.
- *
- * <p>Não é registrado sozinho: {@code REFUND} é um comando só (conta ou cartão), então o handler de reembolso despacha para
- * este quando o comando traz {@code cardId}.
- */
 public class CardRefundHandler {
 
     private final HandlerSupport support;
@@ -50,7 +40,6 @@ public class CardRefundHandler {
                 support.refundCategory(c, refundOf, editing), refundOf, chain, time.today());
     }
 
-    /** O crédito que o cartão, a cadeia e o "hoje" determinam: a única forma de montá-lo. */
     public static Transaction plan(TransactionHeader header, Money amount, CreditCard card, Category category, RefundOrigin refundOf,
                                    InvoiceChain chain, LocalDate today) {
         return CardTransactions.refundToCard(header, amount, card, category, refundOf, chain, today);

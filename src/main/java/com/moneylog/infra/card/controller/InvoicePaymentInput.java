@@ -8,7 +8,6 @@ import jakarta.validation.constraints.Pattern;
 
 import com.moneylog.infra.web.validation.DateInWindow;
 
-/** Corpo de {@code POST /v1/invoices/{id}/payments} (contrato: {@code InvoicePaymentInput}). */
 public record InvoicePaymentInput(@NotNull UUID accountId, @NotNull @Pattern(regexp = InvoicePaymentInput.AMOUNT_PATTERN) String amount,
                                   @NotNull @DateInWindow LocalDate date) {
 

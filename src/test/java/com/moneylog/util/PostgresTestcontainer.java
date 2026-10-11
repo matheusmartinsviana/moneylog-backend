@@ -11,10 +11,6 @@ import org.springframework.context.annotation.Bean;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/**
- * Postgres real para os testes de integração, com a mesma imagem do {@code docker-compose.yml}.
- * O container é reaproveitado entre os testes do mesmo contexto Spring.
- */
 @TestConfiguration(proxyBeanMethods = false)
 public class PostgresTestcontainer {
 

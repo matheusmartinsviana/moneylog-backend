@@ -13,7 +13,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.moneylog.util.IntegrationTest;
 
-/** T21 CA5: Swagger e {@code /v3/api-docs} só no perfil {@code dev}. */
 @DisplayName("springdoc só no perfil dev")
 class SwaggerProfileIT {
 

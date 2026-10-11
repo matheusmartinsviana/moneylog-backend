@@ -17,7 +17,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Lançamentos por competência (D1 §2.10, S-47): a segunda visão da lista. */
 @RestController
 @RequestMapping("/v1/entries")
 public class EntryController {

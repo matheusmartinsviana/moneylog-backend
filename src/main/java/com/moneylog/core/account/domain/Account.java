@@ -30,20 +30,6 @@ import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Conta (D1 §2.2): corrente, poupança, carteira ou investimento.
- *
- * <ul>
- *   <li>O saldo atual <b>não</b> é campo: é Σ dos postings do livro {@code ACCOUNT} da conta. Por isso {@link #archive}
- *       recebe o saldo calculado.</li>
- *   <li>O saldo inicial vira o posting de abertura {@code ACCOUNT +X / EQUITY −X} (pode ser negativo, S-5).</li>
- *   <li>Só BRL (S-2). Só arquiva com saldo zero hoje e em todas as datas futuras (S-4). Arquivada não recebe
- *       movimentação nova.</li>
- *   <li>Instituição com no máximo {@value #INSTITUTION_MAX_LENGTH} caracteres (coluna {@code accounts.institution});
- *       saldo inicial com módulo até o teto de S-78.</li>
- *   <li>Sem setters: a mudança é por métodos de negócio que reaplicam as invariantes.</li>
- * </ul>
- */
 public final class Account {
 
     public static final int NAME_MAX_LENGTH = 100;
@@ -72,23 +58,17 @@ public final class Account {
         this.version = version;
     }
 
-    /** Abre uma conta nova, ativa. O id é gerado pela aplicação (caso de uso). */
     public static Account open(UUID id, UUID userId, String name, AccountType type, String institution,
                                Money openingBalance, LocalDate openingDate) {
         return new Account(id, userId, name, type, institution, openingBalance, FinancialDates.requireInWindow(openingDate, "openingDate"),
                 AccountStatus.ACTIVE, 0L);
     }
 
-    /** Reidrata uma conta já persistida (usado pelo mapper da infra). Passa pelas mesmas invariantes. */
     public static Account restore(UUID id, UUID userId, String name, AccountType type, String institution,
                                   Money openingBalance, LocalDate openingDate, AccountStatus status, long version) {
         return new Account(id, userId, name, type, institution, openingBalance, openingDate, status, version);
     }
 
-    /**
-     * Postings do saldo inicial: {@code ACCOUNT(conta) +X} e {@code EQUITY −X} na data de abertura (Σ = 0).
-     * Saldo inicial zero não gera lançamento.
-     */
     public List<Posting> openingPostings() {
         if (openingBalance.isZero()) {
             return List.of();
@@ -102,12 +82,10 @@ public final class Account {
         return BookRef.account(id);
     }
 
-    /** Renomeia, com as mesmas regras do construtor. */
     public void rename(String newName) {
         this.name = requireName(newName);
     }
 
-    /** Atualiza os dados editáveis (nome e instituição), com as mesmas regras do construtor. */
     public void updateDetails(String newName, String newInstitution) {
         String validName = requireName(newName);
         String validInstitution = requireInstitution(newInstitution);
@@ -115,21 +93,10 @@ public final class Account {
         this.institution = validInstitution;
     }
 
-    /** O saldo inicial (tipo, valor e data) já é este? */
     public boolean openingMatches(AccountType otherType, Money otherBalance, LocalDate otherDate) {
         return type == otherType && openingBalance.equals(otherBalance) && openingDate.equals(otherDate);
     }
 
-    /**
-     * Corrige o saldo inicial (T25, D1 §2.2): só enquanto a conta não tem movimentação ativa. Troca tipo, valor e data
-     * e devolve o <b>par novo</b> de postings de abertura ({@code ACCOUNT +X / EQUITY −X}, vazio se o saldo for zero); o
-     * caso de uso desativa o par antigo e grava este. Conta arquivada não corrige (o saldo dela é zero em todas as
-     * datas).
-     *
-     * @param hasActiveMovements a conta tem movimentação ativa (informado pelo caso de uso, que lê o razão)
-     * @throws AccountWithBalanceCannotBeArchivedException se houver saldo diferente de zero hoje
-     * @throws AccountOpeningLockedException se houver movimentação ativa
-     */
     public List<Posting> correctOpening(AccountType newType, Money newBalance, LocalDate newDate, boolean hasActiveMovements) {
         AccountType validType = required(newType, "type");
         Money validBalance = AmountLimit.ensureWithinLimit(requireBrl(required(newBalance, "openingBalance")), "openingBalance");
@@ -144,14 +111,6 @@ public final class Account {
         return openingPostings();
     }
 
-    /**
-     * Arquiva a conta (S-4): só com saldo zero hoje <b>e</b> em toda data futura com movimentação. Uma conta com saldo
-     * zero hoje, mas com uma movimentação datada no futuro, ficaria arquivada com saldo diferente de zero depois.
-     *
-     * @param accountPostings postings <b>ativos</b> do livro desta conta, de todas as datas (os de outros livros são
-     *                        ignorados)
-     * @param today           "hoje" no fuso do usuário
-     */
     public void archive(Collection<Posting> accountPostings, LocalDate today) {
         if (status == AccountStatus.ARCHIVED) {
             throw new AccountAlreadyArchivedException();
@@ -160,10 +119,6 @@ public final class Account {
         this.status = AccountStatus.ARCHIVED;
     }
 
-    /**
-     * A conta está ativa e pode ser arquivada agora (saldo zero em todas as datas, S-92)? É a mesma checagem de
-     * {@link #archive} sem mudar nada: alimenta a flag {@code archivable} da API.
-     */
     public boolean canBeArchived(Collection<Posting> accountPostings, LocalDate today) {
         if (status == AccountStatus.ARCHIVED) {
             return false;
@@ -209,14 +164,12 @@ public final class Account {
         this.status = AccountStatus.ACTIVE;
     }
 
-    /** Conta arquivada não recebe movimentação nova (D1 §2.4, regra transversal 4). */
     public void ensureCanReceiveTransactions() {
         if (status == AccountStatus.ARCHIVED) {
             throw new AccountArchivedException();
         }
     }
 
-    /** Referência de outro usuário é tratada como inexistente (D1 §2.4, regra transversal 3). */
     public void ensureBelongsTo(UUID requesterId) {
         if (!userId.equals(requesterId)) {
             throw new AccountNotFoundException(id);
@@ -247,7 +200,6 @@ public final class Account {
         return type;
     }
 
-    /** Instituição (opcional): {@code null} quando não informada. */
     public String institution() {
         return institution;
     }

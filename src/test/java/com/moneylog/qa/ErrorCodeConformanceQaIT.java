@@ -32,10 +32,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T43 (QA), critério 7: todo {@code code} de erro (4xx) que a API devolve numa bateria de cenários precisa estar na
- * descrição do contrato (tabela "Códigos de erro"), e toda resposta de erro valida contra o schema.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: códigos de erro × contrato")
@@ -148,7 +144,6 @@ class ErrorCodeConformanceQaIT {
     @DisplayName("bateria de cenários de erro: todo code visto está documentado e toda resposta valida")
     void todoCodeDeErroEstaNoContrato() throws Exception {
         String ex = a.expenseTx;
-        // contas
         probe("conta nome só espaços", HttpMethod.POST, "/v1/accounts", acct("   ", "CHECKING", "1.00", "2026-10-01"), a);
         probe("conta nome 101", HttpMethod.POST, "/v1/accounts", acct("n".repeat(101), "CHECKING", "1.00", "2026-10-01"), a);
         probe("conta instituição 101", HttpMethod.POST, "/v1/accounts", acct("ok", "CHECKING", "1.00", "2026-10-01").replace("\"type\"", "\"institution\":\"" + "i".repeat(101) + "\",\"type\""), a);
@@ -160,14 +155,12 @@ class ErrorCodeConformanceQaIT {
         probe("desarquivar ativa", HttpMethod.POST, "/v1/accounts/" + a.xp + "/unarchive", "", a);
         probe("editar saldo inicial com movimentação", HttpMethod.PUT, "/v1/accounts/" + a.nubank, acct("Nubank", "CHECKING", "5.00", "2026-10-01").replace("}", ",\"version\":0}"), a);
         probe("editar conta versão velha", HttpMethod.PUT, "/v1/accounts/" + a.xp, acct("XP", "CHECKING", "0.00", "2026-10-01").replace("}", ",\"version\":9}"), a);
-        // categorias
         probe("categoria nome vazio", HttpMethod.POST, "/v1/categories", "{\"name\":\" \",\"kind\":\"EXPENSE\"}", a);
         probe("categoria repetida", HttpMethod.POST, "/v1/categories", "{\"name\":\"alimentação\",\"kind\":\"EXPENSE\"}", a);
         probe("categoria nome 61", HttpMethod.POST, "/v1/categories", "{\"name\":\"" + "c".repeat(61) + "\",\"kind\":\"EXPENSE\"}", a);
         probe("categoria desarquivar ativa", HttpMethod.POST, "/v1/categories/" + a.food + "/unarchive", "", a);
         probe("categoria arquivar 2x", HttpMethod.POST, "/v1/categories/" + a.salary + "/archive", "", a);
         probe("categoria arquivar 2x (2)", HttpMethod.POST, "/v1/categories/" + a.salary + "/archive", "", a);
-        // movimentações
         probe("valor zero", HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.food, "0.00", "2026-10-10", "x"), a);
         probe("valor 13 dígitos", HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.food, "9999999999999.99", "2026-10-10", "x"), a);
         probe("valor 12 dígitos", HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.food, "999999999999.99", "2026-10-10", "x"), a);
@@ -188,14 +181,13 @@ class ErrorCodeConformanceQaIT {
         probe("tipo CARD_PURCHASE", HttpMethod.POST, "/v1/transactions", "{\"type\":\"CARD_PURCHASE\"}", a);
         probe("tipo LOAN_GIVEN", HttpMethod.POST, "/v1/transactions", "{\"type\":\"LOAN_GIVEN\",\"amount\":\"1.00\"}", a);
         probe("categoria inexistente", HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, UUID.randomUUID().toString(), "1.00", "2026-10-10", "x"), a);
-        probe("sem Idempotency-Key", HttpMethod.POST, "/v1/transactions", "{}", a); // ainda 400
+        probe("sem Idempotency-Key", HttpMethod.POST, "/v1/transactions", "{}", a);
         probe("outro usuário", HttpMethod.GET, "/v1/transactions/" + b.expenseTx, null, a);
         probe("editar tipo diferente", HttpMethod.PUT, "/v1/transactions/" + ex, QaWorld.income(a.nubank, a.salary, "1.00", "2026-10-10").replace("}", ",\"version\":0}"), a);
         probe("editar sem version", HttpMethod.PUT, "/v1/transactions/" + ex, QaWorld.expense(a.nubank, a.food, "1.00", "2026-10-10", "x"), a);
         probe("editar version velha", HttpMethod.PUT, "/v1/transactions/" + ex, QaWorld.expense(a.nubank, a.food, "1.00", "2026-10-10", "x").replace("}", ",\"version\":7}"), a);
         probe("estorno sem motivo", HttpMethod.POST, "/v1/transactions/" + ex + "/void", "{\"reason\":\"\"}", a);
         probe("estorno motivo 501", HttpMethod.POST, "/v1/transactions/" + ex + "/void", "{\"reason\":\"" + "r".repeat(501) + "\"}", a);
-        // reembolso ativo trava a despesa
         String refund = a.create(QaWorld.refund(a.nubank, a.food, ex, "10.00", "2026-10-10")).get("id").asString();
         probe("estornar original com reembolso", HttpMethod.POST, "/v1/transactions/" + ex + "/void", "{\"reason\":\"x\"}", a);
         probe("trocar categoria com reembolso", HttpMethod.PUT, "/v1/transactions/" + ex,
@@ -204,18 +196,15 @@ class ErrorCodeConformanceQaIT {
         probe("estornar 1x", HttpMethod.POST, "/v1/transactions/" + refund + "/void", "{\"reason\":\"x\"}", a);
         probe("estornar 2x", HttpMethod.POST, "/v1/transactions/" + refund + "/void", "{\"reason\":\"x\"}", a);
         probe("editar estornada", HttpMethod.PUT, "/v1/transactions/" + refund, QaWorld.refund(a.nubank, a.food, ex, "1.00", "2026-10-10").replace("}", ",\"version\":1}"), a);
-        // conta arquivada recebe movimentação
         String parked = a.account("Parada", "WALLET", "0.00");
         probe("arquivar conta zerada", HttpMethod.POST, "/v1/accounts/" + parked + "/archive", "", a);
         probe("despesa em conta arquivada", HttpMethod.POST, "/v1/transactions", QaWorld.expense(parked, a.food, "1.00", "2026-10-10", "x"), a);
         probe("arquivar categoria", HttpMethod.POST, "/v1/categories/" + a.food + "/archive", "", a);
         probe("despesa em categoria arquivada", HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.food, "1.00", "2026-10-10", "x"), a);
-        // fora do app
         probe("rota inexistente", HttpMethod.GET, "/v1/nada", null, a);
         probe("método não permitido", HttpMethod.DELETE, "/v1/accounts/" + a.nubank, null, a);
         probe("Accept inaceitável", HttpMethod.GET, "/v1/accounts", null, a);
 
-        // mídia errada
         MvcResult media = mvc.perform(a.req(HttpMethod.POST, "/v1/accounts", "x=1").contentType("application/x-www-form-urlencoded")).andReturn();
         seen.put("Content-Type form", media.getResponse().getStatus() + " " + om.readTree(media.getResponse().getContentAsString()).path("code").asString());
         MvcResult notAcceptable = mvc.perform(a.req(HttpMethod.GET, "/v1/accounts", null).accept("application/xml")).andReturn();

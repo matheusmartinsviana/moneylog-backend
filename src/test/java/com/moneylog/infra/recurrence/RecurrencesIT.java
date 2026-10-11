@@ -16,10 +16,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T79: recorrências (persistência, CRUD, ocorrências, custo fixo) e a fonte de compromissos real do dashboard. Cenário padrão: Internet de
- * 119,00 todo dia 10 (Contas, Nubank, PIX); relógio 10/10/2026; toda requisição e resposta validada contra o contrato.
- */
 @DisplayName("Recorrências: persistência, CRUD, ocorrências e custo fixo (T79)")
 class RecurrencesIT extends E4ItBase {
 
@@ -66,12 +62,10 @@ class RecurrencesIT extends E4ItBase {
         assertThat(money(window.get("items").get(0), "amount")).isEqualTo("119.00");
         assertThat(window.get("items").get(0).get("direction").asString()).isEqualTo("OUT");
 
-        // sem `from`, a janela começa no início da agenda: as vencidas e não realizadas continuam pendentes (S-20)
         JsonNode pending = occurrences("status=PENDING&to=2026-12-31");
         assertThat(pending.get("items")).hasSize(4);
         assertThat(pending.get("items").get(0).get("date").asString()).isEqualTo("2026-09-10");
         assertThat(pending.get("items").get(0).get("overdue").asBoolean()).isTrue();
-        // a recorrência vira compromisso real: nada de movimentação, nada de consumo
         assertThat(count("transactions")).isZero();
         assertThat(money(summary().get("month"), "consumption")).isEqualTo("0.00");
         assertThat(okBody(get("/v1/recurrences/" + created.get("id").asString())).get("id").asString()).isEqualTo(created.get("id").asString());
@@ -92,7 +86,6 @@ class RecurrencesIT extends E4ItBase {
         assertThat(weeks.get("items").toString()).contains("2026-11-01", "2026-11-15", "2026-11-29", "2026-12-13", "2026-12-27");
         assertThat(weeks.get("items").toString()).doesNotContain("2027-01-10");
 
-        // CUSTOM sem unidade, intervalo fora da faixa, fim antes do início e quantidade zero
         mockMvc.perform(post("/v1/recurrences", body("EXPENSE", "20.00", "Sem unidade", bills, account(), "CUSTOM", "2026-11-01", "\"interval\":2")))
                 .andExpect(status().isUnprocessableEntity()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("RECURRENCE_INVALID"));
         mockMvc.perform(post("/v1/recurrences", body("EXPENSE", "20.00", "Intervalo", bills, account(), "MONTHLY", "2026-11-01", "\"interval\":2")))
@@ -101,7 +94,6 @@ class RecurrencesIT extends E4ItBase {
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("RECURRENCE_INVALID"));
         mockMvc.perform(post("/v1/recurrences", body("EXPENSE", "20.00", "Zero", bills, account(), "MONTHLY", "2026-11-01", "\"maxOccurrences\":0")))
                 .andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
-        // campo desconhecido (a assinatura parcelada não existe, S-144) é 400
         mockMvc.perform(post("/v1/recurrences", body("CARD_PURCHASE", "49.90", "Streaming", subscriptions, "\"cardId\":\"" + card + "\"", "MONTHLY",
                 "2026-10-15", "\"installments\":3"))).andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly())
                 .andExpect(jsonPath("$.errors[0].code").value("UNKNOWN_FIELD"));
@@ -164,7 +156,6 @@ class RecurrencesIT extends E4ItBase {
     @DisplayName("CA4: PUT muda valor e categoria das ocorrências não realizadas; as realizadas ficam; frequência no corpo é 400; version velha é 409")
     void deveEditarOModelo() throws Exception {
         String id = internet("2026-10-10").get("id").asString();
-        // realiza a de 10/10 com o valor do modelo e edita o modelo depois
         mockMvc.perform(post("/v1/recurrences/" + id + "/occurrences/2026-10-10/realize", "{}").header("Idempotency-Key", UUID.randomUUID().toString()))
                 .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
         String update = "{\"amount\":\"129.90\",\"description\":\"Internet fibra\",\"categoryId\":\"" + subscriptions + "\"," + account() + ",\"version\":0}";
@@ -180,7 +171,6 @@ class RecurrencesIT extends E4ItBase {
         assertThat(list.get("items").get(0).get("transactionId").isNull()).isFalse();
         assertThat(money(list.get("items").get(1), "amount")).isEqualTo("129.90");
         assertThat(money(list.get("items").get(2), "amount")).isEqualTo("129.90");
-        // a movimentação já realizada continua com o valor e a categoria de antes (é histórico)
         assertThat(jdbc.queryForObject("SELECT amount_cents FROM transactions WHERE recurrence_id = ?::uuid", Long.class, id)).isEqualTo(11_900L);
 
         mockMvc.perform(put("/v1/recurrences/" + id, update.replace("\"version\":0", "\"frequency\":\"WEEKLY\",\"version\":1")))
@@ -189,12 +179,10 @@ class RecurrencesIT extends E4ItBase {
                 .andExpect(status().isBadRequest());
         mockMvc.perform(put("/v1/recurrences/" + id, update)).andExpect(status().isConflict()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.code").value("VERSION_CONFLICT"));
-        // o fim antes da última ocorrência realizada é recusado; depois dela, vale
         mockMvc.perform(put("/v1/recurrences/" + id, update.replace("\"version\":0", "\"endDate\":\"2026-10-05\",\"version\":1")))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("RECURRENCE_INVALID"));
         mockMvc.perform(put("/v1/recurrences/" + id, update.replace("\"version\":0", "\"endDate\":\"2026-12-31\",\"version\":1")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.endDate").value("2026-12-31"));
-        // conta e cartão juntos no PUT
         mockMvc.perform(put("/v1/recurrences/" + id, update.replace("\"version\":0", "\"cardId\":\"" + card + "\",\"version\":2")))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("RECURRENCE_INVALID"));
     }
@@ -214,7 +202,6 @@ class RecurrencesIT extends E4ItBase {
                 .andExpect(jsonPath("$.active").value(false)).andExpect(jsonPath("$.monthlyEstimate.amount").value("0.00"))
                 .andExpect(jsonPath("$.nextOccurrence").doesNotExist());
         assertThat(money(okBody(get("/v1/recurrences/summary")), "fixedCosts")).isEqualTo("119.00");
-        // desativar de novo é idempotente
         mockMvc.perform(post("/v1/recurrences/" + weekly + "/deactivate", "")).andExpect(status().isOk()).andExpect(jsonPath("$.active").value(false));
         JsonNode actives = okBody(get("/v1/recurrences?active=true"));
         assertThat(actives.get("items")).hasSize(2);
@@ -239,13 +226,11 @@ class RecurrencesIT extends E4ItBase {
         });
         assertThat(upcoming.get("items").get(0).get("bucket").asString()).isEqualTo("TODAY");
         assertThat(money(upcoming.get("totals"), "out")).isEqualTo("357.00");
-        // commitment ≠ consumption: nada virou despesa; o comprometido de 30 dias soma só a de hoje e a de 10/11 não entra (dia 31)
         JsonNode summary = summary();
         assertThat(money(summary.get("committed"), "d30")).isEqualTo("119.00");
         assertThat(money(summary.get("committed"), "d60")).isEqualTo("238.00");
         assertThat(money(summary.get("month"), "consumption")).isEqualTo("0.00");
 
-        // uma recorrência com início no passado: as vencidas e não realizadas entram em todos os horizontes
         String old = createdBody(post("/v1/recurrences", body("EXPENSE", "50.00", "Antiga", bills, account(), "MONTHLY", "2026-09-20", "\"endDate\":\"2026-10-31\"")))
                 .get("id").asString();
         assertThat(money(summary().get("committed"), "d7")).isEqualTo("169.00");

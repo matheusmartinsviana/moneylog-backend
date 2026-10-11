@@ -31,10 +31,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T98 (QA): segurança das rotas da Etapa 5 (metas, reservas, resumo, projeção, exportação). Isolamento entre usuários, sem token,
- * {@code Origin} hostil, campos desconhecidos, números em texto e fracionários, caracteres de controle e datas fora de 2000 a 2100.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: segurança e entrada hostil da Etapa 5")
@@ -92,27 +88,23 @@ class GoalSecurityQaIT {
             assertThat(res.status()).as(e.getKey() + " -> " + res).isEqualTo(404);
             assertThat(res.code()).as(e.getKey()).isEqualTo("GOAL_NOT_FOUND");
         }
-        // meta de B com conta de A: 404 da conta
         String bGoal = GoalQa.goal(b, "Meta da B", "500.00", null);
         Res foreignAccount = GoalQa.reserve(b, bGoal, a.nubank, "10.00", today);
         assertThat(foreignAccount.status()).as(foreignAccount.toString()).isEqualTo(404);
         assertThat(foreignAccount.code()).isEqualTo("ACCOUNT_NOT_FOUND");
         Res foreignRelease = GoalQa.reserve(b, bGoal, a.nubank, "-10.00", today);
         assertThat(foreignRelease.status()).isEqualTo(404);
-        // a mesma Idempotency-Key de A vale em B de forma independente
         String key = UUID.randomUUID().toString();
         assertThat(GoalQa.reserveKey(a, aGoal, a.nubank, "1.00", today, key).status()).isEqualTo(200);
         assertThat(GoalQa.reserveKey(b, bGoal, b.nubank, "2.00", today, key).status()).as("a chave de A não pode afetar B").isEqualTo(200);
         assertThat(GoalQa.getGoal(b, bGoal).get("current").get("amount").asString()).isEqualTo("2.00");
         assertThat(GoalQa.getGoal(a, aGoal).get("current").get("amount").asString()).isEqualTo("101.00");
-        // criação de meta com a chave de A em B não devolve a meta de A
         String createKey = UUID.randomUUID().toString();
         Res createdA = a.call(HttpMethod.POST, "/v1/goals", GoalQa.goalBody("Idem A", "10.00", null, "LOW"), createKey);
         Res createdB = b.call(HttpMethod.POST, "/v1/goals", GoalQa.goalBody("Idem B", "10.00", null, "LOW"), createKey);
         assertThat(createdB.status()).isEqualTo(201);
         assertThat(createdB.node().get("id").asString()).isNotEqualTo(createdA.node().get("id").asString());
         assertThat(createdB.node().get("name").asString()).isEqualTo("Idem B");
-        // nada de A vazou nas leituras de B
         List<String> reads = List.of("/v1/goals", "/v1/accounts", "/v1/dashboard/summary", "/v1/summaries/2026-10", "/v1/projections?horizon=M12&includeTrend=true",
                 "/v1/exports/transactions.csv?includeVoided=true", "/v1/exports/backup");
         for (String url : reads) {
@@ -124,10 +116,8 @@ class GoalSecurityQaIT {
         }
         assertThat(b.getOk("/v1/goals").get("items").size()).isEqualTo(2);
         assertThat(b.getOk("/v1/goals?status=ARCHIVED").get("items")).isEmpty();
-        // reservas de A não entram no reservado de B
         assertThat(b.getOk("/v1/dashboard/summary").get("balances").get("reserved").get("amount").asString()).isEqualTo("2.00");
         assertThat(snapshotOf(a).replace("101", "100")).isNotEmpty();
-        // A não mudou além do que ela mesma fez (as 2 chamadas acima)
         assertThat(jdbc.queryForObject("select count(*) from goal_reservations where user_id = ?", Long.class, a.id)).isEqualTo(2L);
         assertThat(before).isNotEmpty();
         assertThat(world.contractViolations).isEmpty();
@@ -192,7 +182,6 @@ class GoalSecurityQaIT {
                 "[]", "null", "\"x\"", "{", "", "{\"name\":\"a\",\"name\":\"b\",\"target\":\"10.00\",\"priority\":\"LOW\"}");
         for (String body : goalBodies) {
             Res r = a.raw(HttpMethod.POST, "/v1/goals", body, null);
-            // o último caso (nome duplicado no JSON) pode ser aceito: é o comportamento do Jackson; não é vulnerabilidade
             if (body.contains("\"name\":\"a\",\"name\":\"b\"")) {
                 assertThat(r.status()).as(body).isLessThan(500);
                 continue;
@@ -201,7 +190,6 @@ class GoalSecurityQaIT {
                 bad.add("POST /v1/goals " + body + " -> " + r);
             }
         }
-        // PUT: sem version, version hostil
         for (String version : List.of("", ",\"version\":\"0\"", ",\"version\":0.5", ",\"version\":1e0", ",\"version\":null", ",\"version\":-1", ",\"version\":[0]", ",\"version\":99999999999999999999")) {
             Res r = a.raw(HttpMethod.PUT, "/v1/goals/" + aGoal, "{\"name\":\"N\",\"target\":\"10.00\",\"priority\":\"LOW\"" + version + "}", null);
             if (r.status() < 400 || r.status() >= 500) {
@@ -230,7 +218,6 @@ class GoalSecurityQaIT {
                 bad.add("reserva " + body + " -> " + r);
             }
         }
-        // cabeçalho Idempotency-Key ausente / inválido; ids de caminho inválidos
         assertThat(a.raw(HttpMethod.POST, "/v1/goals/" + aGoal + "/reservations", GoalQa.reservationBody(acc, "1.00", "2026-10-10"), null).status()).isEqualTo(400);
         for (String key : List.of("nao-uuid", "123", " ", "00000000-0000-0000-0000-00000000000g", UUID.randomUUID() + "x")) {
             Res r = a.raw(HttpMethod.POST, "/v1/goals/" + aGoal + "/reservations", GoalQa.reservationBody(acc, "1.00", "2026-10-10"), key);
@@ -247,7 +234,6 @@ class GoalSecurityQaIT {
                 }
             }
         }
-        // filtros e paginação
         for (String q : List.of("?status=FOO", "?status=active", "?status=", "?pageSize=0", "?pageSize=51", "?pageSize=abc", "?pageSize=1.5", "?page=0", "?page=-1", "?page=abc", "?page=99999999999")) {
             Res r = a.raw(HttpMethod.GET, "/v1/goals" + q, null, null);
             if (r.status() >= 500) {

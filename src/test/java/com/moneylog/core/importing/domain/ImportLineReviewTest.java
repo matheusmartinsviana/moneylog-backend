@@ -121,7 +121,6 @@ class ImportLineReviewTest {
             assertThat(revisao.line()).isEqualTo(umaLinhaDeCafe());
         }
 
-        /** Monta uma revisão no status pedido, pelos caminhos válidos. */
         static ImportLineReview revisaoNoStatus(ImportLineStatus status) {
             return switch (status) {
                 case PENDING -> ImportLineReview.classify(umaLinhaDeCafe(), CHAVE, List.of());

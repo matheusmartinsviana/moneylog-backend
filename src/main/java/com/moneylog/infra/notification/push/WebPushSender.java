@@ -24,11 +24,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
 
-/**
- * Web Push com VAPID (S-173, T130): mensagem cifrada ({@code aes128gcm}) enviada ao serviço de push do navegador, com {@code TTL} e {@code Urgency}.
- * {@code 404/410} = assinatura morta ({@link Result#GONE}); {@code 429/5xx} = recuo ({@link Result#RETRY_LATER}). O corpo da resposta, o endpoint e
- * as chaves nunca vão para o log. <b>Não foi exercitado em dispositivo</b>: depende de HTTPS real, chaves VAPID e PWA instalada.
- */
 public class WebPushSender implements PushSender {
 
     private static final Logger log = LoggerFactory.getLogger(WebPushSender.class);
@@ -46,7 +41,6 @@ public class WebPushSender implements PushSender {
         this(publicKey, privateKey, subject, mapper, clock, ttlSeconds, PushEndpointPolicy::isAllowed);
     }
 
-    /** A política de endpoint é injetável só para o teste contra servidor local; em produção é sempre {@link PushEndpointPolicy}. */
     WebPushSender(String publicKey, String privateKey, String subject, ObjectMapper mapper, Clock clock, int ttlSeconds,
                   Predicate<String> endpointPolicy) {
         this.endpointPolicy = endpointPolicy;

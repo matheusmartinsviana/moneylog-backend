@@ -35,17 +35,11 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T186: {@code GET /v1/search}. Cenário base da Etapa 4 (Nubank, cartão Roxinho, categorias Alimentação, Assinaturas, Contas e Salário) mais o que cada teste
- * semeia. Toda requisição e resposta é validada contra o contrato.
- */
 @DisplayName("Busca global (T186, S-287)")
 class SearchIT extends E4ItBase {
 
     @MockitoSpyBean
     private SearchGateway searchGateway;
-
-    // ------------------------------------------------------------------ helpers
 
     private JsonNode search(String q) throws Exception {
         return okBody(get("/v1/search").param("q", q));
@@ -76,8 +70,6 @@ class SearchIT extends E4ItBase {
         group.forEach(item -> values.add(item.get(field).asString()));
         return values;
     }
-
-    // ------------------------------------------------------------------ busca
 
     @Test
     @DisplayName("sem diferenciar acento nem caixa: 'cafe' acha a movimentação 'Café', a categoria 'Cafeteria', a conta e a nota 'Reunião café'; 'CAFÉ' acha o mesmo; o termo volta aparado")
@@ -322,7 +314,6 @@ class SearchIT extends E4ItBase {
         assertThat(theirs.get("cards")).hasSize(1);
         assertThat(theirs.get("notes")).hasSize(1);
         assertThat(theirs.get("notes").get(0).get("id").asString()).isNotEqualTo(myNote);
-        // quem não tem nada não vê nada
         UUID empty = UUID.randomUUID();
         committed(() -> SqlFixtures.insertUser(jdbc, empty, "empty-" + empty + "@moneylog.com"));
         JsonNode nothing = searchAs(auth.bearer(empty), "japon");

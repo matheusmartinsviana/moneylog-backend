@@ -45,7 +45,6 @@ import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** Monta {@link TransactionDetails}: lê contas, categoria e cartão referenciados e calcula impacto e flags. */
 public class TransactionDetailsAssembler {
 
     private final TransactionGateway transactions;
@@ -56,18 +55,15 @@ public class TransactionDetailsAssembler {
     private final DebtGateway debts;
     private final PersonGateway persons;
 
-    /** Só os tipos em conta (Etapa 2). */
     public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories) {
         this(transactions, accounts, categories, null, null);
     }
 
-    /** Tipos em conta e de cartão (Etapa 3): precisa do cartão e do "hoje" para derivar o status das parcelas e faturas. */
     public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
                                        CardGateway cards, TimeProvider time) {
         this(transactions, accounts, categories, cards, time, null, null);
     }
 
-    /** Tipos em conta, de cartão e de dívida (Etapa 4): traz a dívida da movimentação e as partes da despesa dividida. */
     @SuppressWarnings("java:S107")
     public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
                                        CardGateway cards, TimeProvider time, DebtGateway debts, PersonGateway persons) {
@@ -116,7 +112,6 @@ public class TransactionDetailsAssembler {
                 flags != null ? flags : TransactionFlags.of(transaction, touched.values(), hasActiveRefunds), cardInfo, summaries);
     }
 
-    /** A dívida da movimentação de dívida, ou as partes da despesa dividida; vazio nos demais (ou sem a porta de dívidas). */
     private List<Debt> linkedDebts(UUID userId, Transaction transaction) {
         if (debts == null) {
             return List.of();
@@ -144,10 +139,6 @@ public class TransactionDetailsAssembler {
                 : TransactionFlags.ofShares(transaction, touched, hasActiveRefunds, linked);
     }
 
-    /**
-     * Monta os detalhes de uma página inteira sem consulta por item (S-79): contas, reembolsos, descrições e as cadeias de
-     * faturas vêm dos {@link FinancialRecords} já carregados e as categorias de uma única leitura.
-     */
     public List<TransactionDetails> assembleAll(UUID userId, List<Persisted<Transaction>> items, FinancialRecords records) {
         Map<UUID, Account> accountsById = records.accounts().stream().collect(Collectors.toMap(Account::id, Function.identity()));
         Map<UUID, Category> categoriesById = categories.list(userId, null, true).stream()
@@ -213,7 +204,6 @@ public class TransactionDetailsAssembler {
         return details;
     }
 
-    /** Despesa e compra no cartão são as que recebem reembolso com {@code refundOf} (S-9). */
     private static boolean refundable(Transaction transaction) {
         return transaction.type() == TransactionType.EXPENSE || transaction.type() == TransactionType.CARD_PURCHASE;
     }
@@ -222,7 +212,6 @@ public class TransactionDetailsAssembler {
         return time == null ? null : time.today();
     }
 
-    /** As parcelas e a fatura como a API mostra, com o status derivado da cadeia de faturas do cartão. */
     private static CardInfo cardInfo(Transaction transaction, CreditCard card, InvoiceChain chain, LocalDate today) {
         List<InstallmentView> installments = new ArrayList<>();
         for (TransactionInstallment i : transaction.installments()) {
@@ -236,7 +225,6 @@ public class TransactionDetailsAssembler {
         return new CardInfo(card, installments, invoice);
     }
 
-    /** Σ das parcelas não canceladas da compra ativa que estão em faturas {@code FUTURE} (D1 §2.8). */
     private static Money commitment(Transaction transaction, InvoiceChain chain, LocalDate today) {
         Money zero = Money.zero(CurrencyCode.BRL);
         if (!transaction.isActive() || transaction.type() != TransactionType.CARD_PURCHASE) {

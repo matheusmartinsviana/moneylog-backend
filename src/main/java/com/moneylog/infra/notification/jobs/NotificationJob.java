@@ -12,11 +12,6 @@ import com.moneylog.core.notification.app.usecase.NotificationUseCases.ArchiveOl
 import com.moneylog.core.notification.app.usecase.NotificationUseCases.DispatchPushUseCase;
 import com.moneylog.core.notification.app.usecase.NotificationUseCases.GenerateNotificationsUseCase;
 
-/**
- * Job das notificações (S-174): a cada 15 minutos, em {@code America/Sao_Paulo}, gera as notificações de cada usuário, despacha o push (se ligado) e
- * arquiva as lidas há mais de 90 dias. <b>Idempotente</b>: reexecutar ou reiniciar o app não duplica (índice único). A falha de um usuário é
- * registrada (sem dados) e os demais seguem (T128 CA8). Uma instância só (ADR-001); o índice único protege se houver duas.
- */
 public class NotificationJob {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationJob.class);
@@ -39,7 +34,6 @@ public class NotificationJob {
         runOnce();
     }
 
-    /** Uma passada completa; devolve quantas notificações novas foram criadas. Público para o teste chamar sem esperar o agendador. */
     public int runOnce() {
         int created = 0;
         List<UUID> users = notifications.allUserIds();
@@ -47,7 +41,6 @@ public class NotificationJob {
             try {
                 created += generate.handle(userId);
             } catch (RuntimeException e) {
-                // nunca registra dados do usuário nem a mensagem (pode conter valores): só a classe e o id técnico
                 log.error("Falha ao gerar notificações de um usuário (userId={}, erro={})", userId, e.getClass().getSimpleName());
             }
         }

@@ -24,11 +24,6 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionVoiding;
 import com.moneylog.core.transaction.domain.VoidContext;
 
-/**
- * Cenário do cartão Roxinho (fechamento 25, vencimento 5): a fatura ref. 2026-11 (25/09–24/10, fecha 25/10, vence
- * 05/11) com a parcela 1/6 de 200 (compra de 1.200 em 10/10) e uma compra à vista de 1.083 (12/10): total 1.283.
- * Mutável: as operações acrescentam movimentações e a cadeia é recalculada a partir delas.
- */
 public final class InvoiceScenario {
 
     public static final Instant NOW = Instant.parse("2026-10-10T15:00:00Z");
@@ -45,7 +40,6 @@ public final class InvoiceScenario {
         this.card = card;
     }
 
-    /** Só a compra de 1.200 em 6x (fatura ref. nov com 200). */
     public static InvoiceScenario comCompraParcelada() {
         InvoiceScenario s = new InvoiceScenario(CreditCardTestFactory.umCartao());
         s.transactions.add(compraNoCalendario(header(PURCHASE_6X_ID, LocalDate.of(2026, 10, 10)), Money.of("1200.00"),
@@ -53,7 +47,6 @@ public final class InvoiceScenario {
         return s;
     }
 
-    /** Fatura ref. nov com 1.283 (parcela 1/6 de 200 + 1.083 à vista). */
     public static InvoiceScenario comFaturaDe1283() {
         InvoiceScenario s = comCompraParcelada();
         s.transactions.add(compraNoCalendario(header(PURCHASE_1083_ID, LocalDate.of(2026, 10, 12)), Money.of("1083.00"),
@@ -79,7 +72,6 @@ public final class InvoiceScenario {
         return tx;
     }
 
-    /** Reembolso ligado a uma compra (S-9): o teto é o cobrado menos os reembolsos ativos anteriores. */
     public Transaction refundOf(Transaction original, String amount, LocalDate date, LocalDate today) {
         Transaction tx = CardTransactions.refundToCard(header(nextId(), date), Money.of(amount), card,
                 CategoryTestFactory.umaCategoriaDeDespesa(), new com.moneylog.core.transaction.domain.RefundOrigin(original,
@@ -88,7 +80,6 @@ public final class InvoiceScenario {
         return tx;
     }
 
-    /** Σ dos reembolsos ativos ligados à compra (o que o gateway devolve em {@code sumActiveRefundsOf}). */
     public Money activeRefundsOf(Transaction original) {
         return Money.sum(transactions.stream().filter(t -> t.isActive() && original.id().equals(t.refundOfId()))
                 .map(Transaction::amount).toList(), CurrencyCode.BRL);
@@ -101,7 +92,6 @@ public final class InvoiceScenario {
         return tx;
     }
 
-    /** Cenário com outro cartão (outro limite), sem movimentações. */
     public static InvoiceScenario vazio(CreditCard card) {
         return new InvoiceScenario(card);
     }
@@ -113,17 +103,14 @@ public final class InvoiceScenario {
         return tx;
     }
 
-    /** Estorna pelo ponto único (M1), com o cartão e a cadeia do cenário. */
     public void voidTx(Transaction tx, String reason, LocalDate today) {
         TransactionVoiding.voidTransaction(tx, VoidContext.of(reason, NOW, today).withCard(card, chain()));
     }
 
-    /** Postings ativos de todas as movimentações do cenário. */
     public List<Posting> postings() {
         return transactions.stream().flatMap(t -> t.postings().stream()).toList();
     }
 
-    /** Saldo do livro CARD em todas as datas (postings ativos). */
     public Money cardBookBalance() {
         return Money.sum(transactions.stream().flatMap(t -> t.postings().stream())
                 .filter(p -> p.bookType() == BookType.CARD).map(Posting::amount).toList(), CurrencyCode.BRL);

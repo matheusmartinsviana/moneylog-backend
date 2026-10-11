@@ -22,14 +22,6 @@ import com.moneylog.core.importing.parser.ParsedStatement.Skipped;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Parser de CSV de extrato (T122, S-169, S-170). Puro: bytes entram, {@link ParsedStatement} sai. Detecta codificação (UTF-8, com ou sem BOM; senão
- * ISO-8859-1), delimitador ({@code ;}, {@code ,} ou tab) e cabeçalho, sugere o mapeamento pelo nome das colunas e respeita aspas e quebra de linha em
- * campo. A descrição é texto: nada é "executado" (injeção de fórmula só importa na exportação, que já neutraliza).
- *
- * <p>Sentido: coluna única, negativo = saída e positivo = entrada ({@code invert} troca); duas colunas, débito = saída, crédito = entrada.
- * Valor zero, branco, totais/saldos e linhas de data ou valor inválidos são ignorados e listados em {@code skipped}.
- */
 public final class CsvStatementParser {
 
     public static final int MAX_BYTES = 5 * 1024 * 1024;
@@ -40,7 +32,6 @@ public final class CsvStatementParser {
     private CsvStatementParser() {
     }
 
-    /** O que o detector achou no arquivo (para a prévia e o mapeamento sugerido). */
     public record Detection(String encoding, char delimiter, boolean hasHeader, List<String> header, ColumnMapping suggested,
                             List<List<String>> preview) {
     }
@@ -117,7 +108,6 @@ public final class CsvStatementParser {
         return new ParsedStatement(Format.CSV, false, rows, skipped);
     }
 
-    /** {@code null} = valor inválido; vazio = ambas as colunas vazias (zero). */
     private static Optional<Long> signedCents(List<String> cells, ColumnMapping mapping) {
         if (mapping.amount() != null) {
             String raw = cell(cells, mapping.amount());
@@ -151,8 +141,6 @@ public final class CsvStatementParser {
     private static String cell(List<String> cells, int index) {
         return index < cells.size() ? cells.get(index) : "";
     }
-
-    // ------------------------------------------------------------------ codificação, delimitador, registros
 
     static boolean isUtf8(byte[] content) {
         try {
@@ -195,7 +183,6 @@ public final class CsvStatementParser {
         return n;
     }
 
-    /** Registros do CSV (RFC 4180): aspas dobradas, quebra de linha dentro de aspas. */
     static List<List<String>> readAll(String text, char delimiter, byte[] original) {
         if (original != null && original.length > MAX_BYTES) {
             throw new ImportTooLargeException("o limite é 5 MB.");
@@ -253,8 +240,6 @@ public final class CsvStatementParser {
         return records;
     }
 
-    // ------------------------------------------------------------------ cabeçalho e mapeamento sugerido
-
     private static boolean isHeader(List<String> first) {
         if (first.isEmpty()) {
             return false;
@@ -267,7 +252,6 @@ public final class CsvStatementParser {
         return Normalizer.normalize(text == null ? "" : text, Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT).strip();
     }
 
-    /** {@code null} se não achou data, descrição e valor. */
     static ColumnMapping suggest(List<String> first, boolean header, List<List<String>> records) {
         int date = -1;
         int description = -1;
@@ -319,7 +303,6 @@ public final class CsvStatementParser {
         return null;
     }
 
-    /** Recusa de formato por extensão/conteúdo: usado pelo caso de uso para escolher o parser. */
     public static void requireTextual(byte[] content) {
         for (byte b : content) {
             if (b == 0) {

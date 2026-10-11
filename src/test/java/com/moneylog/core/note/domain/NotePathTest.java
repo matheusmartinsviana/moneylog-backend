@@ -66,7 +66,6 @@ class NotePathTest {
         assertThat(problem("a\\b.md")).isEqualTo(PathProblem.BACKSLASH);
         assertThat(problem("a\u0000b.md")).isEqualTo(PathProblem.CONTROL_CHARACTERS);
         assertThat(problem("C:/x.md")).isEqualTo(PathProblem.DRIVE_LETTER);
-        // letra + dois-pontos que não é caminho de unidade ("Q: dúvida.md") é só caractere proibido: não é hostil
         assertThat(problem("Q: dúvida.md")).isEqualTo(PathProblem.FORBIDDEN_CHARACTER);
         assertThat(PathProblem.FORBIDDEN_CHARACTER.hostile()).isFalse();
         assertThat(PathProblem.TRAVERSAL.hostile() && PathProblem.ABSOLUTE.hostile() && PathProblem.BACKSLASH.hostile()

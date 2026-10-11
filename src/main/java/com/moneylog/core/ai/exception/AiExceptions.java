@@ -6,7 +6,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/** Exceções da IA. Mensagens genéricas: nunca ecoam corpo de provedor, chave nem payload. */
 public final class AiExceptions {
 
     private AiExceptions() {
@@ -60,21 +59,18 @@ public final class AiExceptions {
         }
     }
 
-    /** 429: limite diário de chamadas. Não é regra de negócio (422) nem invariante (500): o handler mapeia esta classe. */
     public static class AiRateLimitedException extends DomainException {
         public AiRateLimitedException() {
             super("AI_RATE_LIMITED", "Limite diário de chamadas de IA atingido. Tente amanhã.");
         }
     }
 
-    /** 503: provedor indisponível (falhas seguidas com o disjuntor aberto, autenticação recusada, timeout). Mensagem sempre genérica. */
     public static class AiProviderUnavailableException extends DomainException {
         public AiProviderUnavailableException() {
             super("AI_PROVIDER_UNAVAILABLE", "O provedor de IA está indisponível no momento.");
         }
     }
 
-    /** A saída do modelo foi descartada (fora do esquema ou com número que não está nos fatos). */
     public static class AiResponseRejectedException extends BusinessRuleException {
         public AiResponseRejectedException() {
             super("AI_RESPONSE_REJECTED", "A resposta da IA foi descartada por não passar na validação.");

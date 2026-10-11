@@ -16,23 +16,16 @@ import com.moneylog.core.transaction.domain.CardBillingChanges;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * O que a prévia e a mudança de dias têm em comum (S-128): a primeira fatura afetada (a que a mudança toca primeiro) e a
- * contagem do que muda de fatura, calculada com a <b>própria</b> {@link CardBillingChanges#changeBillingDays} sobre cópias
- * do cartão e das movimentações, então prévia e mudança nunca divergem.
- */
 final class BillingChangeSupport {
 
     private BillingChangeSupport() {
     }
 
-    /** Fechamento da primeira fatura afetada no calendário atual: a identidade que a prévia e o {@code PUT} comparam. */
     static LocalDate effectiveFromClosingDate(CreditCard card, int closingDay, int dueDay, LocalDate today) {
         BillingChange change = card.planBillingChange(closingDay, dueDay, today);
         return change.before().periodClosingIn(change.effectiveFrom()).closingDate();
     }
 
-    /** A prévia: nada é gravado nem mudado (opera em cópias). */
     static BillingChangePreviewView preview(CreditCard card, List<Transaction> transactionsOfCard, int closingDay, int dueDay,
                                             LocalDate today) {
         BillingChange change = card.planBillingChange(closingDay, dueDay, today);

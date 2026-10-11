@@ -34,10 +34,6 @@ import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryDates;
 import com.moneylog.infra.web.validation.NoControlChars;
 
-/**
- * Exportação dos dados do usuário (PR 00 §33, S-153): CSV de movimentações (mesmo filtro da lista) e backup completo em JSON. Só os dados do
- * próprio usuário (token); o arquivo nunca traz hash de senha, tokens nem segredos.
- */
 @RestController
 @RequestMapping("/v1/exports")
 @Validated
@@ -56,7 +52,6 @@ public class ExportController {
         this.time = time;
     }
 
-    /** CSV em fluxo: o caso de uso calcula as linhas (e pode falhar) <b>antes</b> de qualquer byte da resposta. */
     @GetMapping(value = "/transactions.csv", produces = "text/csv")
     public void transactions(@CurrentUser UUID userId,
                              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -75,7 +70,6 @@ public class ExportController {
             throw new RequestValidationException("from", "INVALID_RANGE", "'from' não pode ser depois de 'to'.");
         }
         TransactionFilter filter = new TransactionFilter(from, to, type, accountId, categoryId, method, status, q);
-        // S-261 (L3): o status explícito vale mais que includeVoided (status=ACTIVE&includeVoided=true devolve só as ativas)
         CsvExport export = csv.handle(new ExportTransactionsCsvQuery(userId, filter, includeVoided && status == null, language(acceptLanguage)));
         response.setContentType("text/csv;charset=UTF-8");
         response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + export.fileName() + "\"");
@@ -83,12 +77,10 @@ public class ExportController {
         export.writeTo(response.getOutputStream());
     }
 
-    /** Backup completo (JSON versionado por {@code schemaVersion}); é um download, nunca cacheado. */
     @GetMapping(value = "/backup", produces = "application/json")
     public ResponseEntity<BackupResponse> backup(@CurrentUser UUID userId) {
         rateLimiter.acquire(userId);
         BackupSnapshot snapshot = backup.handle(new ExportBackupQuery(userId));
-        // BUG-QA-29: o dia do nome do arquivo é o do usuário (America/Sao_Paulo), não o de UTC
         String day = snapshot.generatedAt().atZone(time.zone()).toLocalDate().toString();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"moneylog-backup-" + day + ".json\"")
@@ -96,7 +88,6 @@ public class ExportController {
                 .body(BackupResponse.of(snapshot));
     }
 
-    /** Primeiro idioma de {@code Accept-Language}; ausente ou ilegível = português. */
     static Locale language(String acceptLanguage) {
         if (acceptLanguage == null || acceptLanguage.isBlank()) {
             return Locale.forLanguageTag("pt-BR");

@@ -21,15 +21,10 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
 
-/**
- * A1 (S-9): o teto do reembolso com {@code refundOf} é o valor efetivamente cobrado (Σ parcelas não canceladas, na
- * compra no cartão) menos os reembolsos anteriores. Sem isso, cancelar as parcelas restantes + reembolsar o total
- * revertia o consumo duas vezes.
- */
 @DisplayName("Reembolso depois de cancelar parcelas (A1, S-9)")
 class ReembolsoComParcelasCanceladasTest {
 
-    private static final LocalDate HOJE = LocalDate.of(2026, 10, 26); // fatura de 25/10 fechada: só a parcela 1 foi cobrada
+    private static final LocalDate HOJE = LocalDate.of(2026, 10, 26);
 
     private static TransactionHeader header(int n) {
         return TransactionHeader.of(UUID.fromString(String.format("00000000-0000-0000-0000-0000000a1%03d", n)), USER_ID, HOJE, "Reembolso");
@@ -115,7 +110,6 @@ class ReembolsoComParcelasCanceladasTest {
         assertThat(TransactionTestFactoryAccess.despesa().chargedAmount()).isEqualTo(Money.of("100.00"));
     }
 
-    /** Acesso à despesa de referência sem depender da ordem dos imports estáticos. */
     private static final class TransactionTestFactoryAccess {
         static Transaction despesa() {
             return com.moneylog.core.transaction.util.factory.TransactionTestFactory.umaDespesaPix();

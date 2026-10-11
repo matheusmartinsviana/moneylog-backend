@@ -15,13 +15,6 @@ import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Serialização de {@link Money} na API (D2 §4): {@code {"amount":"1234.50","currency":"BRL"}}, com {@code amount} em
- * <b>string</b> decimal de sempre 2 casas, nunca número. O {@code core} não conhece Jackson; o módulo fica na infra.
- *
- * <p>Na entrada, {@code amount} precisa ser string (número JSON é recusado, sem coerção) e valores inválidos viram
- * {@code 400} (o handler lê o caminho do campo da exceção do Jackson).
- */
 public final class MoneyJson extends SimpleModule {
 
     private static final Set<String> FIELDS = Set.of("amount", "currency");

@@ -19,10 +19,6 @@ import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Monta o {@link GenerationContext} pelas <b>mesmas fontes</b> do dashboard (S-79, PR 01 regra 10): {@code FinancialRecords},
- * {@code CommitmentSchedule} e {@code DashboardSummary}. A mensagem diária e as notificações não têm um segundo caminho de cálculo.
- */
 public class GenerationContextLoader {
 
     private final FinancialRecordsGateway records;

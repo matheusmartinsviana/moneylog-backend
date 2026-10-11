@@ -19,10 +19,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/**
- * Adaptador em memória da porta {@link DebtGateway}, só para teste. A dívida guarda as quitações nela mesma (na persistência real
- * elas derivam das movimentações ligadas), então o status e o saldo seguem os do agregado.
- */
 public class InMemoryDebtGateway implements DebtGateway {
 
     private final Map<UUID, Debt> debts = new HashMap<>();
@@ -59,7 +55,6 @@ public class InMemoryDebtGateway implements DebtGateway {
         return locked;
     }
 
-    /** Registra a data de uma quitação (a persistência real lê da movimentação). */
     public void settlementDate(UUID transactionId, LocalDate date) {
         settlementDates.put(transactionId, date);
     }

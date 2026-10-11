@@ -18,10 +18,6 @@ import org.junit.jupiter.api.Test;
 
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * Garante que a configuração local não diverge: variáveis do .env.example, imagem do Postgres e .gitignore.
- * Roda com {@code ./mvnw test} a partir de {@code backend/} (o repositório fica em {@code ..}).
- */
 @DisplayName("Configuração local consistente")
 class LocalEnvironmentConsistencyTest {
 
@@ -58,7 +54,6 @@ class LocalEnvironmentConsistencyTest {
                 assertThat(kv[1]).as(kv[0]).isEmpty();
             }
             if (kv[0].equals("MONEYLOG_OWNER_PASSWORD_HASH")) {
-                // Compose e shell interpolam "$" fora de aspas simples (achado 21 da revisão do plano).
                 assertThat(kv[1]).as(kv[0]).isEqualTo("''");
             }
             if (kv[0].equals("AI_PROVIDER")) {

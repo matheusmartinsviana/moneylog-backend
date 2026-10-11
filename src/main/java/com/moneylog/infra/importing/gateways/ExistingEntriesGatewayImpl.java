@@ -15,13 +15,8 @@ import com.moneylog.core.importing.domain.ImportDirection;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/** Movimentações existentes vistas como {@link ExistingEntry}. Só ativas; sempre por {@code user_id}. */
 public class ExistingEntriesGatewayImpl implements ExistingEntriesGateway {
 
-    /**
-     * Direção do ponto de vista da conta {@code ?} (o primeiro argumento do CASE). Transferência: saída na conta de origem, entrada no destino.
-     * Investimento: aporte sai da conta, resgate entra. Ajuste: aumento entra, redução sai. Receita, devolução e dinheiro recebido entram; o resto sai.
-     */
     private static final String ACCOUNT_DIRECTION = """
             CASE
               WHEN t.type = 'TRANSFER' THEN CASE WHEN t.account_id = ? THEN 'OUT' ELSE 'IN' END
@@ -56,7 +51,6 @@ public class ExistingEntriesGatewayImpl implements ExistingEntriesGateway {
 
     @Override
     public List<ExistingEntry> findInOtherAccounts(UUID userId, UUID excludingAccountId, LocalDate from, LocalDate to) {
-        // transações de outras contas (despesas e receitas) e linhas ainda não aplicadas de lotes em revisão, também de outras contas
         List<ExistingEntry> transactions = jdbc.query("""
                 SELECT t.id, t.account_id AS source_id, t.transaction_date AS day, t.amount_cents,
                        CASE WHEN t.type = 'INCOME' THEN 'IN' ELSE 'OUT' END AS dir
@@ -76,7 +70,6 @@ public class ExistingEntriesGatewayImpl implements ExistingEntriesGateway {
 
     @Override
     public boolean hasActiveOppositeLeg(UUID userId, UUID accountId, ImportDirection direction, Money amount, LocalDate date) {
-        // linha de saída: a perna oposta é uma receita em outra conta; linha de entrada: uma despesa
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (SELECT 1 FROM transactions t
                 WHERE t.user_id = ? AND t.status = 'ACTIVE' AND t.type = ? AND t.account_id IS NOT NULL AND t.account_id <> ?
@@ -88,7 +81,6 @@ public class ExistingEntriesGatewayImpl implements ExistingEntriesGateway {
         String key = rs.getString("dedup_key");
         String original = rs.getString("original_dedup_key");
         String type = rs.getString("type");
-        // transferência entra como "manual": a perna espelhada de um extrato vira possível duplicata dela, nunca despesa/receita sozinha
         boolean manual = "MANUAL".equals(rs.getString("source")) || "TRANSFER".equals(type);
         return new ExistingEntry(rs.getObject("id", UUID.class), sourceId, rs.getObject("transaction_date", LocalDate.class),
                 Money.ofCents(rs.getLong("amount_cents"), CurrencyCode.BRL), ImportDirection.valueOf(rs.getString("dir")),

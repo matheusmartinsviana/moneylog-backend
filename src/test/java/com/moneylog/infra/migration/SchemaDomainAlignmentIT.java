@@ -33,9 +33,6 @@ import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.util.IntegrationTest;
 
-/**
- * Schema (T11) e domínio (T2–T9) alinhados: cada CHECK de enum tem exatamente os valores do enum do core.
- */
 @IntegrationTest
 @DisplayName("Schema × domínio: enums alinhados")
 class SchemaDomainAlignmentIT {

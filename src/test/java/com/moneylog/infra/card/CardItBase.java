@@ -45,11 +45,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * Base dos ITs de cartão da Etapa 3 (T54 em diante). Cenário padrão: Nubank CHECKING 20.000,00, cartão Roxinho (instituição
- * Nubank, limite 10.000,00, fecha 25, vence 5, conta padrão Nubank), categorias Alimentação, Tecnologia (despesa) e Salário
- * (receita); relógio 10/10/2026 em {@code America/Sao_Paulo}. Toda requisição e resposta validada contra o contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 abstract class CardItBase {
@@ -103,9 +98,6 @@ abstract class CardItBase {
         income = category("Salário", CategoryKind.INCOME);
     }
 
-    // ---------------------------------------------------------------- relógio e transações
-
-    /** Avança o relógio e renova o token (o JWT expira pelo relógio do contexto). */
     protected void advanceTo(Instant instant) {
         clock.set(instant);
         bearer = auth.bearer(userId);
@@ -115,13 +107,10 @@ abstract class CardItBase {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
     }
 
-    // ---------------------------------------------------------------- requisições
-
     protected MockHttpServletRequestBuilder get(String url) {
         return MockMvcRequestBuilders.get(url).header(HttpHeaders.AUTHORIZATION, bearer);
     }
 
-    /** GET como outro usuário (o {@code Authorization} é o dele, não o do cenário). */
     protected MockHttpServletRequestBuilder getAs(String otherBearer, String url) {
         return MockMvcRequestBuilders.get(url).header(HttpHeaders.AUTHORIZATION, otherBearer);
     }
@@ -155,8 +144,6 @@ abstract class CardItBase {
         return body(mockMvc.perform(request).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
     }
 
-    // ---------------------------------------------------------------- cenário
-
     protected String createCard(String name, int closingDay, int dueDay) throws Exception {
         return body(mockMvc.perform(post("/v1/cards", "{\"name\":\"" + name + "\",\"institution\":\"Nubank\",\"limit\":{\"amount\":\"10000.00\","
                 + "\"currency\":\"BRL\"},\"closingDay\":" + closingDay + ",\"dueDay\":" + dueDay + ",\"defaultPaymentAccountId\":\"" + nubank
@@ -183,7 +170,6 @@ abstract class CardItBase {
                 + "\",\"cardId\":\"" + card + "\",\"categoryId\":\"" + tech + "\"}";
     }
 
-    /** As duas compras do cenário dos critérios, ambas em 10/10: 1.200,00 em 6x ("Notebook") e 1.083,00 à vista ("Mercado"). */
     protected void twoPurchases() throws Exception {
         created(purchase("1200.00", 6, "2026-10-10", "Notebook"));
         created(purchase("1083.00", 1, "2026-10-10", "Mercado"));
@@ -209,9 +195,6 @@ abstract class CardItBase {
         return node.get(field).get("amount").asString();
     }
 
-    /**
-     * Semeia o pagamento de uma fatura pelo domínio e pelo gateway (estado montado por fábrica, não pelo endpoint, E3-13).
-     */
     protected Transaction seedPayment(String amount, LocalDate closing, LocalDate date) {
         CreditCard domainCard = cardGateway.findById(userId, UUID.fromString(card)).orElseThrow().value();
         Account account = accountGateway.findById(userId, UUID.fromString(nubank)).orElseThrow().value();
@@ -225,8 +208,6 @@ abstract class CardItBase {
         return payment;
     }
 
-    // ---------------------------------------------------------------- pagamento de fatura pelo endpoint (T55 em diante)
-
     protected static String paymentBody(String accountId, String amount, String date) {
         return "{\"accountId\":\"" + accountId + "\",\"amount\":\"" + amount + "\",\"date\":\"" + date + "\"}";
     }
@@ -236,7 +217,6 @@ abstract class CardItBase {
                 .header("Idempotency-Key", UUID.randomUUID().toString()));
     }
 
-    /** Paga e devolve a fatura atualizada (200 e contrato conferidos). */
     protected JsonNode paid(LocalDate closing, String amount, String date) throws Exception {
         return body(payInvoice(invoiceId(closing), nubank, amount, date).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());

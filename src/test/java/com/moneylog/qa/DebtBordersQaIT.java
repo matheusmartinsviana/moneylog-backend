@@ -28,11 +28,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T82 (QA), bordas: divisão de 100,00 em 3 partes e 1 a 20 partes, teto S-78, datas de recorrência (dia 31, fevereiro, anual
- * 29/02, janela 2000-2100, fuso America/Sao_Paulo), frequências, ocorrência vencida (S-20), recorrência desativada e encerrada,
- * reembolso e edição da despesa dividida, caso 6/7/8 do PR 01.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: bordas de dívidas, divisão e recorrências")
@@ -93,8 +88,6 @@ class DebtBordersQaIT {
         return out;
     }
 
-    // ------------------------------------------------------------------------------------------------ divisão
-
     @Test
     @DisplayName("PR 01 casos 6, 7 e 8: empréstimo 300 (caixa −300, consumo 0, patrimônio 0), recebimento 300 (caixa +300, sem renda), dívida sem movimentação 200 (caixa 0, consumo 0, patrimônio −200)")
     void casos6e7e8() throws Exception {
@@ -138,7 +131,6 @@ class DebtBordersQaIT {
         assertThat(DebtQa.sharedExpense(a, "100.00", "2026-10-10", List.of(DebtQa.shareJson("100.00", joao))).code()).isEqualTo("SHARES_EXCEED_AMOUNT");
         Res single = CardQaWorld.ok(DebtQa.sharedExpense(a, "100.00", "2026-10-10", List.of(DebtQa.shareJson("99.99", joao))));
         assertThat(consumption(single)).isEqualTo("0.01");
-        // o consumo da categoria nunca fica negativo e a lista concorda
         JsonNode entries = a.getOk("/v1/entries?competence=2026-10");
         assertThat(entries.get("totals").get("total").get("amount").asString()).isEqualTo("0.02");
         assertThat(a.getOk("/v1/dashboard/summary").get("month").get("consumption").get("amount").asString()).isEqualTo("0.02");
@@ -181,11 +173,9 @@ class DebtBordersQaIT {
         Res voidTx = a.voidTx(id);
         assertThat(voidTx.status()).as(voidTx.toString()).isEqualTo(422);
         assertThat(a.ledgerSum()).isZero();
-        // a quitação do João não altera o consumo nem a regra do reembolso
         String share = tx.node().get("shares").get(0).get("id").asString();
         CardQaWorld.ok(DebtQa.received(a, "100.00", "2026-10-10", share));
         assertThat(DebtQa.accountRefund(a, "0.01", "2026-10-10", a.food, id).code()).isEqualTo("REFUND_EXCEEDS_ORIGINAL");
-        // perdoar a parte do João não devolve consumo ao reembolso
         Res tx2 = CardQaWorld.ok(DebtQa.sharedExpense(a, "200.00", "2026-10-11", List.of(DebtQa.shareJson("100.00", joao))));
         CardQaWorld.ok(DebtQa.cancelDebt(a, tx2.node().get("shares").get(0).get("id").asString()));
         assertThat(DebtQa.accountRefund(a, "100.01", "2026-10-11", a.food, tx2.node().get("id").asString()).code()).isEqualTo("REFUND_EXCEEDS_ORIGINAL");
@@ -229,7 +219,6 @@ class DebtBordersQaIT {
         assertThat(DebtQa.loan(a, over, "2026-10-10", joao, null).status()).isEqualTo(422);
         CardQaWorld.ok(DebtQa.plainDebt(a, joao, "PAYABLE", max, "2026-10-10", null, a.food));
         assertThat(DebtQa.plainDebt(a, joao, "PAYABLE", over, "2026-10-10", null, null).status()).isEqualTo(422);
-        // partes: cada uma no teto, Σ das 20 estoura o valor da despesa (422), e uma despesa no teto com parte no teto−0,01 passa
         List<String> shares = new ArrayList<>();
         for (int i = 0; i < 20; i++) {
             shares.add(DebtQa.shareJson(max, joao));
@@ -238,18 +227,15 @@ class DebtBordersQaIT {
         assertThat(big.status()).as(big.toString()).isEqualTo(422);
         CardQaWorld.ok(DebtQa.sharedExpense(a, max, "2026-10-10", List.of(DebtQa.shareJson("999999999.98", maria))));
         assertThat(DebtQa.sharedExpense(a, over, "2026-10-10", List.of(DebtQa.shareJson("1.00", maria))).status()).isEqualTo(422);
-        // quitação até o último centavo
         String debt = jdbc.queryForObject("select id::text from debts where user_id = ? and direction = 'RECEIVABLE' and principal_cents = 99999999999 limit 1", String.class, a.id);
         CardQaWorld.ok(DebtQa.received(a, max, "2026-10-10", debt));
         assertThat(a.getOk("/v1/debts/" + debt).get("status").asString()).isEqualTo("SETTLED");
-        // recorrência no teto e realização acima dele
         String rec = recurrence("EXPENSE", max, "MONTHLY", "2026-10-10", null);
         assertThat(a.raw(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", over, "x", a.food, DebtQa.accountTarget(a, "EXPENSE"), "MONTHLY", "2026-10-10", null), null).status())
                 .isEqualTo(422);
         assertThat(DebtQa.realize(a, rec, "2026-10-10", over).status()).isEqualTo(422);
         assertThat(DebtQa.realize(a, rec, "2026-10-10", "0.00").status()).isIn(400, 422);
         assertThat(DebtQa.realize(a, rec, "2026-10-10", max).status()).isEqualTo(201);
-        // o resumo e o patrimônio continuam consistentes (sem overflow)
         JsonNode s = a.getOk("/v1/dashboard/summary");
         assertThat(s.get("netWorth").get("total").get("amount").asString()).isNotEmpty();
         assertThat(a.ledgerSum()).isZero();
@@ -259,8 +245,6 @@ class DebtBordersQaIT {
         assertThat(world.contractViolations).isEmpty();
     }
 
-    // ------------------------------------------------------------------------------------------------ recorrências: datas
-
     @Test
     @DisplayName("dia 31, fevereiro e anual 29/02: 31/01, 28/02, 31/03, 30/04, 31/05; bissexto 29/02/2028; anual 29/02 vira 28/02 e volta a 29/02 em 2032")
     void datasDeRecorrencia() throws Exception {
@@ -269,7 +253,6 @@ class DebtBordersQaIT {
         String leap = recurrence("EXPENSE", "10.00", "MONTHLY", "2028-01-31", "\"maxOccurrences\":3");
         assertThat(dates(leap, "2028-01-01", "2028-12-31", "PENDING")).containsExactly("2028-01-31", "2028-02-29", "2028-03-31");
         String yearly = recurrence("EXPENSE", "10.00", "YEARLY", "2028-02-29", "\"maxOccurrences\":5");
-        // a janela de /occurrences tem no máximo 3 anos (S-240): o período de 6 anos vai em duas consultas
         List<String> yearlyDates = new ArrayList<>(dates(yearly, "2028-01-01", "2030-12-31", "PENDING"));
         yearlyDates.addAll(dates(yearly, "2031-01-01", "2033-12-31", "PENDING"));
         assertThat(yearlyDates).containsExactly("2028-02-29", "2029-02-28", "2030-02-28", "2031-02-28", "2032-02-29");
@@ -285,11 +268,9 @@ class DebtBordersQaIT {
         assertThat(dates(custom3m, "2026-11-01", "2027-12-31", "PENDING")).containsExactly("2026-11-30", "2027-02-28", "2027-05-30", "2027-08-30");
         String both = recurrence("EXPENSE", "10.00", "MONTHLY", "2026-10-10", "\"maxOccurrences\":10,\"endDate\":\"2026-12-10\"");
         assertThat(dates(both, "2026-10-01", "2027-12-31", "PENDING")).containsExactly("2026-10-10", "2026-11-10", "2026-12-10");
-        // data que não é ocorrência
         assertThat(DebtQa.realize(a, monthly31, "2026-02-27", null).code()).isEqualTo("RECURRENCE_NOT_AN_OCCURRENCE");
         assertThat(DebtQa.skip(a, monthly31, "2026-02-27").code()).isEqualTo("RECURRENCE_NOT_AN_OCCURRENCE");
         assertThat(DebtQa.realize(a, monthly31, "2026-06-30", null).code()).isEqualTo("RECURRENCE_NOT_AN_OCCURRENCE");
-        // fevereiro: realizar 28/02 cria a movimentação em 28/02
         Res feb = CardQaWorld.ok(DebtQa.realize(a, monthly31, "2026-02-28", null));
         assertThat(feb.node().get("date").asString()).isEqualTo("2026-02-28");
         assertThat(a.ledgerSum()).isZero();
@@ -302,7 +283,6 @@ class DebtBordersQaIT {
         assertThat(a.raw(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", "10.00", "x", a.food, DebtQa.accountTarget(a, "EXPENSE"), "YEARLY", "2101-01-01", null), null).status()).isEqualTo(400);
         String yearly2000 = recurrence("EXPENSE", "10.00", "YEARLY", "2000-01-01", null);
         String last = recurrence("EXPENSE", "10.00", "DAILY", "2100-12-30", null);
-        // a ocorrência 01/01/2101 da recorrência diária e a de 2101-01-01 da anual existem na agenda (não há fim); realizar cria movimentação fora da janela
         List<String> failures = new ArrayList<>();
         for (Object[] c : new Object[][] {{yearly2000, "2101-01-01"}, {last, "2101-01-01"}, {last, "2100-12-31"}}) {
             Res r = DebtQa.realize(a, (String) c[0], (String) c[1], null);
@@ -364,7 +344,6 @@ class DebtBordersQaIT {
         }
         assertThat(overdueItems).isEqualTo(2);
         assertThat(a.getOk("/v1/dashboard/summary").get("committed").get("d30").get("amount").asString()).isEqualTo("357.00");
-        // realizar a de agosto: movimentação em 10/08, sai dos compromissos; pular a de setembro: some, sem movimentação
         Res realized = CardQaWorld.ok(DebtQa.realize(a, id, "2026-08-10", null));
         assertThat(realized.node().get("date").asString()).isEqualTo("2026-08-10");
         CardQaWorld.ok(DebtQa.skip(a, id, "2026-09-10"));
@@ -373,7 +352,6 @@ class DebtBordersQaIT {
         assertThat(DebtQa.realize(a, id, "2026-09-10", null).code()).isEqualTo("RECURRENCE_OCCURRENCE_SKIPPED");
         assertThat(DebtQa.skip(a, id, "2026-08-10").code()).isIn("RECURRENCE_OCCURRENCE_ALREADY_REALIZED", "RECURRENCE_OCCURRENCE_SKIPPED");
         assertThat(DebtQa.skip(a, id, "2026-09-10").status()).as("pular de novo").isIn(200, 422);
-        // estornar a realizada de agosto a reabre (S-49) e ela volta a ser vencida/pendente
         CardQaWorld.ok(a.voidTx(realized.node().get("id").asString()));
         assertThat(a.getOk("/v1/dashboard/summary").get("committed").get("d30").get("amount").asString()).isEqualTo("238.00");
         assertThat(a.ledgerSum()).isZero();
@@ -391,7 +369,6 @@ class DebtBordersQaIT {
         assertThat(dates(off, "2026-10-01", "2027-03-31", "PENDING")).isEmpty();
         assertThat(dates(off, "2026-10-01", "2027-03-31", "REALIZED")).containsExactly("2026-10-10");
         assertThat(dates(off, "2026-10-01", "2027-03-31", "SKIPPED")).containsExactly("2026-11-10");
-        // encerrar em 15/12: 10/12 continua, 10/01 some
         Res end = CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/recurrences/" + ended + "/end", "{\"endDate\":\"2026-12-15\"}", null));
         assertThat(end.node().get("endDate").asString()).isEqualTo("2026-12-15");
         assertThat(dates(ended, "2026-10-01", "2027-03-31", "PENDING")).containsExactly("2026-10-10", "2026-11-10", "2026-12-10");
@@ -400,13 +377,11 @@ class DebtBordersQaIT {
         up.get("items").forEach(i -> refs.add(i.get("refId").asString()));
         assertThat(refs).doesNotContain(off);
         assertThat(refs.stream().filter(ended::equals).count()).isEqualTo(3);
-        // encerrar com data anterior ao início e no passado
         Res before = a.raw(HttpMethod.POST, "/v1/recurrences/" + ended + "/end", "{\"endDate\":\"2026-09-01\"}", null);
         assertThat(before.status()).as(before.toString()).isIn(400, 422);
         Res yesterday = a.call(HttpMethod.POST, "/v1/recurrences/" + ended + "/end", "", null);
         assertThat(yesterday.status()).as(yesterday.toString()).isEqualTo(200);
         assertThat(dates(ended, "2026-10-01", "2027-03-31", "PENDING")).containsExactly("2026-10-10").as("encerrada hoje (10/10): a de hoje continua").isNotNull();
-        // realizar (e pular) na desativada é recusado, inclusive as atrasadas (S-234, BUG-QA-19)
         Res late = DebtQa.realize(a, off, "2026-12-10", null);
         assertThat(late.status()).as(late.toString()).isEqualTo(422);
         assertThat(late.code()).isEqualTo("RECURRENCE_INACTIVE");
@@ -429,7 +404,6 @@ class DebtBordersQaIT {
                 invoices += CardQaWorld.cents(i.get("amount"));
             }
         }
-        // pendentes: 15/09 (vencida), 15/10 e 15/11; fatura 1.233,10; dívida 200,00
         assertThat(out).isEqualTo(invoices + 3 * 4990L + 20_000L);
         CardQaWorld.ok(DebtQa.realize(a, rec, "2026-10-15", null));
         JsonNode after = a.getOk("/v1/dashboard/upcoming?from=2026-10-10&to=2026-11-30");
@@ -475,10 +449,8 @@ class DebtBordersQaIT {
         assertThat(overdueItems).as("só as 500 vencidas mais recentes").isEqualTo(500);
         assertThat(up.node().get("overdueTruncated").asBoolean()).isTrue();
         assertThat(occ.node().get("overdueTruncated").asBoolean()).isTrue();
-        // o aviso e a lista valem na página seguinte: 500 vencidas, 50 por página = 10 páginas, sem a 11a
         assertThat(pending.node().get("items").size()).isEqualTo(50);
         assertThat(pending.node().get("hasNext").asBoolean()).isFalse();
-        // os totais continuam completos (as 98.100 vencidas + os próximos 30 dias de cada diária), iguais ao comprometido do dashboard
         assertThat(up.node().get("totals").get("out").get("amount").asString()).isEqualTo(summary.node().get("committed").get("d30").get("amount").asString());
     }
 
@@ -495,7 +467,6 @@ class DebtBordersQaIT {
             assertThat(r.status()).as(url + " -> " + r).isEqualTo(400);
             assertThat(r.code()).as(url).isEqualTo("VALIDATION_FAILED");
         }
-        // o limite é inclusivo e a janela 2000-2100 vale; "to" no passado dentro da janela, sem "from", segue válido em /occurrences (as vencidas)
         for (String url : List.of("/v1/dashboard/upcoming?to=2029-10-10", "/v1/dashboard/upcoming?from=2000-01-01&to=2003-01-01", "/v1/dashboard/upcoming?from=2097-12-31&to=2100-12-31",
                 "/v1/recurrences/occurrences?to=2029-10-10", "/v1/recurrences/occurrences?to=2020-01-01", "/v1/recurrences/occurrences?from=2000-01-01&to=2003-01-01",
                 "/v1/dashboard/summary?asOf=2000-01-01", "/v1/dashboard/summary?asOf=2100-12-31")) {
@@ -504,8 +475,6 @@ class DebtBordersQaIT {
         }
     }
 
-
-    // ------------------------------------------------------------------------------------------------ contrato (S-227, S-228)
 
     @Test
     @DisplayName("S-228 (alteração não aditiva): POST só com type LOAN_GIVEN/MONEY_RECEIVED/DEBT_PAYMENT agora é 400 (antes 422 NOT_AVAILABLE); INVOICE_PAYMENT segue 422 NOT_AVAILABLE; PUT de dívida é 422 NOT_EDITABLE (S-227), também com o corpo mínimo")
@@ -525,7 +494,6 @@ class DebtBordersQaIT {
         Res full = a.raw(HttpMethod.PUT, "/v1/transactions/" + id, "{\"type\":\"LOAN_GIVEN\",\"amount\":\"90.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"accountId\":\"" + a.nubank
                 + "\",\"newDebt\":{\"personId\":\"" + joao + "\"},\"version\":0}", null);
         assertThat(full.status()).as(full.toString()).isIn(400, 422);
-        // movimentações de dívida: tipo trocado no PUT
         Res swapped = a.raw(HttpMethod.PUT, "/v1/transactions/" + id, "{\"type\":\"EXPENSE\",\"amount\":\"90.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"accountId\":\"" + a.nubank
                 + "\",\"categoryId\":\"" + a.food + "\",\"method\":\"PIX\",\"version\":0}", null);
         assertThat(swapped.status()).as(swapped.toString()).isEqualTo(422);
@@ -547,15 +515,12 @@ class DebtBordersQaIT {
         assertThat(DebtQa.payment(a, "10.00", "2026-10-10", debt).code()).isEqualTo("DEBT_DIRECTION_MISMATCH");
         String payable = CardQaWorld.ok(DebtQa.plainDebt(a, maria, "PAYABLE", "50.00", "2026-10-10", null, null)).node().get("id").asString();
         assertThat(DebtQa.received(a, "10.00", "2026-10-10", payable).code()).isEqualTo("DEBT_DIRECTION_MISMATCH");
-        // conta de investimento
         String invest = CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/accounts", "{\"name\":\"CDB\",\"type\":\"INVESTMENT\",\"institution\":\"X\",\"openingBalance\":{\"amount\":\"0.00\",\"currency\":\"BRL\"},"
                 + "\"openingDate\":\"2026-10-01\"}", null)).node().get("id").asString();
         Res onInvest = DebtQa.createTx(a, "{\"type\":\"LOAN_GIVEN\",\"amount\":\"10.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"accountId\":\"" + invest + "\",\"newDebt\":{\"personId\":\"" + joao + "\"}}");
         assertThat(onInvest.code()).isEqualTo("TRANSACTION_ACCOUNT_NOT_CASH");
         assertThat(a.ledgerSum()).isZero();
     }
-
-    // ------------------------------------------------------------------------------------------------ paginação e filtros
 
     @Test
     @DisplayName("paginação e filtros das listas novas: pageSize 51 e page 0 são 400; status/direction/overdue inválidos 400; q longo e filtros cruzados sem 5xx")

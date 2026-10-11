@@ -31,12 +31,6 @@ import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/**
- * T184 e T185: {@code GET /v1/reports/income-expenses} e {@code GET /v1/reports/spending-by-category}. Cenário de outubro de 2026 (relógio
- * 10/10/2026 em America/Sao_Paulo): Salário 3.000,00 (05/10), Pix de 100,00 (05/10) com reembolso de 50,00 (09/10), Pix de 100,00 e compra de 1.200,00
- * em 6x (10/10), pagamento antecipado de fatura, transferência, aplicação de 10.000,00 e empréstimo (nenhum deles é consumo). Toda requisição e resposta
- * é validada contra o contrato.
- */
 @DisplayName("Relatórios: série de entradas e saídas e consumo por categoria (T184, T185)")
 class ReportsIT extends E4ItBase {
 
@@ -86,7 +80,6 @@ class ReportsIT extends E4ItBase {
         assertThat(invoiceId).as("a fatura aberta com a compra").isNotNull();
         okBody(post(invoicePayment + invoiceId + "/payments", "{\"amount\":\"150.00\",\"date\":\"2026-10-10\",\"accountId\":\"" + nubank + "\"}")
                 .header("Idempotency-Key", UUID.randomUUID().toString()));
-        // agendada para depois de hoje (mês corrente)
         created(expense("80.00", "2026-10-20", "Agendada", food));
     }
 
@@ -289,8 +282,6 @@ class ReportsIT extends E4ItBase {
         assertThat(amount(spending.get("total"))).isEqualTo("0.00");
     }
 
-    // ------------------------------------------------------------------ spending-by-category
-
     @Test
     @DisplayName("T185: top 5 de 8 categorias em ordem decrescente, other soma as 3 restantes; total = month.consumption = entries.totals.total; share com 4 casas")
     void deveListarAsMaioresCategorias() throws Exception {
@@ -375,8 +366,6 @@ class ReportsIT extends E4ItBase {
         mockMvc.perform(get("/v1/reports/spending-by-category?limit=" + limit)).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
-
-    // ------------------------------------------------------------------ propriedade e isolamento da leitura
 
     @ParameterizedTest(name = "semente {0}")
     @ValueSource(longs = {1, 2, 3, 4})

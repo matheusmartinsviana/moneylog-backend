@@ -10,11 +10,6 @@ import com.moneylog.core.sk.money.Money;
 
 public interface CreateCommitmentUseCase {
 
-    /**
-     * Cadastra um compromisso acompanhado. {@code TRACKED_THIRD_PARTY}: parcelas pagas/total (+ valor pago e próximo vencimento, se
-     * informados); o saldo não é calculado. {@code LONG_TERM_PROJECT}: cronograma completo (itens pagos e pendentes); {@code total}
-     * opcional tem de fechar com Σ do cronograma. Mesma chave + mesmo corpo devolve o mesmo compromisso.
-     */
     com.moneylog.core.commitment.app.CommitmentView handle(CreateCommitmentCommand command);
 
     record ItemInput(String label, ScheduleItemType type, LocalDate dueDate, Money amount, boolean paid, LocalDate paidOn) {

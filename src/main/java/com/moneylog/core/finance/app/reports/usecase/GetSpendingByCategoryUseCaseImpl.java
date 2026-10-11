@@ -16,7 +16,6 @@ import com.moneylog.core.finance.domain.SpendingByCategory;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Sem classificação própria (S-79): {@link EntryReport} da lente de consumo e só {@link SpendingByCategory#of}. */
 public class GetSpendingByCategoryUseCaseImpl implements GetSpendingByCategoryUseCase {
 
     private final FinancialRecordsGateway records;

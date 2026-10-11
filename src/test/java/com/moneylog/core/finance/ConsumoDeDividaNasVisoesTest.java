@@ -32,11 +32,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.app.query.EntryFilter;
 
-/**
- * S-137 e S-79: o consumo de uma dívida {@code PAYABLE} com categoria (um amigo pagou meu jantar de 80,00) aparece no dashboard
- * ({@code debtConsumption}, dentro de {@code consumption}) e na visão por competência (linha sem movimentação), então a lista e o
- * dashboard continuam fechando.
- */
 @DisplayName("Consumo de dívida nas visões por competência e no dashboard (S-137, S-79)")
 class ConsumoDeDividaNasVisoesTest {
 
@@ -76,12 +71,10 @@ class ConsumoDeDividaNasVisoesTest {
         assertThat(debtLine.description()).isEqualTo("jantar pago pelo amigo");
         assertThat(debtLine.categoryId()).isEqualTo(food.id());
         assertThat(all.byCategory().get(food.id())).isEqualTo(Money.of("180.00"));
-        // com filtro por movimentação (5 argumentos) a linha de dívida fica de fora; o filtro de categoria da dívida a traz de volta
         EntryReport filtered = EntryReport.of(records, records.ledger(), EntryLens.CONSUMPTION, OCTOBER, t -> true);
         assertThat(filtered.total()).isEqualTo(Money.of("100.00"));
         EntryReport byCategory = EntryReport.of(records, records.ledger(), EntryLens.CONSUMPTION, OCTOBER, t -> true, food.id()::equals);
         assertThat(byCategory.total()).isEqualTo(Money.of("180.00"));
-        // a lente de receita não tem linha de dívida
         assertThat(EntryReport.of(records, records.ledger(), EntryLens.INCOME, OCTOBER).lines()).isEmpty();
     }
 

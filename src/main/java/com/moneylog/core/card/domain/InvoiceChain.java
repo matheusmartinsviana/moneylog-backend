@@ -14,18 +14,6 @@ import com.moneylog.core.card.exception.CardExceptions.InvoiceChainInconsistentE
 import com.moneylog.core.card.exception.CardExceptions.InvoiceClosingDateNotFoundException;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Cadeia de faturas de um cartão (D1 §2.5.3): calcula {@code carryIn}/{@code creditCarry} em ordem de fechamento e o
- * status de cada fatura. É reconstruída a partir dos itens e pagamentos ativos; o transporte de crédito é só
- * apresentação (no razão há um posting por pagamento e um por crédito).
- *
- * <p>Invariante (D1 §4, item 11): Σ outstanding − creditCarry da última = Σ total − Σ paid = −(saldo do livro CARD).
- *
- * <p>A cadeia é de <b>um</b> cartão ({@link #cardId()}): fábricas e guardas recusam cadeia de outro cartão (A3). Todo
- * item e pagamento aponta para uma data que é fechamento do calendário; o contrário lança
- * {@link InvoiceChainInconsistentException} em vez de sumir com o item (C1, depois de uma mudança de dia sem
- * realocação).
- */
 public final class InvoiceChain {
 
     public static final String INVOICE_NOT_PAYABLE = "INVOICE_NOT_PAYABLE";
@@ -36,7 +24,6 @@ public final class InvoiceChain {
     private final InvoiceCalendar calendar;
     private final List<InvoiceItem> items;
     private final List<InvoicePayment> payments;
-    /** B5: a cadeia da primeira à última fatura com movimento, calculada uma vez por estado (invalidada pelas mutações). */
     private List<CreditCardInvoice> memo;
     private YearMonth memoFirst;
 
@@ -49,7 +36,6 @@ public final class InvoiceChain {
         this.payments.forEach(p -> requireInCalendar(p.invoiceClosingDate(), "pagamento " + p.transactionId()));
     }
 
-    /** Cadeia sem movimentos do cartão. */
     public static InvoiceChain empty(CreditCard card) {
         return new InvoiceChain(card.id(), card.calendar(), List.of(), List.of());
     }
@@ -58,33 +44,21 @@ public final class InvoiceChain {
         return cardId;
     }
 
-    /**
-     * Garante que a cadeia é do cartão informado (A3). Cadeia de outro cartão é erro de ligação do caso de uso.
-     *
-     * @throws InvoiceChainInconsistentException se for de outro cartão
-     */
     public void ensureFor(UUID expectedCardId) {
         if (!cardId.equals(expectedCardId)) {
             throw new InvoiceChainInconsistentException("a cadeia é do cartão " + cardId + ", não do cartão " + expectedCardId + ".");
         }
     }
 
-    /** Faturas com algum item ou pagamento (ativo ou não), contíguas da primeira à última, em ordem de fechamento. */
     public List<CreditCardInvoice> invoices() {
         return new ArrayList<>(memoized());
     }
 
-    /**
-     * Fatura que fecha em {@code closingDate} (pode estar vazia), com o crédito transportado das anteriores.
-     *
-     * @throws InvoiceChainInconsistentException se {@code closingDate} não é fechamento do calendário
-     */
     public CreditCardInvoice invoice(LocalDate closingDate) {
         requireInCalendar(closingDate, "fatura consultada");
         return invoiceAt(closingDate);
     }
 
-    /** {@code true} se existe fatura (vazia ou não) que fecha exatamente em {@code closingDate}. */
     public boolean hasClosingDate(LocalDate closingDate) {
         return calendar.isClosingDate(closingDate);
     }
@@ -93,21 +67,15 @@ public final class InvoiceChain {
         return invoice(closingDate).statusAt(today);
     }
 
-    /** Fatura corrente: a única {@code OPEN} em {@code today}. */
     public CreditCardInvoice current(LocalDate today) {
         return invoice(calendar.periodFor(today).closingDate());
     }
 
-    /** Crédito no cartão: o {@code creditCarry} da última fatura com movimento. */
     public Money creditBalance() {
         List<CreditCardInvoice> all = memoized();
         return all.isEmpty() ? CreditCardInvoice.zero() : all.getLast().creditCarry();
     }
 
-    /**
-     * Valida a entrada de um item (matriz status × operação, T6a CA9): {@code FUTURE}/{@code OPEN} aceitam;
-     * {@code CLOSED}/{@code OVERDUE} só como lançamento tardio; {@code PAID} nunca recebe item (S-14).
-     */
     public void ensureCanReceiveItem(LocalDate closingDate, boolean lateEntry, LocalDate today) {
         requireExistingInvoice(closingDate);
         if (isUntouchedIssued(closingDate, today)) {
@@ -129,10 +97,6 @@ public final class InvoiceChain {
         }
     }
 
-    /**
-     * Pagamento em {@code OPEN} (antecipação), {@code CLOSED} e {@code OVERDUE}; recusado em {@code FUTURE}/{@code PAID}.
-     * A data precisa ser exatamente um fechamento do calendário (A3): "24/10" não é a fatura de 25/10.
-     */
     public void ensurePayable(LocalDate closingDate, LocalDate today) {
         requireExistingInvoice(closingDate);
         InvoiceStatus status = statusOf(closingDate, today);
@@ -142,11 +106,6 @@ public final class InvoiceChain {
         }
     }
 
-    /**
-     * Fatura já fechada, ainda dentro do prazo de vencimento e sem nenhum item ou pagamento (nem desativado): o status derivado a
-     * chama de {@code PAID} (total zero), mas ninguém a pagou; o banco a emitiu e o app só não recebeu os itens ainda (carga de uma
-     * fatura emitida, lançamento tardio). Depois do vencimento volta a valer a regra geral (fatura sem movimento = paga, S-14).
-     */
     public boolean isUntouchedIssued(LocalDate closingDate, LocalDate today) {
         requireExistingInvoice(closingDate);
         CreditCardInvoice invoice = invoice(closingDate);
@@ -166,14 +125,12 @@ public final class InvoiceChain {
         invalidate();
     }
 
-    /** Desativa itens e pagamentos de uma movimentação estornada. */
     public void deactivateTransaction(UUID transactionId) {
         items.replaceAll(i -> i.transactionId().equals(transactionId) ? i.deactivate() : i);
         payments.replaceAll(p -> p.transactionId().equals(transactionId) ? p.deactivate() : p);
         invalidate();
     }
 
-    /** Desativa o item de uma parcela cancelada. */
     public void deactivateInstallment(UUID installmentId) {
         items.replaceAll(i -> installmentId.equals(i.installmentId()) ? i.deactivate() : i);
         invalidate();
@@ -206,7 +163,6 @@ public final class InvoiceChain {
         return Stream.concat(items.stream().map(InvoiceItem::invoiceClosingDate), payments.stream().map(InvoicePayment::invoiceClosingDate));
     }
 
-    /** A cadeia contígua do mês da primeira ao da última movimentação (vazia sem movimento); calculada uma vez por estado. */
     private List<CreditCardInvoice> memoized() {
         if (memo == null) {
             YearMonth first = movementClosings().map(YearMonth::from).min(YearMonth::compareTo).orElse(null);
@@ -226,10 +182,6 @@ public final class InvoiceChain {
         return memo;
     }
 
-    /**
-     * A fatura que fecha no mês de {@code closingDate}: sai da cadeia memoizada quando está dentro dela; depois da última
-     * movimentação só há o crédito da última fatura para transportar; antes da primeira não há nada a transportar.
-     */
     private CreditCardInvoice invoiceAt(LocalDate closingDate) {
         YearMonth target = YearMonth.from(closingDate);
         List<CreditCardInvoice> chain = memoized();

@@ -12,10 +12,6 @@ import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/**
- * Adaptador em memória da porta {@link GoalGateway}, só para teste (a implementação JPA é {@code GoalGatewayImpl}). Cada gravação sobe a
- * versão, como a persistência real; guarda <b>uma cópia</b> da meta, então mudar o objeto devolvido sem gravar não altera o que está guardado.
- */
 public class InMemoryGoalGateway implements GoalGateway {
 
     private final Map<UUID, Goal> goals = new HashMap<>();

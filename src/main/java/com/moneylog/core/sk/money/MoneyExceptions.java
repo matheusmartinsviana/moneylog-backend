@@ -2,9 +2,6 @@ package com.moneylog.core.sk.money;
 
 import com.moneylog.core.sk.exception.BusinessRuleException;
 
-/**
- * Exceções do value object {@link Money}.
- */
 public final class MoneyExceptions {
 
     private MoneyExceptions() {
@@ -29,7 +26,6 @@ public final class MoneyExceptions {
         }
     }
 
-    /** S-78: valor de entrada acima do teto (erro de digitação provável). */
     public static class AmountAboveLimitException extends BusinessRuleException {
         public AmountAboveLimitException(String field, Money max) {
             super("AMOUNT_ABOVE_LIMIT", "O valor de " + field + " passa do máximo permitido (" + max + ").");

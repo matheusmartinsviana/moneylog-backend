@@ -10,10 +10,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.moneylog.core.finance.domain.Projection;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * {@code Projection} do contrato (S-152): sempre {@code isProjection = true}, com as premissas ({@code assumptions}, chaves
- * traduzíveis). A tendência ({@code trend}) só vem com {@code includeTrend = true} e é sempre {@code estimate = true}.
- */
 public record ProjectionResponse(@JsonProperty("isProjection") boolean isProjection, ProjectionHorizon horizon, LocalDate asOf,
                                  Money startingBalance, List<Point> series, List<String> assumptions, Goals goals,
                                  @JsonInclude(JsonInclude.Include.NON_NULL) Trend trend) {
@@ -30,7 +26,6 @@ public record ProjectionResponse(@JsonProperty("isProjection") boolean isProject
     public record TrendPoint(String competence, Money estimatedSpending, Money balance) {
     }
 
-    /** {@code reason}, {@code monthlyAverage} e {@code series} só quando aplicável ({@code available}). */
     public record Trend(boolean available, boolean estimate, String reason, Money monthlyAverage, List<String> basedOn,
                         List<TrendPoint> series) {
     }

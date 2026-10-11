@@ -4,19 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
 
-/**
- * Reescreve o <b>alvo</b> de wikilinks no texto, preservando tudo o mais (alias, seção, embed, código e o resto do corpo, byte a byte).
- * Links dentro de código nunca são tocados (o {@link WikilinkParser} não os devolve).
- */
 public final class WikilinkRewriter {
 
     private WikilinkRewriter() {
     }
 
-    /**
-     * @param newTarget devolve o novo alvo de cada link, ou {@code null} para deixá-lo como está
-     * @return o texto reescrito (o mesmo objeto se nada mudou)
-     */
     public static String rewrite(String text, int from, Function<Wikilink, String> newTarget) {
         List<Wikilink> links = WikilinkParser.parse(text, from);
         List<Object[]> edits = new ArrayList<>();

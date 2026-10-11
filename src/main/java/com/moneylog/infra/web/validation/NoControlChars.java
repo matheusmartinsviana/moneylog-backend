@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 
-/** O texto não tem caractere de controle (B4); com {@code allowLineBreaks}, quebra de linha e tabulação passam (notas). */
 @Documented
 @Constraint(validatedBy = NoControlCharsValidator.class)
 @Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT})

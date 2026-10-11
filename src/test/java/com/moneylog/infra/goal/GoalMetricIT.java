@@ -32,7 +32,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/** ADR-016: meta de medida, estágio, plano declarado, instantâneos e consistência, contra o contrato. Relógio 10/10/2026. Dados sintéticos. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Metas de medida, estágio, plano e consistência (ADR-016)")
@@ -118,16 +117,14 @@ class GoalMetricIT {
         assertThat(goal.get("stage").asString()).isEqualTo("FANTASY");
         assertThat(snapshots(id)).isEqualTo(1L);
 
-        // a dívida cai (pagamento fictício simulado por nova compra negativa não existe): a leitura acompanha o overview
         mockMvc.perform(post("/v1/cards/" + card + "/ongoing-installments", "{\"description\":\"Mais\",\"installmentAmount\":\"100.00\","
                 + "\"totalInstallments\":2,\"remainingInstallments\":2}")).andExpect(status().isCreated());
         JsonNode read = body(mockMvc.perform(get("/v1/goals/" + id)).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
         assertThat(read.get("current").get("amount").asString()).isEqualTo("1400.00");
-        assertThat(read.get("progress").asString()).isEqualTo("0.0000"); // piorou: nunca negativo
+        assertThat(read.get("progress").asString()).isEqualTo("0.0000");
         JsonNode list = body(mockMvc.perform(get("/v1/goals")).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
         assertThat(list.get("items")).hasSize(1);
 
-        // erros
         mockMvc.perform(post("/v1/goals", "{\"kind\":\"METRIC\",\"metric\":\"TOTAL_DEBT\",\"target\":\"0.00\"}")).andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GOAL_METRIC_DUPLICATE"));
         mockMvc.perform(post("/v1/goals", "{\"kind\":\"METRIC\",\"metric\":\"CARD_DEBT\",\"target\":\"1400.00\"}")).andExpect(status().isUnprocessableEntity())
@@ -176,31 +173,25 @@ class GoalMetricIT {
         assertThat(edited.get("target").get("amount").asString()).isEqualTo("600.00");
         assertThat(edited.get("stage").asString()).isEqualTo("STRATEGY");
         assertThat(edited.get("monthsLeft").asInt()).isEqualTo(9);
-        assertThat(edited.get("requiredPace").get("amount").asString()).isEqualTo("66.67"); // 600 / 9, para cima
+        assertThat(edited.get("requiredPace").get("amount").asString()).isEqualTo("66.67");
         assertThat(edited.get("onTrack").asBoolean()).isTrue();
-        // desligar o prazo rebaixa para FANTASY
         JsonNode noDeadline = body(mockMvc.perform(put("/v1/goals/" + id, "{\"planNote\":\"Pagar 150 por mês\",\"version\":" + edited.get("version").asLong() + "}"))
                 .andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
         assertThat(noDeadline.get("stage").asString()).isEqualTo("FANTASY");
         assertThat(noDeadline.get("requiredPace").isNull()).isTrue();
-        // alvo igual à baseline (1200) é 422 e não muda nada
         mockMvc.perform(put("/v1/goals/" + id, "{\"target\":\"1200.00\",\"version\":" + noDeadline.get("version").asLong() + "}"))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("GOAL_METRIC_TARGET_EQUALS_BASELINE"));
-        // outra meta com o mesmo alvo: editar para colidir é 409
         createMetric("{\"kind\":\"METRIC\",\"metric\":\"TOTAL_DEBT\",\"target\":\"700.00\"}");
         mockMvc.perform(put("/v1/goals/" + id, "{\"target\":\"700.00\",\"version\":" + noDeadline.get("version").asLong() + "}"))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("GOAL_METRIC_DUPLICATE"));
-        // re-ancorar com o valor de agora
         mockMvc.perform(post("/v1/cards/" + card + "/ongoing-installments", "{\"description\":\"Mais\",\"installmentAmount\":\"100.00\","
                 + "\"totalInstallments\":2,\"remainingInstallments\":2}")).andExpect(status().isCreated());
         mockMvc.perform(post("/v1/goals/" + id + "/baseline", "")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.baseline.amount").value("1400.00")).andExpect(jsonPath("$.progress").value("0.0000"));
-        // reservar: não reservável
         mockMvc.perform(MockMvcRequestBuilders.post("/v1/goals/" + id + "/reservations").header(HttpHeaders.AUTHORIZATION, bearer)
                 .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"accountId\":\"" + UUID.randomUUID() + "\",\"amount\":\"10.00\",\"date\":\"2026-10-10\"}"))
                 .andExpect(status().is4xxClientError());
-        // arquivar: não calcula
         mockMvc.perform(post("/v1/goals/" + id + "/archive", "")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.status").value("ARCHIVED")).andExpect(jsonPath("$.current").value((Object) null))
                 .andExpect(jsonPath("$.remaining").value((Object) null)).andExpect(jsonPath("$.metricAsOf").value((Object) null));
@@ -212,7 +203,7 @@ class GoalMetricIT {
         JsonNode goal = createMetric("{\"kind\":\"METRIC\",\"metric\":\"TOTAL_DEBT\",\"target\":\"0.00\",\"deadline\":\"2027-09-30\"}");
         String id = goal.get("id").asString();
         assertThat(goal.get("stage").asString()).isEqualTo("OBJECTIVE");
-        assertThat(goal.get("requiredPace").get("amount").asString()).isEqualTo("100.00"); // 1200 / 12 meses, sugestão do plano automático
+        assertThat(goal.get("requiredPace").get("amount").asString()).isEqualTo("100.00");
         MvcResult added = mockMvc.perform(post("/v1/goals/" + id + "/actions", "{\"title\":\"Pagar a fatura em dia\",\"frequency\":\"MONTHLY\"}"))
                 .andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.stage").value("STRATEGY")).andReturn();
         assertThat(added.getResponse().getHeader("Location")).isEqualTo("/v1/goals/" + id);
@@ -257,27 +248,25 @@ class GoalMetricIT {
         mockMvc.perform(get("/v1/goals/" + id)).andExpect(status().isOk());
         assertThat(snapshots(id)).isEqualTo(1L);
 
-        // ação declarada + meses seguintes: out cumpriu, nov sem dado, dez cumpriu (esperado: 1200 - 100 * k), jan é o mês corrente
         String action = body(mockMvc.perform(post("/v1/goals/" + id + "/actions", "{\"title\":\"Pagar\",\"frequency\":\"MONTHLY\"}")).andReturn())
                 .get("actions").get(0).get("id").asString();
         assertThat(action).isNotBlank();
-        write("UPDATE goal_metric_snapshots SET value_cents = 100000 WHERE goal_id = ?::uuid", id); // out/2026: 1000,00 <= 1100,00
-        insertSnapshot(id, "2026-12-01", 90000L);   // dez: 900,00 <= 900,00
-        clock.set(MutableClockConfig.INITIAL.plus(Duration.ofDays(100))); // 18/01/2027
+        write("UPDATE goal_metric_snapshots SET value_cents = 100000 WHERE goal_id = ?::uuid", id);
+        insertSnapshot(id, "2026-12-01", 90000L);
+        clock.set(MutableClockConfig.INITIAL.plus(Duration.ofDays(100)));
         bearer = auth.bearer(userId);
         JsonNode later = body(mockMvc.perform(get("/v1/goals/" + id)).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
         JsonNode history = later.get("consistency");
-        assertThat(history).hasSize(4); // out, nov, dez, jan
+        assertThat(history).hasSize(4);
         assertThat(history.get(0).get("met").asBoolean()).isTrue();
         assertThat(history.get(1).get("met").isNull()).as("nov sem instantâneo = sem dado, nunca cumprido").isTrue();
         assertThat(history.get(1).get("actual").isNull()).isTrue();
         assertThat(history.get(2).get("met").asBoolean()).isTrue();
         assertThat(history.get(3).get("closed").asBoolean()).isFalse();
-        assertThat(later.get("streak").asInt()).isEqualTo(1); // dez cumpriu; nov sem dado interrompe
+        assertThat(later.get("streak").asInt()).isEqualTo(1);
         assertThat(later.get("consistencyRate").asString()).isEqualTo("1.0000");
         assertThat(later.get("stage").asString()).isEqualTo("STRATEGY");
-        // nov cumprido -> sequência 3 -> CONSISTENT
-        insertSnapshot(id, "2026-11-01", 95000L);   // nov: 950,00 <= 1000,00
+        insertSnapshot(id, "2026-11-01", 95000L);
         JsonNode consistent = body(mockMvc.perform(get("/v1/goals/" + id)).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
         assertThat(consistent.get("streak").asInt()).isEqualTo(3);
         assertThat(consistent.get("stage").asString()).isEqualTo("CONSISTENT");
@@ -288,7 +277,6 @@ class GoalMetricIT {
                 + " VALUES (?, ?, ?::uuid, ?::date, ?, 'BRL', now(), now(), now())", UUID.randomUUID(), userId, goalId, month, cents);
     }
 
-    /** O pool não usa autocommit: a escrita do teste precisa de transação para valer. */
     private void write(String sql, Object... args) {
         new TransactionTemplate(transactionManager).executeWithoutResult(s -> jdbc.update(sql, args));
     }

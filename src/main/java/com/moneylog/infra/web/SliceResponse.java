@@ -5,10 +5,6 @@ import java.util.function.Function;
 
 import com.moneylog.core.sk.page.Slice;
 
-/**
- * Corpo de toda lista paginada (D2 §4): {@code { "items": [...], "hasNext": true }}, sem {@code COUNT}.
- * Listas com totais (movimentações, lançamentos) usam um record próprio com os mesmos dois campos.
- */
 public record SliceResponse<T>(List<T> items, boolean hasNext) {
 
     public SliceResponse {

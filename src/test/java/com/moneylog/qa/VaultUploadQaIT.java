@@ -33,11 +33,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.PostgresTestcontainer;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T113 (QA): importação com o servidor REAL (Tomcat, não MockMvc): uploads de 19, 20, 20 MB + 1 byte, 21 e 25 MB, multipart fora do padrão (muitas
- * partes, sem boundary, cabeçalhos absurdos, corpo cortado no meio, transferência em pedaços). Nunca 500; o app segue saudável; cada usuário tem a
- * sua cota de taxa (6 por minuto), então cada requisição usa um usuário novo.
- */
 @Tag("i")
 @ActiveProfiles("it")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -86,7 +81,6 @@ class VaultUploadQaIT {
         return out.toByteArray();
     }
 
-    /** Zip de EXATAMENTE {@code total} bytes: uma entrada STORED de enchimento (overhead fixo de 112 bytes com o nome pad.bin). */
     private static byte[] zipOfSize(long total) {
         byte[] data = new byte[(int) (total - 112)];
         new java.util.Random(1).nextBytes(data);
@@ -177,7 +171,6 @@ class VaultUploadQaIT {
         System.out.println("QA-E6-UP chunked 25 MB -> " + r.statusCode() + " " + r.body().substring(0, Math.min(120, r.body().length())));
         assertThat(r.statusCode()).isIn(413, 422);
 
-        // corta no meio: promete 5 MB e envia 200 KB, depois fecha a conexão
         try (Socket socket = new Socket("localhost", port)) {
             socket.setSoTimeout(5_000);
             OutputStream out = socket.getOutputStream();
@@ -188,7 +181,6 @@ class VaultUploadQaIT {
         }
         Thread.sleep(500);
         healthy();
-        // e o app continua importando
         HttpResponse<String> ok = post(freshBearer(), "multipart/form-data; boundary=" + B, multipart(Map.of(), new RawZip().add("a.md", "oi").bytes(), "v.zip"));
         assertThat(ok.statusCode()).isEqualTo(200);
         assertThat(om.readTree(ok.body()).get("created").asInt()).isEqualTo(1);

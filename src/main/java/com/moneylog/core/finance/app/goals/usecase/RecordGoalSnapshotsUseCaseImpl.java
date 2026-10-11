@@ -42,7 +42,6 @@ public class RecordGoalSnapshotsUseCaseImpl implements RecordGoalSnapshotsUseCas
         }
         Set<GoalMetric> needed = EnumSet.noneOf(GoalMetric.class);
         tracked.forEach(g -> needed.add(g.isMetric() ? g.metric() : GoalMetric.TOTAL_DEBT));
-        // uma leitura do razão e uma passada por fonte para todas as metas do usuário
         Map<GoalMetric, Money> metrics = GoalMetricValues.compute(needed, records.load(userId), () -> sources.recurrences(userId), time.today());
         tracked.forEach(goal -> model.recordSnapshot(userId, goal, GoalReadModel.valueOf(goal, metrics)));
         return tracked.size();

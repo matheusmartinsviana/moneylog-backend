@@ -13,9 +13,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/**
- * Plano automático e consistência (ADR-016): funções puras sobre a trajetória linear. Sem I/O, sem relógio: tudo recebe {@code today}.
- */
 public final class GoalPlanner {
 
     private static final Money ZERO = Money.zero(CurrencyCode.BRL);
@@ -23,19 +20,9 @@ public final class GoalPlanner {
     private GoalPlanner() {
     }
 
-    /**
-     * Trajetória acompanhada.
-     *
-     * @param decrease a medida precisa cair até o alvo
-     * @param start    valor no início (baseline; 0,00 em guardar dinheiro)
-     * @param startOn  data de início (mês de partida da trajetória)
-     * @param target   alvo (0,00 em quitar dívidas)
-     * @param deadline prazo; {@code null} = sem plano
-     */
     public record Track(boolean decrease, Money start, LocalDate startOn, Money target, LocalDate deadline) {
     }
 
-    /** Plano automático; {@code null} sem trajetória ou sem prazo. */
     public static GoalPlan plan(Track track, Money current, LocalDate today) {
         if (track == null || track.deadline() == null) {
             return null;
@@ -51,10 +38,6 @@ public final class GoalPlanner {
         return new GoalPlan(pace, monthsLeft, milestone, reached || !gap.isNegative(), gap);
     }
 
-    /**
-     * Histórico do mês de início até o mês de hoje. {@code snapshotOf} devolve o valor gravado do mês fechado ({@code null} = sem
-     * dado); o mês corrente usa o valor de agora. Sem prazo, vazio.
-     */
     public static GoalConsistency consistency(Track track, Money current, LocalDate today, Function<Competence, Money> snapshotOf) {
         if (track == null || track.deadline() == null) {
             return GoalConsistency.none();
@@ -85,10 +68,6 @@ public final class GoalPlanner {
         return new GoalConsistency(history, streak, rate);
     }
 
-    /**
-     * Valor esperado no fim do mês {@code month}: {@code start + (target − start) × k / N}, com {@code N} = meses do mês de início ao do
-     * prazo (inclusive, mínimo 1) e {@code k} = meses do início até {@code month} (inclusive), limitado a 0..N.
-     */
     public static Money expectedAtEndOf(Track track, Competence month) {
         YearMonth startMonth = YearMonth.from(track.startOn());
         long total = Math.max(1, ChronoUnit.MONTHS.between(startMonth, YearMonth.from(track.deadline())) + 1);

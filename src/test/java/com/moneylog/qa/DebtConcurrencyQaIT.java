@@ -35,12 +35,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T82 (QA), critério 3: concorrência da Etapa 4. Quitações simultâneas, quitação x estorno da origem, estorno concorrente de
- * despesa dividida, realização concorrente (e realize x skip, realize x estorno), recorrência x cartão, criação concorrente de
- * dívida para a mesma origem (V4.01 tornou o índice não único) e uma tempestade de escritas misturadas. Toda falha de trava
- * tem de ser 409 CONFLICT, nunca 500, e o razão tem de fechar em zero no fim.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: concorrência de dívidas, divisão e recorrências")
@@ -104,7 +98,6 @@ class DebtConcurrencyQaIT {
         assertThat(results.stream().filter(r -> r.status() >= 500).map(Res::toString).toList()).as(label).isEmpty();
     }
 
-    /** O estado final de qualquer corrida: razão em zero, dívidas coerentes com os livros, nenhuma ocorrência realizada duas vezes. */
     private void assertHealthy() throws Exception {
         assertThat(a.ledgerSum()).as("razão").isZero();
         assertThat(a.unbalancedGroups()).as("grupos desbalanceados").isZero();
@@ -134,7 +127,6 @@ class DebtConcurrencyQaIT {
         Long skipAndReal = jdbc.queryForObject("select count(*) from recurrence_skips s join transactions t on t.recurrence_id = s.recurrence_id "
                 + "and t.occurrence_date = s.occurrence_date and t.status = 'ACTIVE' where s.user_id = ?", Long.class, a.id);
         assertThat(skipAndReal).as("pulada e realizada").isZero();
-        // BUG-QA-25 (contrato): POST /v1/transactions/{id}/void não declara 409, que a S-220 manda devolver em falha de trava
         assertThat(world.contractViolations.stream().filter(v -> !(v.contains("/void -> 409"))).toList()).isEmpty();
     }
 
@@ -157,8 +149,6 @@ class DebtConcurrencyQaIT {
         Res r = CardQaWorld.ok(DebtQa.loan(a, amount, "2026-10-10", personId, "2026-11-05"));
         return r.node().get("debt").get("id").asString();
     }
-
-    // ------------------------------------------------------------------------------------------------ quitações
 
     @Test
     @DisplayName("8 quitações simultâneas de 100,00 numa dívida de 300,00: exatamente 3 vencem, as outras 422; saldo 0; sem 5xx")
@@ -266,7 +256,6 @@ class DebtConcurrencyQaIT {
             if (r.get(0).status() == 200 && r.get(1).status() == 201) {
                 failures.add("rodada " + round + ": estorno da despesa dividida e quitação da parte ambos deram certo");
             }
-            // estorno vencedor: as duas dívidas devem estar VOIDED; quitação vencedora: despesa continua ativa
             if (r.get(0).status() == 200) {
                 for (JsonNode s : tx.node().get("shares")) {
                     String st = a.getOk("/v1/debts/" + s.get("id").asString()).get("status").asString();
@@ -296,8 +285,6 @@ class DebtConcurrencyQaIT {
         }
         assertHealthy();
     }
-
-    // ------------------------------------------------------------------------------------------------ recorrências
 
     @Test
     @DisplayName("8 realizações simultâneas da mesma ocorrência (conta): 1 x 201 e 7 x 422; uma só movimentação")
@@ -388,8 +375,6 @@ class DebtConcurrencyQaIT {
         }
         assertHealthy();
     }
-
-    // ------------------------------------------------------------------------------------------------ mesma origem
 
     @Test
     @DisplayName("criação de dívida para a mesma origem: 8 empréstimos com a mesma Idempotency-Key = 1 movimentação e 1 dívida; 8 despesas divididas idem; 6 LOAN_GIVEN com debtId existente = 422 DEBT_ALREADY_HAS_ORIGIN")
@@ -551,8 +536,6 @@ class DebtConcurrencyQaIT {
         System.out.println("QA-E4-CARDREAD " + histogram(all));
         assertNoServerError("cartão x dívida", all);
     }
-
-    // ------------------------------------------------------------------------------------------------ tempestade
 
     @Test
     @DisplayName("tempestade: 12 threads x 25 escritas aleatórias misturadas (empréstimo, quitação, perdão, divisão, estorno, realize, skip, compra, pagamento, mudança de dias): sem 5xx e estado final coerente")

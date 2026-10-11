@@ -62,7 +62,6 @@ import com.moneylog.infra.goal.gateways.GoalGatewayImpl;
 import com.moneylog.infra.goal.persistence.GoalRepositoryJpa;
 import com.moneylog.infra.goal.persistence.GoalReservationRepositoryJpa;
 
-/** Ligação da feature meta (Etapa 5, T93): gateway JPA, CRUD, reservas (lógicas) e arquivar. */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 public class GoalConfig {
@@ -71,8 +70,6 @@ public class GoalConfig {
     GoalGateway goalGateway(GoalRepositoryJpa goals, GoalReservationRepositoryJpa reservations, TimeProvider time, JdbcTemplate jdbc) {
         return new GoalGatewayImpl(goals, reservations, time, jdbc);
     }
-
-    // ------------------------------------------------------------------ fotos e destaque (ADR-018)
 
     @Bean
     PhotoLimits photoLimits(@Value("${moneylog.goals.photos.max-per-goal:8}") int maxPerGoal,

@@ -35,12 +35,6 @@ import com.moneylog.core.transaction.domain.RefundOrigin;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/**
- * Propriedades sobre razões aleatórios (semente fixa): dinheiro novo nunca aparece nem some entre o razão e os fatos dos insights; as classes
- * (parcela, recorrência, dívida, variável) particionam o consumo; renda por competência só troca de balde; nenhum insight sai junto com o seu
- * "dado insuficiente"; orçamento do dia nunca é negativo. 150 cenários com parcelamento, recorrência, reembolso (inclusive de terceiro),
- * transferência, investimento, empréstimo, renda de outro mês e datas futuras.
- */
 @DisplayName("Propriedades dos insights (T299, PR 01): sem dupla contagem, competência da renda e determinismo")
 class InsightPropertiesTest {
 

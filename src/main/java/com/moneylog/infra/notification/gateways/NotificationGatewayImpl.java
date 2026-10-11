@@ -25,7 +25,6 @@ import com.moneylog.core.notification.domain.NotificationKind;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/** A central em JDBC; todo método de usuário filtra por {@code user_id}. A idempotência é o índice único {@code (user, kind, ref, dia)}. */
 public class NotificationGatewayImpl implements NotificationGateway {
 
     private static final String COLUMNS = "id, user_id, kind, ref_type, ref_id, on_date, title_key, params, due_on, push_eligible, push_sent_at, "
@@ -102,7 +101,6 @@ public class NotificationGatewayImpl implements NotificationGateway {
 
     @Override
     public List<Notification> pushPending(int limit) {
-        // só as dos últimos dois dias: push velho não interessa e a fila não cresce para sempre
         return jdbc.query("SELECT " + COLUMNS + " FROM notifications WHERE push_eligible AND push_sent_at IS NULL AND archived = FALSE "
                 + "AND created_at > now() - interval '2 days' ORDER BY created_at, id LIMIT ?", (rs, i) -> map(rs), limit);
     }

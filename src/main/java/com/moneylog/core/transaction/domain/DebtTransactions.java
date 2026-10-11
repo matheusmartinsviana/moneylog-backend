@@ -8,39 +8,29 @@ import com.moneylog.core.sk.ledger.BookRef;
 import com.moneylog.core.sk.ledger.Posting;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Fábricas das movimentações de dívida (D1 §2.4, §2.6): {@code LOAN_GIVEN}, {@code MONEY_RECEIVED} (devolução ou
- * captação, S-6) e {@code DEBT_PAYMENT}. Nenhuma toca {@code EXPENSE}/{@code INCOME}: empréstimo não é consumo e
- * devolução não é renda (PR 01). O estorno passa por {@link TransactionVoiding} (ponto único, M1).
- */
 public final class DebtTransactions {
 
     private DebtTransactions() {
     }
 
-    /** Empréstimo dado: cria a dívida {@code RECEIVABLE}; {@code RECEIVABLE(dívida) +X / ACCOUNT −X}. */
     public static DebtOperation loanGiven(TransactionHeader header, Money amount, Account account, NewDebt newDebt) {
         return withNewDebt(header, amount, account, newDebt, TransactionType.LOAN_GIVEN, DebtDirection.RECEIVABLE);
     }
 
-    /** Empréstimo ligado a uma dívida existente: só para recusar com o motivo certo (direção ou origem já existente). */
     public static DebtOperation loanGiven(TransactionHeader header, Money amount, Account account, Debt existing) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
         requireDebt(header, existing).ensureDirection(DebtDirection.RECEIVABLE);
         throw existing.newOriginRefusal();
     }
 
-    /** Captação (S-6): cria a dívida {@code PAYABLE}; {@code ACCOUNT +X / PAYABLE −X}, sem {@code INCOME}. */
     public static DebtOperation moneyBorrowed(TransactionHeader header, Money amount, Account account, NewDebt newDebt) {
         return withNewDebt(header, amount, account, newDebt, TransactionType.MONEY_RECEIVED, DebtDirection.PAYABLE);
     }
 
-    /** Devolução de um recebível: {@code ACCOUNT +X / RECEIVABLE −X}, sem {@code INCOME}; quitação ≤ saldo devedor. */
     public static DebtOperation moneyReceived(TransactionHeader header, Money amount, Account account, Debt receivable) {
         return settlement(header, amount, account, receivable, TransactionType.MONEY_RECEIVED, DebtDirection.RECEIVABLE);
     }
 
-    /** Pagamento de um passivo: {@code PAYABLE +X / ACCOUNT −X}; quitação ≤ saldo devedor. */
     public static DebtOperation debtPayment(TransactionHeader header, Money amount, Account account, Debt payable) {
         return settlement(header, amount, account, payable, TransactionType.DEBT_PAYMENT, DebtDirection.PAYABLE);
     }

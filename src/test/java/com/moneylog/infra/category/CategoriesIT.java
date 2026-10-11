@@ -34,7 +34,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/** T23: seed, API de categorias, isolamento por usuário e contrato. */
 @IntegrationTest
 @DisplayName("Categorias (T23)")
 class CategoriesIT {
@@ -52,12 +51,9 @@ class CategoriesIT {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    /** O pool roda com auto-commit desligado: SQL de preparação fora de transação precisa de uma explícita. */
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private MockHttpServletRequestBuilder get(String url) {
         return MockMvcRequestBuilders.get(url).header(HttpHeaders.AUTHORIZATION, auth.ownerBearer());
@@ -73,7 +69,6 @@ class CategoriesIT {
                 .contentType(MediaType.APPLICATION_JSON).content(json);
     }
 
-    /** Nome único por teste (o banco do contexto é compartilhado entre os testes da classe). */
     private static String unique(String base) {
         return base + " " + UUID.randomUUID().toString().substring(0, 8);
     }
@@ -91,8 +86,6 @@ class CategoriesIT {
         return json(mockMvc.perform(get("/v1/categories" + query)).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
     }
-
-    // ---------------------------------------------------------------- seed
 
     @Nested
     @DisplayName("CA1 e CA2: seed das categorias de sistema")
@@ -134,8 +127,6 @@ class CategoriesIT {
         }
     }
 
-    // ---------------------------------------------------------------- consulta
-
     @Test
     @DisplayName("CA3: GET ?kind=EXPENSE traz só as de despesa não arquivadas em ordem alfabética; includeArchived traz as arquivadas")
     void deveListarPorTipoEmOrdem() throws Exception {
@@ -162,8 +153,6 @@ class CategoriesIT {
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED")).andExpect(jsonPath("$.errors[0].field").value("kind"))
                 .andExpect(ContractValidation.responseOnly());
     }
-
-    // ---------------------------------------------------------------- criar
 
     @Test
     @DisplayName("CA4: POST cria com 201 + Location; mesmo nome (sem diferenciar maiúsculas) no mesmo tipo é 409; no outro tipo, aceita")
@@ -197,8 +186,6 @@ class CategoriesIT {
         mockMvc.perform(post("/v1/categories", "{\"name\":\"X\"}")).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors[0].field").value("kind")).andExpect(ContractValidation.responseOnly());
     }
-
-    // ---------------------------------------------------------------- editar, arquivar
 
     @Test
     @DisplayName("CA5: categoria de sistema pode ser renomeada e arquivada; PUT com versão antiga é 409; não existe DELETE (405)")
@@ -262,7 +249,6 @@ class CategoriesIT {
                 .andExpect(jsonPath("$.code").value("CATEGORY_NOT_FOUND")).andExpect(ContractValidation.conforms());
         assertThat(list("?includeArchived=true").valueStream().map(c -> c.get("name").asString())).doesNotContain("Segredo");
         assertThat(jdbc.queryForObject("select name from categories where id = ?", String.class, categoryId)).isEqualTo("Segredo");
-        // o mesmo nome em outro usuário não conflita com o do dono
         createCategory("Segredo", "EXPENSE");
     }
 

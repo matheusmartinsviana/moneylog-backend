@@ -197,7 +197,6 @@ class UpdateAndVoidUseCasesTest {
 
             assertThatThrownBy(() -> update.handle(new UpdateTransactionCommand(s.transferencia.id(), 0, transfer)))
                     .hasFieldOrPropertyWithValue("code", "ACCOUNT_ARCHIVED");
-            // movimentação cuja conta antiga está ok, mas o destino novo está arquivado
             assertThatThrownBy(() -> update.handle(new UpdateTransactionCommand(s.debito.id(), 0, new CreateTransactionCommand.Expense(
                     common("10.00", "x"), s.xp.id(), s.transporte.id(), PaymentMethod.PIX)))).hasFieldOrPropertyWithValue("code", "ACCOUNT_ARCHIVED");
             nothingWritten();
@@ -223,7 +222,6 @@ class UpdateAndVoidUseCasesTest {
         @Test
         @DisplayName("S-81 (b): editar um reembolso não conta o próprio valor: teto = original − os outros reembolsos")
         void deveRevalidarOReembolsoSemContarASiMesmo() {
-            // R1 (reembolso do cenário, 50,00) e R2 de 20,00 sobre a despesa de 100,00; R1 passa a 30 para o exemplo do plano
             Transaction r1 = AccountTransactions.refundToAccount(TransactionHeader.of(UUID.fromString("00000000-0000-0000-0000-0000000b0a01"), USER_ID, TODAY, "R1"),
                     Money.of("30.00"), s.nubank, s.alimentacao, RefundOrigin.firstRefundOf(s.pix));
             found(r1);

@@ -17,12 +17,6 @@ import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 
-/**
- * Adaptador em memória da porta {@link RecurrenceGateway}, só para teste (a implementação JPA é {@code RecurrenceGatewayImpl}, Etapa 4, T79). Guarda o
- * modelo e as ocorrências puladas; as <b>realizadas</b> são derivadas das movimentações ativas com a origem
- * {@code RECURRENCE} e o par {@code (recurrenceId, occurrenceDate)}, como a porta documenta (S-49): estornar a compra gerada
- * devolve a ocorrência às pendentes.
- */
 public class InMemoryRecurrenceGateway implements RecurrenceGateway {
 
     private final Map<UUID, RecurringTransaction> models = new HashMap<>();
@@ -30,7 +24,6 @@ public class InMemoryRecurrenceGateway implements RecurrenceGateway {
     private final Supplier<Collection<Transaction>> transactions;
     private int locks;
 
-    /** @param transactions todas as movimentações do usuário (ativas e estornadas): a fonte das ocorrências realizadas */
     public InMemoryRecurrenceGateway(Supplier<Collection<Transaction>> transactions) {
         this.transactions = transactions;
     }

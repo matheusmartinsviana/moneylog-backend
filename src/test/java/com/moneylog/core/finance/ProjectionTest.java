@@ -47,7 +47,6 @@ class ProjectionTest {
 
     private static final LocalDate TODAY = BASE_DATE;
 
-    /** Nubank 20.000,00; fatura de 1.283,00 em 05/11; parcelas de 200,00 em 05/12 a 05/04; Internet 119,00 todo dia 10; salário 3.000,00 todo dia 5. */
     private final FinanceScenarioFactory s = cenario();
 
     private static FinanceScenarioFactory cenario() {
@@ -156,7 +155,6 @@ class ProjectionTest {
     void deveIncluirOsVencidosNoPrimeiroPonto() {
         Projection p = Projection.of(s.records(), recorrencias(LocalDate.of(2026, 9, 10)), Horizon.M6, TODAY, false);
 
-        // Internet de 10/09 e 10/10 (hoje) pendentes: 238 no mês corrente
         ponto(p.series().get(0), "2026-10", "0.00", "238.00", "19762.00");
         assertThat(p.series().get(1).outflows()).isEqualTo(Money.of("1402.00"));
     }
@@ -203,9 +201,6 @@ class ProjectionTest {
         assertThatThrownBy(() -> Projection.of(s.records(), List.of(), Horizon.D60, TODAY, false)).isInstanceOf(IllegalArgumentException.class);
     }
 
-    // ---------------------------------------------------------------- tendência
-
-    /** Histórico de maio a setembro: despesas, compra à vista e parcelada, recorrência realizada e reembolso. */
     private FinanceScenarioFactory comHistorico() {
         FinanceScenarioFactory h = umCenarioBase();
         for (int month = 6; month <= 9; month++) {
@@ -218,7 +213,6 @@ class ProjectionTest {
     @DisplayName("CA4: includeTrend traz a média dos 3 meses completos (consumo novo: despesas não recorrentes + 1ª parcela), com estimate; a série base fica idêntica")
     void deveCalcularATendenciaSeparada() {
         FinanceScenarioFactory h = comHistorico();
-        // jul: compra de 600 em 3x (1ª parcela = 200 conta; 2ª e 3ª não); ago: compra à vista de 90; set: despesa de recorrência (não conta)
         h.transactions.add(compraNoCalendario(h.header(LocalDate.of(2026, 7, 10), "Parcelada"), Money.of("600.00"), h.roxinho, h.alimentacao, 3));
         h.transactions.add(compraNoCalendario(h.header(LocalDate.of(2026, 8, 10), "À vista"), Money.of("90.00"), h.roxinho, h.alimentacao, 1));
         h.transactions.add(com.moneylog.core.transaction.domain.AccountTransactions.expense(h.header(LocalDate.of(2026, 9, 10), "Internet"), Money.of("119.00"), h.nubank,
@@ -228,7 +222,6 @@ class ProjectionTest {
         Projection sem = Projection.of(records, List.of(), Horizon.M6, TODAY, false);
         Projection com = Projection.of(records, List.of(), Horizon.M6, TODAY, true);
 
-        // jul: 300 + 200 = 500; ago: 300 + 90 = 390; set: 300 + 119 = 419; total 1.309 / 3 = 436,33
         assertThat(com.trend().available()).isTrue();
         assertThat(com.trend().estimate()).isTrue();
         assertThat(com.trend().reason()).isNull();
@@ -247,14 +240,12 @@ class ProjectionTest {
     void naoDeveContarRecorrenciaNemParcelasAntigas() {
         FinanceScenarioFactory h = comHistorico();
         UUID recurrenceId = UUID.randomUUID();
-        // despesa criada pela realização de uma ocorrência (origem RECURRENCE): fora da tendência
         RecurringTransaction recurrence = RecurringTransaction.ofAccount(recurrenceId, USER_ID, TransactionType.EXPENSE, Money.of("119.00"), "Internet",
                 h.alimentacao.id(), h.nubank.id(), PaymentMethod.PIX, Schedule.of(Frequency.MONTHLY, LocalDate.of(2026, 9, 10)));
         h.transactions.add(recurrence.realize(LocalDate.of(2026, 9, 10), UUID.randomUUID(), null, h.nubank, h.alimentacao));
         h.transactions.add(compraNoCalendario(h.header(LocalDate.of(2026, 6, 10), "Notebook"), Money.of("1200.00"), h.roxinho, h.alimentacao, 6));
         SpendingTrend trend = SpendingTrend.of(h.records(), h.records().ledger(), TODAY);
 
-        // jul: 300 (parcela 2/6 do notebook fica de fora); ago: 300 (3/6); set: 300 (4/6 e a recorrência ficam de fora) => média 300,00
         assertThat(trend.available()).isTrue();
         assertThat(trend.average()).isEqualTo(Money.of("300.00"));
     }
@@ -312,8 +303,6 @@ class ProjectionTest {
         assertThat(filled.average()).isEqualTo(Money.of("210.00"));
     }
 
-    // ---------------------------------------------------------------- propriedade
-
     @Test
     @DisplayName("CA8 (propriedade): em 100 cenários aleatórios nenhum compromisso aparece duas vezes na série; Σ da série = comprometido/entradas do horizonte e o último saldo = projected")
     void naoDeveContarDuasVezesEm100Cenarios() {
@@ -322,7 +311,7 @@ class ProjectionTest {
             FinanceScenarioFactory h = umCenarioBase();
             int operations = 3 + random.nextInt(10);
             for (int i = 0; i < operations; i++) {
-                LocalDate date = LocalDate.of(2026, 8 + random.nextInt(5), 1 + random.nextInt(28)); // de agosto a dezembro: passadas, de hoje e futuras (M3)
+                LocalDate date = LocalDate.of(2026, 8 + random.nextInt(5), 1 + random.nextInt(28));
                 int kind = random.nextInt(6);
                 if (kind == 0) {
                     h.transactions.add(compraNoCalendario(h.header(date, "c" + i), Money.ofCents(1200 + random.nextInt(900_000), CurrencyCode.BRL), h.roxinho,
@@ -334,7 +323,6 @@ class ProjectionTest {
                     h.transactions.add(AccountTransactions.income(h.header(date, "r" + i), Money.ofCents(100 + random.nextInt(100_000), CurrencyCode.BRL), h.nubank,
                             h.salario, PaymentMethod.PIX));
                 } else if (kind == 4) {
-                    // ocorrência realizada (adiantada ou não): vira movimentação e não pode aparecer de novo como pendente (S-258)
                     RecurringTransaction realized = RecurringTransaction.ofAccount(UUID.randomUUID(), USER_ID, TransactionType.EXPENSE,
                             Money.ofCents(100 + random.nextInt(50_000), CurrencyCode.BRL), "real" + i, h.alimentacao.id(), h.nubank.id(), PaymentMethod.PIX,
                             Schedule.of(Frequency.MONTHLY, date));

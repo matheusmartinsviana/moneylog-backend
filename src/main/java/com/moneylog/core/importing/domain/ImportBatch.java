@@ -9,11 +9,6 @@ import com.moneylog.core.importing.exception.ImportingExceptions.ImportBatchNotP
 import com.moneylog.core.importing.exception.ImportingExceptions.ImportBatchNotUndoableException;
 import com.moneylog.core.importing.exception.ImportingExceptions.ImportSourceRequiredException;
 
-/**
- * Lote de importação de um extrato (D1 §6): de <b>uma</b> conta ou <b>um</b> cartão. O arquivo bruto nunca é guardado; só o hash e as linhas lidas.
- *
- * <pre>PENDING_REVIEW ─apply▶ APPLIED ─undo▶ UNDONE | PARTIALLY_UNDONE ─undo▶ UNDONE | PARTIALLY_UNDONE</pre>
- */
 public final class ImportBatch {
 
     public static final String WARNING_SAME_FILE = "SAME_FILE_ALREADY_IMPORTED";
@@ -96,7 +91,6 @@ public final class ImportBatch {
         return cardId != null;
     }
 
-    /** Conta ou cartão do extrato. */
     public UUID sourceId() {
         return isCard() ? cardId : accountId;
     }

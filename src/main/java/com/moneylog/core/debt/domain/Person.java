@@ -8,7 +8,6 @@ import com.moneylog.core.debt.exception.DebtExceptions.PersonArchivedException;
 import com.moneylog.core.debt.exception.DebtExceptions.PersonNameRequiredException;
 import com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException;
 
-/** Pessoa com quem há dívidas (D1 §2.6). */
 public final class Person {
 
     public static final int NAME_MAX_LENGTH = 100;

@@ -8,11 +8,6 @@ import com.moneylog.core.note.exception.NoteExceptions.NoteFrontmatterReservedEx
 import com.moneylog.core.note.exception.NoteExceptions.NoteTooLargeException;
 import com.moneylog.core.sk.text.PlainText;
 
-/**
- * O que se lê do texto de uma nota, sem renderizar nada: título do frontmatter, tags, wikilinks e onde o corpo começa. O texto é validado
- * aqui: até 200 KB (UTF-8), sem caractere de controle (só quebra de linha e tabulação), sem surrogate solto, frontmatter seguro e sem a
- * chave reservada {@code moneylog}. <b>Nenhum HTML é interpretado, removido ou alterado</b>: o texto é dado do usuário e sai como entrou.
- */
 public record NoteContent(String text, String frontmatterTitle, Set<String> tags, List<Wikilink> wikilinks, int bodyStart) {
 
     public static NoteContent analyze(String text) {
@@ -28,7 +23,6 @@ public record NoteContent(String text, String frontmatterTitle, Set<String> tags
         return new NoteContent(text, title, tags, wikilinks, bodyStart);
     }
 
-    /** Tamanho, controle e surrogates; lança {@code NOTE_TOO_LARGE} ou {@code TEXT_INVALID_CHARACTERS}. */
     public static void validateText(String text) {
         if (text.length() > NoteLimits.NOTE_MAX_BYTES || text.getBytes(StandardCharsets.UTF_8).length > NoteLimits.NOTE_MAX_BYTES) {
             throw new NoteTooLargeException(NoteLimits.NOTE_MAX_BYTES);
@@ -44,15 +38,10 @@ public record NoteContent(String text, String frontmatterTitle, Set<String> tags
         }
     }
 
-    /** Título exibido: o {@code title} do frontmatter ou o nome do arquivo. */
     public String titleFor(NotePath path) {
         return frontmatterTitle != null ? frontmatterTitle : cap(path.name());
     }
 
-    /**
-     * O título vem de um escalar YAML, que aceita escapes ({@code "\x00"}, {@code "\x1b"}, {@code "\u202e"}): precisa ser uma linha de texto
-     * visível, sem controle, sem caractere de formatação (bidi, largura zero) e sem separador de linha.
-     */
     private static String requireSafeTitle(String title) {
         if (!PlainText.isSafeSingleLine(title)) {
             throw new PlainText.TextInvalidCharactersException("title");
@@ -60,7 +49,6 @@ public record NoteContent(String text, String frontmatterTitle, Set<String> tags
         return title;
     }
 
-    /** Corte por ponto de código: nunca deixa um emoji pela metade (o Postgres conta o VARCHAR em caracteres). */
     private static String cap(String title) {
         return CodePoints.truncate(title, NoteLimits.MAX_TITLE_LENGTH);
     }

@@ -7,7 +7,6 @@ import java.util.UUID;
 import com.moneylog.core.finance.app.cards.FutureInstallmentsView;
 import com.moneylog.core.sk.money.Money;
 
-/** Saída de {@code GET /v1/cards/{id}/future-installments} (contrato: {@code FutureInstallments}). */
 public record FutureInstallmentsResponse(Money total, List<ByInvoiceResponse> byInvoice) {
 
     public record ByInvoiceResponse(UUID invoiceId, String referenceMonth, LocalDate dueDate, Money amount,

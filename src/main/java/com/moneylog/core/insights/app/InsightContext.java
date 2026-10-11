@@ -47,16 +47,8 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 
-/**
- * Contexto de insights de <b>uma requisição</b> (ADR-008, ADR-019): recebe o razão já carregado (uma leitura), as recorrências (uma leitura) e as
- * metas (derivadas de {@code records.goals()} + os instantâneos, uma consulta) e monta, sob demanda e com memória, os {@link MonthFacts} e os
- * {@link DayFacts}. Cada mês é agregado uma vez ({@code EntryReport}, a mesma calculadora do dashboard e da lista, PR 01 regra 10), mesmo que o
- * histórico de 12 meses peça os mesmos meses várias vezes. Nenhuma conta própria sobre o razão: este objeto só <b>classifica</b> as linhas que as
- * calculadoras já devolvem, em quatro classes disjuntas (parcela, recorrência, dívida, variável), então nada é contado duas vezes.
- */
 public final class InsightContext {
 
-    /** Classe disjunta de uma linha de consumo. */
     enum Kind {
         INSTALLMENT,
         RECURRING,
@@ -67,7 +59,6 @@ public final class InsightContext {
     record Line(EntryReport.Line line, Kind kind) {
     }
 
-    /** Um mês classificado: totais por classe e por categoria, a partir do mesmo {@code EntryReport}. */
     record Classified(Competence month, List<Line> lines, Money income, List<EntryReport.Line> incomeLines, Money consumption,
                       Money installments, Money recurring, Money debt, Money variable, Map<UUID, Money> byCategory) {
 
@@ -113,8 +104,6 @@ public final class InsightContext {
         return today;
     }
 
-    // ------------------------------------------------------------------ mensal
-
     public MonthFacts monthFacts(Competence month) {
         Classified current = classified(month);
         boolean isCurrent = month.equals(Competence.from(today));
@@ -137,8 +126,6 @@ public final class InsightContext {
                 subscriptionLines(month, isCurrent), registeredDescriptions());
     }
 
-    // ------------------------------------------------------------------ do dia
-
     public DayFacts dayFacts(LocalDate date) {
         Competence month = Competence.from(date);
         Classified current = classified(month);
@@ -148,8 +135,6 @@ public final class InsightContext {
                 cash.inAccounts(), hasCashAccounts(), dueWeek(schedule, date), events(schedule, date), todayEntries(current, date),
                 categoryHistory(month), categoryNames, closings(schedule, date));
     }
-
-    // ------------------------------------------------------------------ agregação por mês (memória)
 
     Classified classified(Competence month) {
         return months.computeIfAbsent(month, this::buildClassified);
@@ -177,7 +162,6 @@ public final class InsightContext {
                 variable, consumption.byCategory());
     }
 
-    /** Disjunção por construção: dívida, depois parcela, depois recorrência, e o resto é variável. Cada linha cai em exatamente uma classe. */
     private Kind kindOf(EntryReport.Line line) {
         if (line.debtId() != null) {
             return Kind.DEBT;
@@ -200,7 +184,6 @@ public final class InsightContext {
         return new MonthSnapshot(c.month(), c.income(), c.consumption(), c.essential(), c.byCategory());
     }
 
-    /** Gasto variável de cada dia de {@code fromDay} a {@code toDay} do mês (zeros incluídos). */
     private List<Money> variableByDay(Classified c, int fromDay, int toDay) {
         if (toDay < fromDay) {
             return List.of();
@@ -219,7 +202,6 @@ public final class InsightContext {
         return out;
     }
 
-    /** Gasto variável de um dia. */
     private static Money variableOn(Classified c, LocalDate date) {
         Money total = ZERO;
         for (Line l : c.lines()) {
@@ -230,13 +212,6 @@ public final class InsightContext {
         return total;
     }
 
-    // ------------------------------------------------------------------ base do dinheiro livre
-
-    /**
-     * Competência: renda <b>recebida</b> até {@code asOf} (data efetiva do lançamento, mesmo que a competência seja de outro mês, ADR-017 pelo
-     * {@code EntryReport}); consumo já feito (data até {@code asOf}); o que é conhecido e ainda vai acontecer (lançamentos do mês com data
-     * depois de {@code asOf} e ocorrências de recorrência de saída ainda previstas até o fim do mês); reservado em metas no mês.
-     */
     MonthFacts.Budget budget(LocalDate asOf) {
         Competence month = Competence.from(asOf);
         Classified c = classified(month);
@@ -258,7 +233,6 @@ public final class InsightContext {
         return new MonthFacts.Budget(received, spent, later, pendingRecurring(asOf, month), reservedInMonth(asOf, month));
     }
 
-    /** Ocorrências de recorrência de saída ainda previstas de {@code asOf} ao fim do mês (as vencidas e não realizadas ficam de fora). */
     private Money pendingRecurring(LocalDate asOf, Competence month) {
         Money total = ZERO;
         for (Commitment c : schedule(asOf).items()) {
@@ -270,7 +244,6 @@ public final class InsightContext {
         return total;
     }
 
-    /** Reservas líquidas (reserva − liberação) feitas no mês até {@code asOf} nas metas não arquivadas; nunca negativo (liberar não gera folga). */
     private Money reservedInMonth(LocalDate asOf, Competence month) {
         Money net = ZERO;
         for (Goal goal : records.goals()) {
@@ -285,8 +258,6 @@ public final class InsightContext {
         }
         return net.isNegative() ? ZERO : net;
     }
-
-    // ------------------------------------------------------------------ agenda e caixa
 
     CommitmentSchedule schedule(LocalDate asOf) {
         return schedules.computeIfAbsent(asOf, d -> CommitmentSchedule.of(records, recurrences, d));
@@ -306,12 +277,10 @@ public final class InsightContext {
         return total;
     }
 
-    /** Fatura com saldo que vence no mês: a mesma conta do resumo mensal. */
     private Money cardOutstanding(Competence month) {
         return cardOutstanding.computeIfAbsent(month, m -> MonthlySummary.of(records, ledger, m, today).card().outstanding());
     }
 
-    /** Parcelas por competência, de {@code month} a {@code month + 11}: uma passada no razão ativo (postings de parcela do livro de despesa). */
     private List<Money> installmentLoad(Competence month) {
         if (installmentByCompetence == null) {
             Map<Competence, Money> byCompetence = new HashMap<>();
@@ -328,8 +297,6 @@ public final class InsightContext {
         }
         return load;
     }
-
-    // ------------------------------------------------------------------ metas e cartões
 
     private List<MonthFacts.GoalFact> goalFacts() {
         if (goals == null) {
@@ -375,8 +342,6 @@ public final class InsightContext {
         return facts;
     }
 
-    // ------------------------------------------------------------------ assinaturas
-
     private List<SubscriptionDetector.Line> subscriptionLines(Competence month, boolean isCurrent) {
         LocalDate end = isCurrent ? today : month.lastDay();
         List<SubscriptionDetector.Line> lines = new ArrayList<>();
@@ -402,12 +367,6 @@ public final class InsightContext {
         return descriptions;
     }
 
-    // ------------------------------------------------------------------ insumos do dia
-
-    /**
-     * Saídas de hoje a hoje + 7 (primeiro nível: a parcela já está dentro da fatura e nunca é somada de novo). Faturas e dívidas vencidas e não pagas
-     * entram (são devidas agora); ocorrência de recorrência vencida e não realizada não (pode ser só não registrada).
-     */
     private List<DayFacts.Due> dueWeek(CommitmentSchedule schedule, LocalDate date) {
         LocalDate until = date.plusDays(Thresholds.DUE_SOON_DAYS);
         List<DayFacts.Due> due = new ArrayList<>();
@@ -423,10 +382,6 @@ public final class InsightContext {
         return due;
     }
 
-    /**
-     * Fluxo conhecido de hoje a hoje + 30: saídas de tudo que está agendado; entradas só de recorrência e de lançamento futuro (confirmados), nunca
-     * a receber de terceiros (ADR-014). Vencidos e não pagos (fatura, dívida) caem no dia zero.
-     */
     private List<DayFacts.CashEvent> events(CommitmentSchedule schedule, LocalDate date) {
         LocalDate until = date.plusDays(Thresholds.FORECAST_DAYS);
         List<DayFacts.CashEvent> events = new ArrayList<>();
@@ -489,7 +444,6 @@ public final class InsightContext {
         return c.kind() == CommitmentKind.INVOICE || c.kind() == CommitmentKind.INVOICE_FORECAST;
     }
 
-    /** Identidade da fatura (cartão + fechamento, S-13): a mesma chave no vencimento e no fechamento, para deduplicar. */
     private static String invoiceRef(Commitment c) {
         return "invoice." + c.refId() + "." + c.refDate();
     }

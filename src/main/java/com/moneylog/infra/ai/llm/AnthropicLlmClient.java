@@ -15,11 +15,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import com.moneylog.core.ai.app.LlmClient;
 
-/**
- * Adaptador do provedor Anthropic (Messages API) sobre o {@link HttpClient} do JDK. A chave vai só no cabeçalho {@code x-api-key}; o corpo da
- * resposta de erro <b>nunca</b> é lido nem repetido em mensagem ou log. {@code 429} e {@code 5xx} são transitórios; {@code 401/403} e os demais
- * {@code 4xx} não. Único ponto do código que conhece o provedor (trocar = outra implementação de {@link LlmClient}).
- */
 public class AnthropicLlmClient implements LlmClient {
 
     static final String DEFAULT_BASE_URL = "https://api.anthropic.com";

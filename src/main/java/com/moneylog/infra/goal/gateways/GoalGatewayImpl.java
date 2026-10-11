@@ -27,7 +27,6 @@ import com.moneylog.infra.goal.persistence.GoalRepositoryJpa;
 import com.moneylog.infra.goal.persistence.GoalReservationEntity;
 import com.moneylog.infra.goal.persistence.GoalReservationRepositoryJpa;
 
-/** {@link GoalGateway} sobre JPA. As reservas só são inseridas; a meta sobe de versão a cada gravação. */
 public class GoalGatewayImpl implements GoalGateway {
 
     private final GoalRepositoryJpa goals;
@@ -110,8 +109,6 @@ public class GoalGatewayImpl implements GoalGateway {
                 actions.getOrDefault(e.getId(), List.of()), photos.getOrDefault(e.getId(), List.of()))).toList();
     }
 
-    // ------------------------------------------------------------------ plano declarado (ações e check-ins)
-
     private Map<UUID, List<GoalAction>> loadActions(UUID userId, UUID goalId) {
         Map<UUID, Set<String>> done = new java.util.HashMap<>();
         jdbc.query("SELECT c.action_id, c.period FROM goal_action_checkins c JOIN goal_actions a ON a.id = c.action_id AND a.user_id = c.user_id"
@@ -129,7 +126,6 @@ public class GoalGatewayImpl implements GoalGateway {
         return byGoal;
     }
 
-    /** Regrava as ações e os check-ins só se mudaram (as tabelas são filhas da meta; a ordem é a da lista). */
     private void syncActions(Goal goal, java.time.Instant now) {
         List<GoalAction> stored = loadActions(goal.userId(), goal.id()).getOrDefault(goal.id(), List.of());
         if (stored.equals(goal.actions())) {
@@ -151,8 +147,6 @@ public class GoalGatewayImpl implements GoalGateway {
         }
     }
 
-    // ------------------------------------------------------------------ fotos (só metadados; os bytes ficam em PhotoStorage)
-
     private Map<UUID, List<GoalPhoto>> loadPhotos(UUID userId, UUID goalId) {
         Map<UUID, List<GoalPhoto>> byGoal = new java.util.HashMap<>();
         jdbc.query("SELECT id, goal_id, width, height, size_bytes, created_at FROM goal_photos WHERE user_id = ?"
@@ -163,10 +157,6 @@ public class GoalGatewayImpl implements GoalGateway {
         return byGoal;
     }
 
-    /**
-     * Alinha {@code goal_photos} com a lista do agregado: apaga as que saíram (o {@code ON DELETE CASCADE} leva os bytes), insere as novas e
-     * regrava a posição das que mudaram. A unicidade de posição é adiada ao fim da transação, então trocar posições não colide.
-     */
     private void syncPhotos(Goal goal, java.time.Instant now) {
         Map<UUID, Integer> stored = new java.util.HashMap<>();
         jdbc.query("SELECT id, position FROM goal_photos WHERE goal_id = ? AND user_id = ?",

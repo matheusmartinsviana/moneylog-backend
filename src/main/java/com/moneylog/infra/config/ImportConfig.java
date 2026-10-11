@@ -47,11 +47,6 @@ import com.moneylog.infra.importing.gateways.ImportHistoryGatewayImpl;
 import com.moneylog.infra.importing.gateways.ImportIdempotencyGatewayImpl;
 import com.moneylog.infra.importing.gateways.ImportSourceGatewayImpl;
 
-/**
- * Ligação da importação de extrato (Etapa 7): gateways em JDBC, upload/revisão/aplicar numa transação cada, leituras em instantâneo. O desfazer
- * <b>não</b> tem transação própria de propósito: cada estorno é uma transação do caso de uso de estorno, então uma guarda que recusa um estorno
- * (S-36) não desfaz os demais.
- */
 @Configuration(proxyBeanMethods = false)
 public class ImportConfig {
 
@@ -118,7 +113,6 @@ public class ImportConfig {
     @Bean
     ApplyImportBatchUseCase applyImportBatchUseCase(ImportBatchGateway batches, CreateTransactionUseCase create, ImportIdempotencyGateway idempotency,
                                                     TimeProvider time, ExistingEntriesGateway existing, PlatformTransactionManager tm) {
-        // A2: a violação do índice único de chave (mesmo extrato em outro lote) vira conflito de domínio, nunca 500
         return TransactionalProxies.required(ApplyImportBatchUseCase.class,
                 new ApplyImportBatchUseCaseImpl(batches, new DuplicateTranslatingCreate(create), idempotency, time, existing), tm);
     }
@@ -128,7 +122,6 @@ public class ImportConfig {
         return TransactionalProxies.required(DiscardImportBatchUseCase.class, new ImportQueryUseCasesImpl.DiscardBatch(batches), tm);
     }
 
-    /** Traduz {@link DataIntegrityViolationException} da criação importada em {@link ImportLineAlreadyRecordedException}. */
     private record DuplicateTranslatingCreate(CreateTransactionUseCase delegate) implements CreateTransactionUseCase {
         @Override
         public TransactionDetails handle(CreateTransactionCommand command, UUID idempotencyKey) {

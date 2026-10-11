@@ -18,7 +18,6 @@ import com.moneylog.core.finance.util.FinanceScenarioFactory;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
 
-/** O cartão com o que a API calcula (T51 CA1, T54 CA1/CA2/CA4/CA5, S-129), sobre o cenário base de D1 §3. */
 @DisplayName("CardViews: limite, fatura corrente e os dois comprometidos (S-129)")
 class CardViewsTest {
 
@@ -73,7 +72,6 @@ class CardViewsTest {
         assertThat(d.usedRatio()).isEqualByComparingTo(new BigDecimal("0.2283"));
         assertThat(d.limit().overLimit()).isFalse();
         assertThat(d.archivable()).isFalse();
-        // limite - disponível = totalCommitted + committedFuture (com crédito 0)
         assertThat(Money.of("10000.00").subtract(d.limit().available()))
                 .isEqualTo(d.totalCommitted().add(d.committedFuture()));
     }
@@ -103,7 +101,7 @@ class CardViewsTest {
         CardDetails d = details(LocalDate.of(2026, 11, 6));
 
         assertThat(d.limit().available()).isEqualTo(Money.of("8217.00"));
-        assertThat(d.totalCommitted()).isEqualTo(Money.of("983.00")); // 783 em atraso + 200 da corrente
+        assertThat(d.totalCommitted()).isEqualTo(Money.of("983.00"));
         assertThat(d.committedFuture()).isEqualTo(Money.of("800.00"));
     }
 

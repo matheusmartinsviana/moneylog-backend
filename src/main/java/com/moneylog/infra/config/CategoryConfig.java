@@ -25,7 +25,6 @@ import com.moneylog.infra.category.CategorySeedRunner;
 import com.moneylog.infra.category.gateways.CategoryGatewayImpl;
 import com.moneylog.infra.category.persistence.CategoryRepositoryJpa;
 
-/** Ligação da feature categoria: gateway e casos de uso com a fronteira transacional. */
 @Configuration(proxyBeanMethods = false)
 public class CategoryConfig {
 

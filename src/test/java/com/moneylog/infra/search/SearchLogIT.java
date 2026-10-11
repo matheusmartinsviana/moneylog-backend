@@ -22,10 +22,6 @@ import ch.qos.logback.core.read.ListAppender;
 
 import com.moneylog.infra.debt.E4ItBase;
 
-/**
- * S-287: o termo {@code q} (dado financeiro ou pessoal) nunca vai para o log de aplicação: nem na busca que funciona, nem na recusada com 400,
- * nem na limitada com 429, nem na que falha. O nível da raiz sobe a DEBUG durante o teste para pegar também o log do Spring MVC e do JDBC.
- */
 @DisplayName("Busca global: o termo não aparece em nenhum log (S-287)")
 class SearchLogIT extends E4ItBase {
 

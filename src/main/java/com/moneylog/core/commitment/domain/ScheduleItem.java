@@ -8,10 +8,6 @@ import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.FinancialDates;
 
-/**
- * Item do cronograma: valor, vencimento (opcional: o financiamento pode não ter data) e, quando pago, a data do pagamento
- * ({@code paidOn}, opcional: um pagamento informado pelo usuário pode não ter data nem comprovante). Imutável; marcar como pago devolve outro item.
- */
 public record ScheduleItem(int position, String label, ScheduleItemType type, LocalDate dueDate, Money amount, boolean paid, LocalDate paidOn) {
 
     public static final int LABEL_MAX_LENGTH = 100;

@@ -16,7 +16,6 @@ import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Compromissos futuros pelo mesmo {@link CommitmentSchedule} do dashboard, sobre o mesmo carregamento (S-64, S-79). */
 public class GetUpcomingUseCaseImpl implements GetUpcomingUseCase {
 
     private final FinancialRecordsGateway records;
@@ -43,13 +42,11 @@ public class GetUpcomingUseCaseImpl implements GetUpcomingUseCase {
                 .filter(c -> c.bucket() == Bucket.OVERDUE || (!c.dueDate().isBefore(from) && !c.dueDate().isAfter(to))).toList();
         Money out = total(items, FlowDirection.OUT);
         Money in = total(items, FlowDirection.IN);
-        // as ocorrências vencidas e pendentes não têm teto de tempo (S-20): devolve as 500 mais recentes e avisa (S-240)
         long overdueOccurrences = items.stream().filter(GetUpcomingUseCaseImpl::isOverdueOccurrence).count();
         boolean truncated = overdueOccurrences > MAX_OVERDUE_OCCURRENCES;
         if (truncated) {
             long toDrop = overdueOccurrences - MAX_OVERDUE_OCCURRENCES;
             long[] dropped = {0};
-            // os itens vêm por vencimento crescente: descarta as mais antigas
             items = items.stream().filter(c -> !isOverdueOccurrence(c) || dropped[0]++ >= toDrop).toList();
         }
         return new UpcomingView(items, schedule.undated(), out, in, truncated);

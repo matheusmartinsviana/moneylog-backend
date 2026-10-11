@@ -37,10 +37,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 4: round-trip exportar -> importar com 1.000 notas aleatórias (semente fixa) e com casos de borda do frontmatter. O corpo
- * volta byte a byte; tags, título, wikilinks e vínculos explícitos voltam iguais; exportar de novo gera o mesmo zip.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: round-trip exportar -> importar (propriedade, semente fixa)")
@@ -74,8 +70,6 @@ class VaultRoundTripQaIT {
     private void purge(Actor x) {
         new org.springframework.transaction.support.TransactionTemplate(tm).executeWithoutResult(s -> jdbc.update("delete from notes where user_id = ?", x.id));
     }
-
-    // ------------------------------------------------------------------------------------------------ gerador
 
     private static final String[] WORDS = {"Revisão", "orçamento", "MacBook", "café", "Ação", "naïve", "São Paulo", "日本語", "🚀 foguete", "Ünïcödé", "ÇÃO", "plano (B)",
             "a&b", "100%", "x_y", "o'brien", "@casa", "{chaves}", "~til", "uma frase com espaços", "UPPER", "lower", "Mixed Case", "ß", "İstanbul", "ǅ", "emoji 👨‍👩‍👧"};
@@ -175,8 +169,6 @@ class VaultRoundTripQaIT {
         return (r.nextInt(8) == 0 ? "!" : "") + "[[" + base + section + alias + "]]";
     }
 
-    // ------------------------------------------------------------------------------------------------ cenário financeiro e criação
-
     private record Entities(String tx, String goal, String person, String debt, String invoice) {
     }
 
@@ -207,7 +199,6 @@ class VaultRoundTripQaIT {
         return "[" + String.join(",", links) + "]";
     }
 
-    /** Cria as notas (sem conferir contrato, por velocidade); devolve path -> id das criadas. Recusas do domínio (frontmatter inválido) são contadas. */
     private Map<String, String> createAll(Actor actor, List<Gen> gens, Entities e, Random r, int[] rejected) throws Exception {
         Map<String, String> ids = new LinkedHashMap<>();
         for (Gen g : gens) {
@@ -221,7 +212,6 @@ class VaultRoundTripQaIT {
                 rejected[0]++;
             }
         }
-        // vínculos explícitos entre notas (por id): um terço das notas ganha um ou dois
         List<String> idList = new ArrayList<>(ids.values());
         for (Map.Entry<String, String> n : ids.entrySet()) {
             if (r.nextInt(3) != 0) {
@@ -249,9 +239,6 @@ class VaultRoundTripQaIT {
         return ids;
     }
 
-    // ------------------------------------------------------------------------------------------------ fotografia do vault
-
-    /** path -> descrição completa (corpo, título, tags e vínculos, com notas-alvo pelo CAMINHO), para comparar vaults com ids diferentes. */
     private Map<String, String> snapshot(Actor actor) {
         Map<String, String> out = new TreeMap<>();
         List<Map<String, Object>> notes = jdbc.queryForList("select id, path, title, body from notes where user_id = ? and deleted_at is null", actor.id);
@@ -296,8 +283,6 @@ class VaultRoundTripQaIT {
         return s.replace("\r", "\\r").replace("\n", "\\n").replace("\t", "\\t");
     }
 
-    // ------------------------------------------------------------------------------------------------ testes
-
     @Test
     @DisplayName("1.000 notas aleatórias (frontmatter, CRLF, código, wikilinks de todas as formas, vínculos explícitos): exportar, apagar tudo e importar devolve TUDO igual; exportar de novo gera os mesmos bytes")
     void roundTripMesmoUsuario() throws Exception {
@@ -315,7 +300,6 @@ class VaultRoundTripQaIT {
         assertThat(files1.keySet()).containsExactlyInAnyOrderElementsOf(before.keySet());
         System.out.println("QA-E6-RT zip exportado: " + export1.length + " bytes, " + files1.size() + " entradas");
 
-        // nota sem vínculo explícito sai byte a byte igual ao que foi escrito
         List<String> diffs = new ArrayList<>();
         for (Gen g : gens) {
             if (!ids.containsKey(g.path())) {
@@ -371,7 +355,6 @@ class VaultRoundTripQaIT {
         for (String path : before.keySet()) {
             String x = before.get(path);
             String y = after.get(path);
-            // o corpo, o título e as tags são idênticos
             String bodyX = x.substring(x.indexOf("\nbody=") + 6);
             String bodyY = y.substring(y.indexOf("\nbody=") + 6);
             if (!bodyX.equals(bodyY)) {
@@ -382,7 +365,6 @@ class VaultRoundTripQaIT {
                 diffs.add("TÍTULO/TAGS " + path);
             }
         }
-        // nenhum vínculo explícito de entidade do usuário A aponta para algo do usuário B
         assertThat(jdbc.queryForObject("select count(*) from note_links where user_id = ? and (target_transaction_id is not null or target_goal_id is not null or target_person_id is not null"
                 + " or target_debt_id is not null or target_invoice_id is not null or target_card_id is not null or target_account_id is not null)", Long.class, b.id)).isZero();
         long explicitEntity = jdbc.queryForObject("select count(*) from note_links where user_id = ? and origin = 'EXPLICIT' and target_type not in ('NOTE','MONTHLY_SUMMARY')", Long.class, a.id);
@@ -468,9 +450,7 @@ class VaultRoundTripQaIT {
         assertThat(text).contains("MONTHLY_SUMMARY");
         assertThat(text).as("o vínculo para a nota da lixeira não deve sumir em silêncio do arquivo").contains("lixo.md");
         assertThat(text).contains("state: trashed");
-        // enquanto a nota está na lixeira o vínculo continua no banco; restaurar a nota devolve o vínculo ao estado normal no arquivo
         assertThat(jdbc.queryForObject("select count(*) from note_links where note_id = ?::uuid and origin = 'EXPLICIT' and target_type = 'NOTE'", Long.class, keep)).isEqualTo(1L);
-        // esvaziar a lixeira apaga a nota e, com ela, o vínculo (a decisão de produto fica adiada: ADR-009 e contrato)
         a.call(HttpMethod.DELETE, "/v1/notes/trash", null, null);
         assertThat(jdbc.queryForObject("select count(*) from note_links where note_id = ?::uuid and origin = 'EXPLICIT' and target_type = 'NOTE'", Long.class, keep)).isZero();
         assertThat(new String(unzip(NoteQa.export(w, a)).get("fica.md"), StandardCharsets.UTF_8)).doesNotContain("lixo.md");

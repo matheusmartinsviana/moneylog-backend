@@ -38,12 +38,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T190 / R13 (QA): desempenho dos endpoints novos do redesign com 10.000 e 50.000 movimentações (despesas e receitas em 12 categorias, com
- * acento, datas de 2018 a 2026), no padrão do {@code GoalVolumeQaIT}. Mede e imprime ({@code QA-REDESIGN-VOL}); os limites são só uma rede
- * de segurança (30 s de CPU por leitura). Mede também a abertura do Início inteiro (as leituras do razão em sequência) e o estouro do
- * {@code statement_timeout} da busca num ledger grande.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T190/R13: volume de 10.000 e 50.000 movimentações nos endpoints do redesign")
@@ -70,7 +64,6 @@ class RedesignVolumeQaIT {
         world = new CardQaWorld(mvc, om, jdbc, auth, tm, clock);
     }
 
-    /** Mais 2 que o {@code Actor} já cria (Alimentação e Tecnologia): 12 categorias de despesa no total. */
     private static final String[] CATEGORIES = {"Transporte", "Moradia", "Saúde", "Lazer", "Educação", "Café", "Mercado", "Contas", "Viagem", "Presentes"};
 
     private void seed(Actor a, int count) {
@@ -123,10 +116,6 @@ class RedesignVolumeQaIT {
 
     private static final java.lang.management.ThreadMXBean THREADS = java.lang.management.ManagementFactory.getThreadMXBean();
 
-    /**
-     * Mede o relógio de parede e o tempo de CPU da thread da requisição (o MockMvc roda na mesma thread). Numa máquina compartilhada e carregada o
-     * relógio de parede mente (a mesma leitura variou de 9 a 61 s entre execuções); o CPU da thread é o que não depende da carga. Devolve o CPU.
-     */
     private long timed(String label, Actor a, String url) throws Exception {
         long cpuStart = THREADS.getCurrentThreadCpuTime();
         long start = System.nanoTime();
@@ -139,11 +128,6 @@ class RedesignVolumeQaIT {
         return cpu;
     }
 
-    /**
-     * O banco do contexto é compartilhado com as outras suítes (CardPropertyQaIT, por exemplo, tem consultas que varrem a tabela inteira): 60.000
-     * movimentações largadas aqui tornavam cada passo dela de milissegundos em ~4 s (a suíte inteira passou de 1 hora). Por isso o ator é apagado
-     * ao fim e as tabelas são limpas com VACUUM.
-     */
     private void cleanUp(Actor a) throws Exception {
         new TransactionTemplate(tm).executeWithoutResult(s -> {
             jdbc.update("DELETE FROM ledger_postings WHERE user_id = ?", a.id);
@@ -171,23 +155,19 @@ class RedesignVolumeQaIT {
         seed(a, count);
         System.out.println("QA-REDESIGN-VOL === " + count + " movimentações; heap antes: " + usedMb() + " MB, máx " + (Runtime.getRuntime().maxMemory() >> 20) + " MB");
         long before = usedMb();
-        // baseline (já medido no ADR-008): o dashboard e o resumo carregam o razão inteiro
         long dash = timed("dashboard " + count, a, "/v1/dashboard/summary");
         long sum = timed("resumo mensal " + count, a, "/v1/summaries/2026-10");
-        // endpoints novos
         long d7 = timed("income-expenses D7 " + count, a, "/v1/reports/income-expenses?period=D7");
         long d30 = timed("income-expenses D30 " + count, a, "/v1/reports/income-expenses?period=D30");
         long m3 = timed("income-expenses M3 " + count, a, "/v1/reports/income-expenses?period=M3");
         long m12 = timed("income-expenses M12 " + count, a, "/v1/reports/income-expenses?period=M12");
         long spending = timed("spending-by-category " + count, a, "/v1/reports/spending-by-category?limit=5");
         long afterReads = usedMb();
-        // busca: o termo que casa tudo (LIMIT corta cedo), o que casa pouco e o que não casa (varredura completa)
         long searchAll = timed("busca 'despesa' (casa ~90%) " + count, a, "/v1/search?q=despesa");
         long searchFew = timed("busca 'despesa 4999' " + count, a, "/v1/search?q=" + "despesa%204999");
         long searchCafe = timed("busca 'cafe' sem acento (casa ~14%) " + count, a, "/v1/search?q=cafe");
         long searchNone = timed("busca 'zzznaoexiste' (varredura completa) " + count, a, "/v1/search?q=zzznaoexiste");
         long searchLiteral = timed("busca '100%' (curinga literal) " + count, a, "/v1/search?q=100%25");
-        // a abertura do Início: o razão carregado em sequência (a ordem de prioridade do plano, T201), sem a busca
         long start = System.nanoTime();
         timed("início: dashboard", a, "/v1/dashboard/summary");
         timed("início: resumo do mês", a, "/v1/summaries/2026-10");
@@ -196,7 +176,6 @@ class RedesignVolumeQaIT {
         System.out.printf("QA-REDESIGN-VOL início inteiro (4 leituras do razão em sequência) %d: %d ms%n", count, (System.nanoTime() - start) / 1_000_000);
         System.out.printf("QA-REDESIGN-VOL heap %d MB -> após as leituras %d MB (limite %d MB)%n", before, afterReads, Runtime.getRuntime().maxMemory() >> 20);
 
-        // A/B da consulta de movimentações (menor de 5 execuções, ms): unaccent(?) avaliado por linha × uma vez só (subconsulta de uma linha)
         String perRow = "SELECT t.id FROM transactions t WHERE t.user_id = ? AND t.status = 'ACTIVE' AND t.description IS NOT NULL "
                 + "AND unaccent(t.description) ILIKE unaccent(?) ORDER BY t.transaction_date DESC, t.created_at DESC, t.id DESC LIMIT 5";
         String once = "SELECT t.id FROM transactions t CROSS JOIN (SELECT unaccent(?) AS pat) p WHERE t.user_id = ? AND t.status = 'ACTIVE' "
@@ -215,7 +194,6 @@ class RedesignVolumeQaIT {
             System.out.printf("QA-REDESIGN-VOL A/B busca %s com %d: unaccent(?) por linha %d ms × uma vez só %d ms%n", term, count, best1, best2);
         }
 
-        // estouro do statement_timeout: 1 ms num ledger grande trunca os grupos em varredura e a transação segue
         SearchGatewayImpl impatient = new SearchGatewayImpl(jdbc, Duration.ofMillis(1));
         DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
         definition.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);

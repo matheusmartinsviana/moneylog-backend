@@ -28,13 +28,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 1: integridade financeira. Dois usuários gêmeos fazem a MESMA sequência de operações das Etapas 1 a 5 (compras parceladas,
- * despesa, empréstimo, dívida, meta e reserva, pagamento de fatura, estornos, cancelamentos, arquivamentos). Um deles mistura operações de nota o
- * tempo todo (criar, editar, mover, vincular a todas as entidades, lixeira, exportar, importar); o outro não tem nota nenhuma. As fotografias
- * financeiras (JSON da API e agregados do banco, com ids e instantes mascarados) têm de ser idênticas, e as notas vinculadas continuam coerentes
- * quando o alvo é estornado, cancelado, arquivado ou (fatura vazia) removido.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: nenhuma operação de nota altera razão, saldos, dashboard, resumo, projeção, metas ou dívidas (gêmeos com e sem notas)")
@@ -61,14 +54,11 @@ class NoteFinancialQaIT {
         w = new CardQaWorld(mvc, om, jdbc, auth, tm, clock);
     }
 
-    // ------------------------------------------------------------------------------------------------ fotografia
-
     private static String mask(String text) {
         return text.replaceAll("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "<id>")
                 .replaceAll("\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\d(\\.\\d+)?Z", "<ts>");
     }
 
-    /** Forma canônica: chaves e elementos de lista em ordem estável (a ordem de empate nas listas não é o que se confere aqui). */
     private String canon(String text) {
         try {
             JsonNode node = om.readTree(text);
@@ -110,7 +100,6 @@ class NoteFinancialQaIT {
             }
             String text = canon(mask(r.text()));
             if (url.contains("backup")) {
-                // o backup traz o próprio id/instante de geração; só a contagem de seções e os valores importam
                 text = text.replaceAll("\"generatedAt\":\"[^\"]*\"", "");
             }
             s.put(url.replaceAll("/[0-9a-f-]{36}", "/<id>"), r.status() + " " + text);
@@ -141,8 +130,6 @@ class NoteFinancialQaIT {
             out.add(label + ": chaves diferentes " + x.keySet() + " x " + y.keySet());
         }
     }
-
-    // ------------------------------------------------------------------------------------------------ roteiro
 
     private record Stage(String name, Map<String, String> snapshot, List<Integer> statuses) {
     }
@@ -192,7 +179,6 @@ class NoteFinancialQaIT {
         }
         stages.add(new Stage("setup+notas", snapshot(a, c.ids), List.copyOf(statuses)));
 
-        // pagamento de fatura, estornos, cancelamentos, arquivamentos: a mesma sequência nos dois gêmeos
         String[][] lifecycle = {
                 {"pagar fatura"}, {"estornar despesa"}, {"cancelar parcelas"}, {"cancelar dívida"}, {"estornar empréstimo"}, {"arquivar meta"}, {"arquivar pessoa"},
                 {"arquivar conta"}, {"desarquivar tudo"}, {"estornar compra 1x"}};
@@ -216,14 +202,12 @@ class NoteFinancialQaIT {
             statuses.add(res.status());
             assertThat(res.status()).as("%s: %s", step[0], res).isLessThan(500);
             if (withNotes) {
-                // depois de CADA mudança no alvo, toda nota vinculada continua legível, com o vínculo e o estado do alvo, e as consultas por entidade a trazem
                 verifyNotes(a, c, step[0], problems);
                 noteBurst(a, c, r, "após " + step[0], problems);
             }
             stages.add(new Stage(step[0], snapshot(a, c.ids), List.copyOf(statuses)));
         }
 
-        // fatura vazia removida pela mudança do calendário: o vínculo some junto (ON DELETE CASCADE) e a nota continua íntegra
         c.card2 = a.newCard("Segundo", 25, 5, "5000.00");
         List<JsonNode> invoices = a.invoicesOf(c.card2);
         if (!invoices.isEmpty()) {
@@ -269,7 +253,6 @@ class NoteFinancialQaIT {
         return stages;
     }
 
-    /** Operações de nota aleatórias; nenhuma pode mexer em finanças. Todas sem 5xx. */
     private void noteBurst(Actor a, Ctx c, Random r, String when, List<String> problems) throws Exception {
         String[] entityLinks = {NoteQa.link("TRANSACTION", c.tx1), NoteQa.link("TRANSACTION", c.tx2), NoteQa.link("TRANSACTION", c.tx3), NoteQa.link("ACCOUNT", a.nubank),
                 NoteQa.link("ACCOUNT", c.second), NoteQa.link("CARD", a.card), NoteQa.link("INVOICE", c.invoice), NoteQa.link("PERSON", c.person), NoteQa.link("PERSON", c.person2),
@@ -308,7 +291,6 @@ class NoteFinancialQaIT {
             } else if (dice < 9) {
                 res = NoteQa.restore(a, c.notes.get(r.nextInt(c.notes.size())));
             } else {
-                // exportar e importar de volta (RENAME: nunca sobrescreve) mexe em notas e jamais em finanças
                 Res exp = a.raw(HttpMethod.GET, "/v1/vault/export", null, null);
                 assertThat(exp.status()).isIn(200, 429);
                 res = a.raw(HttpMethod.GET, "/v1/notes/tags", null, null);
@@ -340,7 +322,6 @@ class NoteFinancialQaIT {
                 problems.add(when + ": GET /v1/links " + t[0] + " -> " + res);
             }
         }
-        // o vínculo de uma transação estornada continua e mostra o estado do alvo
         Res tx = a.get("/v1/links?targetType=TRANSACTION&targetId=" + c.tx3);
         if (tx.status() == 200 && when.equals("estornar despesa")) {
             for (JsonNode n : tx.node().get("items")) {
@@ -368,7 +349,6 @@ class NoteFinancialQaIT {
             Stage x = withNotes.get(i);
             Stage y = without.get(i);
             diff("etapa '" + x.name() + "'", y.snapshot(), x.snapshot(), diffs);
-            // o resultado de cada operação financeira (status HTTP) também é o mesmo
             assertThat(x.statuses()).as("status das operações financeiras até '%s'", x.name()).isEqualTo(y.statuses());
         }
         long vault = twinWith.count("notes");

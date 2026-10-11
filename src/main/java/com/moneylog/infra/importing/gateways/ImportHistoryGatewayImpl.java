@@ -15,7 +15,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Histórico de categorização, regras aprendidas e mapeamentos salvos. */
 public class ImportHistoryGatewayImpl implements ImportHistoryGateway {
 
     private final JdbcTemplate jdbc;

@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 
-/** Relógio que os ITs avançam à mão (tolerância do refresh, expiração de token, rate limit). */
 public final class MutableClock extends Clock {
 
     private volatile Instant now;

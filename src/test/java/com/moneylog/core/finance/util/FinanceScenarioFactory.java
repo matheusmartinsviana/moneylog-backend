@@ -35,11 +35,6 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionVoiding;
 import com.moneylog.core.transaction.domain.VoidContext;
 
-/**
- * Cenário base de D1 §3: Nubank (corrente, 20.000,00 em 01/10/2026), XP (corrente, 0), XP Invest (investimento, 0) e o
- * cartão Roxinho (fechamento 25, vencimento 5, limite 10.000,00). Data base 10/10/2026. Cada método aplica um caso do
- * PR 01 e devolve a movimentação criada; as listas são mutáveis para os testes acrescentarem casos em sequência.
- */
 public final class FinanceScenarioFactory {
 
     public static final LocalDate BASE_DATE = LocalDate.of(2026, 10, 10);
@@ -74,7 +69,6 @@ public final class FinanceScenarioFactory {
         return TransactionHeader.of(UUID.fromString(String.format("00000000-0000-0000-0000-0000000f%04d", sequence++)), USER_ID, date, description);
     }
 
-    /** Estorna pelo ponto único (M1), montando o contexto (cartão + cadeia, ou dívida) a partir do cenário. */
     public void estornar(Transaction tx, String reason, LocalDate today) {
         estornar(tx, reason, today, NOW);
     }
@@ -98,27 +92,22 @@ public final class FinanceScenarioFactory {
         return tx;
     }
 
-    /** Caso 1: R$ 100 Pix restaurante. */
     public Transaction caso1DespesaPix() {
         return add(AccountTransactions.expense(header(BASE_DATE, "Restaurante"), Money.of("100.00"), nubank, alimentacao, PaymentMethod.PIX));
     }
 
-    /** Caso 2: R$ 1.200 no cartão em 6x. */
     public Transaction caso2CompraParcelada() {
         return add(compraNoCalendario(header(BASE_DATE, "Notebook"), Money.of("1200.00"), roxinho, alimentacao, 6));
     }
 
-    /** Compra qualquer no Roxinho em 10/10 (Alimentação), em {@code installments} parcelas. */
     public Transaction compraNoCartao(String amount, int installments) {
         return add(compraNoCalendario(header(BASE_DATE, "Compra"), Money.of(amount), roxinho, alimentacao, installments));
     }
 
-    /** Compra à vista de 1.083 em 12/10 (completa a fatura ref. nov de 1.283 com a parcela 1/6). */
     public Transaction compraAVista1083() {
         return add(compraNoCalendario(header(LocalDate.of(2026, 10, 12), "Mercado"), Money.of("1083.00"), roxinho, alimentacao, 1));
     }
 
-    /** Caso 3: pagar a fatura ref. nov/26 (fecha 25/10) em 05/11. */
     public Transaction caso3PagarFatura(String amount) {
         return pagarFatura(amount, LocalDate.of(2026, 10, 25), LocalDate.of(2026, 11, 5));
     }
@@ -127,17 +116,14 @@ public final class FinanceScenarioFactory {
         return add(CardTransactions.invoicePayment(header(date, "Fatura"), Money.of(amount), nubank, roxinho, closing, chain(), date));
     }
 
-    /** Caso 4: R$ 1.000 Nubank → XP. */
     public Transaction caso4Transferencia() {
         return add(AccountTransactions.transfer(header(BASE_DATE, "Transferência"), Money.of("1000.00"), nubank, xp));
     }
 
-    /** Caso 5: investir R$ 10.000. */
     public Transaction caso5Investimento() {
         return add(AccountTransactions.investment(header(BASE_DATE, "CDB"), Money.of("10000.00"), InvestmentDirection.CONTRIBUTION, nubank, xpInvest));
     }
 
-    /** Caso 6: emprestar R$ 300 ao João (previsão 05/11/2026). */
     public DebtOperation caso6Emprestimo() {
         DebtOperation op = DebtTransactions.loanGiven(header(BASE_DATE, "Empréstimo João"), Money.of("300.00"), nubank,
                 new NewDebt(JOAO_DEBT_ID, PersonTestFactory.umJoao(), EXPECTED, null));
@@ -146,13 +132,11 @@ public final class FinanceScenarioFactory {
         return op;
     }
 
-    /** Caso 7: o João devolve R$ 300. */
     public Transaction caso7Devolucao() {
         Debt debt = debts.stream().filter(d -> d.id().equals(JOAO_DEBT_ID)).findFirst().orElseThrow();
         return add(DebtTransactions.moneyReceived(header(BASE_DATE, "Devolução João"), Money.of("300.00"), nubank, debt).transaction());
     }
 
-    /** Caso 8: eu devo R$ 200 ao Pedro, sem movimentação. */
     public Debt caso8DividaSemMovimentacao() {
         Debt debt = Debt.withoutMovement(PEDRO_DEBT_ID, USER_ID, PersonTestFactory.umPedro(), DebtDirection.PAYABLE, Money.of("200.00"),
                 BASE_DATE, EXPECTED, "show");
@@ -160,7 +144,6 @@ public final class FinanceScenarioFactory {
         return debt;
     }
 
-    /** Caso 9: reembolso de R$ 50 na Nubank, Alimentação, refundOf = caso 1. */
     public Transaction caso9Reembolso(Transaction original) {
         return add(AccountTransactions.refundToAccount(header(BASE_DATE, "Reembolso"), Money.of("50.00"), nubank, alimentacao,
                 RefundOrigin.firstRefundOf(original)));

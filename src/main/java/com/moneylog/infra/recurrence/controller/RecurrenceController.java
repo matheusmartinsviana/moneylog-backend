@@ -56,10 +56,6 @@ import com.moneylog.infra.transaction.controller.TransactionResponse;
 import com.moneylog.infra.web.SliceResponse;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Recorrências (D1 §2.7, S-20, S-139, S-140): criar, listar, editar os dados do modelo, encerrar, desativar, listar ocorrências e
- * confirmar ({@code realize}) ou pular ({@code skip}) cada uma. Nada é realizado sozinho.
- */
 @RestController
 @RequestMapping("/v1/recurrences")
 public class RecurrenceController {
@@ -117,7 +113,6 @@ public class RecurrenceController {
         return new RecurrenceSummaryResponse(estimate.fixedCosts(), estimate.recurringIncome(), estimate.estimate());
     }
 
-    /** As pendentes vão até {@code to}, inclusive as vencidas antes de {@code from} (S-20). */
     @GetMapping("/occurrences")
     public OccurrenceResponse.Slice occurrences(@CurrentUser UUID userId,
                                                          @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -126,7 +121,6 @@ public class RecurrenceController {
         QueryDates.inWindow(from, "from");
         QueryDates.inWindow(to, "to");
         if (to != null) {
-            // sem "from" a janela é aberta no início (as vencidas, S-20): a janela de 3 anos conta de hoje; to < from é faixa invertida
             QueryDates.range(from != null ? from : (to.isBefore(time.today()) ? to : time.today()), to);
         }
         return OccurrenceResponse.Slice.of(occurrences.handle(new ListOccurrencesQuery(userId, from, to, status, page)));
@@ -155,7 +149,6 @@ public class RecurrenceController {
         return RecurrenceResponse.of(deactivate.handle(new DeactivateRecurrenceCommand(userId, id)));
     }
 
-    /** Confirma a ocorrência: cria a movimentação na data dela (conta: despesa/receita; cartão: compra em 1 parcela). */
     @PostMapping("/{id}/occurrences/{date}/realize")
     public ResponseEntity<TransactionResponse> realize(@CurrentUser UUID userId, @PathVariable UUID id,
                                                        @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,

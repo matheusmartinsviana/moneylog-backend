@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Corpos de entrada de {@code /v1/people} (contrato: {@code PersonInput} e {@code PersonUpdate}). */
 public final class PersonRequests {
 
     private PersonRequests() {

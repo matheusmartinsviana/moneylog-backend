@@ -10,7 +10,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.qa.CardQaWorld.Actor;
 import com.moneylog.qa.CardQaWorld.Res;
 
-/** T98 (QA): chamadas da Etapa 5 (metas, reservas, resumo, projeção, exportação) sobre o {@link Actor}. */
 final class GoalQa {
 
     private GoalQa() {
@@ -58,7 +57,6 @@ final class GoalQa {
                 + "\"openingBalance\":{\"amount\":\"" + opening + "\",\"currency\":\"BRL\"},\"openingDate\":\"" + openingDate + "\"}", null)).node().get("id").asString();
     }
 
-    /** Σ reservas (todas as datas) de uma meta numa conta, em centavos. */
     static long net(org.springframework.jdbc.core.JdbcTemplate jdbc, Actor a, String goalId, String accountId) {
         Long v = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from goal_reservations where user_id = ? and goal_id = ?::uuid and account_id = ?::uuid",
                 Long.class, a.id, goalId, accountId);

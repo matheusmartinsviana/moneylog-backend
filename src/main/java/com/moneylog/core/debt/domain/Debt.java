@@ -32,33 +32,16 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.FinancialDates;
 
-/**
- * Dívida (D1 §2.6): "me devem" ({@code RECEIVABLE}) ou "eu devo" ({@code PAYABLE}).
- *
- * <ul>
- *   <li>{@code WITH_MOVEMENT}: nasce junto com a sua única movimentação de origem ({@code LOAN_GIVEN} ou captação);
- *       os postings são da movimentação (S-41).</li>
- *   <li>{@code WITHOUT_MOVEMENT}: reconhecida contra {@code EQUITY} (origem {@code DEBT_RECOGNITION}), sem caixa nem
- *       consumo (PR 01 caso 8). Uma dívida {@code PAYABLE} pode nascer de consumo (D1 §2.6.1, S-137): com categoria, o
- *       reconhecimento é {@code EXPENSE(cat) +X / PAYABLE −X} (consumo +X, caixa 0).</li>
- *   <li>O status é derivado das quitações ativas; só o encerramento ({@code CANCELED}/{@code VOIDED}) é gravado.</li>
- *   <li>Perdão ({@link #cancel}) zera o saldo contra {@code EQUITY} (origem {@code DEBT_CANCELLATION}), sem
- *       despesa nem receita (S-19).</li>
- * </ul>
- */
 public final class Debt {
 
     public static final String DEBT_ALREADY_HAS_ORIGIN = "DEBT_ALREADY_HAS_ORIGIN";
     public static final int TEXT_MAX_LENGTH = 500;
-    /** Coluna {@code debts.description} (VARCHAR(200)). */
     public static final int DESCRIPTION_MAX_LENGTH = 200;
-    /** Coluna {@code debts.creditor_name} (VARCHAR(100)). */
     public static final int CREDITOR_NAME_MAX_LENGTH = 100;
 
     private final UUID id;
     private final UUID userId;
     private final UUID personId;
-    /** Credor livre das "outras dívidas" (P1, ADR-013): banco, loja, financiamento; só em {@code PAYABLE}, no lugar da pessoa. */
     private final String creditorName;
     private final DebtDirection direction;
     private final DebtOrigin origin;
@@ -112,7 +95,6 @@ public final class Debt {
         this.entries = origin == DebtOrigin.WITHOUT_MOVEMENT ? recognitionEntries() : List.of();
     }
 
-    /** Reidratação (veja {@link #restore}); copia o estado já validado. */
     private Debt(DebtState s, List<DebtSettlement> settlements, List<LedgerEntry> entries) {
         this.id = s.id();
         this.userId = s.userId();
@@ -133,37 +115,24 @@ public final class Debt {
         this.closureReason = s.closureReason();
     }
 
-    /**
-     * Dívida que nasce com a movimentação de origem (uso de {@code DebtTransactions}: o principal é o valor da origem).
-     */
     public static Debt withMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
                                     LocalDate date, LocalDate expectedDate, String description, UUID originTransactionId) {
         return new Debt(id, userId, person, null, direction, DebtOrigin.WITH_MOVEMENT, principal, description, date, expectedDate,
                 required(originTransactionId, "originTransactionId"), null);
     }
 
-    /** Dívida sem movimentação ("eu devo 200 ao Pedro"): {@code PAYABLE −X / EQUITY +X} na data da dívida. */
     public static Debt withoutMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
                                        LocalDate date, LocalDate expectedDate, String description) {
         return new Debt(id, userId, person, null, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
                 null, null);
     }
 
-    /**
-     * "Outra dívida" (P1, ADR-013): {@code PAYABLE} com credor livre (banco, loja, financiamento), sem {@link Person}. Reconhecida contra
-     * {@code EQUITY} como a dívida com pessoa ({@code PAYABLE −X / EQUITY +X}): sem caixa e sem consumo. Quitação e perdão são os de sempre.
-     */
     public static Debt withoutMovementToCreditor(UUID id, UUID userId, String creditorName, Money principal, LocalDate date,
                                                  LocalDate expectedDate, String description) {
         return new Debt(id, userId, null, creditorName, DebtDirection.PAYABLE, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date,
                 expectedDate, null, null);
     }
 
-    /**
-     * Dívida {@code PAYABLE} sem movimentação que nasce de consumo (D1 §2.6.1, S-137: "um amigo pagou meu jantar de 80"):
-     * {@code EXPENSE(cat) +X / PAYABLE −X} na data da dívida. Consumo +X na competência da data, caixa 0, patrimônio −X. A
-     * categoria é de despesa, do usuário e ativa; dívida {@code RECEIVABLE} não tem categoria.
-     */
     public static Debt withoutMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
                                        LocalDate date, LocalDate expectedDate, String description, Category category) {
         if (category == null) {
@@ -179,15 +148,6 @@ public final class Debt {
                 null, category.id());
     }
 
-    /**
-     * Reidrata uma dívida já persistida (usado pelo mapper da infra). Não consulta relógio nem refaz as operações:
-     * devolve o agregado como foi gravado, com status e saldo <b>derivados</b> das quitações (S-37). Estado corrompido
-     * (principal inválido, origem sem movimentação, encerramento incompleto, lançamento de outra origem, grupo que não
-     * fecha em zero, Σ quitações ativas &gt; principal) lança {@link DebtStateInconsistentException}.
-     *
-     * @param settlements quitações, ativas e inativas ({@link #settlements()})
-     * @param entries     lançamentos próprios (reconhecimento e perdão), ativos e inativos ({@link #entries()})
-     */
     public static Debt restore(DebtState state, List<DebtSettlement> settlements, List<LedgerEntry> entries) {
         try {
             return validated(state, settlements, entries);
@@ -198,7 +158,6 @@ public final class Debt {
         }
     }
 
-    /** Estado persistido (o inverso de {@link #restore}); quitações e lançamentos saem por {@link #settlements()} e {@link #entries()}. */
     public DebtState state() {
         return new DebtState(id, userId, personId, direction, origin, principal, description, date, expectedDate,
                 originTransactionId, closure, closureDate, closureReason, categoryId, creditorName);
@@ -286,8 +245,6 @@ public final class Debt {
         return new DebtStateInconsistentException(reason);
     }
 
-    // ------------------------------------------------------------------ status derivado
-
     public DebtStatus status() {
         if (closure != null) {
             return closure == DebtClosure.CANCELED ? DebtStatus.CANCELED : DebtStatus.VOIDED;
@@ -299,22 +256,17 @@ public final class Debt {
         return settled.isLessThan(principal) ? DebtStatus.PARTIALLY_SETTLED : DebtStatus.SETTLED;
     }
 
-    /** Σ quitações ativas. */
     public Money settled() {
         return Money.sum(settlements.stream().filter(DebtSettlement::active).map(DebtSettlement::amount).toList(), principal.currency());
     }
 
-    /** Saldo devedor: principal − quitações ativas (0 se encerrada). */
     public Money outstanding() {
         return closure != null ? Money.zero(principal.currency()) : principal.subtract(settled());
     }
 
-    /** "Atrasada": previsão anterior a hoje e saldo &gt; 0 (D1 §2.6). */
     public boolean isOverdue(LocalDate today) {
         return expectedDate != null && expectedDate.isBefore(today) && outstanding().isPositive();
     }
-
-    // ------------------------------------------------------------------ operações
 
     public void ensureDirection(DebtDirection expected) {
         if (direction != expected) {
@@ -322,17 +274,12 @@ public final class Debt {
         }
     }
 
-    /**
-     * Uma dívida existente nunca recebe outra origem (S-41): emprestar de novo = nova dívida. Devolve a recusa para o
-     * chamador lançar.
-     */
     public DebtOperationRefusedException newOriginRefusal() {
         return new DebtOperationRefusedException(DEBT_ALREADY_HAS_ORIGIN, origin == DebtOrigin.WITH_MOVEMENT
                 ? "a dívida já tem movimentação de origem; emprestar de novo cria outra dívida."
                 : "a dívida foi registrada sem movimentação e não recebe origem.");
     }
 
-    /** Valida uma quitação sem registrá-la (o chamador cria a movimentação e depois registra). */
     public void ensureCanSettle(Money amount) {
         ensureNotClosed();
         if (amount.isGreaterThan(outstanding())) {
@@ -346,11 +293,6 @@ public final class Debt {
         settlements.add(new DebtSettlement(transactionId, amount, true));
     }
 
-    /**
-     * Valida, sem mudar nada, o efeito do estorno da movimentação {@code transactionId} nesta dívida (M1): origem só
-     * sem quitações ativas e sem encerramento; quitação só se existir ativa e a dívida não foi perdoada. O ponto único
-     * de estorno chama isto <b>antes</b> de estornar a movimentação, para não deixar estado parcial.
-     */
     public void ensureCanVoidTransaction(UUID transactionId) {
         required(transactionId, "transactionId");
         if (transactionId.equals(originTransactionId)) {
@@ -361,24 +303,18 @@ public final class Debt {
         }
     }
 
-    /** Estorno de uma quitação: o status volta sozinho (é derivado). Recusado depois do perdão (DEBT_CLOSED). */
     public void voidSettlement(UUID transactionId) {
         refuseIfNotAllowed(DebtVoidRules.forSettlement(this));
         int index = activeSettlementIndex(transactionId);
         settlements.set(index, settlements.get(index).deactivate());
     }
 
-    /**
-     * Edita a descrição e a previsão (o principal, a pessoa e a origem não mudam). Dívida encerrada não muda
-     * ({@code DEBT_CLOSED}).
-     */
     public void updateDetails(String newDescription, LocalDate newExpectedDate) {
         ensureNotClosed();
         this.description = requireDescription(newDescription);
         this.expectedDate = FinancialDates.requireInWindow(newExpectedDate, "expectedDate");
     }
 
-    /** Perdão (S-19): só {@code OPEN}/{@code PARTIALLY_SETTLED}; zera o saldo contra {@code EQUITY}. */
     public void cancel(String reason, LocalDate today) {
         String validReason = requireReason(reason);
         required(today, "today");
@@ -396,7 +332,6 @@ public final class Debt {
         close(DebtClosure.CANCELED, today, validReason);
     }
 
-    /** Estorno do registro de uma dívida sem movimentação: só sem quitações ativas; os postings ficam inativos. */
     public void voidRecord(String reason, LocalDate today) {
         String validReason = requireReason(reason);
         required(today, "today");
@@ -409,7 +344,6 @@ public final class Debt {
         close(DebtClosure.VOIDED, today, validReason);
     }
 
-    /** Efeito do estorno da movimentação de origem (a guarda já foi consultada pela movimentação). */
     public void markOriginVoided(UUID transactionId, String reason, LocalDate today) {
         if (!transactionId.equals(originTransactionId)) {
             throw new DebtNotFoundException(id);
@@ -428,9 +362,6 @@ public final class Debt {
         return direction == DebtDirection.RECEIVABLE ? BookRef.receivable(id) : BookRef.payable(id);
     }
 
-    // ------------------------------------------------------------------ leitura
-
-    /** Postings próprios da dívida (reconhecimento e perdão), ativos e inativos. */
     public List<LedgerEntry> entries() {
         return entries;
     }
@@ -447,12 +378,10 @@ public final class Debt {
         return userId;
     }
 
-    /** Pessoa devedora/credora; {@code null} na dívida com credor livre ({@link #creditorName()}). */
     public UUID personId() {
         return personId;
     }
 
-    /** Credor livre das "outras dívidas"; {@code null} quando há pessoa. */
     public String creditorName() {
         return creditorName;
     }
@@ -485,7 +414,6 @@ public final class Debt {
         return originTransactionId;
     }
 
-    /** Categoria de despesa da dívida {@code PAYABLE} que nasceu de consumo (S-137); {@code null} nas demais. */
     public UUID categoryId() {
         return categoryId;
     }
@@ -501,8 +429,6 @@ public final class Debt {
     public String closureReason() {
         return closureReason;
     }
-
-    // ------------------------------------------------------------------ internos
 
     private List<LedgerEntry> recognitionEntries() {
         if (categoryId != null) {

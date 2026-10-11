@@ -13,7 +13,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.infra.ledger.persistence.LedgerPostingEntity;
 
-/** {@code LedgerEntry} ⇄ {@code ledger_postings} (domínio ⇄ entity). */
 public final class LedgerRepositoryMapper {
 
     private LedgerRepositoryMapper() {

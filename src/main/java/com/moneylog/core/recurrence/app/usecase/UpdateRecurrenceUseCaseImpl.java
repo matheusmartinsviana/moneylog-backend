@@ -44,7 +44,6 @@ public class UpdateRecurrenceUseCaseImpl implements UpdateRecurrenceUseCase {
             throw new InvalidRecurrenceException("informe a conta ou o cartão, não os dois.");
         }
         FinancialDates.requireInWindow(c.endDate(), "endDate");
-        // só o que mudou é revalidado: uma conta que arquivou depois não impede de corrigir o valor
         if (!Objects.equals(c.categoryId(), recurrence.categoryId())) {
             references.category(c.userId(), c.categoryId(), recurrence.type());
         }

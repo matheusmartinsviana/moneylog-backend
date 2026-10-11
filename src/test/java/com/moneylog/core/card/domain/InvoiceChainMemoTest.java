@@ -12,10 +12,6 @@ import org.junit.jupiter.api.Test;
 import com.moneylog.core.card.util.factory.InvoiceScenario;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * B5: a cadeia é calculada uma vez por estado e reaproveitada por {@code invoice}/{@code statusOf}/{@code creditBalance};
- * as mutações invalidam o cálculo guardado e os resultados são os mesmos de uma cadeia nova.
- */
 @DisplayName("Cadeia de faturas: cálculo memoizado e invalidado pelas mutações (B5)")
 class InvoiceChainMemoTest {
 

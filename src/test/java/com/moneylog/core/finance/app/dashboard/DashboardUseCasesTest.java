@@ -107,7 +107,6 @@ class DashboardUseCasesTest {
         assertThat(view.summary().month().net()).isEqualTo(Money.of("2910.00"));
         assertThat(view.summary().balances().inAccounts()).isEqualTo(Money.of("22410.00"));
         assertThat(view.summary().balances().investments()).isEqualTo(Money.of("500.00"));
-        // a despesa de 70,00 do cenário tem data 05/11 (futura): é compromisso (S-258), não caixa
         assertThat(view.summary().balances().committed30d()).isEqualTo(Money.of("70.00"));
         assertThat(view.summary().balances().available()).isEqualTo(Money.of("22340.00"));
         assertThat(view.summary().cashFlow()).isEqualTo(CashFlowReport.between(loaded, loaded.ledger(), LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31)));
@@ -150,21 +149,16 @@ class DashboardUseCasesTest {
         s.caso8DividaSemMovimentacao();
         records(s.records());
 
-        // hoje 31/10: as duas dívidas vencem em 05/11, dentro da janela padrão (até 30/11)
         UpcomingView defaultWindow = upcoming.handle(new GetUpcomingQuery(USER_ID, null, null));
         assertThat(defaultWindow.items()).extracting(c -> c.kind()).containsExactlyInAnyOrder(CommitmentKind.DEBT_RECEIVABLE, CommitmentKind.DEBT_PAYABLE);
         assertThat(defaultWindow.out()).isEqualTo(Money.of("200.00"));
         assertThat(defaultWindow.in()).isEqualTo(Money.of("300.00"));
         assertThat(defaultWindow.items()).extracting(c -> c.bucket()).containsOnly(Bucket.NEXT_7_DAYS);
 
-        // janela depois do vencimento: não entram (não estão vencidos hoje)
         assertThat(upcoming.handle(new GetUpcomingQuery(USER_ID, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31))).items()).isEmpty();
-        // só from: to = from + 30 dias
         assertThat(upcoming.handle(new GetUpcomingQuery(USER_ID, LocalDate.of(2026, 11, 1), null)).items()).hasSize(2);
-        // só to
         assertThat(upcoming.handle(new GetUpcomingQuery(USER_ID, null, LocalDate.of(2026, 11, 1))).items()).isEmpty();
 
-        // depois do vencimento, os itens ficam vencidos e entram mesmo fora da janela
         when(time.today()).thenReturn(LocalDate.of(2026, 11, 20));
         UpcomingView later = upcoming.handle(new GetUpcomingQuery(USER_ID, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 12, 31)));
         assertThat(later.items()).hasSize(2).extracting(c -> c.bucket()).containsOnly(Bucket.OVERDUE);
@@ -196,15 +190,12 @@ class DashboardUseCasesTest {
         long overdueOccurrences = view.items().stream().filter(c -> c.kind() == CommitmentKind.RECURRENCE && c.bucket() == Bucket.OVERDUE).count();
         assertThat(view.overdueTruncated()).isTrue();
         assertThat(overdueOccurrences).isEqualTo(500);
-        // as 500 mais recentes: de hoje − 500 a hoje − 1
         assertThat(view.items().stream().filter(c -> c.kind() == CommitmentKind.RECURRENCE && c.bucket() == Bucket.OVERDUE).map(c -> c.dueDate()).min(java.util.Comparator.naturalOrder()))
                 .contains(TODAY.minusDays(500));
-        // a dívida a receber e as futuras continuam; o total é o completo: 600 vencidas + hoje + 30 dias = 631 de 1,00
         assertThat(view.items()).extracting(c -> c.kind()).contains(CommitmentKind.DEBT_RECEIVABLE);
         assertThat(view.out()).isEqualTo(Money.of("631.00"));
         assertThat(view.items().stream().filter(c -> c.bucket() != Bucket.OVERDUE).count()).isGreaterThan(30);
 
-        // exatamente 500 vencidas: não trunca
         var exact = com.moneylog.core.recurrence.domain.RecurringTransaction.ofAccount(java.util.UUID.randomUUID(), USER_ID,
                 com.moneylog.core.transaction.domain.TransactionType.EXPENSE, Money.of("1.00"), "Diária", salary.id(),
                 s.nubank.id(), com.moneylog.core.transaction.domain.PaymentMethod.PIX,

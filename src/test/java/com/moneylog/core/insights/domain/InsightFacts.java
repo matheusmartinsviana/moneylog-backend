@@ -12,7 +12,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/** Construtor de {@link MonthFacts} e {@link DayFacts} com dados 100% sintéticos para os testes dos calculadores. */
 final class InsightFacts {
 
     static final LocalDate TODAY = LocalDate.of(2026, 10, 20);
@@ -37,7 +36,6 @@ final class InsightFacts {
         return new MonthSnapshot(month, brl(income), brl(consumption), brl("0.00"), byCategory);
     }
 
-    /** {@code n} meses fechados imediatamente antes de {@code month}, do mais antigo ao mais recente, com a renda e o consumo dados. */
     static List<MonthSnapshot> closed(Competence month, int n, String income, String consumption) {
         List<MonthSnapshot> list = new ArrayList<>();
         for (int back = n; back >= 1; back--) {
@@ -50,7 +48,6 @@ final class InsightFacts {
         return new Builder(month, today);
     }
 
-    /** Mês passado fechado: hoje é depois do mês. */
     static Builder closedMonth(Competence month) {
         return new Builder(month, month.plusMonths(2).firstDay());
     }

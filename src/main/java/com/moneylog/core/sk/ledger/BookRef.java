@@ -4,10 +4,6 @@ import java.util.UUID;
 
 import com.moneylog.core.sk.ledger.LedgerExceptions.InvalidPostingException;
 
-/**
- * Referência a um livro do razão: tipo + id da entidade dona (conta, cartão, dívida, categoria). {@code EQUITY} não
- * tem id.
- */
 public record BookRef(BookType type, UUID id) {
 
     public BookRef {

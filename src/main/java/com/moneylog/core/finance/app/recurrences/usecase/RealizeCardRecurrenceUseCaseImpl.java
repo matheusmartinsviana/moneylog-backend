@@ -22,11 +22,6 @@ import com.moneylog.core.transaction.app.gateways.TransactionGateway;
 import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * O lado do cartão da recorrência (T60). Uma transação: a compra e os lançamentos dela. A ocorrência fica "realizada" por
- * existir a movimentação ativa com o par {@code (recurrenceId, occurrenceDate)} ({@link RecurrenceGateway}), e o índice único
- * parcial {@code uq_transactions_recurrence_occurrence} é a última barreira contra duas realizações concorrentes.
- */
 public class RealizeCardRecurrenceUseCaseImpl implements RealizeCardRecurrenceUseCase {
 
     private final RecurrenceGateway recurrences;
@@ -55,7 +50,6 @@ public class RealizeCardRecurrenceUseCaseImpl implements RealizeCardRecurrenceUs
     @Override
     public TransactionDetails handle(RealizeCardRecurrenceCommand command) {
         UUID userId = command.userId();
-        // ordem global de travas: movimentações (nenhuma) → recorrência → cartão; tudo lido só depois das travas
         recurrences.lockForUpdate(userId, command.recurrenceId());
         RecurringTransaction recurrence = recurrences.findById(userId, command.recurrenceId())
                 .orElseThrow(() -> new RecurrenceNotFoundException(command.recurrenceId()));
@@ -63,7 +57,6 @@ public class RealizeCardRecurrenceUseCaseImpl implements RealizeCardRecurrenceUs
         if (cardId != null) {
             cards.lockForUpdate(userId, cardId);
         }
-        // o modelo de conta (cardId nulo) cai na checagem do domínio: RECURRENCE_REFERENCE_MISMATCH
         CreditCard card = cardId == null ? null : cards.findById(userId, cardId).map(Persisted::value)
                 .orElseThrow(() -> new CardNotFoundException(cardId));
         Category category = categories.findById(userId, recurrence.categoryId())

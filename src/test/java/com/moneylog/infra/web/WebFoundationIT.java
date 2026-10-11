@@ -35,12 +35,10 @@ class WebFoundationIT {
     @Autowired
     private ItAuth auth;
 
-    /** GET autenticado como o dono (a API inteira exige Bearer, T22b). */
     private MockHttpServletRequestBuilder get(String url) {
         return MockMvcRequestBuilders.get(url).header(HttpHeaders.AUTHORIZATION, auth.ownerBearer());
     }
 
-    /** POST autenticado como o dono. */
     private MockHttpServletRequestBuilder post(String url) {
         return MockMvcRequestBuilders.post(url).header(HttpHeaders.AUTHORIZATION, auth.ownerBearer());
     }
@@ -263,7 +261,6 @@ class WebFoundationIT {
         @Test
         @DisplayName("\"hoje\" é calculado em America/Sao_Paulo e o relógio é fixável nos ITs")
         void deveCalcularHojeNoFusoDoUsuario() throws Exception {
-            // 2026-10-11T01:30Z já é dia 11 em UTC, mas ainda é dia 10 em São Paulo (UTC−3).
             mockMvc.perform(get("/test/today"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.today").value("2026-10-10"))

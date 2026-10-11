@@ -33,7 +33,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/** O que os handlers têm em comum: carregar conta e categoria do usuário e montar o cabeçalho. */
 public class HandlerSupport {
 
     private final TransactionGateway transactions;
@@ -43,12 +42,10 @@ public class HandlerSupport {
     private final DebtGateway debts;
     private final IdGenerator ids;
 
-    /** Só contas e categorias (Etapas 2 e 3): os handlers de dívida e a divisão de despesa não estão ligados. */
     public HandlerSupport(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories) {
         this(transactions, accounts, categories, null, null, null);
     }
 
-    /** Com pessoas, dívidas e o gerador de ids (Etapa 4). */
     public HandlerSupport(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories, PersonGateway persons,
                           DebtGateway debts, IdGenerator ids) {
         this.transactions = transactions;
@@ -59,7 +56,6 @@ public class HandlerSupport {
         this.ids = ids;
     }
 
-    /** Os handlers de dívida só existem quando as portas de pessoa e dívida e o gerador de ids foram informados. */
     public boolean hasDebts() {
         return persons != null && debts != null && ids != null;
     }
@@ -72,13 +68,11 @@ public class HandlerSupport {
         return debts.findById(userId, debtId).map(Versioned::value).orElseThrow(() -> new DebtNotFoundException(debtId));
     }
 
-    /** A dívida que nasce com a movimentação: pessoa do usuário (outra → 404), previsão e descrição (sem ela, a da movimentação). */
     NewDebt newDebt(UUID userId, NewDebtSpec spec, TransactionHeader header) {
         return new NewDebt(ids.next(), person(userId, spec.personId()), spec.expectedDate(),
                 spec.description() == null || spec.description().isBlank() ? header.description() : spec.description());
     }
 
-    /** As dívidas cuja origem é a movimentação (a despesa dividida tem uma por parte); vazio se as dívidas não estão ligadas. */
     List<Debt> debtsOriginatedBy(UUID userId, UUID transactionId) {
         return debts == null ? List.of() : debts.findByOriginTransaction(userId, transactionId).stream().map(Versioned::value).toList();
     }
@@ -99,10 +93,6 @@ public class HandlerSupport {
         return accounts.findById(userId, accountId).map(Persisted::value).orElseThrow(() -> new AccountNotFoundException(accountId));
     }
 
-    /**
-     * Na edição, a categoria arquivada só é recusada se a edição a <b>troca</b> por ela (B9, S-113); mantendo a que a
-     * movimentação já tinha, a edição passa.
-     */
     Category category(UUID userId, UUID categoryId, Transaction editing, CategoryKind kind) {
         if (categoryId == null) {
             return defaultCategory(userId, kind);
@@ -111,14 +101,12 @@ public class HandlerSupport {
         return editing != null && categoryId.equals(editing.categoryId()) ? category.forExistingUse() : category;
     }
 
-    /** Categoria de sistema padrão (Outros / Outras receitas) quando o comando não traz categoria; 422 se faltar ou estiver arquivada. */
     Category defaultCategory(UUID userId, CategoryKind kind) {
         String key = kind == CategoryKind.INCOME ? SystemCategories.DEFAULT_INCOME_KEY : SystemCategories.DEFAULT_EXPENSE_KEY;
         return categories.findBySystemKey(userId, key).filter(c -> !c.isArchived())
                 .orElseThrow(() -> new DefaultCategoryUnavailableException(key));
     }
 
-    /** Reembolso sem categoria: herda a da original; sem origem, cai na padrão de despesa. */
     Category refundCategory(Refund c, RefundOrigin origin, Transaction editing) {
         if (c.categoryId() == null && origin != null && origin.original().categoryId() != null) {
             return category(c.userId(), origin.original().categoryId(), editing, CategoryKind.EXPENSE);
@@ -126,10 +114,6 @@ public class HandlerSupport {
         return category(c.userId(), c.categoryId(), editing, CategoryKind.EXPENSE);
     }
 
-    /**
-     * A despesa ou compra de origem do reembolso e quanto dela já foi reembolsado, ou {@code null} sem origem. B1: trava a
-     * movimentação original antes de ler a soma; reembolsos, edição e estorno dela se serializam aqui.
-     */
     RefundOrigin refundOrigin(Refund refund, Transaction editing) {
         if (refund.refundOfTransactionId() == null) {
             return null;
@@ -141,8 +125,6 @@ public class HandlerSupport {
         if (editing != null && editing.isActive() && original.id().equals(editing.refundOfId())) {
             alreadyRefunded = alreadyRefunded.subtract(editing.amount());
         }
-        // despesa dividida (S-137): a parte que outras pessoas devem não é consumo do usuário, então não pode ser "reembolsada" como
-        // consumo (o consumo da categoria ficaria negativo): o teto do reembolso é a parte do próprio usuário
         for (Debt shared : debtsOriginatedBy(refund.userId(), original.id())) {
             alreadyRefunded = alreadyRefunded.add(shared.principal());
         }

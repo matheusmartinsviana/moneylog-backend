@@ -18,11 +18,6 @@ import com.moneylog.core.transaction.domain.CardTransactions;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * T54 CA8, invariante de D1 §2.5.3 e §4: {@code Σ outstanding − creditCarry da última = Σ total − Σ paid = −(saldo do livro
- * CARD)}, para todo cartão e toda data. 100 cenários aleatórios (semente fixa por cenário) de compras, reembolsos,
- * pagamentos parciais, a maior e antecipados, estornos e cancelamento de parcelas, com o relógio avançando.
- */
 @DisplayName("Invariante do cartão: Σ outstanding − creditCarry da última = −saldo CARD (T54 CA8)")
 class InvarianteDoCartaoPropriedadeTest {
 
@@ -43,7 +38,6 @@ class InvarianteDoCartaoPropriedadeTest {
                     operate(scenario, random, today);
                     operations++;
                 } catch (DomainException expected) {
-                    // operação recusada pelo domínio (fatura paga, guarda de estorno...): nada muda e o invariante continua valendo
                 }
                 assertConsumptionNeverNegative(scenario, seed, today);
                 assertInvariant(scenario, seed, today);
@@ -61,7 +55,6 @@ class InvarianteDoCartaoPropriedadeTest {
                 List<Transaction> purchases = s.transactions().stream()
                         .filter(t -> t.isActive() && t.type() == TransactionType.CARD_PURCHASE).toList();
                 if (!purchases.isEmpty() && random.nextBoolean()) {
-                    // S-9: reembolso ligado à compra, até o cobrado ainda disponível (às vezes quase todo, para o A1)
                     Transaction purchase = purchases.get(random.nextInt(purchases.size()));
                     long room = purchase.chargedAmount().subtract(s.activeRefundsOf(purchase)).cents();
                     if (room > 0) {
@@ -102,7 +95,6 @@ class InvarianteDoCartaoPropriedadeTest {
                 .toPlainString();
     }
 
-    /** A1/S-218: o consumo líquido de cada compra (cobrado − reembolsos ativos ligados a ela) nunca fica negativo. */
     private static void assertConsumptionNeverNegative(InvoiceScenario s, long seed, LocalDate date) {
         for (Transaction purchase : s.transactions()) {
             if (purchase.isActive() && purchase.type() == TransactionType.CARD_PURCHASE) {

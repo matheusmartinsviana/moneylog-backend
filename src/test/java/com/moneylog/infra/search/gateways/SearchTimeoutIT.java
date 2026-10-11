@@ -21,10 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.moneylog.core.search.domain.SearchGroup;
 import com.moneylog.util.IntegrationTest;
 
-/**
- * S-287: estourar o {@code statement_timeout} de um grupo devolve o grupo vazio e marcado em {@code truncated}, e a transação (o instantâneo
- * {@code REPEATABLE_READ} dos outros grupos) <b>continua viva</b>: no Postgres uma consulta cancelada aborta a transação, e só o savepoint a salva.
- */
 @IntegrationTest
 @DisplayName("Busca global: limite de tempo por grupo com savepoint (S-287)")
 class SearchTimeoutIT {

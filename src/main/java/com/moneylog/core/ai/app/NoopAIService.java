@@ -3,7 +3,6 @@ package com.moneylog.core.ai.app;
 import com.moneylog.core.ai.app.AiResult.AiUnavailable;
 import com.moneylog.core.ai.app.AiResult.Reason;
 
-/** Sem provedor (padrão): toda operação devolve "indisponível", nunca erro. O app inteiro funciona sem IA. */
 public class NoopAIService implements AIService {
 
     private static final AiResult UNAVAILABLE = new AiUnavailable(Reason.DISABLED);

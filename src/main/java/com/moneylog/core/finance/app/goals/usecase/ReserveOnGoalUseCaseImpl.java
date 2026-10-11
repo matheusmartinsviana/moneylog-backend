@@ -21,11 +21,6 @@ import com.moneylog.core.transaction.app.IdempotentClaim;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 
-/**
- * Reservas da meta (T93, S-147/S-148). Ordem global de travas: a meta vem <b>antes</b> das contas (a lista de travas das Etapas 3 e
- * 4 não toca metas): duas reservas na mesma meta se serializam na trava da meta; conta arquivada concorrente espera na trava da
- * conta. Nada é gravado no razão nem em {@code transactions}: só {@code goal_reservations}.
- */
 public class ReserveOnGoalUseCaseImpl implements ReserveOnGoalUseCase {
 
     private final GoalGateway goals;
@@ -73,7 +68,6 @@ public class ReserveOnGoalUseCaseImpl implements ReserveOnGoalUseCase {
         return model.view(userId, saved, records.load(userId));
     }
 
-    /** Hash do comando canônico (o dono não entra: a chave é por usuário). */
     private static String hashOf(ReserveOnGoalCommand c) {
         return IdempotentClaim.hash("goalId=" + c.goalId() + ";accountId=" + c.accountId() + ";amount="
                 + (c.amount() == null ? "-" : c.amount().toPlainString()) + ";date=" + c.date() + ";note="

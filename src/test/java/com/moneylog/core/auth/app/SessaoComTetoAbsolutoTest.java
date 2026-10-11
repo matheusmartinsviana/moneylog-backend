@@ -30,7 +30,6 @@ import com.moneylog.core.auth.domain.RefreshToken;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.ClockTimeProvider;
 
-/** B7: teto absoluto da família de refresh tokens (90 dias) e limpeza dos expirados. */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Sessão com teto absoluto e limpeza do refresh (B7)")
 class SessaoComTetoAbsolutoTest {

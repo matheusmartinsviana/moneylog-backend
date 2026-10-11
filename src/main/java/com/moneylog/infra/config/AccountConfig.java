@@ -34,7 +34,6 @@ import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
 import com.moneylog.infra.transaction.gateways.TransactionHydrator;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/** Ligação da feature conta e do carregamento único dos registros financeiros (S-79: contas, cartões e movimentações). */
 @Configuration(proxyBeanMethods = false)
 public class AccountConfig {
 

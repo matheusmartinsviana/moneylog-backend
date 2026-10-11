@@ -5,7 +5,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-/** SHA-256 em hexadecimal (64 caracteres) do valor do refresh token. */
 public final class RefreshTokenHash {
 
     private RefreshTokenHash() {

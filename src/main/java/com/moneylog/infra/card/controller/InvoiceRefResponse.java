@@ -7,7 +7,6 @@ import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.finance.app.cards.InvoiceView;
 import com.moneylog.core.finance.app.cards.PurchasePreviewView.InvoiceTarget;
 
-/** Referência curta a uma fatura (contrato: {@code InvoiceRef}). */
 public record InvoiceRefResponse(UUID id, String referenceMonth, LocalDate closingDate, LocalDate dueDate, InvoiceStatus status) {
 
     public static InvoiceRefResponse of(InvoiceView view) {

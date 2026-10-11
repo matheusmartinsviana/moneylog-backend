@@ -35,16 +35,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T82 (QA), critério 2: operações aleatórias com sementes fixas sobre o ciclo completo da Etapa 4 (empréstimo, recebimento,
- * captação, pagamento, dívida sem movimentação com e sem categoria, perdão, estorno do registro, despesa dividida de 1 a 20 partes,
- * reembolso da despesa dividida, estornos de qualquer movimentação, compras e reembolsos no cartão, pagamento de fatura,
- * mudança de dias, recorrências em conta e cartão realizadas, puladas, estornadas, desativadas, e passagem do tempo).
- * A cada lote: o razão fecha em zero; dívida nunca negativa nem quitada acima do principal; livros RECEIVABLE/PAYABLE = Σ saldo
- * em aberto; nada de dívida/devolução vira despesa ou receita; consumo por categoria e por competência nunca negativo e igual ao
- * razão; pessoa = Σ dívidas; saldo da conta = razão; dashboard = lista = entries; Σ saídas do /upcoming = faturas + ocorrências +
- * dívidas datadas; nenhuma ocorrência realizada duas vezes; todo {@code code} está na tabela do contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: propriedade das metas, reservas, resumo mensal e projeções misturadas com todas as operações")
@@ -136,8 +126,6 @@ class GoalPropertyQaIT {
         assertThat(violations).as("violações").isEmpty();
     }
 
-    // ------------------------------------------------------------------------------------------------ operações
-
     private static String pick(Random rnd, List<String> list) {
         return list.get(rnd.nextInt(list.size()));
     }
@@ -205,7 +193,6 @@ class GoalPropertyQaIT {
             r = rnd.nextInt(3) == 0 ? DebtQa.voidDebt(a, id) : DebtQa.cancelDebt(a, id);
             what = "perdão/estorno do registro";
         } else if (roll < 60) {
-            // despesa dividida: 1 a 20 partes; soma sempre menor que o total (sobram centavos), às vezes bem justa
             int n = rnd.nextInt(5) == 0 ? 1 + rnd.nextInt(20) : 1 + rnd.nextInt(4);
             long total = Math.max(n + 1, 100 + rnd.nextInt(120_000));
             List<String> shares = new ArrayList<>();
@@ -334,14 +321,10 @@ class GoalPropertyQaIT {
         return out;
     }
 
-    // ------------------------------------------------------------------------------------------------ invariantes
-
-    /** Competência (ou categoria) com consumo mensal negativo por reembolso em mês posterior ao da despesa: comportamento esperado do domínio, só registrado. */
     private final Set<String> monthlyNegatives = new TreeSet<>();
 
     private void verify(Actor a, List<String> v, String label) throws Exception {
         List<String> found = new ArrayList<>();
-        // consumo de cada despesa/compra (a própria + reembolsos ativos ligados) nunca negativo
         for (Map<String, Object> m : jdbc.queryForList("""
                 select p.id::text as id, sum(lp.amount_cents) as consumption from transactions p
                 join ledger_postings lp on lp.active and lp.book_type = 'EXPENSE'
@@ -349,7 +332,6 @@ class GoalPropertyQaIT {
                 where p.user_id = ? and p.status = 'ACTIVE' and p.type in ('EXPENSE','CARD_PURCHASE') group by p.id having sum(lp.amount_cents) < 0""", a.id)) {
             found.add("consumo negativo na despesa/compra " + m.get("id") + ": " + m.get("consumption"));
         }
-        // 1. razão
         if (a.ledgerSum() != 0) {
             found.add("razão não fecha em zero: " + a.ledgerSum());
         }
@@ -358,7 +340,6 @@ class GoalPropertyQaIT {
         }
         found.addAll(CardInvariants.check(a, a.card));
 
-        // 2. dívidas
         List<JsonNode> debts = DebtQa.debts(a);
         long recvOut = 0;
         long payOut = 0;
@@ -385,7 +366,6 @@ class GoalPropertyQaIT {
             if (("CANCELED".equals(status) || "VOIDED".equals(status)) && outstanding != 0) {
                 found.add("dívida " + status + " " + id + " com saldo " + outstanding);
             }
-            // quitações ativas somam o settled
             long sumSettlements = 0;
             for (JsonNode s : d.get("settlements")) {
                 if (s.get("active").asBoolean()) {
@@ -414,7 +394,6 @@ class GoalPropertyQaIT {
             found.add("livro PAYABLE " + payBook + " != −Σ saldo a pagar " + (-payOut));
         }
 
-        // 3. pessoa: net = Σ dívidas abertas; lista = detalhe
         for (JsonNode p : DebtQa.all(a, "/v1/people")) {
             String pid = p.get("id").asString();
             long net = CardQaWorld.cents(p.get("net"));
@@ -439,7 +418,6 @@ class GoalPropertyQaIT {
             }
         }
 
-        // 4. dívida/devolução nunca vira despesa ou receita
         Long leaked = jdbc.queryForObject("select count(*) from ledger_postings lp join transactions t on t.id = lp.transaction_id where lp.user_id = ? and lp.active "
                 + "and lp.book_type in ('INCOME') and t.type in ('LOAN_GIVEN','MONEY_RECEIVED','DEBT_PAYMENT')", Long.class, a.id);
         Long leakedExpense = jdbc.queryForObject("select count(*) from ledger_postings lp join transactions t on t.id = lp.transaction_id where lp.user_id = ? and lp.active "
@@ -448,7 +426,6 @@ class GoalPropertyQaIT {
             found.add("movimentação de dívida gerou lançamento de receita/despesa: INCOME " + leaked + " EXPENSE " + leakedExpense);
         }
 
-        // 5. consumo por competência: nunca negativo, = razão, = entries (lista), por categoria também
         List<String> competences = jdbc.queryForList("select distinct competence from ledger_postings where user_id = ? and active and book_type = 'EXPENSE' order by 1",
                 String.class, a.id);
         for (String c : competences) {
@@ -489,7 +466,6 @@ class GoalPropertyQaIT {
             }
         }
 
-        // 6. dashboard x lista x conta
         LocalDate today = today();
         JsonNode summary = a.getOk("/v1/dashboard/summary");
         JsonNode month = summary.get("month");
@@ -536,11 +512,9 @@ class GoalPropertyQaIT {
         }
         long equity = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active and book_type in ('ACCOUNT','RECEIVABLE','PAYABLE','CARD')",
                 Long.class, a.id);
-        // patrimônio = Σ livros de ativos e passivos (tudo mais fecha em zero com EXPENSE/INCOME/EQUITY em contrapartida) (abertura inclusa)
         long ledgerNetWorth = equity;
         long ledgerNetWorthToday = ledgerNetWorth;
         if (CardQaWorld.cents(nw.get("total")) != ledgerNetWorthToday) {
-            // pode diferir só por lançamentos futuros (data efetiva depois de hoje): reconferir só com data <= hoje
             long upToToday = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active "
                     + "and book_type in ('ACCOUNT','RECEIVABLE','PAYABLE','CARD') and effective_date <= ?", Long.class, a.id, java.sql.Date.valueOf(today));
             if (CardQaWorld.cents(nw.get("total")) != upToToday) {
@@ -548,7 +522,6 @@ class GoalPropertyQaIT {
             }
         }
 
-        // 7. ocorrências: nenhuma realizada duas vezes; REALIZED = movimentação ativa; /upcoming = faturas + ocorrências + dívidas datadas
         Long dup = jdbc.queryForObject("select count(*) from (select recurrence_id, occurrence_date from transactions where user_id = ? and status = 'ACTIVE' "
                 + "and recurrence_id is not null group by 1, 2 having count(*) > 1) t", Long.class, a.id);
         if (dup != null && dup > 0) {
@@ -593,7 +566,6 @@ class GoalPropertyQaIT {
                 expectedByKey.merge("DEBT|" + d.get("id").asString(), o, Long::sum);
             }
         }
-        // S-258: movimentações ativas com data depois de hoje são compromissos; o oráculo vem direto do razão (efeito líquido por movimentação e data nas contas de caixa)
         for (Map<String, Object> row : jdbc.queryForList("select lp.transaction_id::text tx, lp.effective_date d, sum(lp.amount_cents) net from ledger_postings lp "
                 + "join accounts ac on ac.id = lp.book_id where lp.user_id = ? and lp.active and lp.source_type = 'TRANSACTION' and lp.book_type = 'ACCOUNT' "
                 + "and ac.type <> 'INVESTMENT' and lp.effective_date > ? and lp.effective_date <= ? group by lp.transaction_id, lp.effective_date having sum(lp.amount_cents) <> 0",
@@ -640,7 +612,6 @@ class GoalPropertyQaIT {
         if (sumItems != upOut) {
             found.add("Σ itens OUT " + sumItems + " != totals.out " + upOut);
         }
-        // undated: dívidas abertas sem expectedDate
         Set<String> undatedExpected = new TreeSet<>();
         for (JsonNode d : debts) {
             String status = d.get("status").asString();
@@ -666,8 +637,6 @@ class GoalPropertyQaIT {
         return s == null ? 0 : s;
     }
 
-    // ================================================================================================ T98: metas, projeção, resumo
-
     private static final class Ctx {
         String inv;
         String second;
@@ -680,7 +649,6 @@ class GoalPropertyQaIT {
         return today().toString().substring(0, 7);
     }
 
-    /** Tudo o que a reserva NÃO pode mexer (e o que a criação/edição/arquivamento de meta também não). */
     private Map<String, String> snapshot(Actor a) throws Exception {
         Map<String, String> m = new java.util.LinkedHashMap<>();
         m.put("transactions", String.valueOf(a.count("transactions")));
@@ -708,7 +676,6 @@ class GoalPropertyQaIT {
         return CardQaWorld.cents(a.getOk("/v1/accounts/" + accountId).get("currentBalance"));
     }
 
-    /** {epochDay, cents} das reservas de uma meta numa conta (todas as datas). */
     private List<long[]> reservationsOf(Actor a, String goalId, String accountId) {
         List<long[]> out = new ArrayList<>();
         for (Map<String, Object> row : jdbc.queryForList("select reserved_on d, amount_cents c from goal_reservations where user_id = ? and goal_id = ?::uuid "
@@ -718,7 +685,6 @@ class GoalPropertyQaIT {
         return out;
     }
 
-    /** O saldo corrente por data (reservas antes de liberações no mesmo dia) nunca pode ficar negativo (S-247). */
     private static boolean neverNegative(List<long[]> items) {
         java.util.TreeMap<Long, Long> byDay = new java.util.TreeMap<>();
         for (long[] i : items) {
@@ -762,7 +728,7 @@ class GoalPropertyQaIT {
             r = a.call(HttpMethod.PUT, "/v1/goals/" + id, "{\"name\":\"Meta ed " + rnd.nextInt(1000) + "\",\"target\":\"" + CardQaWorld.money(1 + rnd.nextInt(5_000_000))
                     + "\"" + deadline + ",\"priority\":\"LOW\",\"version\":" + version + "}", null);
             boolean archived = jdbc.queryForObject("select archived from goals where id = ?::uuid", Boolean.class, id);
-            int expected = stale ? 409 : archived ? 422 : 200; // a version é conferida antes do estado arquivado
+            int expected = stale ? 409 : archived ? 422 : 200;
             if (r.status() != expected) {
                 violations.add(label + ": PUT da meta (arquivada=" + archived + ", velha=" + stale + ") deu " + r + " esperado " + expected);
             }
@@ -770,7 +736,6 @@ class GoalPropertyQaIT {
         } else if (roll < 30) {
             JsonNode acc = a.getOk("/v1/accounts/" + ctx.second);
             boolean archived = "ARCHIVED".equals(acc.get("status").asString());
-            // S-259: reserva líquida positiva (qualquer data) de meta não arquivada nesta conta impede arquivar; oráculo direto do banco
             boolean hasReserve = Boolean.TRUE.equals(jdbc.queryForObject("select exists (select 1 from (select gr.goal_id from goal_reservations gr join goals g on g.id = gr.goal_id "
                     + "where gr.account_id = ?::uuid and not g.archived group by gr.goal_id having sum(gr.amount_cents) > 0) t)", Boolean.class, ctx.second));
             r = a.call(HttpMethod.POST, "/v1/accounts/" + ctx.second + (archived ? "/unarchive" : "/archive"), null, null);
@@ -860,13 +825,12 @@ class GoalPropertyQaIT {
     private void verifyGoals(Actor a, List<String> found) throws Exception {
         LocalDate today = today();
         List<String> accounts = List.of(a.nubank, ctx.inv, ctx.second);
-        Map<String, long[]> goalRows = new HashMap<>(); // target, archived
+        Map<String, long[]> goalRows = new HashMap<>();
         Map<String, LocalDate> deadlines = new HashMap<>();
         for (Map<String, Object> g : jdbc.queryForList("select id::text id, target_cents t, archived ar, deadline dl from goals where user_id = ?", a.id)) {
             goalRows.put((String) g.get("id"), new long[] {((Number) g.get("t")).longValue(), (Boolean) g.get("ar") ? 1 : 0});
             deadlines.put((String) g.get("id"), g.get("dl") == null ? null : ((java.sql.Date) g.get("dl")).toLocalDate());
         }
-        // goal -> account -> net até hoje
         Map<String, Map<String, Long>> net = new HashMap<>();
         Map<String, Long> reservedByAccount = new HashMap<>();
         Map<String, Integer> reservationCount = new HashMap<>();
@@ -888,7 +852,6 @@ class GoalPropertyQaIT {
                     + "and book_id = ?::uuid and effective_date <= ?", Long.class, a.id, acc, java.sql.Date.valueOf(today));
             balance.put(acc, expected);
         }
-        // contas
         long reservedInCash = 0;
         for (String acc : accounts) {
             JsonNode account = a.getOk("/v1/accounts/" + acc);
@@ -908,14 +871,12 @@ class GoalPropertyQaIT {
                 reservedInCash += reserved;
             }
         }
-        // lista de contas = detalhe
         for (JsonNode item : DebtQa.all(a, "/v1/accounts")) {
             String id = item.get("id").asString();
             if (accounts.contains(id) && !item.equals(a.getOk("/v1/accounts/" + id))) {
                 found.add("conta " + id + ": item da lista != detalhe");
             }
         }
-        // dashboard
         JsonNode summary = a.getOk("/v1/dashboard/summary");
         JsonNode balances = summary.get("balances");
         if (CardQaWorld.cents(balances.get("reserved")) != reservedInCash) {
@@ -925,7 +886,6 @@ class GoalPropertyQaIT {
         if (CardQaWorld.cents(balances.get("available")) != expectedAvailable) {
             found.add("balances.available " + balances.get("available").get("amount") + " != em contas − comprometido 30d − reservado " + expectedAvailable);
         }
-        // metas
         Set<String> seenInLists = new HashSet<>();
         for (String status : List.of("ACTIVE", "ACHIEVED", "ARCHIVED")) {
             for (JsonNode item : DebtQa.all(a, "/v1/goals?status=" + status)) {
@@ -988,7 +948,6 @@ class GoalPropertyQaIT {
             if (g.get("reservations").size() != reservationCount.getOrDefault(id, 0)) {
                 found.add("meta " + id + " reservations[] " + g.get("reservations").size() + " != banco " + reservationCount.getOrDefault(id, 0));
             }
-            // saldo corrente por conta e data nunca negativo
             for (String acc : accounts) {
                 if (!neverNegative(reservationsOf(a, id, acc))) {
                     found.add("meta " + id + " conta " + acc + ": saldo da reserva negativo em alguma data");
@@ -1036,13 +995,11 @@ class GoalPropertyQaIT {
             if (!projected.equals(last)) {
                 found.add(tag + ": saldo final " + last + " != projected do dashboard " + projected);
             }
-            // sem dupla contagem: saldo final = em contas + Σ entradas − Σ saídas dos itens de /upcoming até o fim do horizonte
             JsonNode up = a.getOk("/v1/dashboard/upcoming?from=" + today + "&to=" + h.getValue());
             long viaUpcoming = inAccounts + CardQaWorld.cents(up.get("totals").get("in")) - CardQaWorld.cents(up.get("totals").get("out"));
             if (viaUpcoming != CardQaWorld.cents(series.get(series.size() - 1).get("balance"))) {
                 found.add(tag + ": saldo final " + last + " != em contas + /upcoming IN − OUT " + viaUpcoming + " (dupla contagem ou item perdido)");
             }
-            // com tendência a base não muda
             JsonNode t = a.getOk("/v1/projections?horizon=" + h.getKey() + "&includeTrend=true");
             if (!t.get("series").equals(series) || !t.get("startingBalance").equals(p.get("startingBalance")) || !t.get("goals").equals(p.get("goals"))) {
                 found.add(tag + ": includeTrend=true mudou a série base");
@@ -1066,13 +1023,11 @@ class GoalPropertyQaIT {
                 found.add(tag + ": tendência indisponível com motivo " + trend.get("reason"));
             }
         }
-        // D30 coincide com o ponto que fecha em hoje+30
         JsonNode d30 = a.getOk("/v1/projections?horizon=D30");
         if (!d30.get("series").get(d30.get("series").size() - 1).get("balance").get("amount").asString()
                 .equals(summary.get("projected").get("d30").get("amount").asString())) {
             found.add("D30 != projected.d30");
         }
-        // a reserva não entra na projeção: goals.reserved = reservado em contas de caixa
         JsonNode m6 = a.getOk("/v1/projections?horizon=M6");
         if (!m6.get("goals").get("reserved").equals(summary.get("balances").get("reserved"))) {
             found.add("projeção.goals.reserved " + m6.get("goals").get("reserved") + " != balances.reserved " + summary.get("balances").get("reserved"));
@@ -1126,7 +1081,6 @@ class GoalPropertyQaIT {
                     found.add(tag + ": resumo != dashboard.month (receita/consumo/net/investimento/crédito)");
                 }
             }
-            // maior categoria = maior consumo positivo por categoria; maior gasto = maior linha positiva
             long bestCategory = 0;
             for (JsonNode c : entries.get("totals").get("byCategory")) {
                 bestCategory = Math.max(bestCategory, CardQaWorld.cents(c.get("amount")));
@@ -1155,7 +1109,6 @@ class GoalPropertyQaIT {
             if (CardQaWorld.cents(s.get("futureInstallments")) != future2) {
                 found.add(tag + ": futureInstallments " + s.get("futureInstallments").get("amount") + " != Σ parcelas depois do mês " + future2);
             }
-            // comparação com o mês anterior = o resumo do mês anterior
             String previous = java.time.YearMonth.parse(month).minusMonths(1).toString();
             JsonNode cmp = s.get("comparison");
             JsonNode prev = byMonth.get(previous);

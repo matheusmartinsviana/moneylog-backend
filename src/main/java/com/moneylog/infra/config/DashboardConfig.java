@@ -17,10 +17,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
 import com.moneylog.infra.dashboard.gateways.RecurrenceCommitmentSources;
 
-/**
- * Ligação do dashboard (T29): casos de uso só de leitura sobre o carregamento único dos registros (S-79). As recorrências são a
- * fonte de compromissos persistida (T79); faturas e dívidas entram pelos próprios registros.
- */
 @Configuration(proxyBeanMethods = false)
 public class DashboardConfig {
 

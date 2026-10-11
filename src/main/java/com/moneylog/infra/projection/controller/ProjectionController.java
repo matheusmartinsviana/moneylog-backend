@@ -11,7 +11,6 @@ import com.moneylog.core.finance.app.projection.GetProjectionUseCase;
 import com.moneylog.core.finance.app.projection.GetProjectionUseCase.GetProjectionQuery;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Projeções determinísticas (PR 00 §19, S-152, S-155): sempre rotuladas como projeção. Tudo calculado no backend. */
 @RestController
 @RequestMapping("/v1/projections")
 public class ProjectionController {

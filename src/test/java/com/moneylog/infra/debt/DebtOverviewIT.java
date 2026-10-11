@@ -34,7 +34,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/** T240, T242, T243, T244: visão total de dívidas, compra em andamento, meta de quitação e credor livre, contra o contrato. Relógio 10/10/2026. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Visão total de dívidas, parcelado em andamento e meta de quitação (ADR-013)")
@@ -139,12 +138,10 @@ class DebtOverviewIT {
         assertThat(plan.get("remainingInstallments").asInt()).isEqualTo(8);
         assertThat(plan.get("nextInstallmentNumber").asInt()).isEqualTo(3);
         assertThat(o.get("hasRecords").asBoolean()).isTrue();
-        // consumo: nenhum mês muda
         for (String month : new String[] {"2026-08", "2026-09", "2026-10", "2026-11"}) {
             mockMvc.perform(get("/v1/summaries/" + month)).andExpect(status().isOk())
                     .andExpect(jsonPath("$.expenses.amount").value("0.00"));
         }
-        // sem idempotência: repetir cria outra e o total sobe de novo
         ongoing("", "").andExpect(status().isCreated());
         assertThat(overview().get("total").get("amount").asString()).isEqualTo("2400.00");
 
@@ -203,7 +200,7 @@ class DebtOverviewIT {
                 .andExpect(jsonPath("$.code").value("DEBT_PAYOFF_NOTHING_TO_BASELINE"));
         mockMvc.perform(get("/v1/goals/" + id)).andExpect(jsonPath("$.status").value("ACTIVE"));
 
-        ongoing("", "").andExpect(status().isCreated()); // 1.200
+        ongoing("", "").andExpect(status().isCreated());
         mockMvc.perform(baseline(id)).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.baselineSet").value(true)).andExpect(jsonPath("$.baseline.amount").value("1200.00"))
                 .andExpect(jsonPath("$.target.amount").value("1200.00")).andExpect(jsonPath("$.progress").value("0.0000"))
@@ -224,7 +221,6 @@ class DebtOverviewIT {
         mockMvc.perform(get("/v1/dashboard/summary")).andExpect(jsonPath("$.balances.reserved.amount").value("0.00"));
         mockMvc.perform(get("/v1/goals")).andExpect(status().isOk()).andExpect(ContractValidation.conforms());
 
-        // meta de guardar dinheiro segue igual e não aceita baseline
         String savings = body(mockMvc.perform(post("/v1/goals", "{\"name\":\"Viagem\",\"target\":\"500.00\"}")).andExpect(status().isCreated())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.kind").value("SAVINGS")).andReturn()).get("id").asString();
         mockMvc.perform(baseline(savings)).andExpect(status().isUnprocessableEntity())

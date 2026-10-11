@@ -9,10 +9,6 @@ import com.moneylog.core.finance.domain.DashboardSummary;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Não lê o razão por outro caminho (S-79): recebe o {@link FinancialRecords} do {@link FinancialRecordsGateway} e chama
- * {@link DashboardSummary#of}, com as mesmas calculadoras da lista e dos lançamentos por competência.
- */
 public class GetDashboardSummaryUseCaseImpl implements GetDashboardSummaryUseCase {
 
     private final FinancialRecordsGateway records;

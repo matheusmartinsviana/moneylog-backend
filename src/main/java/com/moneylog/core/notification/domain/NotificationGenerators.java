@@ -19,12 +19,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Geradores de notificação por tipo (S-174), puros: leem o {@link GenerationContext} e devolvem rascunhos. Nada aqui grava; a chave única
- * {@code (kind, refId, onDate)} e o limite diário ficam por conta do {@link NotificationPlanner} e do banco.
- *
- * <p>Atrasadas não repetem todo dia: aparecem no primeiro dia de atraso e depois a cada 7 dias (limite documentado, sem spam).
- */
 public final class NotificationGenerators {
 
     public static final int GOAL_DEADLINE_DAYS = 30;
@@ -62,8 +56,6 @@ public final class NotificationGenerators {
         return drafts;
     }
 
-    // ------------------------------------------------------------------ faturas e dívidas
-
     static List<NotificationDraft> invoices(GenerationContext ctx) {
         List<NotificationDraft> result = new ArrayList<>();
         for (Commitment c : ctx.schedule().items()) {
@@ -95,7 +87,6 @@ public final class NotificationGenerators {
         return result;
     }
 
-    /** {@code warnDays} = quantos dias antes avisar (3, 1, 0); depois do vencimento, "atrasada" no 1º dia e a cada 7. */
     private static java.util.Optional<NotificationDraft> countdown(GenerationContext ctx, Commitment c, int[] warnDays, NotificationKind kind,
                                                                   String refType, String keyPrefix) {
         long days = ChronoUnit.DAYS.between(ctx.today(), c.dueDate());
@@ -132,12 +123,6 @@ public final class NotificationGenerators {
         return false;
     }
 
-    // ------------------------------------------------------------------ recorrências
-
-    /**
-     * Uma por recorrência e dia: "hoje" quando há ocorrência pendente com a data de hoje; senão, "atrasada" pela ocorrência pendente mais antiga, no
-     * primeiro dia de atraso e depois no máximo 1x por semana.
-     */
     static List<NotificationDraft> recurrences(GenerationContext ctx) {
         Map<UUID, Commitment> todays = new LinkedHashMap<>();
         Map<UUID, Commitment> oldest = new LinkedHashMap<>();
@@ -168,8 +153,6 @@ public final class NotificationGenerators {
                 Map.of("name", nz(c.label()), "amount", c.amount().toPlainString(), "dueDate", c.dueDate().toString(), "daysLate", String.valueOf(late)),
                 c.dueDate());
     }
-
-    // ------------------------------------------------------------------ comprometido do mês seguinte, metas, lembretes
 
     static java.util.Optional<NotificationDraft> committedNextMonth(GenerationContext ctx) {
         if (ctx.today().getDayOfMonth() != COMMITTED_NEXT_MONTH_DAY) {
@@ -217,8 +200,6 @@ public final class NotificationGenerators {
         }
         return result;
     }
-
-    // ------------------------------------------------------------------ resumo diário
 
     static java.util.Optional<NotificationDraft> dailySummary(GenerationContext ctx) {
         NotificationSettings settings = ctx.settings();

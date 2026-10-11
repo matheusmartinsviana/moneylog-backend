@@ -6,7 +6,6 @@ import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.finance.domain.Projection;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Mesmas fontes do dashboard (S-79): {@link FinancialRecords} + recorrências, e só {@link Projection#of}. */
 public class GetProjectionUseCaseImpl implements GetProjectionUseCase {
 
     private final FinancialRecordsGateway records;

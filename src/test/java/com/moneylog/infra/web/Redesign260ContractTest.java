@@ -16,9 +16,6 @@ import io.swagger.v3.oas.models.media.Schema;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T181: o contrato 2.6.0 (redesign) é só aditivo e os exemplos novos fecham. Sem Spring: lê o próprio contrato.
- */
 @DisplayName("Contrato 2.6.0 (redesign, T181): acréscimos compatíveis, exemplos válidos e aritmética dos exemplos")
 class Redesign260ContractTest {
 
@@ -26,7 +23,6 @@ class Redesign260ContractTest {
             .createForSpecificationUrl(ContractValidation.SPEC_FILE.toUri().toString()).build();
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
 
-    /** O exemplo lido do YAML cru (o parser do swagger descarta os {@code null} dos exemplos). */
     private static com.fasterxml.jackson.databind.JsonNode example(String schemaName) throws Exception {
         var root = new com.fasterxml.jackson.dataformat.yaml.YAMLMapper().readTree(ContractValidation.SPEC_FILE.toFile());
         var examples = root.get("components").get("schemas").get(schemaName).get("examples");

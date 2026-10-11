@@ -58,7 +58,6 @@ import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IdempotencyKeyReusedException;
 
-/** T77: dívida sem movimentação, edição, perdão e estorno do registro, com o razão gravado por {@code LedgerWriteGateway}. */
 @DisplayName("Dívida sem movimentação, edição, perdão e estorno do registro: casos de uso (T77)")
 class DividasSemMovimentacaoUseCasesTest {
 
@@ -137,7 +136,6 @@ class DividasSemMovimentacaoUseCasesTest {
         verify(ledger, org.mockito.Mockito.times(1)).append(eq(USER_ID), any());
         assertThatThrownBy(() -> create.handle(command("81.00", food.id(), key))).isInstanceOf(IdempotencyKeyReusedException.class);
         verify(ledger, org.mockito.Mockito.times(1)).append(eq(USER_ID), any());
-        // sem chave: nada de idempotência (comportamento anterior)
         create.handle(command("80.00", food.id(), null));
         verify(idempotency, org.mockito.Mockito.times(3)).claim(any(), any(), any(), any(), any(), any(), any());
     }

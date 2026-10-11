@@ -35,7 +35,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Leituras de fatura (T54): lista, detalhe e parcelas futuras, sobre as duas compras do cenário (6x de 1.200 + 1.083 à vista). */
 @DisplayName("Casos de uso de leitura de faturas (T54)")
 class InvoiceReadUseCasesTest {
 

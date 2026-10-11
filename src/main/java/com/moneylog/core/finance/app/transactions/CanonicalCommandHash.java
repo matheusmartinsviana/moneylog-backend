@@ -22,12 +22,6 @@ import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionComma
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Unavailable;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
 
-/**
- * Hash (SHA-256 em hexadecimal) do <b>comando canônico</b> de criação (S-87): não depende dos bytes do corpo
- * (ordem das chaves, espaços) nem da forma do valor ({@code "100.0"} e {@code "100.00"} são o mesmo). Os campos entram
- * numa ordem fixa, o texto é normalizado como o domínio faz (sem espaços nas pontas, em branco = ausente) e o
- * {@code kind} ausente do ajuste vale {@code CORRECTION}. O dono não entra: a chave já é única por usuário.
- */
 public final class CanonicalCommandHash {
 
     private CanonicalCommandHash() {
@@ -51,7 +45,6 @@ public final class CanonicalCommandHash {
                 field(canonical, "categoryId", c.categoryId());
                 field(canonical, "method", c.method());
                 if (c.incomeCompetence() != null) {
-                    // só entra quando informada: o hash das receitas sem competência é o de antes (chaves de 24 h seguem valendo)
                     field(canonical, "incomeCompetence", c.incomeCompetence());
                 }
             }
@@ -116,7 +109,6 @@ public final class CanonicalCommandHash {
         return sha256(canonical.toString());
     }
 
-    /** Hash do comando canônico de pagamento de fatura (T55): a fatura, a conta, o valor e a data (o dono não entra). */
     public static String ofInvoicePayment(java.util.UUID invoiceId, java.util.UUID accountId, com.moneylog.core.sk.money.Money amount,
                                           java.time.LocalDate date) {
         StringBuilder canonical = new StringBuilder();
@@ -129,10 +121,6 @@ public final class CanonicalCommandHash {
         return sha256(canonical.toString());
     }
 
-    /**
-     * As partes entram em ordem, cada uma com valor e dívida nova. Sem partes (despesa comum) nada é acrescentado: o hash
-     * das despesas sem divisão é o mesmo de antes (as chaves de idempotência de 24 h continuam valendo depois da atualização).
-     */
     private static void shares(StringBuilder canonical, java.util.List<Share> shares) {
         if (shares.isEmpty()) {
             return;
@@ -166,7 +154,6 @@ public final class CanonicalCommandHash {
         return value == null || value.isBlank() ? null : value.strip();
     }
 
-    /** {@code nome=tamanho:valor;}, com o tamanho para o valor não poder forjar outro campo. */
     private static void field(StringBuilder canonical, String name, Object value) {
         String text = value == null ? null : value.toString();
         canonical.append(name).append('=');

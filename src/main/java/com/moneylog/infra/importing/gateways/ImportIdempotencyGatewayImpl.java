@@ -7,7 +7,6 @@ import java.util.UUID;
 import com.moneylog.core.importing.app.gateways.ImportIdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 
-/** Delega ao mesmo mecanismo de chaves das criações (a importação não pode importar {@code core.transaction}). */
 public class ImportIdempotencyGatewayImpl implements ImportIdempotencyGateway {
 
     private final IdempotencyGateway delegate;

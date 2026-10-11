@@ -16,10 +16,6 @@ import com.moneylog.core.sk.exception.VersionConflictException;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T74: pessoas (criar, listar, editar, arquivar, desarquivar). Cenário padrão da Etapa 4 (João e Maria já criados pela base); toda
- * requisição e resposta é validada contra o contrato.
- */
 @DisplayName("Pessoas (T74)")
 class PersonsIT extends E4ItBase {
 
@@ -35,7 +31,6 @@ class PersonsIT extends E4ItBase {
         JsonNode created = body(result);
         assertThat(result.getResponse().getHeader("Location")).isEqualTo("/v1/people/" + created.get("id").asString());
 
-        // nome só com espaços e nome com mais de 100 caracteres: 400 de validação (o contrato exige minLength 1 e maxLength 100)
         mockMvc.perform(post("/v1/people", "{\"name\":\"   \"}")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         mockMvc.perform(post("/v1/people", "{\"name\":\"" + "x".repeat(101) + "\"}")).andExpect(status().isBadRequest())
@@ -58,7 +53,6 @@ class PersonsIT extends E4ItBase {
         assertThat(byQuery.get("items")).hasSize(2);
         assertThat(okBody(get("/v1/people?q=JO")).get("items")).hasSize(3);
         assertThat(okBody(get("/v1/people?q=zzz")).get("items")).isEmpty();
-        // ordem por nome e paginação sem COUNT
         JsonNode firstPage = okBody(get("/v1/people?pageSize=2"));
         assertThat(firstPage.get("items")).hasSize(2);
         assertThat(firstPage.get("hasNext").asBoolean()).isTrue();
@@ -90,7 +84,6 @@ class PersonsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("VERSION_CONFLICT"));
         mockMvc.perform(put("/v1/people/" + joao, "{\"name\":\"\",\"version\":1}")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
-        // o GET devolve o detalhe com o histórico (vazio) e o mesmo saldo
         mockMvc.perform(get("/v1/people/" + joao)).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.name").value("João Pedro")).andExpect(jsonPath("$.debts.length()").value(0));
     }
@@ -111,7 +104,6 @@ class PersonsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms());
         assertThat(body(mockMvc.perform(getAs(otherBearer, "/v1/people")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn()).get("items")).isEmpty();
-        // sem token: 401
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v1/people")).andExpect(status().isUnauthorized());
     }
 

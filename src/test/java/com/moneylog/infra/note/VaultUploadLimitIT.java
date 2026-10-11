@@ -24,10 +24,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * O app sobe de verdade (servidor real, não MockMvc) e recebe um upload acima do teto do container: a resposta é {@code application/problem+json}
- * {@code 422 VAULT_IMPORT_TOO_LARGE}, sem 500 e sem derrubar o contexto (regressão do tratador de {@code MaxUploadSizeExceededException} ambíguo).
- */
 @Tag("i")
 @ActiveProfiles("it")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

@@ -1,9 +1,5 @@
 package com.moneylog.core.goal.photo;
 
-/**
- * Lê só a tag de orientação (0x0112) do EXIF de um JPEG, com todos os acessos limitados ao tamanho do arquivo. O resultado é usado para girar
- * a imagem antes de o EXIF ser descartado na recodificação. Qualquer coisa fora do esperado devolve 1 (sem rotação): nunca lança.
- */
 final class ExifOrientation {
 
     private static final int MAX_ENTRIES = 256;
@@ -11,10 +7,9 @@ final class ExifOrientation {
     private ExifOrientation() {
     }
 
-    /** Valor de 1 a 8 (padrão EXIF); 1 se ausente ou ilegível. */
     static int read(byte[] jpeg) {
         int length = jpeg.length;
-        int i = 2; // depois do SOI (FFD8)
+        int i = 2;
         while (i + 4 <= length) {
             if ((jpeg[i] & 0xFF) != 0xFF) {
                 return 1;
@@ -29,7 +24,7 @@ final class ExifOrientation {
                 continue;
             }
             if (marker == 0xDA || marker == 0xD9) {
-                return 1; // início dos dados da imagem: o EXIF vem antes
+                return 1;
             }
             int segmentLength = ((jpeg[i + 2] & 0xFF) << 8) | (jpeg[i + 3] & 0xFF);
             int start = i + 4;

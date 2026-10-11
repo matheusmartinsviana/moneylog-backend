@@ -19,10 +19,6 @@ import com.moneylog.core.search.domain.SearchTerm;
 import com.moneylog.infra.exception.InvalidPathValueException;
 import com.moneylog.infra.security.CurrentUser;
 
-/**
- * Busca global (redesign, S-287). O termo {@code q} pode ser dado financeiro ou pessoal: <b>nunca</b> vai para log (nem na mensagem de erro) e a
- * resposta não é cacheada. O limite de taxa vem antes de tudo (inclusive da validação), porque a rota roda a cada pausa de digitação.
- */
 @RestController
 @RequestMapping("/v1/search")
 @Validated

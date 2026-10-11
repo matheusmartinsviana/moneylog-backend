@@ -100,7 +100,6 @@ class GoalUseCasesTest {
         when(time.zone()).thenReturn(java.time.ZoneId.of("America/Sao_Paulo"));
         when(ids.next()).thenReturn(GOAL_ID, UUID.fromString("00000000-0000-0000-0000-0000000000b1"), UUID.fromString("00000000-0000-0000-0000-0000000000b2"),
                 UUID.fromString("00000000-0000-0000-0000-0000000000b3"));
-        // as metas do carregamento único são as da porta em memória (no sistema real, o FinancialRecordsGateway as lê do banco)
         when(records.load(any())).thenAnswer(invocation -> {
             FinancialRecords base = scenario.records();
             return new FinancialRecords(base.accounts(), base.cards(), base.transactions(), base.debts(),

@@ -16,10 +16,6 @@ import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T56: reembolso/crédito no cartão por {@code POST /v1/transactions} ({@code REFUND} com {@code cardId}). Cenário padrão;
- * toda requisição e resposta validada contra o contrato.
- */
 @DisplayName("Reembolso e crédito no cartão (T56)")
 class CardRefundIT extends CardItBase {
 

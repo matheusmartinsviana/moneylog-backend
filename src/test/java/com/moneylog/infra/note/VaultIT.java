@@ -28,7 +28,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.core.note.util.NoteTestKit.Zip;
 import com.moneylog.util.ContractValidation;
 
-/** T112: exportar e importar o vault (zip Obsidian), com zips hostis, limites e o ciclo completo, pela API real com Postgres real. */
 @DisplayName("Vault: exportar e importar o zip compatível com o Obsidian (T112, S-157, S-162, S-166)")
 class VaultIT extends NotesItBase {
 
@@ -38,8 +37,6 @@ class VaultIT extends NotesItBase {
         return mode == null ? request : request.param("mode", mode);
     }
 
-    // O validador de contrato não lê o corpo multipart do MockMvc: o pedido de upload é conferido só pela resposta (responseOnly); o formato do
-    // pedido (file + mode na query) está no contrato e é exercitado por estes testes.
     private JsonNode imported(byte[] zip, String mode) throws Exception {
         return body(mockMvc.perform(upload(bearer, zip, mode)).andExpect(status().isOk()).andExpect(ContractValidation.responseOnly()).andReturn());
     }
@@ -64,7 +61,6 @@ class VaultIT extends NotesItBase {
                 .andReturn().getResponse().getContentAsByteArray();
     }
 
-    /** Uma pasta no formato que o Obsidian e o macOS geram: configuração do app, lixeira, __MACOSX, anexos, canvas, frontmatter e wikilinks. */
     private static byte[] obsidianSample() {
         return new Zip().dir("Meu Vault").add(".obsidian/app.json", "{}").add(".obsidian/workspace.json", "{\"main\":{}}").add(".trash/Velha.md", "# lixeira do Obsidian")
                 .add("__MACOSX/._Welcome.md", "lixo do macOS").add(".DS_Store", "x")
@@ -98,11 +94,9 @@ class VaultIT extends NotesItBase {
         JsonNode review = getNote(noteIdByPath("Revisão de outubro.md"));
         assertThat(review.get("title").asString()).isEqualTo("Revisão do mês");
         assertThat(review.get("links").get(0).get("state").asString()).isEqualTo("PENDING");
-        // o wikilink dentro do bloco de código não é link
         JsonNode project = getNote(noteIdByPath("Projetos/MG Tech.md"));
         assertThat(project.get("links").size()).isEqualTo(1);
         assertThat(getNote(noteIdByPath("Diário/2026-10-05.md")).get("body").asString()).isEqualTo("Hoje: [[Welcome]]\r\nSegunda linha com CRLF\r\n");
-        // wikilinks pendentes: logo.png e Notebook MacBook
         assertThat(report.get("pendingLinks").asInt()).isEqualTo(2);
         assertThat(backlinks(welcomeId).get("items").size()).isEqualTo(2);
     }
@@ -145,7 +139,6 @@ class VaultIT extends NotesItBase {
         assertThat(otherGoal).isNotEqualTo(goalId);
         JsonNode report = body(mockMvc.perform(upload(other, zip, "SKIP")).andExpect(status().isOk()).andExpect(ContractValidation.responseOnly()).andReturn());
         assertThat(report.get("created").asInt()).isEqualTo(2);
-        // [[Inexistente]], a transação e a meta (ids de outro usuário) ficam pendentes
         assertThat(report.get("pendingLinks").asInt()).isEqualTo(3);
         MvcResult list = mockMvc.perform(getAs(other, "/v1/notes?sort=PATH")).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn();
         assertThat(paths(body(list))).containsExactly("MacBook.md", "reviews/2026-10.md");
@@ -158,9 +151,7 @@ class VaultIT extends NotesItBase {
         assertThat(linkOf(review, "MONTHLY_SUMMARY").get("state").asString()).isEqualTo("RESOLVED");
         assertThat(linkOf(review, "NOTE").get("state").asString()).isEqualTo("RESOLVED");
         assertThat(linkOf(review, "NOTE").get("target").get("label").asString()).isEqualTo("MacBook");
-        // nenhuma dupla referência nem referência para dado de outro usuário
         assertThat(jdbc.queryForObject("SELECT count(*) FROM note_links WHERE user_id = ? AND (target_transaction_id IS NOT NULL OR target_goal_id IS NOT NULL)", Long.class, otherId)).isZero();
-        // o do dono não mudou, e reexportar o outro devolve o que ele tem (pendente volta como veio)
         assertThat(getNote(macbook).get("version").asLong()).isZero();
         Map<String, String> again = unzip(exportBytes(other));
         assertThat(again.get("reviews/2026-10.md")).contains("{ type: TRANSACTION, id: " + notebookId + " }").endsWith("---\nCompra do [[MacBook]] e [[Inexistente]] #revisao-mensal");
@@ -183,7 +174,6 @@ class VaultIT extends NotesItBase {
         assertThat(renamed.get("renamedFiles").get(0).get("to").asString()).isEqualTo("A (2).md");
         assertThat(paths(listNotes("sort=PATH"))).containsExactly("A (2).md", "a.md", "pasta/b.md");
         assertThat(getNote(noteIdByPath("a.md")).get("body").asString()).isEqualTo("um");
-        // nota na lixeira não conflita: o caminho está livre
         trashNote(noteIdByPath("a.md"));
         assertThat(imported(zip, "SKIP").get("created").asInt()).isEqualTo(1);
     }

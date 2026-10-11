@@ -36,12 +36,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T29 CA3 (PR 01 regra 10, plano §4.7): as igualdades valem <b>por construção</b> (mesmas calculadoras do {@code core.finance}
- * sobre o mesmo carregamento, S-79); este IT é a prova, campo a campo (sem aproximação). Cenário de outubro de T28 (Nubank 20.000,00, XP, XP Invest;
- * despesa Pix 100,00, débito 40,00, receita 3.000,00, transferência 1.000,00, aplicação 500,00, reembolso 50,00, uma
- * despesa estornada de 30,00 e uma de 70,00 em 05/11), com o relógio avançável.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Lista × entries × dashboard: os mesmos números (T29 CA3, PR 01 regra 10, plano §4.7)")
@@ -76,8 +70,6 @@ class ListaDashboardConsistenciaIT {
         committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@moneylog.com"));
         bearer = auth.bearer(userId);
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
@@ -117,7 +109,6 @@ class ListaDashboardConsistenciaIT {
                 + nubank + "\",\"categoryId\":\"" + category + "\",\"method\":\"" + method + "\"}");
     }
 
-    /** O cenário de outubro de T28 (a estornada é estornada pela API). */
     private void octoberScenario() throws Exception {
         nubank = account("Nubank", "CHECKING", "20000.00");
         xp = account("XP", "CHECKING", "0.00");
@@ -152,20 +143,16 @@ class ListaDashboardConsistenciaIT {
         return money.get("amount").asString();
     }
 
-    /** As quatro igualdades de §4.7 para o mês M (de {@code first} a {@code last}) com o resumo em {@code asOf} = último dia. */
     private void assertMonthMatches(String competence, String first, String last) throws Exception {
         JsonNode summary = json("/v1/dashboard/summary?asOf=" + last);
         JsonNode month = summary.get("month");
 
-        // entries CONSUMPTION.total = month.consumption; entries INCOME.total = month.income
         assertThat(amount(json("/v1/entries?competence=" + competence + "&lens=CONSUMPTION").get("totals").get("total"))).isEqualTo(amount(month.get("consumption")));
         assertThat(amount(json("/v1/entries?competence=" + competence + "&lens=INCOME").get("totals").get("total"))).isEqualTo(amount(month.get("income")));
-        // transactions (mês inteiro, sem outros filtros).totals.cashFlow = month.cashFlow
         JsonNode cashFlow = json("/v1/transactions?from=" + first + "&to=" + last).get("totals").get("cashFlow");
         assertThat(amount(cashFlow.get("in"))).isEqualTo(amount(month.get("cashFlow").get("in")));
         assertThat(amount(cashFlow.get("out"))).isEqualTo(amount(month.get("cashFlow").get("out")));
         assertThat(amount(cashFlow.get("net"))).isEqualTo(amount(month.get("cashFlow").get("net")));
-        // as identidades do próprio resumo: consumo = despesas pagas + crédito − reembolsos; net = receita − consumo
         assertThat(new BigDecimal(amount(month.get("expensesPaid").get("total"))).add(new BigDecimal(amount(month.get("credit"))))
                 .subtract(new BigDecimal(amount(month.get("refunds"))))).isEqualByComparingTo(new BigDecimal(amount(month.get("consumption"))));
         assertThat(new BigDecimal(amount(month.get("income"))).subtract(new BigDecimal(amount(month.get("consumption")))))
@@ -188,7 +175,6 @@ class ListaDashboardConsistenciaIT {
         octoberScenario();
         String savings = account("Reserva", "SAVINGS", "0.00");
         mockMvc.perform(post("/v1/accounts/" + savings + "/archive", "")).andExpect(status().isOk());
-        // avança o relógio para que hoje seja depois da aplicação (o saldo é "até hoje")
         clock.set(java.time.Instant.parse("2026-10-20T15:00:00Z"));
         bearer = auth.bearer(userId);
 

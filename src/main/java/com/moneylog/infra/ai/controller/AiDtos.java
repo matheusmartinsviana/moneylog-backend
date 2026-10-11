@@ -17,7 +17,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
-/** Entrada e saída de {@code /v1/ai/*} e {@code /v1/settings/ai}. Nenhuma resposta carrega chave, URL base nem segredo. */
 public final class AiDtos {
 
     private AiDtos() {
@@ -53,7 +52,6 @@ public final class AiDtos {
     public record Result(String text, String caveat, List<String> factRefs, String source) {
     }
 
-    /** {@code fallback = true}: sem resultado de IA utilizável; o front mostra o equivalente determinístico. */
     public record AnalysisResponse(UUID id, UUID previewId, AiPurpose purpose, String period, String provider, String model, AiStatus status,
                                    Tokens tokens, long durationMs, Result result, boolean fallback, String failureReason, String redactedPayload,
                                    Instant payloadPurgedAt, Instant createdAt) {

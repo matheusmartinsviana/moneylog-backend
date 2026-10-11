@@ -89,7 +89,6 @@ class VaultZipReaderTest {
     @Test
     @DisplayName("CA4: zip bomb: descompressão acima de 300 MB é recusada contando os bytes lidos (um zip de poucos KB)")
     void deveRecusarZipBomb() throws IOException {
-        // 301 MB de zeros comprimem para ~300 KB: o tamanho enviado é pequeno, o descomprimido não
         byte[] bomb = zeros(301);
         assertThat(bomb.length).isLessThan(1024 * 1024);
         assertThatThrownBy(() -> VaultZipReader.scan(source(bomb))).isInstanceOf(VaultImportTooLargeException.class);
@@ -162,8 +161,6 @@ class VaultZipReaderTest {
         assertThat(scan.entryCount()).isZero();
     }
 
-    // ------------------------------------------------------------------ S-272: diretório central, nomes, arquivo temporário
-
     @Test
     @DisplayName("BUG-QA-02: zip truncado em qualquer ponto (inclusive na fronteira de uma entrada) é recusado inteiro; só o zip completo é lido")
     void deveRecusarZipTruncado() {
@@ -194,7 +191,7 @@ class VaultZipReaderTest {
     void deveConferirOCrc() {
         byte[] stored = storedZip("a.md", "conteudo armazenado");
         byte[] flipped = stored.clone();
-        flipped[30 + "a.md".length() + 3] ^= 0x20; // dentro dos dados da entrada STORED (cabeçalho local de 30 bytes + nome)
+        flipped[30 + "a.md".length() + 3] ^= 0x20;
         assertThat(VaultZipReader.scan(source(stored)).notes()).hasSize(1);
         assertThatThrownBy(() -> VaultZipReader.scan(source(flipped))).isInstanceOf(VaultImportInvalidException.class);
     }
@@ -273,7 +270,6 @@ class VaultZipReaderTest {
         return -1;
     }
 
-    /** Zip com uma entrada STORED (sem compressão), para trocar um byte dos dados sem quebrar a descompressão. */
     private static byte[] storedZip(String name, String content) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -296,7 +292,6 @@ class VaultZipReaderTest {
         }
     }
 
-    /** Zip de uma entrada STORED com o nome em bytes crus e a flag EFS (UTF-8) ligada ou não. */
     private static byte[] rawZip(byte[] name, String content, boolean utf8Flag) {
         java.nio.ByteBuffer out = java.nio.ByteBuffer.allocate(1024).order(java.nio.ByteOrder.LITTLE_ENDIAN);
         byte[] data = content.getBytes(java.nio.charset.StandardCharsets.UTF_8);

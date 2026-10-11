@@ -54,7 +54,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidRefundOriginException;
 
-/** Reembolso/crédito no cartão (T56), pelo cenário base de D1 §3 (Roxinho fecha 25 e vence 5; relógio 10/10/2026). */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Casos de uso: reembolso/crédito no cartão (T56)")

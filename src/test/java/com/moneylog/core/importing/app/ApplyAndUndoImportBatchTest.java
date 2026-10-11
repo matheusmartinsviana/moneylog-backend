@@ -322,8 +322,6 @@ class ApplyAndUndoImportBatchTest {
         verify(create, never()).handleImported(any(), any());
     }
 
-    // ------------------------------------------------------------------ desfazer
-
     @Test
     @DisplayName("desfazer estorna as movimentações ativas do lote com o motivo e o lote vira UNDONE")
     void desfaz() {

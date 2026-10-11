@@ -23,7 +23,6 @@ import com.moneylog.qa.CardQaWorld.Actor;
 import com.moneylog.qa.CardQaWorld.Res;
 import com.moneylog.util.ContractValidation;
 
-/** T113 (QA): ajudantes dos ITs da Etapa 6 (notas e vault): chamadas conferidas contra o contrato e um construtor de zip cru (zips que o JDK não escreve). */
 final class NoteQa {
 
     private NoteQa() {
@@ -77,9 +76,6 @@ final class NoteQa {
         return "{\"type\":\"MONTHLY_SUMMARY\",\"key\":\"" + key + "\"}";
     }
 
-    // ------------------------------------------------------------------------------------------------ upload
-
-    /** Envia o zip como multipart (a resposta é conferida contra o contrato; o validador não lê o corpo multipart do MockMvc). */
     static Res upload(CardQaWorld w, Actor a, byte[] zip, String mode) throws Exception {
         MockMultipartHttpServletRequestBuilder b = MockMvcRequestBuilders.multipart("/v1/vault/import")
                 .file(new MockMultipartFile("file", "vault.zip", "application/zip", zip)).header(HttpHeaders.AUTHORIZATION, a.bearer);
@@ -106,9 +102,6 @@ final class NoteQa {
         return r.getResponse().getContentAsByteArray();
     }
 
-    // ------------------------------------------------------------------------------------------------ zip cru
-
-    /** Zip montado byte a byte: nomes arbitrários (inclusive não UTF-8 e repetidos), STORED/DEFLATED, atributo Unix (symlink) e sem diretório central. */
     static final class RawZip {
 
         private record Item(byte[] name, byte[] data, boolean deflate, boolean utf8Flag, int externalAttrs) {
@@ -143,7 +136,6 @@ final class NoteQa {
             return this;
         }
 
-        /** Uma entrada que descomprime a {@code size} bytes de zeros, comprimida em fluxo (não aloca o conteúdo). */
         RawZip addZeros(String name, long size) {
             byte[] compressed = deflateZeros(size);
             CRC32 crc = new CRC32();

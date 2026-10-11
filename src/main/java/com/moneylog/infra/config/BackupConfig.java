@@ -24,11 +24,6 @@ import com.moneylog.infra.backup.S3BackupStorage;
 import com.moneylog.infra.backup.S3Credentials;
 import com.moneylog.infra.backup.S3CredentialsProvider;
 
-/**
- * Backup do banco (T176). Desligado por padrão: só liga com {@code moneylog.backup.enabled=true}. Armazenamento
- * {@code local} (padrão, {@code BACKUP_DIR}) ou {@code s3} (bucket, região e credenciais por ambiente ou role da instância).
- * {@code BACKUP_ENCRYPTION_KEY} opcional liga a cifra. Nada de segredo no código.
- */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 @ConditionalOnProperty(name = "moneylog.backup.enabled", havingValue = "true")

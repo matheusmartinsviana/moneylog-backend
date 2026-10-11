@@ -45,7 +45,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Movimentações: criar (com {@code Idempotency-Key}), consultar, listar, editar e estornar (T26a, T26b, T27, T28). */
 @RestController
 @RequestMapping("/v1/transactions")
 @Validated
@@ -75,7 +74,6 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> create(@CurrentUser UUID userId,
                                                       @RequestHeader("Idempotency-Key") UUID idempotencyKey,
                                                       @Valid @RequestBody TransactionInput body) {
-        // o contrato não tem `version` no POST (additionalProperties: false); só o PUT a aceita
         if (body.version() != null && !(body instanceof TransactionInput.Unavailable)) {
             throw new RequestValidationException("version", "UNKNOWN_FIELD", "Campo desconhecido: 'version'.");
         }
@@ -85,7 +83,6 @@ public class TransactionController {
                 .body(TransactionResponse.of(created));
     }
 
-    /** Compra no cartão e tipos de dívida: as restrições estão no grupo {@link TransactionInput.Strict}. */
     private void validateStrict(TransactionInput body) {
         if (body instanceof TransactionInput.StrictValidated) {
             var violations = validator.validate(body, TransactionInput.Strict.class);
@@ -95,10 +92,6 @@ public class TransactionController {
         }
     }
 
-    /**
-     * Lista de registros (D1 §2.10): {@code items} paginados e {@code totals} do filtro inteiro, pelas calculadoras do
-     * {@code core.finance} (S-79).
-     */
     @GetMapping
     public TransactionListResponse list(@CurrentUser UUID userId,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -116,14 +109,8 @@ public class TransactionController {
         return TransactionListResponse.of(list.handle(new ListTransactionsQuery(userId, filter, page)));
     }
 
-    /**
-     * Edição (S-68): o corpo do {@code POST} do tipo + {@code version}; {@code 409} se a versão está desatualizada. A compra
-     * no cartão leva o corpo inteiro, mas só descrição, categoria e observação mudam (S-121): valor, data, parcelas e cartão
-     * diferentes dos da compra → {@code 422 TRANSACTION_NOT_EDITABLE}.
-     */
     @PutMapping("/{id}")
     public TransactionResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody TransactionInput body) {
-        // os tipos que não existem nesta etapa não têm version no contrato: chegam ao caso de uso e dão TRANSACTION_NOT_EDITABLE
         boolean versionless = body instanceof TransactionInput.Unavailable || body instanceof TransactionInput.NotEditable;
         if (body.version() == null && !versionless) {
             throw new RequestValidationException("version", "REQUIRED", "'version' é obrigatória na edição.");
@@ -135,16 +122,11 @@ public class TransactionController {
         return TransactionResponse.of(update.handle(new UpdateTransactionCommand(id, version, body.toCommand(userId))));
     }
 
-    /** Estorno (S-36): nada é apagado; a movimentação vira {@code VOIDED} e os lançamentos ficam inativos. */
     @PostMapping("/{id}/void")
     public TransactionResponse voidTransaction(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody VoidRequest body) {
         return TransactionResponse.of(voidUseCase.handle(new VoidTransactionCommand(userId, id, body.reason())));
     }
 
-    /**
-     * Cancela as parcelas restantes de uma compra no cartão (D1 §2.5.2): as de faturas {@code FUTURE}/{@code OPEN} viram
-     * {@code CANCELED}; as de faturas fechadas não mudam (a correção é um reembolso no cartão).
-     */
     @PostMapping("/{id}/cancel-installments")
     public TransactionResponse cancelInstallments(@CurrentUser UUID userId, @PathVariable UUID id,
                                                   @Valid @RequestBody VoidRequest body) {

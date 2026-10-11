@@ -40,10 +40,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T27: edição com revisões e estorno. Cenário de T26a (Nubank 20.000,00, XP 0, XP Invest 0; relógio em 10/10/2026), com a
- * categoria Lazer além de Alimentação.
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Edição com revisões e estorno (T27)")
@@ -77,8 +73,6 @@ class TransactionEditVoidIT {
         food = category("Alimentação");
         leisure = category("Lazer");
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
@@ -162,8 +156,6 @@ class TransactionEditVoidIT {
         return count("select count(*) from transaction_revisions where transaction_id = ?", UUID.fromString(id));
     }
 
-    // ---------------------------------------------------------------- CA1, CA2
-
     @Test
     @DisplayName("CA1: PUT de 100,00 Alimentação para 120,00 Lazer com version 0: 200, version 1, consumo 120,00 em Lazer; postings antigos inativos (EDIT), novos ativos; revisão 1 com o estado anterior; Nubank 19.880,00")
     void deveEditarComRevisao() throws Exception {
@@ -190,7 +182,6 @@ class TransactionEditVoidIT {
         assertThat(jdbc.queryForObject("select user_id from transaction_revisions where transaction_id = ?", UUID.class, UUID.fromString(id))).isEqualTo(userId);
         assertThat(fetch(id)).isEqualTo(body(result));
 
-        // segunda edição: a revisão 2 guarda a primeira edição
         edit(id, expenseJson("EXPENSE", "130.00", leisure, ",\"version\":1")).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2))
                 .andExpect(ContractValidation.conforms());
         assertThat(revisions(id)).isEqualTo(2);
@@ -266,8 +257,6 @@ class TransactionEditVoidIT {
         assertThat(activePostings(id)).isEqualTo(2);
     }
 
-    // ---------------------------------------------------------------- CA3, CA4
-
     @Test
     @DisplayName("CA3: despesa com reembolso ativo de 50,00: trocar a categoria é 422 REFUND_CATEGORY_LOCKED; 40,00 é 422 REFUND_EXCEEDS_ORIGINAL; 50,00 e 80,00 são 200; nas recusas nada muda")
     void deveAplicarOInvarianteDoReembolso() throws Exception {
@@ -306,12 +295,9 @@ class TransactionEditVoidIT {
         edit(r1, refundJson("80.00", expense, food, ",\"version\":0")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.amount.amount").value("80.00")).andExpect(jsonPath("$.refundOf.id").value(expense))
                 .andExpect(jsonPath("$.impact.consumption[0].amount.amount").value("-80.00"));
-        // um reembolso a mais já não cabe: 80 + 20 = 100 = o valor da despesa
         edit(expense, expenseJson("EXPENSE", "99.00", food, ",\"version\":0")).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("REFUND_EXCEEDS_ORIGINAL"));
     }
-
-    // ---------------------------------------------------------------- CA5, CA6, CA7
 
     @Test
     @DisplayName("CA5: POST /void devolve VOIDED com voidedAt e voidReason, flags falsas, postings inativos e o saldo volta; estornar de novo é 422; reason em branco é 400; PUT em estornada é 422")
@@ -392,9 +378,6 @@ class TransactionEditVoidIT {
         assertThat(balance(nubank)).isEqualTo("20000.00");
     }
 
-    // ---------------------------------------------------------------- B1: trava da despesa original
-
-    /** Segura {@code FOR UPDATE} na linha da despesa em outra transação; devolve o que libera (commit). */
     private AutoCloseable holdRowLock(String transactionId) throws Exception {
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -439,7 +422,6 @@ class TransactionEditVoidIT {
         assertBlockedUntilReleased(() -> mockMvc.perform(post("/v1/transactions", refundJson("30.00", expense, food, "")).header("Idempotency-Key", UUID.randomUUID().toString())).andReturn(), holdRowLock(expense), 201);
         assertBlockedUntilReleased(() -> edit(expense, expenseJson("EXPENSE", "100.00", food, ",\"version\":0")).andReturn(),
                 holdRowLock(expense), 200);
-        // despesa com reembolso ativo: o estorno, depois da espera, enxerga o reembolso confirmado e recusa
         assertBlockedUntilReleased(() -> voidIt(expense, "engano").andReturn(), holdRowLock(expense), 422);
     }
 
@@ -478,8 +460,6 @@ class TransactionEditVoidIT {
         }
     }
 
-    // ---------------------------------------------------------------- B9 / S-113
-
     @Test
     @DisplayName("B9 (S-113): com a categoria arquivada, editar descrição e valor sem trocar de categoria é 200; trocar PARA uma arquivada é 422 CATEGORY_ARCHIVED")
     void deveEditarSemTrocarACategoriaArquivada() throws Exception {
@@ -494,7 +474,6 @@ class TransactionEditVoidIT {
         mockMvc.perform(post("/v1/categories/" + archivedCategory + "/archive", "")).andExpect(status().isOk());
         edit(id, expenseJson("EXPENSE", "120.00", archivedCategory, ",\"version\":1")).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("CATEGORY_ARCHIVED")).andExpect(ContractValidation.conforms());
-        // e criar movimentação nova na categoria arquivada continua recusado
         mockMvc.perform(post("/v1/transactions", expenseJson("EXPENSE", "10.00", food, "")).header("Idempotency-Key", UUID.randomUUID().toString()))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("CATEGORY_ARCHIVED"));
         assertThat(fetch(id).get("version").asLong()).isEqualTo(1);

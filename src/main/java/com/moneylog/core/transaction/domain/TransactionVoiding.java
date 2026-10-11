@@ -9,33 +9,11 @@ import com.moneylog.core.sk.ledger.VoidDecision;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidContextMissingException;
 
-/**
- * Ponto único de estorno de movimentação (D1 §2.4 regra 1, S-36, M1). Escolhe a guarda pelo tipo da movimentação e
- * aplica os efeitos colaterais:
- *
- * <ul>
- *   <li>movimentação de dívida ({@code debtId} preenchido): {@link DebtTransactionVoidPolicy}; a dívida é validada
- *       <b>antes</b> de a movimentação mudar e depois recebe o efeito (origem → dívida {@code VOIDED}; quitação → status
- *       recalculado);</li>
- *   <li>movimentação de cartão ({@code cardId} preenchido): {@link CardTransactionVoidPolicy} com a cadeia do mesmo
- *       cartão;</li>
- *   <li>despesa dividida ({@code shareDebts} preenchido): as guardas da despesa e de cada dívida de origem, todas antes de
- *       mudar qualquer coisa; as dívidas viram {@code VOIDED} junto;</li>
- *   <li>demais (em conta): {@link TransactionVoidPolicy#accountTransactions(java.util.Collection, com.moneylog.core.sk.money.Money)},
- *       que também recusa conta arquivada (S-73) e despesa com reembolso ativo (S-89).</li>
- * </ul>
- * {@code Transaction.voidTransaction} é package-private: fora deste pacote não há outro caminho de estorno.
- */
 public final class TransactionVoiding {
 
     private TransactionVoiding() {
     }
 
-    /**
-     * Estorna a movimentação. Se a guarda (ou a dívida) recusar, nada muda: nem a movimentação nem a dívida.
-     *
-     * @throws VoidContextMissingException se faltar o cartão/cadeia ou a dívida que o tipo exige
-     */
     public static void voidTransaction(Transaction transaction, VoidContext context) {
         Objects.requireNonNull(transaction, "transaction");
         Objects.requireNonNull(context, "context");
@@ -57,11 +35,6 @@ public final class TransactionVoiding {
         }
     }
 
-    /**
-     * Despesa dividida (D1 §2.6.1): é a origem de uma dívida por parte e segue as guardas delas. Todas as guardas (da despesa e
-     * de cada dívida) são consultadas <b>antes</b> de qualquer mudança; recusando uma, nada muda. Aceito: a despesa vira
-     * {@code VOIDED} (os lançamentos dela, inclusive os dos recebíveis, ficam inativos) e as dívidas viram {@code VOIDED}.
-     */
     private static void voidSharedExpense(Transaction transaction, VoidContext context) {
         requireAccountContext(transaction, context);
         String validReason = transaction.prepareVoid(context.reason(), context.now(),
@@ -75,7 +48,6 @@ public final class TransactionVoiding {
         }
     }
 
-    /** Falha fechado (B3): sem as contas tocadas e, para despesa, sem a soma dos reembolsos, não há como decidir. */
     private static void requireAccountContext(Transaction transaction, VoidContext context) {
         for (UUID accountId : new UUID[] {transaction.accountId(), transaction.counterpartAccountId()}) {
             if (accountId != null && context.accounts().stream().noneMatch(account -> accountId.equals(account.id()))) {
@@ -93,7 +65,6 @@ public final class TransactionVoiding {
             throw new VoidContextMissingException(transaction.type(), "a dívida");
         }
         if (context.accounts().stream().anyMatch(account -> !account.isActive())) {
-            // S-73: estornar mudaria o saldo de uma conta arquivada (a conta só arquiva zerada); o caminho é desarquivar
             throw new TransactionVoidRefusedException(VoidDecision.refuse(TransactionVoidPolicy.ACCOUNT_ARCHIVED,
                     "a movimentação toca uma conta arquivada; desarquive a conta para estornar."));
         }

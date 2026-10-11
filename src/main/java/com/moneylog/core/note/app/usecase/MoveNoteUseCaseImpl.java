@@ -58,7 +58,6 @@ public class MoveNoteUseCaseImpl implements MoveNoteUseCase {
         }
         WikilinkResolver after = new WikilinkResolver(afterIndex);
 
-        // só os links que apontavam para ESTA nota: a resolução gravada é a de antes da mudança
         Set<UUID> sources = new HashSet<>(notes.noteIdsLinkingTo(c.userId(), moved.id()));
         sources.remove(moved.id());
         List<RewrittenNote> rewritten = new ArrayList<>();
@@ -69,14 +68,12 @@ public class MoveNoteUseCaseImpl implements MoveNoteUseCase {
                 try {
                     note.rewriteBody(text, after);
                 } catch (NoteTooLargeException tooLarge) {
-                    // o nome novo, mais longo, faria ESTA outra nota passar de 200 KB: o erro precisa dizer qual (nada é gravado)
                     throw new NoteRewriteTooLargeException(note.path().value(), NoteLimits.NOTE_MAX_BYTES);
                 }
                 notes.save(note);
                 rewritten.add(new RewrittenNote(note.id(), note.path().value(), note.title()));
             }
         }
-        // links da própria nota para ela mesma
         String ownText = rewrite(moved.body(), moved, newPath, before, after);
         if (!ownText.equals(moved.body())) {
             moved.rewriteBody(ownText, after);
@@ -95,7 +92,6 @@ public class MoveNoteUseCaseImpl implements MoveNoteUseCase {
                 .map(id -> newTarget(link, newPath, after, moved.id())).orElse(null));
     }
 
-    /** Preserva a forma escrita (nome ou caminho, com ou sem {@code .md}) e garante que o novo alvo resolve para a nota movida. */
     static String newTarget(Wikilink link, NotePath newPath, WikilinkResolver after, UUID movedId) {
         String candidate = link.isPathForm() ? newPath.withoutExtension() : newPath.name();
         if (!link.isPathForm() && !after.resolve(candidate).filter(movedId::equals).isPresent()) {

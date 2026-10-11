@@ -20,7 +20,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** S-139: só os dados do modelo mudam (valem para as ocorrências ainda não realizadas); o fim respeita o que já foi realizado ou pulado. */
 @DisplayName("Recorrência: edição dos dados do modelo e encerramento (S-139)")
 class RecurringTransactionEdicaoTest {
 
@@ -66,7 +65,6 @@ class RecurringTransactionEdicaoTest {
                 .isInstanceOf(InvalidRecurrenceException.class);
         assertThatThrownBy(() -> r.updateDetails(Money.of("10.00"), "x".repeat(201), ALIMENTACAO_ID, NUBANK_ID, PaymentMethod.PIX, null))
                 .isInstanceOf(InvalidRecurrenceException.class);
-        // nada mudou nas recusas
         assertThat(r.amount()).isEqualTo(Money.of("119.00"));
         RecurringTransaction card = RecurringTransaction.ofCard(UUID.randomUUID(), USER_ID, Money.of("49.90"), "Streaming", ALIMENTACAO_ID, ROXINHO_ID,
                 Schedule.of(Frequency.MONTHLY, d("2026-09-15")));
@@ -100,10 +98,8 @@ class RecurringTransactionEdicaoTest {
                 .hasMessageContaining("pulada");
         restored.endOn(d("2026-12-10"));
         assertThat(restored.schedule().endDate()).isEqualTo(d("2026-12-10"));
-        // com o fim aceito, a reidratação continua válida (todas as datas ainda são ocorrências)
         assertThat(restored.realizedDates()).containsExactly(d("2026-11-10"));
         assertThat(restored.skippedDates()).containsExactly(d("2026-12-10"));
-        // com maxOccurrences, o limite é preservado
         RecurringTransaction limited = RecurringTransaction.ofAccount(UUID.randomUUID(), USER_ID, TransactionType.EXPENSE, Money.of("1.00"), "x",
                 ALIMENTACAO_ID, NUBANK_ID, PaymentMethod.PIX, Schedule.of(Frequency.MONTHLY, d("2026-10-10")).limitedTo(3));
         limited.endOn(d("2027-12-31"));

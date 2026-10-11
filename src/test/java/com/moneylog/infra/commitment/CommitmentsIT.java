@@ -14,7 +14,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/** ADR-014: compromissos acompanhados (empréstimo de terceiro e projeto de longo prazo), contra o contrato. Sem efeito em contas e no total de dívidas. */
 @DisplayName("Compromissos acompanhados (ADR-014)")
 class CommitmentsIT extends E4ItBase {
 

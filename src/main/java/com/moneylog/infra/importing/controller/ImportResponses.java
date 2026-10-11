@@ -20,7 +20,6 @@ import com.moneylog.core.importing.domain.ImportLineFlag;
 import com.moneylog.core.importing.domain.ImportLineStatus;
 import com.moneylog.core.sk.money.Money;
 
-/** Respostas de {@code /v1/imports} (contrato: {@code ImportBatch}, {@code ImportLine}). Tudo calculado no backend. */
 public final class ImportResponses {
 
     private ImportResponses() {

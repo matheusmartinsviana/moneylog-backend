@@ -28,11 +28,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T61 (QA): ajudantes dos ITs de validação da Etapa 3. Um {@link Actor} é um usuário isolado com a Nubank (20.000,00),
- * o cartão Roxinho (limite 10.000,00, fecha 25, vence 5, conta padrão Nubank) e categorias. Toda chamada passa pelo
- * validador do contrato (requisição e resposta); as violações ficam em {@link #contractViolations} em vez de interromper o teste.
- */
 final class CardQaWorld {
 
     final MockMvc mvc;
@@ -53,7 +48,6 @@ final class CardQaWorld {
         this.clock = clock;
     }
 
-    /** Resposta crua: status e corpo. */
     record Res(int status, String text, JsonNode node) {
         String code() {
             return node == null ? "" : node.path("code").asString("");
@@ -89,7 +83,6 @@ final class CardQaWorld {
             income = category("Salário", CategoryKind.INCOME);
         }
 
-        /** Avança o relógio (o JWT expira pelo relógio do contexto, então renova o token). */
         void at(Instant instant) {
             clock.set(instant);
             bearer = auth.bearer(id);
@@ -115,7 +108,6 @@ final class CardQaWorld {
             return b;
         }
 
-        /** Chamada com validação do contrato (a violação é registrada, o teste decide). {@code key} = Idempotency-Key ou null. */
         Res call(HttpMethod method, String url, String body, String key) throws Exception {
             MockHttpServletRequestBuilder b = req(method, url, body);
             if (key != null) {
@@ -131,7 +123,6 @@ final class CardQaWorld {
             return res(r);
         }
 
-        /** Chamada sem validar a requisição (corpos inválidos de propósito); a resposta continua validada. */
         Res raw(HttpMethod method, String url, String body, String key) throws Exception {
             MockHttpServletRequestBuilder b = req(method, url, body);
             if (key != null) {
@@ -192,7 +183,6 @@ final class CardQaWorld {
             return getOk("/v1/cards/" + card);
         }
 
-        /** Todas as faturas da janela padrão (páginas de 50). */
         List<JsonNode> invoices() throws Exception {
             return invoicesOf(card);
         }
@@ -209,7 +199,6 @@ final class CardQaWorld {
             return out;
         }
 
-        /** Prévia + PUT dos dias (a confirmação é a da prévia). */
         Res changeDays(String cardId, int closing, int due) throws Exception {
             JsonNode card0 = getOk("/v1/cards/" + cardId);
             JsonNode preview = getOk("/v1/cards/" + cardId + "/billing-change-preview?closingDay=" + closing + "&dueDay=" + due);
@@ -222,7 +211,6 @@ final class CardQaWorld {
                     + (confirmed == null ? "" : ",\"confirmedEffectiveFrom\":\"" + confirmed + "\"") + ",\"version\":" + version + "}", null);
         }
 
-        /** Σ dos lançamentos ativos do livro CARD deste cartão (centavos): negativo = dívida. */
         long cardBook(String cardId) {
             Long v = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active "
                     + "and book_type = 'CARD' and book_id = ?::uuid", Long.class, id, cardId);
@@ -263,7 +251,6 @@ final class CardQaWorld {
         return r;
     }
 
-    /** "1234.50" -> centavos. */
     static long cents(String amount) {
         return new java.math.BigDecimal(amount).movePointRight(2).longValueExact();
     }

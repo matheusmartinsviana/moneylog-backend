@@ -101,14 +101,14 @@ class DashboardSummaryTest {
         RecurringTransaction aluguel = RecurringTransaction.ofAccount(UUID.fromString("00000000-0000-0000-0000-00000000ec01"), USER_ID,
                 TransactionType.EXPENSE, Money.of("1500.00"), "Aluguel", s.alimentacao.id(), s.nubank.id(), PaymentMethod.BOLETO,
                 Schedule.of(Frequency.MONTHLY, d("2026-11-20")).limitedTo(3));
-        LocalDate hoje = d("2026-11-10"); // fatura ref. nov (vence 05/11) vencida e não paga
+        LocalDate hoje = d("2026-11-10");
         CommitmentSchedule agenda = CommitmentSchedule.of(s.records(), List.of(aluguel), hoje);
 
         assertThat(agenda.items().getFirst().bucket()).isEqualTo(Bucket.OVERDUE);
         assertThat(agenda.committed(Horizon.D7)).isEqualTo(Money.of("200.00"));
-        assertThat(agenda.committed(Horizon.D30)).isEqualTo(Money.of("1900.00")); // 200 vencida + 1.500 (20/11) + 200 (05/12)
-        assertThat(agenda.committed(Horizon.D60)).isEqualTo(Money.of("3600.00")); // + 1.500 (20/12) + 200 (05/01)
-        assertThat(agenda.committed(Horizon.D90)).isEqualTo(Money.of("5300.00")); // + 1.500 (20/01) + 200 (05/02)
+        assertThat(agenda.committed(Horizon.D30)).isEqualTo(Money.of("1900.00"));
+        assertThat(agenda.committed(Horizon.D60)).isEqualTo(Money.of("3600.00"));
+        assertThat(agenda.committed(Horizon.D90)).isEqualTo(Money.of("5300.00"));
         assertThat(agenda.committed(Horizon.M6)).isEqualTo(Money.of("5700.00"));
         assertThat(agenda.committed(Horizon.M12)).isEqualTo(Money.of("5700.00"));
         assertThat(agenda.undated()).singleElement().satisfies(c -> {

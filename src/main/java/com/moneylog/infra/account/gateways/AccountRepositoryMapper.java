@@ -6,7 +6,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.infra.account.persistence.AccountEntity;
 
-/** {@code Account} ⇄ {@code AccountEntity}. */
 public final class AccountRepositoryMapper {
 
     private AccountRepositoryMapper() {

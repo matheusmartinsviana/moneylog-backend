@@ -8,7 +8,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.moneylog.core.ai.app.gateways.AiSettingsGateway;
 import com.moneylog.core.ai.domain.AiSettings;
 
-/** Preferências de IA: uma linha por usuário. */
 public class AiSettingsGatewayImpl implements AiSettingsGateway {
 
     private final JdbcTemplate jdbc;

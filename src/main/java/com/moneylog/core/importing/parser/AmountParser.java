@@ -3,17 +3,11 @@ package com.moneylog.core.importing.parser;
 import java.math.BigDecimal;
 import java.util.Optional;
 
-/**
- * Valor monetário de texto, exato em centavos (nada de {@code double}). Aceita {@code 1.234,56}, {@code 1,234.56}, {@code -82,90},
- * {@code (82,90)}, {@code R$ 82,90}, {@code 82.90}, {@code 1234}, sinal à direita ({@code 82,90-}) e {@code D}/{@code C} finais.
- * Mais de duas casas decimais ou texto que não é número → vazio.
- */
 public final class AmountParser {
 
     private AmountParser() {
     }
 
-    /** Centavos com sinal (negativo = saída), ou vazio se não for um valor. */
     public static Optional<Long> parseCents(String raw) {
         if (raw == null) {
             return Optional.empty();
@@ -61,7 +55,6 @@ public final class AmountParser {
         }
     }
 
-    /** Descobre qual separador é o decimal: o último, se tiver 1 ou 2 dígitos depois; três dígitos depois = milhar. */
     private static Optional<String> toPlainDecimal(String text) {
         int lastComma = text.lastIndexOf(',');
         int lastDot = text.lastIndexOf('.');
@@ -79,7 +72,6 @@ public final class AmountParser {
             return Optional.empty();
         }
         if (after.length() == 3 && !otherPresent) {
-            // 1.234 ou 1,234: separador de milhar (sem parte decimal), desde que seja o único tipo e agrupado de 3 em 3
             if (!text.matches("[0-9]{1,3}([" + decimalChar + "][0-9]{3})+")) {
                 return Optional.empty();
             }

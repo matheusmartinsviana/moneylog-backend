@@ -5,7 +5,6 @@ import java.util.UUID;
 import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/** Exceções do compromisso acompanhado. */
 public final class CommitmentExceptions {
 
     private CommitmentExceptions() {

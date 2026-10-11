@@ -23,10 +23,6 @@ import com.moneylog.infra.exception.InvalidPathValueException;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryMonths;
 
-/**
- * Relatórios do Início (redesign, S-283 a S-286): série de entradas e saídas e consumo por categoria. Leituras puras sobre o mesmo razão
- * do dashboard; tudo calculado no backend. Dado financeiro do usuário: nunca cacheado.
- */
 @RestController
 @RequestMapping("/v1/reports")
 @Validated
@@ -66,7 +62,6 @@ public class ReportController {
                 return ReportPeriod.valueOf(period);
             }
         } catch (IllegalArgumentException e) {
-            // cai no 400 abaixo
         }
         throw new InvalidPathValueException(REPORT_PERIOD_INVALID, "period", "Período inválido: use D7, D30, M3 ou M12.");
     }

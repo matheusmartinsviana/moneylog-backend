@@ -9,10 +9,6 @@ import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalNotFoundException;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/**
- * Meta em destaque da Home (ADR-018): uma só por usuário. Marcar outra move o destaque: a anterior é desmarcada e gravada antes (o índice
- * único parcial não admite duas), tudo na mesma transação e sob a trava do usuário.
- */
 public class SetGoalFeaturedUseCaseImpl implements SetGoalFeaturedUseCase {
 
     private final GoalGateway goals;

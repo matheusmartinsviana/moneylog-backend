@@ -32,12 +32,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/**
- * Prévia da compra (S-124). Monta a mesma {@code CARD_PURCHASE} que a criação montaria, pela mesma fábrica do domínio e
- * sobre a mesma cadeia de faturas, e a descarta. A prévia não tem categoria: usa uma categoria de despesa transitória
- * (só o livro de consumo muda, e nenhum valor de parcela, competência ou fatura depende dela). Não trava nada: roda em
- * transação somente leitura.
- */
 public class PreviewCardPurchaseUseCaseImpl implements PreviewCardPurchaseUseCase {
 
     private final CardGateway cards;
@@ -85,7 +79,6 @@ public class PreviewCardPurchaseUseCaseImpl implements PreviewCardPurchaseUseCas
         return new PurchasePreviewView(installments, purchase.amount(), after.available(), after.overLimit(), warnings);
     }
 
-    /** Os lançamentos ativos do livro do cartão mais os da compra que ainda não existe. */
     private static List<Posting> postingsAfter(CreditCard card, FinancialRecords loaded, Transaction purchase) {
         List<Posting> postings = new ArrayList<>();
         for (LedgerEntry entry : loaded.ledger().entries()) {

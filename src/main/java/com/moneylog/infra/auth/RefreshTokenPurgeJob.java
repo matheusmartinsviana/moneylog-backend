@@ -10,7 +10,6 @@ import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCase;
 import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCase.PurgeCommand;
 import com.moneylog.infra.security.MoneylogAuthProperties;
 
-/** Limpa os refresh tokens expirados (B7): uma vez no boot e todo dia às 03:30. Falha só vira log (tentará de novo). */
 public class RefreshTokenPurgeJob implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(RefreshTokenPurgeJob.class);

@@ -60,7 +60,6 @@ class CreateAiPreviewTest {
 
         assertThat(preview.payload()).doesNotContain(FOOD.toString()).doesNotContain(USER.toString()).doesNotContain("@")
                 .contains("\"purpose\":\"MONTHLY_SUMMARY\"").contains("\"partial\":\"true\"").contains("\"insight.1.deltaAmount\":\"184.50\"");
-        // o nome de categoria passou pelo redator: o favorecido do PIX não vai
         assertThat(preview.payload()).contains("[PIX]").doesNotContain("FULANO");
         assertThat(preview.redactions()).contains("PAYEE");
         assertThat(preview.payloadHash()).hasSize(64);

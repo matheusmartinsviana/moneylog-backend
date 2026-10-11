@@ -17,29 +17,15 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Efeito de uma movimentação nas lentes, calculado dos lançamentos <b>ativos</b> dela (D1 §1): caixa = Σ nos livros de
- * conta {@code CASH}; consumo = lançamentos de {@code EXPENSE} por competência (reembolso negativo); patrimônio = Σ nos
- * livros de patrimônio; compromisso = o que a própria movimentação cria (só a compra parcelada, ver
- * {@link TransactionDetails.Impact}). Estornada: tudo zero.
- *
- * <p>No patrimônio, os lançamentos do livro {@code CARD} com data efetiva futura (parcelas ainda não vencidas) ficam de
- * fora: "o patrimônio não inclui as parcelas futuras" (S-8, D1 §2.8).
- */
 public final class TransactionImpactCalculator {
 
     private TransactionImpactCalculator() {
     }
 
-    /** Tipos em conta: sem cartão e sem compromisso. */
     public static Impact of(Transaction transaction, Map<UUID, Account> accountsById) {
         return of(transaction, accountsById, null, Money.zero(CurrencyCode.BRL));
     }
 
-    /**
-     * @param today      "hoje" do usuário; {@code null} não filtra o patrimônio por data
-     * @param commitment compromisso futuro que a movimentação cria
-     */
     public static Impact of(Transaction transaction, Map<UUID, Account> accountsById, LocalDate today, Money commitment) {
         Money zero = Money.zero(CurrencyCode.BRL);
         Money cash = zero;

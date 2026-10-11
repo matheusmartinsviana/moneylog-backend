@@ -8,12 +8,6 @@ import java.util.Set;
 import com.moneylog.core.note.exception.NoteExceptions.NotePathInvalidException;
 import com.moneylog.core.note.exception.NoteExceptions.PathProblem;
 
-/**
- * Caminho de uma nota dentro do vault, como numa pasta do Obsidian ({@code reviews/2026-10.md}). Valor imutável e sempre válido (S-162):
- * até 255 caracteres e 10 níveis, extensão {@code .md}, sem {@code ..}, sem barra inicial, sem {@code \}, sem controle nem formatação
- * invisível (bidi, largura zero), sem segmento oculto (começando em ponto), sem caractere que o Windows ou o wikilink não aceitam
- * ({@code <>:"|?*#^[]}) e sem nome reservado do Windows. Unicode em NFC (o macOS gera zips em NFD). A unicidade ignora a caixa ({@link #key()}).
- */
 public final class NotePath {
 
     public static final int MAX_LENGTH = 255;
@@ -31,7 +25,6 @@ public final class NotePath {
         this.value = value;
     }
 
-    /** @throws NotePathInvalidException caminho fora das regras; {@code problem().hostile()} indica tentativa de escapar da pasta */
     public static NotePath of(String raw) {
         if (raw == null || raw.isBlank()) {
             throw invalid(PathProblem.EMPTY, "vazio");
@@ -47,7 +40,6 @@ public final class NotePath {
         if (raw.charAt(0) == '/') {
             throw invalid(PathProblem.ABSOLUTE, "começa com '/'");
         }
-        // "C:/x" é caminho absoluto do Windows; "Q: dúvida" é só um nome com dois-pontos (válido no macOS/Linux), recusado como caractere proibido
         if (raw.length() >= 3 && raw.charAt(1) == ':' && raw.charAt(2) == '/' && Character.isLetter(raw.charAt(0))) {
             throw invalid(PathProblem.DRIVE_LETTER, "letra de unidade");
         }
@@ -107,7 +99,6 @@ public final class NotePath {
             }
         }
         int dot = segment.indexOf('.');
-        // o Windows ignora espaços antes do ponto: "CON .md" é o dispositivo CON
         String stem = (dot < 0 ? segment : segment.substring(0, dot)).strip().toLowerCase(Locale.ROOT);
         if (RESERVED.contains(stem)) {
             throw invalid(PathProblem.RESERVED_NAME, "nome reservado '" + stem + "'");
@@ -122,34 +113,28 @@ public final class NotePath {
         return value;
     }
 
-    /** Nome do arquivo sem a extensão ({@code 2026-10}): é por ele que o wikilink resolve. */
     public String name() {
         String file = value.substring(value.lastIndexOf('/') + 1);
         return file.substring(0, file.length() - EXTENSION.length());
     }
 
-    /** Pasta ({@code reviews}) ou vazio na raiz. */
     public String folder() {
         int slash = value.lastIndexOf('/');
         return slash < 0 ? "" : value.substring(0, slash);
     }
 
-    /** Caminho sem a extensão ({@code reviews/2026-10}). */
     public String withoutExtension() {
         return value.substring(0, value.length() - EXTENSION.length());
     }
 
-    /** Chave de unicidade: o caminho sem diferenciar maiúsculas. */
     public String key() {
         return value.toLowerCase(Locale.ROOT);
     }
 
-    /** Caminho sem extensão, sem caixa e sem acento (resolução de wikilinks). */
     public String foldedWithoutExtension() {
         return TextFolding.fold(withoutExtension());
     }
 
-    /** Novo caminho com o mesmo nome em outra pasta ou com outro nome, na mesma pasta. */
     public NotePath withName(String newName) {
         String folder = folder();
         return NotePath.of((folder.isEmpty() ? "" : folder + "/") + newName + EXTENSION);

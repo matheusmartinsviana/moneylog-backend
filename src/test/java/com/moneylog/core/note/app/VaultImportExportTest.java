@@ -102,8 +102,6 @@ class VaultImportExportTest {
         return files;
     }
 
-    // ------------------------------------------------------------------ importar
-
     @Test
     @DisplayName("CA2/CA3: importa as notas, resolve os wikilinks entre elas, lista o que ignorou (foto.png) e mantém ![[foto.png]] no texto como link pendente")
     void deveImportar() {
@@ -300,7 +298,6 @@ class VaultImportExportTest {
         assertThat(byPath("aspas.md").explicitLinks()).hasSize(1);
         assertThat(byPath("espaco.md").body()).isEqualTo("corpo2");
         assertThat(byPath("espaco.md").explicitLinks()).hasSize(1);
-        // forma que o texto não consegue tirar: o bloco sai com aviso, a nota entra
         assertThat(byPath("fluxo.md").body()).isEqualTo("corpo3");
         assertThat(report.warnings()).extracting(w -> w.path() + ":" + w.code()).containsExactly("fluxo.md:FRONTMATTER_INVALID");
     }
@@ -338,7 +335,6 @@ class VaultImportExportTest {
         assertThat(report.created()).isEqualTo(1);
         assertThat(byPath("nova.md").wikilinks()).extracting(NoteLink::targetId).containsExactly(existing.note().value().id(), null);
         assertThat(report.pendingLinks()).isEqualTo(1);
-        // e a nota que já existia e apontava para o nome da importada passa a resolver
         assertThat(byPath("pendente.md").wikilinks().get(0).targetId()).isEqualTo(byPath("nova.md").id());
     }
 
@@ -374,14 +370,11 @@ class VaultImportExportTest {
             zip.write("x".getBytes(StandardCharsets.UTF_8));
             zip.closeEntry();
         }
-        // o JDK liga a flag UTF-8 ao gravar fora do ASCII só se o charset for UTF-8; com IBM437 ela fica desligada
         ImportReport report = importer.handle(new ImportVaultCommand(USER, NoteTestKit.source(raw.toByteArray()), ConflictMode.SKIP));
         assertThat(report.created()).isEqualTo(1);
         assertThat(byPath("café.md").path().value()).isEqualTo("café.md");
         assertThat(report.warnings()).extracting(w -> w.code()).containsExactly("NAME_ENCODING_GUESSED");
     }
-
-    // ------------------------------------------------------------------ exportar
 
     @Test
     @DisplayName("CA1: exporta um .md por nota ativa, no caminho dela, com o corpo intacto; a lixeira não vai; nome do arquivo usa o dia do usuário")
@@ -444,7 +437,6 @@ class VaultImportExportTest {
                 org.assertj.core.groups.Tuple.tuple(NoteLinkType.MONTHLY_SUMMARY, NoteLink.State.RESOLVED),
                 org.assertj.core.groups.Tuple.tuple(NoteLinkType.NOTE, NoteLink.State.RESOLVED));
         assertThat(a.explicitLinks().get(3).targetId()).isEqualTo(bb.id());
-        // pendentes: [[Inexistente]] e a transação que o outro usuário não tem
         assertThat(report.pendingLinks()).isEqualTo(2);
     }
 
@@ -483,7 +475,6 @@ class VaultImportExportTest {
         for (int i = 0; i < 4; i++) {
             create.handle(new CreateNoteCommand(USER, "n" + i + ".md", "a".repeat(NoteLimits.NOTE_MAX_BYTES), List.of(), null));
         }
-        // 4 x 200 KB cabem; 1.600 x 200 KB passam de 300 MB e são recusados
         long before = exportDirs(tmp);
         ExportVaultUseCaseImpl tooBig = new ExportVaultUseCaseImpl(new RepeatingGateway(NOW, 1_600), NoteTestKit.time());
         assertThatThrownBy(() -> tooBig.handle(new ExportVaultQuery(USER))).isInstanceOf(VaultExportTooLargeException.class).extracting("code")
@@ -512,7 +503,6 @@ class VaultImportExportTest {
         assertThat(exportDirs(tmp)).isEqualTo(before);
     }
 
-    /** Devolve a mesma nota de 200 KB {@code copies} vezes (1.600 x 200 KB passa de 300 MB), sem manter nada em memória. */
     private static class RepeatingGateway extends InMemoryNoteGateway {
         private final int copies;
 

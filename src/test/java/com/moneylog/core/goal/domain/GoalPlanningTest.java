@@ -34,7 +34,6 @@ class GoalPlanningTest {
         return Money.of(value);
     }
 
-    /** Dívida de 1.200,00 a zerar em 12 meses (out/2026 a set/2027), começando em 10/2026. */
     private static GoalPlanner.Track debt() {
         return new GoalPlanner.Track(true, m("1200.00"), LocalDate.of(2026, 10, 1), m("0.00"), LocalDate.of(2027, 9, 30));
     }
@@ -45,9 +44,9 @@ class GoalPlanningTest {
         GoalPlan plan = GoalPlanner.plan(debt(), m("1100.00"), TODAY);
         assertThat(plan.monthsLeft()).isEqualTo(12);
         assertThat(plan.nextMilestone()).isEqualTo(m("1100.00"));
-        assertThat(plan.requiredPace()).isEqualTo(m("91.67")); // 1100 / 12, para cima
+        assertThat(plan.requiredPace()).isEqualTo(m("91.67"));
         assertThat(plan.onTrack()).isTrue();
-        assertThat(plan.gap()).isEqualTo(m("100.00")); // esperado no início do mês: 1200; atual 1100
+        assertThat(plan.gap()).isEqualTo(m("100.00"));
         GoalPlan behind = GoalPlanner.plan(debt(), m("1300.00"), TODAY);
         assertThat(behind.onTrack()).isFalse();
         assertThat(behind.gap()).isEqualTo(m("-100.00"));
@@ -72,18 +71,17 @@ class GoalPlanningTest {
     void deveCalcularConsistencia() {
         GoalPlanner.Track track = new GoalPlanner.Track(true, m("1200.00"), LocalDate.of(2026, 5, 1), m("0.00"), LocalDate.of(2027, 4, 30));
         Map<Competence, Money> snaps = new HashMap<>();
-        snaps.put(Competence.of(2026, 5), m("1100.00")); // esperado 1100: cumpriu
-        // junho sem dado
-        snaps.put(Competence.of(2026, 7), m("900.00"));  // esperado 900: cumpriu
-        snaps.put(Competence.of(2026, 8), m("800.00"));  // esperado 800: cumpriu
-        snaps.put(Competence.of(2026, 9), m("700.00"));  // esperado 700: cumpriu
+        snaps.put(Competence.of(2026, 5), m("1100.00"));
+        snaps.put(Competence.of(2026, 7), m("900.00"));
+        snaps.put(Competence.of(2026, 8), m("800.00"));
+        snaps.put(Competence.of(2026, 9), m("700.00"));
         GoalConsistency c = GoalPlanner.consistency(track, m("650.00"), TODAY, snaps::get);
-        assertThat(c.history()).hasSize(6); // mai a out
+        assertThat(c.history()).hasSize(6);
         assertThat(c.history().get(1).met()).isNull();
         assertThat(c.history().get(1).actual()).isNull();
         assertThat(c.history().get(5).closed()).isFalse();
-        assertThat(c.streak()).isEqualTo(3); // set, ago, jul; junho sem dado interrompe
-        assertThat(c.rate()).isEqualByComparingTo("1.0000"); // 4 cumpridos de 4 com dado
+        assertThat(c.streak()).isEqualTo(3);
+        assertThat(c.rate()).isEqualByComparingTo("1.0000");
         GoalConsistency failing = GoalPlanner.consistency(track, m("650.00"), TODAY, month -> m("1190.00"));
         assertThat(failing.streak()).isZero();
         assertThat(failing.rate()).isEqualByComparingTo("0.0000");
@@ -112,14 +110,11 @@ class GoalPlanningTest {
             boolean declared = random.nextBoolean();
             int streak = random.nextInt(5);
             GoalStage base = GoalStage.derive(false, deadline, auto, declared, streak);
-            // acrescentar prazo, plano declarado ou meses cumpridos nunca rebaixa o estágio
             assertThat(GoalStage.derive(false, true, auto || deadline && random.nextBoolean(), declared, streak).ordinal())
                     .isGreaterThanOrEqualTo(deadline ? base.ordinal() : GoalStage.FANTASY.ordinal());
             assertThat(GoalStage.derive(false, deadline, auto, true, streak).ordinal()).isGreaterThanOrEqualTo(base.ordinal());
             assertThat(GoalStage.derive(false, deadline, auto, declared, streak + 1).ordinal()).isGreaterThanOrEqualTo(base.ordinal());
-            // desligar o prazo rebaixa para FANTASY, com qualquer plano ou sequência
             assertThat(GoalStage.derive(false, false, false, declared, streak)).isEqualTo(GoalStage.FANTASY);
-            // atingida prevalece
             assertThat(GoalStage.derive(true, deadline, auto, declared, streak)).isEqualTo(GoalStage.ACHIEVED);
         }
         for (int i = 0; i < 300; i++) {
@@ -131,7 +126,7 @@ class GoalPlanningTest {
             GoalPlan plan = GoalPlanner.plan(track, Money.ofCents(start, CurrencyCode.BRL), TODAY);
             assertThat(plan.monthsLeft()).isEqualTo(months);
             long product = plan.requiredPace().cents() * plan.monthsLeft();
-            assertThat(product).isBetween(distance, distance + plan.monthsLeft() - 1L); // arredondado para cima ao centavo
+            assertThat(product).isBetween(distance, distance + plan.monthsLeft() - 1L);
             assertThat(plan.nextMilestone().cents()).isBetween(start, start + distance);
         }
     }

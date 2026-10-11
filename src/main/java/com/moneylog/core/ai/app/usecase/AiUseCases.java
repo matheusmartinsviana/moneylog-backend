@@ -16,13 +16,11 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.Competence;
 
-/** Casos de uso da IA (Etapa 8). Um por ação, {@code handle(...)}. */
 public final class AiUseCases {
 
     private AiUseCases() {
     }
 
-    /** Resumo do mês + insights determinísticos (sem IA) + nomes de categoria; a mesma fonte do dashboard e do resumo mensal. */
     public record InsightsView(Competence month, MonthlySummary summary, List<Insight> insights, Map<UUID, String> categoryNames) {
     }
 
@@ -52,7 +50,6 @@ public final class AiUseCases {
         AiPreview handle(UUID userId, UUID previewId);
     }
 
-    /** Envia à IA exatamente o payload da prévia aprovada (S-181). */
     public interface RunApprovedAnalysisUseCase {
         AiAnalysis handle(RunAnalysisCommand command);
     }
@@ -73,7 +70,6 @@ public final class AiUseCases {
         AiSettings handle(UUID userId, boolean dailyMessageEnabled);
     }
 
-    /** Retenção (S-183): apaga o payload enviado com mais de N dias e as prévias vencidas; o registro da análise permanece. */
     public interface PurgeExpiredAiDataUseCase {
         int handle();
     }

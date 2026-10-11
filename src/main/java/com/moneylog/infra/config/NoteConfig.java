@@ -42,7 +42,6 @@ import com.moneylog.infra.note.gateways.NoteGatewayImpl;
 import com.moneylog.infra.note.gateways.NoteTargetGatewayImpl;
 import com.moneylog.infra.note.persistence.NoteRepositoryJpa;
 
-/** Ligação da feature notas/vault (Etapa 6, T108 a T112): gateways, casos de uso (cada um numa transação) e o montador de visões. */
 @Configuration(proxyBeanMethods = false)
 public class NoteConfig {
 
@@ -122,7 +121,6 @@ public class NoteConfig {
         return TransactionalProxies.readOnly(ListTagsUseCase.class, new ListTagsUseCaseImpl(notes), tm);
     }
 
-    /** Só lê para montar o índice; a escrita do zip acontece depois, em lotes, fora da transação (cada lote é uma leitura própria). */
     @Bean
     ExportVaultUseCase exportVaultUseCase(NoteGateway notes, TimeProvider time, PlatformTransactionManager tm) {
         return TransactionalProxies.readOnly(ExportVaultUseCase.class, new ExportVaultUseCaseImpl(notes, time), tm);

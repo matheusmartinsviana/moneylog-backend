@@ -17,7 +17,6 @@ public interface PersonRepositoryJpa extends JpaRepository<PersonEntity, UUID> {
 
     Optional<PersonEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** {@code SELECT ... FOR UPDATE} da linha. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from PersonEntity p where p.id = :id and p.userId = :userId")
     Optional<PersonEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);

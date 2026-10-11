@@ -10,14 +10,6 @@ import com.moneylog.core.importing.domain.CategorySuggester.Suggestion;
 import com.moneylog.core.importing.exception.ImportingExceptions.InvalidImportLineException;
 import com.moneylog.core.importing.exception.ImportingExceptions.InvalidImportLineTransitionException;
 
-/**
- * Linha de um lote em revisão: a {@link ImportLineReview} (estado e chaves) mais o que a revisão acrescenta (marcas, sugestão, escolhas do usuário).
- * Sem setters públicos; toda mudança é um método de negócio que respeita as transições do {@link ImportLineReview}.
- *
- * <p>O que exige decisão (nunca é aceito em lote nem aplicado sem escolha): {@code POSSIBLE_DUPLICATE} e as marcas
- * {@link ImportLineFlag#requiresDecision()} enquanto a linha está {@code PENDING}. Transferência: {@link #acceptAsTransfer} cria <b>uma</b> TRANSFER
- * na aplicação; a perna espelhada do outro extrato fica {@code POSSIBLE_DUPLICATE} dela e continua pedindo decisão (conservador, PR 01).
- */
 public final class ImportBatchLine {
 
     public static final String REASON_INVOICE_PAYMENT = "Pagamento de fatura: já registrado como pagamento na conta.";
@@ -48,7 +40,6 @@ public final class ImportBatchLine {
         this.suggestion = suggestion;
     }
 
-    /** Linha nova: classifica contra o que já existe e aplica as marcas (pagamento de fatura nasce rejeitada). */
     public static ImportBatchLine open(UUID id, UUID batchId, int position, ImportLine line, DedupKey key, Collection<ExistingEntry> existing,
                                        Collection<ImportLineFlag> flags, Suggestion suggestion) {
         ImportBatchLine result = new ImportBatchLine(id, batchId, position, ImportLineReview.classify(line, key, existing), flags, suggestion);
@@ -62,7 +53,6 @@ public final class ImportBatchLine {
         return result;
     }
 
-    /** Reconstitui a linha gravada. */
     @SuppressWarnings("java:S107")
     public static ImportBatchLine restore(UUID id, UUID batchId, int position, ImportLineReview review, Collection<ImportLineFlag> flags,
                                           Suggestion suggestion, String rejectReason, UUID categoryId, String method,
@@ -86,10 +76,6 @@ public final class ImportBatchLine {
         return status == ImportLineStatus.PENDING && LineFlagger.requiresDecision(flags);
     }
 
-    /**
-     * Aceita a linha como entrada/saída comum. Sem categoria própria usa a sugerida; sem nenhuma das duas é erro (a categoria é obrigatória na
-     * movimentação).
-     */
     public void accept(UUID newCategoryId, String newMethod, String newDescription) {
         UUID resolved = newCategoryId != null ? newCategoryId : categoryId != null ? categoryId : suggestion != null ? suggestion.categoryId() : null;
         if (resolved == null) {
@@ -103,7 +89,6 @@ public final class ImportBatchLine {
         }
     }
 
-    /** Decide que a linha marcada {@code POSSIBLE_TRANSFER} é uma transferência com a conta informada: uma única TRANSFER na aplicação. */
     public void acceptAsTransfer(UUID counterpartAccount) {
         if (!flags.contains(ImportLineFlag.POSSIBLE_TRANSFER) || review.status() != ImportLineStatus.PENDING) {
             throw new InvalidImportLineTransitionException(review.status(), "asTransfer");
@@ -122,13 +107,11 @@ public final class ImportBatchLine {
         this.counterpartAccountId = null;
     }
 
-    /** Desfaz a aceitação (enquanto o lote está em revisão): a linha volta a pedir a decisão de origem. */
     public void reopen() {
         review.reopen();
         this.counterpartAccountId = null;
     }
 
-    /** Importa mesmo sendo duplicata; a movimentação sai com a chave derivada do lote. */
     public void force(UUID importBatchId, UUID newCategoryId, String newMethod) {
         review.forceImport(importBatchId);
         UUID resolved = newCategoryId != null ? newCategoryId : suggestion != null ? suggestion.categoryId() : null;

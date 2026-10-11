@@ -15,14 +15,6 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 
-/**
- * Conformidade com {@code contracts/openapi.yaml} (S-66, S-84). Todo IT que chama a API passa a resposta
- * <b>e a requisição</b> por {@link #conforms()}: um campo renomeado no DTO, um tipo errado ou um parâmetro de query
- * fora do enum quebra o teste com a mensagem do validador.
- *
- * <p>Testes de erro {@code 400} enviam requisições propositalmente inválidas e usam {@link #responseOnly()}, que
- * desliga a validação da <b>requisição</b> (por teste, de forma explícita) e continua validando a resposta.
- */
 public final class ContractValidation {
 
     public static final Path SPEC_FILE = locate();
@@ -34,7 +26,6 @@ public final class ContractValidation {
     private ContractValidation() {
     }
 
-    /** Valida requisição e resposta (inclusive a segurança: rota protegida sem {@code Bearer} falha). */
     public static ResultMatcher conforms() {
         ResultMatcher schema = openApi().isValid(FULL);
         return result -> {
@@ -43,11 +34,6 @@ public final class ContractValidation {
         };
     }
 
-    /**
-     * O validador do swagger-request-validator não confere o {@code security} herdado do nível raiz do documento
-     * (verificado com uma requisição sem {@code Authorization}: relatório vazio). Esta checagem cobre: operação sem
-     * {@code security: []} próprio exige {@code Authorization: Bearer ...}.
-     */
     private static void requireBearerWhenProtected(jakarta.servlet.http.HttpServletRequest request) {
         OpenAPI spec = SPEC;
         String uri = request.getRequestURI();
@@ -72,18 +58,15 @@ public final class ContractValidation {
         }
     }
 
-    /** Valida só a resposta (o teste envia uma requisição inválida de propósito). */
     public static ResultMatcher responseOnly() {
         return openApi().isValid(RESPONSE_ONLY);
     }
 
-    /** O contrato parseado (para o teste de cobertura). */
     public static OpenAPI spec() {
         return new OpenAPIV3Parser().read(SPEC_FILE.toUri().toString());
     }
 
     private static OpenApiInteractionValidator validator(boolean ignoreRequest) {
-        // A segurança do contrato (bearerAuth) é conferida: todo IT de rota protegida envia o Bearer (T22b).
         LevelResolver.Builder levels = LevelResolver.create();
         if (ignoreRequest) {
             levels.withLevel("validation.request", Level.IGNORE);

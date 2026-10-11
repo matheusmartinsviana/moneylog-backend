@@ -36,11 +36,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.PostgresTestcontainer;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T190 (QA independente): a busca contra um Tomcat de verdade (MockMvc não passa pelo parser HTTP do container). Pede o que um cliente
- * qualquer (curl, extensão, outro app) pode mandar: caracteres crus que o Tomcat recusa, percent-encoding inválido, NUL, {@code Origin}
- * estranho. Confere que o termo {@code q} não sobra em nenhum log, nem no do container, e o formato dos erros.
- */
 @Tag("i")
 @ActiveProfiles("it")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -193,7 +188,6 @@ class RedesignFase0HttpQaIT {
                 HttpResponse.BodyHandlers.ofString());
         assertThat(noToken.statusCode()).isEqualTo(401);
         assertThat(noToken.headers().firstValue("Content-Type").orElse("")).contains("json");
-        // preflight de outra origem não é liberado
         HttpResponse<String> pre = client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/v1/search?q=abc"))
                 .header("Origin", "https://evil.example").header("Access-Control-Request-Method", "GET").method("OPTIONS", HttpRequest.BodyPublishers.noBody()).build(),
                 HttpResponse.BodyHandlers.ofString());

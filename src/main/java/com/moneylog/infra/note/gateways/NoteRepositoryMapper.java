@@ -9,7 +9,6 @@ import com.moneylog.core.note.domain.NotePath;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.infra.note.persistence.NoteEntity;
 
-/** {@code Note} ⇄ {@code NoteEntity} (+ tags e vínculos, que o gateway lê e grava por JDBC). A reidratação usa {@link Note#restore}. */
 public final class NoteRepositoryMapper {
 
     private NoteRepositoryMapper() {

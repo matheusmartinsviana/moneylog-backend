@@ -48,11 +48,6 @@ import com.moneylog.infra.goal.controller.GoalRequests.GoalFeaturedInput;
 import com.moneylog.infra.goal.controller.GoalRequests.GoalPhotoOrderInput;
 import com.moneylog.infra.security.CurrentUser;
 
-/**
- * Fotos e destaque da meta (ADR-018). O envio é multipart e o conteúdo só sai por esta rota autenticada (Bearer): sem URL assinada, sem token
- * na query. A resposta do conteúdo é {@code no-store} e {@code nosniff}. O nome do arquivo enviado é ignorado e nunca vai para log; o log só
- * leva ids e tamanhos.
- */
 @RestController
 @RequestMapping("/v1/goals")
 public class GoalPhotoController {
@@ -99,7 +94,6 @@ public class GoalPhotoController {
                 .body(GoalResponse.photo(uploaded.photo(), uploaded.position()));
     }
 
-    /** Conteúdo JPEG autenticado. {@code variant}: {@code display} (padrão) ou {@code thumb}. */
     @GetMapping("/{id}/photos/{photoId}/content")
     public ResponseEntity<byte[]> content(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable UUID photoId,
                                           @RequestParam(defaultValue = "display") String variant) {

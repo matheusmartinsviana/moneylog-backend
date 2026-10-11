@@ -32,11 +32,6 @@ import com.moneylog.core.debt.exception.DebtExceptions.DebtDescriptionTooLongExc
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.util.IntegrationTest;
 
-/**
- * T12 CA5 (QA): o que o domínio aceita o schema também precisa aceitar. Cada teste cria o valor pelo domínio e grava
- * no Postgres real. Os testes de BUG-QA-01 e BUG-QA-05 nasceram {@code @Disabled} documentando as divergências e foram
- * reativados com a correção (S-77 e limites de texto no domínio).
- */
 @IntegrationTest
 @DisplayName("Schema × domínio: limites e datas (T12, QA)")
 class SchemaDominioLimitesQaIT {
@@ -66,11 +61,6 @@ class SchemaDominioLimitesQaIT {
         });
     }
 
-    /**
-     * BUG-QA-01 (corrigido, S-77): fecha 30 / vence 31 → em fevereiro (e em meses de 30 dias) o clamp igualava as duas
-     * datas. Agora o vencimento vai para o dia 31 do mês seguinte (com clamp) e o CHECK {@code due_date > closing_date}
-     * continua valendo.
-     */
     @Test
     @DisplayName("BUG-QA-01: fatura com fecha 30 / vence 31 em fevereiro e em abril vence depois do fechamento e grava")
     void deveGravarFaturaComClampDoVencimento() {
@@ -85,10 +75,6 @@ class SchemaDominioLimitesQaIT {
         });
     }
 
-    /**
-     * BUG-QA-05 (corrigido): o domínio limita {@code Debt.description} (200) e {@code institution} de conta e cartão
-     * (100) com exceção de domínio específica. Texto acima do limite nunca chega ao banco; texto no limite grava.
-     */
     @Test
     @DisplayName("BUG-QA-05: textos acima das colunas são recusados pelo domínio e os textos no limite gravam")
     void deveCaberOsTextosAceitosPeloDominio() {

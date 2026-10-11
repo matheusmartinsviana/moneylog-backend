@@ -16,7 +16,6 @@ public interface RecurrenceRepositoryJpa extends JpaRepository<RecurrenceEntity,
 
     Optional<RecurrenceEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** {@code SELECT ... FOR UPDATE} da linha: duas realizações da mesma ocorrência se serializam aqui. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from RecurrenceEntity r where r.id = :id and r.userId = :userId")
     Optional<RecurrenceEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);

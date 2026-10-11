@@ -23,14 +23,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.DayOfMonthRule;
 
-/**
- * Cartão de crédito (D1 §2.5). Não é conta: é passivo (livro {@code CARD}) com ciclo de fatura. Nunca guarda número
- * nem CVV (PR 00 §26). O limite disponível é calculado ({@code AvailableLimitCalculator}), não é campo.
- *
- * <p>Fechamento e vencimento são regras por mês ({@link BillingRule}); a mudança de dia vale a partir da fatura
- * seguinte à corrente (S-42). As regras são a única fonte de verdade dos dias (M4): {@link #closingDay()} e
- * {@link #dueDay()} só leem a regra mais recente.
- */
 public final class CreditCard {
 
     public static final int NAME_MAX_LENGTH = 100;
@@ -45,7 +37,6 @@ public final class CreditCard {
     private final List<BillingRule> rules;
     private CardStatus status;
     private final long version;
-    /** {@code false} = o fechamento ainda não foi confirmado por documento: o dia numérico é só parâmetro técnico provisório, nunca um fato. */
     private boolean closingDayConfirmed = true;
 
     private CreditCard(UUID id, UUID userId, String name, String institution, Money limit, UUID defaultPaymentAccountId,
@@ -64,23 +55,17 @@ public final class CreditCard {
         this.version = version;
     }
 
-    /**
-     * Cadastra um cartão ativo. A primeira regra vale a partir do mês do cadastro (e também para os anteriores, para
-     * registrar compras antigas).
-     */
     public static CreditCard create(UUID id, UUID userId, String name, String institution, Money limit, int closingDay,
                                     int dueDay, UUID defaultPaymentAccountId, LocalDate createdOn) {
         BillingRule rule = rule(YearMonth.from(required(createdOn, "createdOn")), closingDay, dueDay);
         return new CreditCard(id, userId, name, institution, limit, defaultPaymentAccountId, List.of(rule), CardStatus.ACTIVE, 0L);
     }
 
-    /** Reidrata um cartão persistido, pelas mesmas invariantes. */
     public static CreditCard restore(UUID id, UUID userId, String name, String institution, Money limit,
                                      UUID defaultPaymentAccountId, List<BillingRule> rules, CardStatus status, long version) {
         return new CreditCard(id, userId, name, institution, limit, defaultPaymentAccountId, rules, status, version);
     }
 
-    /** Reidrata com a marca de fechamento confirmado (ADR-014). */
     public static CreditCard restore(UUID id, UUID userId, String name, String institution, Money limit,
                                      UUID defaultPaymentAccountId, List<BillingRule> rules, CardStatus status, long version,
                                      boolean closingDayConfirmed) {
@@ -89,7 +74,6 @@ public final class CreditCard {
         return card;
     }
 
-    /** Marca se o dia de fechamento está confirmado. Não muda o calendário nem as faturas: é só a honestidade do dado. */
     public void markClosingDayConfirmed(boolean confirmed) {
         this.closingDayConfirmed = confirmed;
     }
@@ -102,11 +86,6 @@ public final class CreditCard {
         return new InvoiceCalendar(rules);
     }
 
-    /**
-     * Calcula a mudança de fechamento e/ou vencimento (S-42) sem aplicá-la: a fatura corrente (a que contém
-     * {@code today}) e as fechadas não mudam; a regra nova vale a partir do mês seguinte ao do fechamento da corrente.
-     * O resultado sabe realocar as parcelas e os créditos das faturas {@code FUTURE} ({@link BillingChange}).
-     */
     public BillingChange planBillingChange(int newClosingDay, int newDueDay, LocalDate today) {
         InvoiceCalendar before = calendar();
         YearMonth from = before.periodFor(required(today, "today")).closingMonth().plusMonths(1);
@@ -116,13 +95,6 @@ public final class CreditCard {
         return new BillingChange(id, from, before, new InvoiceCalendar(after));
     }
 
-    /**
-     * Aplica uma mudança planejada por {@link #planBillingChange}. Só troca as regras: quem tem as parcelas realoca
-     * (caso de uso via {@code CardBillingChanges}). Sem a realocação, a cadeia de faturas passa a recusar os itens
-     * órfãos com {@code DomainException} em vez de perdê-los em silêncio (C1).
-     *
-     * @throws StaleBillingChangeException se a mudança foi planejada para outro cartão ou sobre regras que já mudaram
-     */
     public void applyBillingChange(BillingChange change) {
         required(change, "change");
         if (!id.equals(change.cardId()) || !change.before().rules().equals(calendar().rules())) {
@@ -132,7 +104,6 @@ public final class CreditCard {
         rules.addAll(change.after().rules());
     }
 
-    /** Planeja e aplica a mudança de dias (S-42); devolve a mudança para a realocação das parcelas. */
     public BillingChange changeBillingDays(int newClosingDay, int newDueDay, LocalDate today) {
         BillingChange change = planBillingChange(newClosingDay, newDueDay, today);
         applyBillingChange(change);
@@ -156,7 +127,6 @@ public final class CreditCard {
         this.status = CardStatus.ARCHIVED;
     }
 
-    /** Reativa um cartão arquivado (simetria com a conta, S-120). */
     public void unarchive() {
         if (status != CardStatus.ARCHIVED) {
             throw new CardNotArchivedException();
@@ -196,7 +166,6 @@ public final class CreditCard {
         return institution;
     }
 
-    /** O limite; {@code null} = ainda não definido (ADR-014). */
     public Money limit() {
         return limit;
     }
@@ -209,12 +178,10 @@ public final class CreditCard {
         return defaultPaymentAccountId;
     }
 
-    /** Dia de fechamento da regra mais recente. */
     public int closingDay() {
         return rules.getLast().closingDay().day();
     }
 
-    /** Dia de vencimento da regra mais recente. */
     public int dueDay() {
         return rules.getLast().dueDay().day();
     }
@@ -266,7 +233,7 @@ public final class CreditCard {
 
     private static Money requireLimit(Money limit) {
         if (limit == null) {
-            return null; // limite ainda não definido (ADR-014): o cartão funciona sem limite; disponível e uso ficam nulos
+            return null;
         }
         if (!limit.isPositive() || !CurrencyCode.BRL.equals(limit.currency())) {
             throw new InvalidCardLimitException();

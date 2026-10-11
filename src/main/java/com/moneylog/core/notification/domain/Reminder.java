@@ -11,9 +11,6 @@ import com.moneylog.core.notification.exception.NotificationExceptions.ReminderA
 import com.moneylog.core.sk.text.PlainText;
 import com.moneylog.core.sk.time.FinancialDates;
 
-/**
- * Lembrete manual (S-177): título, data e hora opcional, nota, vínculo opcional a uma entidade. Concluído não gera notificação. Adiar muda só a data.
- */
 public final class Reminder {
 
     public static final int TITLE_MAX = 120;
@@ -59,7 +56,6 @@ public final class Reminder {
         doneAt = now;
     }
 
-    /** Adia para outra data (a hora, se houver, se mantém). */
     public void snooze(LocalDate newDate) {
         ensureOpen();
         FinancialDates.requireInWindow(newDate, "remindOn");

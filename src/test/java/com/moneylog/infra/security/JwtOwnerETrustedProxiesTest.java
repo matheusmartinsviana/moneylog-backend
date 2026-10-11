@@ -17,7 +17,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
 
-/** B6 (dono do token existe) e B11 (proxies de confiança vazios em produção). */
 @DisplayName("Validador do dono do JWT (B6) e guarda de proxies (B11)")
 class JwtOwnerETrustedProxiesTest {
 

@@ -42,7 +42,6 @@ import com.moneylog.infra.recurrence.persistence.RecurrenceRepositoryJpa;
 import com.moneylog.infra.recurrence.persistence.RecurrenceSkipRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/** Ligação da feature recorrência (Etapa 4, T79 e T80): gateway JPA, CRUD, ocorrências, realizar (conta e cartão) e pular. */
 @Configuration(proxyBeanMethods = false)
 public class RecurrenceConfig {
 

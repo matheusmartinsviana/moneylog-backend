@@ -13,7 +13,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryMonths;
 
-/** Resumo mensal (PR 00 §32, S-151, S-154): {@code GET /v1/summaries/{yyyy-MM}}. Tudo calculado no backend. */
 @RestController
 @RequestMapping("/v1/summaries")
 public class SummaryController {
@@ -31,7 +30,6 @@ public class SummaryController {
         return MonthlySummaryResponse.of(summary.handle(new GetMonthlySummaryQuery(userId, parse(month))));
     }
 
-    /** {@code AAAA-MM} dentro da janela financeira (2000 a 2100); qualquer outra coisa é {@code 400 SUMMARY_MONTH_INVALID}. */
     static Competence parse(String month) {
         return QueryMonths.parse(month, SUMMARY_MONTH_INVALID, "month");
     }

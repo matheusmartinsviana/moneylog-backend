@@ -27,10 +27,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-/**
- * Criptografia do Web Push só com a JDK (sem biblioteca de terceiros): mensagem {@code aes128gcm} (RFC 8291 / RFC 8188) e JWT VAPID {@code ES256}
- * (RFC 8292). Preparado e <b>não exercitado em dispositivo</b>: a cifra é testada por ida e volta com a chave do receptor.
- */
 final class WebPushCrypto {
 
     static final int RECORD_SIZE = 4096;
@@ -84,7 +80,6 @@ final class WebPushCrypto {
         System.arraycopy(raw, start, target, offset + 32 - length, length);
     }
 
-    /** Corpo {@code aes128gcm}: {@code salt(16) | rs(4) | idlen(1) | keyid(65) | texto cifrado}, um único registro. */
     static byte[] encrypt(byte[] payload, byte[] receiverPublic, byte[] authSecret) throws GeneralSecurityException {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(new ECGenParameterSpec("secp256r1"), RANDOM);
@@ -95,7 +90,6 @@ final class WebPushCrypto {
         return encrypt(payload, receiverPublic, authSecret, sender.getPrivate(), senderPublic, salt);
     }
 
-    /** Versão determinística (chaves e sal dados): usada pelo teste com o vetor da RFC 8291 §5. */
     static byte[] encrypt(byte[] payload, byte[] receiverPublic, byte[] authSecret, PrivateKey senderPrivate, byte[] senderPublic, byte[] salt)
             throws GeneralSecurityException {
         byte[] secret = ecdh(senderPrivate, publicKey(receiverPublic));
@@ -114,7 +108,6 @@ final class WebPushCrypto {
         return concat(header.array(), cipherText);
     }
 
-    /** Inverso, para o teste: decifra um corpo {@code aes128gcm} com a chave do receptor. */
     static byte[] decrypt(byte[] body, PrivateKey receiverPrivate, byte[] receiverPublic, byte[] authSecret) throws GeneralSecurityException {
         byte[] salt = Arrays.copyOfRange(body, 0, 16);
         int idLength = body[20] & 0xFF;
@@ -133,10 +126,9 @@ final class WebPushCrypto {
         while (end >= 0 && padded[end] == 0) {
             end--;
         }
-        return Arrays.copyOf(padded, end); // descarta o delimitador 0x02
+        return Arrays.copyOf(padded, end);
     }
 
-    /** JWT VAPID: {@code aud} = origem do endpoint, {@code exp} em segundos epoch, {@code sub} = mailto:/https: de contato. */
     static String vapidJwt(String audience, long expiresAtEpochSeconds, String subject, PrivateKey vapidPrivate) throws GeneralSecurityException {
         String header = encode("{\"typ\":\"JWT\",\"alg\":\"ES256\"}".getBytes(StandardCharsets.UTF_8));
         String claims = encode(("{\"aud\":\"" + escape(audience) + "\",\"exp\":" + expiresAtEpochSeconds + ",\"sub\":\"" + escape(subject) + "\"}")

@@ -21,7 +21,6 @@ public final class ImportTestFactory {
     private ImportTestFactory() {
     }
 
-    /** Café de 8,50 no Nubank em 10/10/2026. */
     public static ImportLine umaLinhaDeCafe() {
         return ImportLine.of(NUBANK_ID, DATE, Money.of("8.50"), ImportDirection.OUT, "Padaria Pão & Café");
     }

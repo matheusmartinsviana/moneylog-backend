@@ -23,11 +23,6 @@ import com.moneylog.core.card.domain.InvoiceIds;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T58: mudança de fechamento/vencimento ({@code PUT /v1/cards/{id}} com {@code confirmedEffectiveFrom}) e a prévia
- * ({@code GET /v1/cards/{id}/billing-change-preview}). Cenário: Roxinho (fecha 25, vence 5) e o Notebook de 1.200,00 em 6x em
- * 10/10 (faturas 25/10 a 25/03); relógio 10/10. Toda requisição e resposta validada contra o contrato.
- */
 @DisplayName("Mudança de fechamento e vencimento do cartão (T58)")
 class CardBillingChangeIT extends CardItBase {
 
@@ -47,7 +42,6 @@ class CardBillingChangeIT extends CardItBase {
         return mockMvc.perform(put("/v1/cards/" + card, putBody(closing, due, confirmed, version)));
     }
 
-    /** Pré-visualiza e aplica a mudança com a confirmação da prévia. */
     private JsonNode confirmedChange(int closing, int due, int version) throws Exception {
         String confirmed = preview(closing, due).get("effectiveFromClosingDate").asString();
         return body(change(closing, due, confirmed, version).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn());
@@ -73,8 +67,6 @@ class CardBillingChangeIT extends CardItBase {
         }
         return node;
     }
-
-    // ---------------------------------------------------------------- CA1
 
     @Test
     @DisplayName("CA1: fechamento 25 e vencimento 5 → 28: a corrente vence 05/11 como antes, a seguinte fecha 25/11 e vence 28/11 (ref. 2026-11), as parcelas ficam nos mesmos ciclos e o consumo por competência não muda; as colunas das linhas acompanham o calendário")
@@ -115,7 +107,6 @@ class CardBillingChangeIT extends CardItBase {
         assertThat(jdbc.queryForObject("SELECT version FROM transactions WHERE id = ?", Long.class, UUID.fromString(notebookId))).isZero();
     }
 
-    /** CA7b: nenhuma coluna de data de linha diverge do calendário (a API calcula o calendário do cartão). */
     private void assertRowsMatchTheCalendar() throws Exception {
         for (Map<String, Object> row : rows()) {
             JsonNode api = okBody(get("/v1/invoices/" + row.get("id")));
@@ -126,8 +117,6 @@ class CardBillingChangeIT extends CardItBase {
             assertThat(row.get("id").toString()).isEqualTo(InvoiceIds.of(UUID.fromString(card), LocalDate.parse(row.get("closing_date").toString())).toString());
         }
     }
-
-    // ---------------------------------------------------------------- CA2
 
     @Test
     @DisplayName("CA2: fechamento 25 → 10 com a corrente fechando 25/10: a primeira fatura nova fecha 10/11; a fatura de 25/10 não muda; as parcelas 2..6 vão para 10/11..10/03; as linhas FUTURE velhas sem referência são removidas; o consumo não muda")
@@ -159,13 +148,10 @@ class CardBillingChangeIT extends CardItBase {
         for (JsonNode listed : okBody(get("/v1/cards/" + card + "/invoices?pageSize=50")).get("items")) {
             okBody(get("/v1/invoices/" + listed.get("id").asString()));
         }
-        // ainda dá para comprar e pagar com o calendário novo
         created(purchase("100.00", 2, "2026-10-12", "Livro"));
         advanceTo(OCT_30);
         assertThat(paid(NOV_CLOSING, "300.00", "2026-10-30").get("status").asString()).isEqualTo("OPEN".equals("") ? "" : "PAID");
     }
-
-    // ---------------------------------------------------------------- CA3
 
     @Test
     @DisplayName("CA3: a prévia com fechamento 10 devolve firstNewInvoice (fecha 10/11, vence 05/12), 5 parcelas movidas e FROM_NEXT_INVOICE, sem gravar nada")
@@ -190,7 +176,6 @@ class CardBillingChangeIT extends CardItBase {
                 .isEqualTo(installmentRowsBefore);
         assertThat(cardNow().get("version").asInt()).isZero();
         assertThat(cardNow().get("closingDay").asInt()).isEqualTo(25);
-        // a mesma data da prévia com os mesmos dias: nada move
         assertThat(preview(25, 5).get("movedInstallments").asInt()).isZero();
     }
 
@@ -213,8 +198,6 @@ class CardBillingChangeIT extends CardItBase {
         assertRowsMatchTheCalendar();
     }
 
-    // ---------------------------------------------------------------- CA4
-
     @Test
     @DisplayName("CA4: a prévia de 10/10 (25/11) fica velha na virada do dia (em 30/10 a primeira fatura afetada é 25/12): 409 CARD_BILLING_CHANGE_STALE e nada muda; com a prévia nova, aplica; sem confirmedEffectiveFrom, 422")
     void deveDetectarPreviaVelha() throws Exception {
@@ -235,12 +218,9 @@ class CardBillingChangeIT extends CardItBase {
         String fresh = preview(10, 5).get("effectiveFromClosingDate").asString();
         assertThat(fresh).isEqualTo("2026-12-25");
         change(10, 5, fresh, 0).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.closingDay").value(10));
-        // as faturas até 25/11 (a corrente em 30/10) não mudaram; as parcelas seguintes seguem o calendário novo
         assertThat(closings()).containsExactly("2026-10-25", "2026-11-25", "2026-12-10", "2027-01-10", "2027-02-10", "2027-03-10");
         assertRowsMatchTheCalendar();
     }
-
-    // ---------------------------------------------------------------- CA5
 
     @Test
     @DisplayName("CA5: falha no meio da realocação (gatilho que recusa o UPDATE das parcelas): 500, rollback total (cartão, regras, parcelas e linhas iguais ao antes, nenhuma linha órfã); sem o gatilho, a mesma chamada funciona")
@@ -272,8 +252,6 @@ class CardBillingChangeIT extends CardItBase {
         assertThat(jdbc.queryForObject("SELECT version FROM transactions WHERE id = ?", Long.class, UUID.fromString(notebookId))).isZero();
         change(10, 5, confirmed, 0).andExpect(status().isOk()).andExpect(jsonPath("$.closingDay").value(10));
     }
-
-    // ---------------------------------------------------------------- CA6
 
     @Test
     @DisplayName("CA6: dois PUT simultâneos com a mesma versão: um vence (200) e o outro é 409 VERSION_CONFLICT; o estado final é o de uma só mudança")
@@ -333,8 +311,6 @@ class CardBillingChangeIT extends CardItBase {
         }
     }
 
-    // ---------------------------------------------------------------- CA7
-
     @Test
     @DisplayName("CA7: itens de compra estornada e de parcelas canceladas também são realocados e mantêm a linha; só a linha FUTURE sem nenhuma referência é removida; o invariante do cartão vale antes e depois")
     void deveRealocarTambemOsItensInativos() throws Exception {
@@ -356,7 +332,6 @@ class CardBillingChangeIT extends CardItBase {
         assertThat(money(after, "committedFuture")).isEqualTo(money(before, "committedFuture"));
         assertThat(money(after.get("currentInvoice"), "total")).isEqualTo(money(before.get("currentInvoice"), "total"));
         assertThat(consumptionByCompetence()).isEqualTo(consumptionBefore);
-        // o pagamento segue na fatura de 25/10; as parcelas inativas foram junto e mantêm uma linha existente no calendário novo
         assertThat(invoice(NOV_CLOSING).get("payments")).hasSize(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transaction_installments i JOIN credit_card_invoices v ON v.id = i.invoice_id WHERE i.user_id = ? "
                 + "AND v.closing_date NOT IN (SELECT closing_date FROM credit_card_invoices WHERE card_id = ?)", Long.class, userId, UUID.fromString(card))).isZero();
@@ -365,8 +340,6 @@ class CardBillingChangeIT extends CardItBase {
         assertRowsMatchTheCalendar();
         assertThat(okBody(get("/v1/transactions/" + voided)).get("status").asString()).isEqualTo("VOIDED");
     }
-
-    // ---------------------------------------------------------------- CA8
 
     @Test
     @DisplayName("CA8: vencimento igual ao fechamento (25/25) e fechamento 31 em meses curtos são resolvidos pelo domínio (200); dia 0 ou 32 é 422 CARD_INVALID_BILLING_DAY, também com a confirmação ausente e na prévia")

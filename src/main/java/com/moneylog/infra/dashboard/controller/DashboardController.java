@@ -17,7 +17,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.web.QueryDates;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Início: resumo e compromissos futuros (D2 §4.4, T29). Tudo calculado no backend. */
 @RestController
 @RequestMapping("/v1/dashboard")
 public class DashboardController {
@@ -44,7 +43,6 @@ public class DashboardController {
                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         QueryDates.inWindow(from, "from");
         QueryDates.inWindow(to, "to");
-        // "from" padrão = hoje; "to" antes de hoje (ou antes de "from") é faixa invertida, 400 e não 500; a janela é de até 3 anos
         LocalDate effectiveFrom = from == null ? time.today() : from;
         QueryDates.range(effectiveFrom, to == null ? effectiveFrom : to);
         return UpcomingResponse.of(upcoming.handle(new GetUpcomingQuery(userId, from, to)));

@@ -37,10 +37,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T51: cartões (criar, consultar, editar detalhes, arquivar, desarquivar, listar), regras de fechamento gravadas junto e
- * isolamento por usuário. "Hoje" é 10/10/2026 (relógio fixo). Cada teste usa um usuário novo.
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Cartões (T51)")
@@ -109,8 +105,6 @@ class CardsIT {
                 .andExpect(status().isCreated()).andReturn()).get("id").asString();
     }
 
-    // ---------------------------------------------------------------- CA1
-
     @Test
     @DisplayName("CA1: POST cria o Roxinho com os números calculados e uma regra de fechamento (mês da fatura corrente)")
     void deveCriarOCartao() throws Exception {
@@ -144,7 +138,6 @@ class CardsIT {
         assertThat(rules.getFirst()).containsEntry("closing_day", 25).containsEntry("due_day", 5)
                 .containsEntry("user_id", userId);
         assertThat(rules.getFirst().get("effective_from").toString().strip()).isEqualTo("2026-10");
-        // a fatura corrente vazia não tem linha (ADR-006: materialização preguiçosa)
         assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_card_invoices WHERE card_id = ?", Integer.class, id)).isZero();
     }
 
@@ -155,8 +148,6 @@ class CardsIT {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.institution").doesNotExist())
                 .andExpect(jsonPath("$.defaultPaymentAccountId").doesNotExist());
     }
-
-    // ---------------------------------------------------------------- CA2
 
     @Test
     @DisplayName("CA2: dias fora de 1..31, limite zero ou acima do teto, nome vazio ou longo: 422 com o code da regra e nada gravado")
@@ -188,7 +179,6 @@ class CardsIT {
         mockMvc.perform(post("/v1/cards", "{\"limit\":{\"amount\":\"1.00\",\"currency\":\"BRL\"},\"closingDay\":25,\"dueDay\":5}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errors[0].field").value("name"))
                 .andExpect(ContractValidation.responseOnly());
-        // o limite é opcional (2.14.0): sem ele o cartão é criado; sem o dia de fechamento é 400
         mockMvc.perform(post("/v1/cards", "{\"name\":\"X\",\"dueDay\":5}")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
         mockMvc.perform(post("/v1/cards", roxinho(",\"number\":\"4111111111111111\""))).andExpect(status().isBadRequest())
@@ -201,8 +191,6 @@ class CardsIT {
                 .andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_cards WHERE user_id = ?", Integer.class, userId)).isZero();
     }
-
-    // ---------------------------------------------------------------- CA3
 
     @Test
     @DisplayName("CA3: PUT muda nome, instituição, limite e conta padrão (versão +1); versão velha é 409; dias diferentes sem a confirmação da prévia são 422 CARD_BILLING_CHANGE_NOT_CONFIRMED (T58)")
@@ -265,8 +253,6 @@ class CardsIT {
                 .andExpect(jsonPath("$.code").value("ACCOUNT_NOT_FOUND")).andExpect(ContractValidation.conforms());
     }
 
-    // ---------------------------------------------------------------- CA4
-
     @Test
     @DisplayName("CA4: sem saldo, crédito e parcelas arquiva (ARCHIVED) e desarquiva (ACTIVE); arquivar de novo é 422 CARD_ALREADY_ARCHIVED; desarquivar ativo é 422 CARD_NOT_ARCHIVED")
     void deveArquivarEDesarquivar() throws Exception {
@@ -284,8 +270,6 @@ class CardsIT {
                 .andExpect(jsonPath("$.code").value("CARD_NOT_ARCHIVED")).andExpect(ContractValidation.conforms());
         assertThat(jdbc.queryForObject("SELECT status FROM credit_cards WHERE id = ?", String.class, UUID.fromString(id))).isEqualTo("ACTIVE");
     }
-
-    // ---------------------------------------------------------------- CA5
 
     @Test
     @DisplayName("CA5: cartão de outro usuário é 404 CARD_NOT_FOUND em GET, PUT, archive e unarchive; a lista só traz os do usuário e ?status=ARCHIVED filtra")
@@ -339,8 +323,6 @@ class CardsIT {
         assertThat(page2.get("hasNext").asBoolean()).isFalse();
         mockMvc.perform(get("/v1/cards?pageSize=51")).andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
     }
-
-    // ---------------------------------------------------------------- CA6
 
     @Test
     @DisplayName("CA6: credit_cards não tem coluna de número de cartão, CVV, bandeira ou dígitos")

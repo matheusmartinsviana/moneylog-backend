@@ -14,13 +14,11 @@ import com.moneylog.core.debt.domain.Person;
 import com.moneylog.core.debt.domain.PersonBalance;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Monta {@link PersonView}: lê as dívidas das pessoas de uma vez (sem consulta por item) e calcula o saldo de cada uma. */
 public final class PersonViews {
 
     private PersonViews() {
     }
 
-    /** Pessoas com saldo; {@code withDebts} acrescenta o histórico (detalhe). */
     public static List<PersonView> of(DebtGateway debts, UUID userId, List<Versioned<Person>> people, LocalDate today,
                                       boolean withDebts) {
         if (people.isEmpty()) {

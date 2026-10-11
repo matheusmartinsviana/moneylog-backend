@@ -18,17 +18,14 @@ import com.moneylog.core.note.domain.NoteLink;
 import com.moneylog.core.note.domain.NoteLinkType;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Respostas de {@code /v1/notes} e {@code /v1/vault}. O texto da nota sai como veio: JSON escapado, nunca HTML interpretado. */
 public final class NoteResponses {
 
     private NoteResponses() {
     }
 
-    /** Alvo resolvido de um vínculo: id (ou chave do mês), rótulo e estado (estornada, arquivada, cancelada, na lixeira). */
     public record LinkTarget(UUID id, String key, String label, String status) {
     }
 
-    /** {@code NoteLink} do contrato. {@code state} é {@code RESOLVED} ou {@code PENDING}; {@code text} só em wikilink ou vínculo pendente. */
     public record NoteLinkResponse(LinkOrigin origin, NoteLinkType type, String state, String text, String alias, String section, boolean embed,
                                    LinkTarget target) {
         static NoteLinkResponse of(LinkView view) {

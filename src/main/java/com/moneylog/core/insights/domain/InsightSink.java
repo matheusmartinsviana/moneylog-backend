@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.moneylog.core.insights.domain.InsufficientData.Reason;
 
-/** Coletor dos calculadores: o que saiu e o que não saiu por falta de dado. Descartável, uma instância por cálculo. */
 public final class InsightSink {
 
     private final List<Insight> insights = new ArrayList<>();

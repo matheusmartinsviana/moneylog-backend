@@ -23,7 +23,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IncomeCompetenceInvalidException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionStateInconsistentException;
 
-/** ADR-017: a receita pode pertencer a outro mês; só a competência do livro INCOME muda, nunca a data nem o caixa. */
 @DisplayName("Competência de renda na receita (ADR-017)")
 class IncomeCompetenceDomainTest {
 
@@ -51,7 +50,6 @@ class IncomeCompetenceDomainTest {
         assertThat(of(t, BookType.INCOME).effectiveDate()).isEqualTo(ADIANTAMENTO);
         assertThat(of(t, BookType.ACCOUNT).effectiveDate()).isEqualTo(ADIANTAMENTO);
         assertThat(of(t, BookType.ACCOUNT).competence()).isEqualTo(Competence.of(2026, 9));
-        // o razão continua fechando em zero e o valor é o mesmo
         assertThat(Money.sum(t.postings().stream().map(Posting::amount).toList(), t.amount().currency())).isEqualTo(Money.of("0.00"));
         assertThat(of(t, BookType.ACCOUNT).amount()).isEqualTo(Money.of("1500.00"));
     }
@@ -111,7 +109,6 @@ class IncomeCompetenceDomainTest {
             TransactionState comCompetencia = withIncomeCompetence(t.state(), Competence.of(2026, 10));
             assertThatThrownBy(() -> Transaction.restore(comCompetencia, t.entries())).isInstanceOf(TransactionStateInconsistentException.class);
         }
-        // lançamentos de despesa/conta com competência de outro mês nem chegam a existir
         assertThatThrownBy(() -> despesa.postings().getFirst().inCompetence(Competence.of(2030, 1)))
                 .isInstanceOf(com.moneylog.core.sk.ledger.LedgerExceptions.InvalidPostingException.class);
     }

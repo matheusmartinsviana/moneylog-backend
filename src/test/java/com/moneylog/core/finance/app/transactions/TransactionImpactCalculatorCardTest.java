@@ -15,7 +15,6 @@ import com.moneylog.core.finance.util.FinanceScenarioFactory;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/** O impacto da compra parcelada: patrimônio só até hoje (S-8) e o compromisso que a compra cria (D1 §2.8). */
 @DisplayName("TransactionImpactCalculator com cartão (T53)")
 class TransactionImpactCalculatorCardTest {
 

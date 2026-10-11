@@ -21,7 +21,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.infra.commitment.gateways.CommitmentGatewayImpl;
 
-/** Montagem dos compromissos acompanhados (ADR-014): o core não conhece Spring. */
 @Configuration
 class CommitmentConfig {
 

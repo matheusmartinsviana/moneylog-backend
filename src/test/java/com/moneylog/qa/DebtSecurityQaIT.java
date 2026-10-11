@@ -29,11 +29,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T82 (QA), critério 4: segurança das rotas da Etapa 4 (pessoas, dívidas, recorrências, ocorrências, realize, skip e os tipos
- * novos de movimentação). Isolamento entre usuários, sem token, Origin hostil, campos desconhecidos, inteiros em texto ou
- * fracionários, idempotência, caracteres de controle e datas fora da janela.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: segurança da Etapa 4")
@@ -236,7 +231,6 @@ class DebtSecurityQaIT {
                 }
             }
         }
-        // recorrência: o corpo de criação rejeita campos que não são do contrato
         for (String extra : List.of("\"id\":\"" + UUID.randomUUID() + "\"", "\"active\":false", "\"version\":3", "\"nextOccurrence\":\"2026-10-10\"", "\"monthlyEstimate\":\"1.00\"", "\"installments\":3")) {
             Res r = a.raw(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", "10.00", "x", a.food, DebtQa.accountTarget(a, "EXPENSE"), "MONTHLY", "2026-10-10", extra), null);
             if (r.status() != 400) {
@@ -277,7 +271,6 @@ class DebtSecurityQaIT {
                 }
             }
         }
-        // valores monetários hostis em todos os campos novos
         for (String v : List.of("\"1e3\"", "\"-5.00\"", "\"0.00\"", "\"10.001\"", "\" \"", "\"1,00\"", "\"\"", "null", "\"NaN\"", "10", "\"٣.٠٠\"", "\"1000000000.00\"", "\"99999999999999999999.00\"")) {
             List<Res> rs = List.of(
                     a.raw(HttpMethod.POST, "/v1/debts", "{\"personId\":\"" + aPerson + "\",\"direction\":\"PAYABLE\",\"principal\":" + v + ",\"date\":\"2026-10-10\",\"description\":\"x\"}", null),
@@ -312,19 +305,16 @@ class DebtSecurityQaIT {
         assertThat(a.call(HttpMethod.POST, url, "{\"amount\":\"130.00\"}", key).code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(a.call(HttpMethod.POST, "/v1/recurrences/" + aRec + "/occurrences/2026-11-10/realize", "{}", key).code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
         assertThat(a.count("transactions")).as("empréstimo + 1 realização").isEqualTo(2L);
-        // a mesma chave no POST /v1/transactions de outro tipo/corpo é reuso
         String loanKey = UUID.randomUUID().toString();
         Res l1 = CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", DebtQa.loanBody(a, "10.00", "2026-10-10", aPerson, null), loanKey));
         Res l2 = CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", DebtQa.loanBody(a, "10.00", "2026-10-10", aPerson, null), loanKey));
         assertThat(l2.node().get("id").asString()).isEqualTo(l1.node().get("id").asString());
         assertThat(a.call(HttpMethod.POST, "/v1/transactions", DebtQa.loanBody(a, "10.01", "2026-10-10", aPerson, null), loanKey).code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
-        // a mesma divisão com partes em outra ordem/valor é outro corpo
         String shareKey = UUID.randomUUID().toString();
         String s1 = DebtQa.sharedExpenseBody(a, "100.00", "2026-10-10", List.of(DebtQa.shareJson("10.00", aPerson)));
         String s2 = DebtQa.sharedExpenseBody(a, "100.00", "2026-10-10", List.of(DebtQa.shareJson("10.01", aPerson)));
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", s1, shareKey));
         assertThat(a.call(HttpMethod.POST, "/v1/transactions", s2, shareKey).code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
-        // usuário B com a mesma chave: independente (outra ocorrência dele)
         String bRec = CardQaWorld.ok(b.call(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", "119.00", "Internet", b.food,
                 DebtQa.accountTarget(b, "EXPENSE"), "MONTHLY", "2026-10-10", null), null)).node().get("id").asString();
         Res other = b.call(HttpMethod.POST, "/v1/recurrences/" + bRec + "/occurrences/2026-10-10/realize", "{}", key);

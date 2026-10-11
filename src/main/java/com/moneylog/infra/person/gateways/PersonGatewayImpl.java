@@ -79,7 +79,6 @@ public class PersonGatewayImpl implements PersonGateway {
             return Slice.fromOverfetch(repository.findPage(userId, archived, OffsetLimit.of(page)).stream()
                     .map(PersonRepositoryMapper::toVersioned).toList(), page);
         }
-        // a busca ignora caixa e acentos: a lista de pessoas é curta, então o filtro é feito aqui (sem extensão do banco)
         List<Versioned<Person>> matches = repository.findPage(userId, archived, org.springframework.data.domain.Pageable.unpaged())
                 .stream().filter(e -> fold(e.getName()).contains(needle)).map(PersonRepositoryMapper::toVersioned).toList();
         int from = (int) Math.min(page.offset(), matches.size());
@@ -87,7 +86,6 @@ public class PersonGatewayImpl implements PersonGateway {
         return Slice.fromOverfetch(matches.subList(from, to), page);
     }
 
-    /** Minúsculas e sem acentos. */
     static String fold(String text) {
         return Normalizer.normalize(text.strip().toLowerCase(Locale.ROOT), Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
     }

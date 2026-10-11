@@ -19,7 +19,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Adaptador em memória da porta {@link PersonGateway}, só para teste: guarda a pessoa e a versão, como a persistência faria. */
 public class InMemoryPersonGateway implements PersonGateway {
 
     private final Map<UUID, Person> people = new HashMap<>();

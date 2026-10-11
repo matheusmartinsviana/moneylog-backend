@@ -15,9 +15,6 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 
-/**
- * Regras de arquitetura do backend (D2 §3.2). O core é Java puro e não conhece a infra.
- */
 @AnalyzeClasses(packages = "com.moneylog", importOptions = ImportOption.DoNotIncludeTests.class)
 class ArchitectureTest {
 
@@ -36,10 +33,6 @@ class ArchitectureTest {
                     "lombok..")
             .because("o core é Java puro (BE 01, D2 §3.2)");
 
-    /**
-     * Exceção declarada ao "core sem biblioteca de terceiros" (ADR-009 §7, S-280): o frontmatter das notas é YAML e o SnakeYAML (versão da BOM
-     * do Spring Boot) só pode ser usado por {@code Frontmatter}, com {@code SafeConstructor} e limites. Nada mais do core o enxerga.
-     */
     @ArchTest
     static final ArchRule yamlSoNoFrontmatterDasNotas = noClasses()
             .that().resideInAPackage(CORE)
@@ -56,12 +49,6 @@ class ArchitectureTest {
             .should().dependOnClassesThat().resideInAPackage("org.yaml..")
             .because("só Frontmatter fala com o SnakeYAML (ADR-009 §7)");
 
-    /**
-     * Exceção declarada (ADR-009 §7, S-280): as notas reaproveitam o mecanismo da {@code Idempotency-Key} das criações ({@code IdempotentClaim} e
-     * {@code IdempotencyGateway}), que mora em {@code core.transaction} porque nasceu lá e depende de uma exceção da própria feature. Mover
-     * para {@code core.sk} arrastaria {@code TransactionExceptions}; por ora é a única dependência permitida de {@code core.note} em
-     * {@code core.transaction}.
-     */
     @ArchTest
     static final ArchRule notasSoUsamAIdempotenciaDeTransaction = noClasses()
             .that().resideInAPackage("com.moneylog.core.note..")
@@ -75,7 +62,6 @@ class ArchitectureTest {
             })
             .because("core.note só acopla com core.transaction pela Idempotency-Key (ADR-009 §7)");
 
-    /** ADR-019: insight é cálculo, não IA. O motor, o contexto, o controller e a ligação dos insights não conhecem o pacote {@code ai}; a IA pode ler insights, nunca o contrário. */
     @ArchTest
     static final ArchRule insightsNaoDependemDeIa = noClasses()
             .that().resideInAnyPackage("com.moneylog.core.insights..", "com.moneylog.infra.insights..")

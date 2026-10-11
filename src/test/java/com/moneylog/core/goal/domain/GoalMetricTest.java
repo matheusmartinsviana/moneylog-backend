@@ -44,7 +44,7 @@ class GoalMetricTest {
         assertThat(metric(GoalMetric.AVAILABLE_BALANCE, "500.00", "-200.00", "  ").name()).isNull();
         Goal g = metric(GoalMetric.AVAILABLE_BALANCE, "500.00", "-200.00", null);
         assertThat(g.direction()).isEqualTo(GoalDirection.INCREASE);
-        assertThat(g.metricProgress(Money.of("150.00")).ratio()).isEqualByComparingTo("0.5000"); // (150 + 200) / (500 + 200)
+        assertThat(g.metricProgress(Money.of("150.00")).ratio()).isEqualByComparingTo("0.5000");
         assertThat(g.baselineAt()).isEqualTo(NOW);
     }
 
@@ -55,7 +55,7 @@ class GoalMetricTest {
         assertThat(g.metricProgress(Money.of("5000.00")).ratio()).isEqualByComparingTo("0.0000");
         assertThat(g.metricProgress(Money.of("4000.00")).ratio()).isEqualByComparingTo("0.2500");
         assertThat(g.metricProgress(Money.of("4000.00")).remaining()).isEqualTo(Money.of("3000.00"));
-        assertThat(g.metricProgress(Money.of("7000.00")).ratio()).isEqualByComparingTo("0.0000"); // piorou: nunca negativo
+        assertThat(g.metricProgress(Money.of("7000.00")).ratio()).isEqualByComparingTo("0.0000");
         MetricProgress almost = g.metricProgress(Money.of("1000.01"));
         assertThat(almost.reached()).isFalse();
         assertThat(almost.ratio()).isEqualByComparingTo("0.9999");
@@ -91,7 +91,6 @@ class GoalMetricTest {
             boolean decrease = g.direction() == GoalDirection.DECREASE;
             BigDecimal previous = null;
             for (int step = -3_000_000; step <= 3_000_000; step += 37_000) {
-                // avança sempre na direção da meta: current cresce (INCREASE) ou cai (DECREASE)
                 long value = decrease ? -step : step;
                 MetricProgress p = g.metricProgress(Money.ofCents(value, com.moneylog.core.sk.money.CurrencyCode.BRL));
                 assertThat(p.ratio()).isBetween(BigDecimal.ZERO, BigDecimal.ONE);
@@ -113,7 +112,7 @@ class GoalMetricTest {
         assertThat(g.baseline()).isEqualTo(Money.of("3000.00"));
         assertThat(g.baselineAt()).isEqualTo(NOW.plusSeconds(60));
         assertThat(g.direction()).isEqualTo(GoalDirection.DECREASE);
-        g.anchorBaseline(Money.of("200.00"), NOW.plusSeconds(120)); // dívida já abaixo do alvo: agora é INCREASE
+        g.anchorBaseline(Money.of("200.00"), NOW.plusSeconds(120));
         assertThat(g.direction()).isEqualTo(GoalDirection.INCREASE);
         assertThatThrownBy(() -> g.anchorBaseline(Money.of("1000.00"), NOW)).isInstanceOf(GoalMetricTargetEqualsBaselineException.class);
         assertThat(g.baseline()).isEqualTo(Money.of("200.00"));
@@ -148,7 +147,7 @@ class GoalMetricTest {
     void deveEstimarRitmoMensal() {
         Goal g = Goal.createMetric(GOAL_ID, USER_ID, null, GoalMetric.TOTAL_DEBT, Money.of("0.00"), Money.of("5000.00"), NOW,
                 LocalDate.of(2026, 12, 31), GoalPriority.LOW, null);
-        assertThat(g.metricMonthlyNeeded(g.metricProgress(Money.of("5000.00")), TODAY)).isEqualTo(Money.of("1666.67")); // 5000 / 3 meses
+        assertThat(g.metricMonthlyNeeded(g.metricProgress(Money.of("5000.00")), TODAY)).isEqualTo(Money.of("1666.67"));
         assertThat(g.metricMonthlyNeeded(g.metricProgress(Money.of("0.00")), TODAY).isZero()).isTrue();
         assertThat(g.metricMonthlyNeeded(g.metricProgress(Money.of("5000.00")), LocalDate.of(2027, 1, 1))).isNull();
         assertThat(metric(GoalMetric.TOTAL_DEBT, "0.00", "5000.00", null).metricMonthlyNeeded(g.metricProgress(Money.of("1.00")), TODAY)).isNull();

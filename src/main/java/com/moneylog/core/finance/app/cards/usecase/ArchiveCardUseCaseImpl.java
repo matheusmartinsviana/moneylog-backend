@@ -25,7 +25,6 @@ public class ArchiveCardUseCaseImpl implements ArchiveCardUseCase {
 
     @Override
     public CardDetails handle(ArchiveCardCommand command) {
-        // a cadeia de faturas é do cartão: uma compra ou um pagamento concorrente espera esta trava (ADR-006 §5)
         cards.lockForUpdate(command.userId(), command.cardId());
         Persisted<CreditCard> current = cards.findById(command.userId(), command.cardId())
                 .orElseThrow(() -> new CardNotFoundException(command.cardId()));

@@ -9,7 +9,6 @@ import com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Archive: a pessoa já arquivada/ativa responde {@code PERSON_ALREADY_ARCHIVED}/{@code PERSON_NOT_ARCHIVED} (a regra é do domínio). */
 public class ArchivePersonUseCaseImpl implements ArchivePersonUseCase {
 
     private final PersonGateway people;

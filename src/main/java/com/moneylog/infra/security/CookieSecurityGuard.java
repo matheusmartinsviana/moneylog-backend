@@ -4,11 +4,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.Set;
 
-/**
- * Impede que {@code secure=false} chegue à produção (S-85, plano B). O cookie é sempre {@code Secure}, exceto com o
- * perfil {@code dev} ativo <b>e</b> todas as origens permitidas em {@code localhost}/{@code 127.0.0.1}. Em qualquer
- * outro caso a aplicação não sobe.
- */
 public final class CookieSecurityGuard {
 
     private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "127.0.0.1", "[::1]");

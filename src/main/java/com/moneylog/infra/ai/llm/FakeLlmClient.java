@@ -6,10 +6,6 @@ import java.util.function.Function;
 
 import com.moneylog.core.ai.app.LlmClient;
 
-/**
- * Cliente roteirizado para testes e para {@code AI_PROVIDER=fake} em dev (nunca em produção). Sem script, devolve uma resposta válida que não
- * cita número algum. Guarda tudo que recebeu, para os testes provarem o que "foi enviado".
- */
 public class FakeLlmClient implements LlmClient {
 
     public static final String DEFAULT_REPLY = "{\"text\":\"Resumo do mês gerado pelo modo de teste, sem números.\",\"factRefs\":[],\"caveat\":null}";

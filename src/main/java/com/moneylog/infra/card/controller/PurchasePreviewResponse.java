@@ -5,7 +5,6 @@ import java.util.List;
 import com.moneylog.core.finance.app.cards.PurchasePreviewView;
 import com.moneylog.core.sk.money.Money;
 
-/** Saída da prévia de compra (contrato: {@code PurchasePreview}). */
 public record PurchasePreviewResponse(List<InstallmentResponse> installments, Money total, Money availableLimitAfter, boolean overLimit,
                                       List<String> warnings) {
 

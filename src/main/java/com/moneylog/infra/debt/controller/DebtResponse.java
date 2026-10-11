@@ -12,7 +12,6 @@ import com.moneylog.core.debt.domain.DebtOrigin;
 import com.moneylog.core.debt.domain.DebtStatus;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code Debt} do contrato (D2 §4.6). */
 public record DebtResponse(UUID id, PersonRefResponse person, String creditorName, DebtDirection direction, DebtOrigin origin, UUID originTransactionId,
                            Money principal, Money settled, Money outstanding, DebtStatus status, LocalDate date, LocalDate expectedDate,
                            boolean overdue, String description, CategoryRef category, LocalDate closureDate, String closureReason,

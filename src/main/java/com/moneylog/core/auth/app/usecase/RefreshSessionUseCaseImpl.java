@@ -11,18 +11,6 @@ import com.moneylog.core.auth.domain.RefreshToken;
 import com.moneylog.core.auth.exception.AuthExceptions.RefreshInvalidException;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Refresh rotativo com detecção de reuso (ADR-003, S-83):
- * <ul>
- *   <li>token ativo e ainda não usado: gera o sucessor na mesma família e marca o antigo como substituído;</li>
- *   <li>token já substituído, reapresentado dentro da janela de tolerância: gera outro sucessor na mesma família, sem
- *       revogar nada (duas abas, F5 durante o refresh);</li>
- *   <li>token já substituído, fora da janela: reuso, revoga a família inteira;</li>
- *   <li>token revogado (logout ou reuso), expirado ou desconhecido: recusado, sem tolerância.</li>
- * </ul>
- * A linha do token é travada ({@code FOR UPDATE}), então duas requisições simultâneas com o mesmo cookie se
- * serializam e as duas recebem um par válido.
- */
 public class RefreshSessionUseCaseImpl implements RefreshSessionUseCase {
 
     private final RefreshTokenGateway refreshTokens;

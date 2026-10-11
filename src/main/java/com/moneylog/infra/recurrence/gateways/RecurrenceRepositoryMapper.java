@@ -10,11 +10,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.infra.recurrence.persistence.RecurrenceEntity;
 
-/**
- * {@code RecurringTransaction} ⇄ {@code RecurrenceEntity}. A reidratação usa {@link RecurringTransaction#restore}, que recusa
- * estado gravado corrompido ({@code RECURRENCE_STATE_INCONSISTENT}); as realizadas vêm das movimentações ativas e as puladas, de
- * {@code recurrence_skips}.
- */
 public final class RecurrenceRepositoryMapper {
 
     private RecurrenceRepositoryMapper() {

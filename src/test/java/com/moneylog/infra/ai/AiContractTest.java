@@ -13,7 +13,6 @@ import io.swagger.v3.oas.models.media.Schema;
 
 import com.moneylog.util.ContractValidation;
 
-/** T139 CA2: nenhum campo de chave, segredo ou URL base em qualquer schema de resposta da IA. */
 class AiContractTest {
 
     private static final Set<String> AI_SCHEMAS = Set.of("AiStatus", "AiPreview", "AiAnalysis", "AiAnalysisSummary", "AiResult", "Insight", "AiSettings");

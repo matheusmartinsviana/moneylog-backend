@@ -22,16 +22,11 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Os 9 casos de referência do PR 01 (D1 §3) nas lentes de caixa, consumo/receita e patrimônio, antes e depois de cada
- * movimentação, com os números exatos da tabela. A coluna "Compromisso" é verificada em {@code CompromissosPR01Test}.
- */
 @DisplayName("Integridade financeira: os 9 casos do PR 01 (T8a)")
 class IntegridadeFinanceiraPR01Test {
 
     private static final Competence OUT_26 = Competence.of(2026, 10);
 
-    /** Retrato das três lentes numa data. */
     record Lentes(Money nubank, Money xp, Money xpInvest, Money inAccounts, Money investments,
                   Map<Competence, Money> consumo, Map<Competence, Money> receita, Money patrimonio, Money parcelasFuturas) {
 
@@ -56,7 +51,6 @@ class IntegridadeFinanceiraPR01Test {
         }
     }
 
-    /** Consumo da categoria Alimentação na competência (livro EXPENSE da categoria), a coluna que o PR 01 pede. */
     private static Money alimentacao(FinanceScenarioFactory s, Competence c) {
         return s.records().ledger().sum(e -> e.posting().book().equals(s.alimentacao.book()) && e.posting().competence().equals(c));
     }
@@ -134,7 +128,6 @@ class IntegridadeFinanceiraPR01Test {
         assertThat(depois.nubank().subtract(antes.nubank())).isEqualTo(m("-1283.00"));
         assertSemConsumoNemReceita(antes, depois);
         assertThat(depois.patrimonio()).isEqualTo(antes.patrimonio());
-        // fatura e parcelas PAID depois do pagamento
         assertThat(s.chain().statusOf(LocalDate.of(2026, 10, 25), pagamento)).isEqualTo(com.moneylog.core.card.domain.InvoiceStatus.PAID);
         assertThat(s.chain().invoice(LocalDate.of(2026, 10, 25)).outstanding()).isEqualTo(m("0.00"));
         var parcelasNaFatura = s.chain().invoice(LocalDate.of(2026, 10, 25)).items().stream()

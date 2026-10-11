@@ -24,7 +24,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClockConfig;
 
-/** T43 (QA): entradas extremas nunca devem produzir 500 (o contrato só admite 500 para falha interna real). */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: robustez de entrada")

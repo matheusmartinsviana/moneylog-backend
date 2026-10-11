@@ -18,10 +18,6 @@ import com.moneylog.core.note.exception.NoteExceptions.NoteLinkInvalidException;
 import com.moneylog.core.note.exception.NoteExceptions.NoteLinkLimitReachedException;
 import com.moneylog.core.note.exception.NoteExceptions.NoteLinkTargetNotFoundException;
 
-/**
- * Valida os vínculos explícitos pedidos pela UI (S-160): forma (id ou chave), chave {@code AAAA-MM} e existência do alvo <b>do usuário</b>
- * ({@code 422 NOTE_LINK_TARGET_NOT_FOUND}; nota na lixeira também não é alvo). Estornada, arquivada ou cancelada é alvo válido (S-164).
- */
 public final class ExplicitLinkValidator {
 
     private final NoteTargetGateway targets;

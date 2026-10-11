@@ -45,11 +45,6 @@ import com.moneylog.infra.ai.jobs.PayloadRetentionJob;
 import com.moneylog.infra.ai.llm.AnthropicLlmClient;
 import com.moneylog.infra.ai.llm.FakeLlmClient;
 
-/**
- * Ligação da IA (Etapa 8). {@code AI_PROVIDER=none} (padrão) liga o {@link NoopAIService}: o app inteiro funciona sem chave. {@code anthropic}
- * sem {@code AI_API_KEY}/{@code AI_MODEL} derruba a subida com mensagem que não imprime a chave; {@code fake} em produção também.
- * Os gateways são transacionais por chamada: o caso de uso de envio não segura transação enquanto espera o provedor.
- */
 @Configuration(proxyBeanMethods = false)
 public class AiConfig {
 
@@ -82,8 +77,6 @@ public class AiConfig {
         return new AiServiceImpl(client, mapper, properties.provider(), properties.model(), RETRY_BACKOFF);
     }
 
-    // ---- gateways (uma transação curta por chamada)
-
     @Bean
     AiAnalysisGateway aiAnalysisGateway(JdbcTemplate jdbc, ObjectMapper mapper, PlatformTransactionManager tm) {
         return TransactionalProxies.required(AiAnalysisGateway.class, new AiAnalysisGatewayImpl(jdbc, mapper), tm);
@@ -103,8 +96,6 @@ public class AiConfig {
     AiGuard aiGuard(AiAnalysisGateway analyses, TimeProvider time, AiProperties properties) {
         return new AiGuard(analyses, time, new AiGuard.Limits(properties.dailyCallLimit(), properties.monthlyTokenBudget()));
     }
-
-    // ---- casos de uso
 
     @Bean
     GetInsightsUseCase getInsightsUseCase(FinancialRecordsGateway records, CategoryGateway categories, TimeProvider time, PlatformTransactionManager tm) {
@@ -126,7 +117,6 @@ public class AiConfig {
         return new AiUseCasesImpl.GetAiPreview(previews);
     }
 
-    /** Sem transação própria de propósito: o provedor é chamado fora de qualquer transação (efeito colateral só depois de gravar a reivindicação). */
     @Bean
     RunApprovedAnalysisUseCase runApprovedAnalysisUseCase(AIService ai, AiGuard guard, AiPreviewGateway previews, AiAnalysisGateway analyses,
                                                           IdGenerator ids, TimeProvider time) {

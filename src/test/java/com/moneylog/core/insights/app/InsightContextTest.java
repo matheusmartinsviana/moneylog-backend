@@ -34,10 +34,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * O contexto só <b>classifica</b> as linhas que as calculadoras do razão já devolvem (PR 01 regra 10), em classes disjuntas: nenhum centavo é contado
- * duas vezes. Cenários 100% sintéticos (cenário base de D1 §3, relógio 10/10/2026).
- */
 @DisplayName("InsightContext (T286): classificação disjunta, competência da renda e casos do PR 01")
 class InsightContextTest {
 
@@ -64,8 +60,6 @@ class InsightContextTest {
         return RecurringTransaction.ofAccount(UUID.fromString("00000000-0000-0000-0000-0000000c0c01"), USER_ID, TransactionType.EXPENSE, m(amount),
                 "Aluguel", s.alimentacao.id(), s.nubank.id(), PaymentMethod.PIX, Schedule.of(Frequency.MONTHLY, start));
     }
-
-    // ---------------------------------------------------------------- tabela de referência do PR 01
 
     @Test
     @DisplayName("PR 01: Pix 100 + notebook 1.200 em 6x + pagar fatura + transferência + investimento + empréstimo + devolução: consumo de outubro = 100 + 200")
@@ -117,8 +111,6 @@ class InsightContextTest {
         assertThat(c.lines()).as("uma linha por posting de consumo: pix, 1 parcela, aluguel").hasSize(3);
     }
 
-    // ---------------------------------------------------------------- fixos 1.500 + parcelas 900 / renda 4.000 = 60%
-
     @Test
     @DisplayName("fixos 1.500 (recorrência realizada) + parcelas 900 com renda 4.000: índice 60% ATTENTION, a parcela entra uma vez só")
     void deveCalcularOIndiceSemContarAParcelaDuasVezes() {
@@ -145,7 +137,6 @@ class InsightContextTest {
     void deveSepararRecorrenciaRealizadaDaPendente() {
         FinanceScenarioFactory s = umCenarioBase();
         RecurringTransaction rent = aluguel(s, "700.00", d("2026-10-05"));
-        // a de 05/10 foi realizada (movimentação com origem na recorrência); a de 05/11 ainda é prevista
         s.transactions.add(AccountTransactions.expense(s.header(d("2026-10-05"), "Aluguel").withOrigin(TransactionOrigin.recurrence(rent.id(),
                 d("2026-10-05"))), m("700.00"), s.nubank, s.alimentacao, PaymentMethod.PIX));
         RecurringTransaction pending = aluguel(s, "300.00", d("2026-10-25"));
@@ -155,8 +146,6 @@ class InsightContextTest {
         assertThat(facts.budget().pendingRecurring()).as("só a de 25/10; a de novembro é de outro mês").isEqualTo(m("300.00"));
         assertThat(facts.recurringOut()).as("700 realizada + 300 prevista").isEqualTo(m("1000.00"));
     }
-
-    // ---------------------------------------------------------------- renda por competência (ADR-017)
 
     @Test
     @DisplayName("adiantamento de 16/09 que é renda de outubro: cai na competência de outubro, setembro fica sem renda e o caixa não muda")
@@ -171,7 +160,6 @@ class InsightContextTest {
         assertThat(out.budget().received()).as("recebida até hoje (16/09 e 02/10) por competência de outubro").isEqualTo(m("4000.00"));
         assertThat(set.current().income()).isEqualTo(m("0.00"));
         assertThat(out.cashBalance()).as("o caixa segue a data real: igual com ou sem competência").isEqualTo(context(without).monthFacts(OCT).cashBalance());
-        // sem competência declarada, o adiantamento é renda de setembro
         assertThat(context(without).monthFacts(SEP).current().income()).isEqualTo(m("1500.00"));
         assertThat(context(without).monthFacts(OCT).current().income()).isEqualTo(m("2500.00"));
     }
@@ -195,8 +183,6 @@ class InsightContextTest {
         assertThat(facts.current().income()).as("a competência é de outubro").isEqualTo(m("4000.00"));
         assertThat(facts.budget().received()).as("mas ainda não foi recebida em 10/10").isEqualTo(m("0.00"));
     }
-
-    // ---------------------------------------------------------------- reembolsos e terceiros (ADR-014)
 
     @Test
     @DisplayName("despesa de 100 e reembolso de 100 (terceiro que devolveu): consumo líquido da categoria vira 0 e o mês fecha em 0")
@@ -231,8 +217,6 @@ class InsightContextTest {
         assertThat(sink.insights()).noneMatch(i -> i.type().equals("CATEGORY_DELTA"));
     }
 
-    // ---------------------------------------------------------------- fatura histórica
-
     @Test
     @DisplayName("fatura histórica (só o pagamento de uma fatura passada): sem consumo em nenhum mês")
     void naoDeveContarConsumoDeFaturaHistorica() {
@@ -254,8 +238,6 @@ class InsightContextTest {
         assertThat(context.monthFacts(OCT).installments()).isEqualTo(m("0.00"));
     }
 
-    // ---------------------------------------------------------------- do dia
-
     @Test
     @DisplayName("insumos do dia: parcela não é gasto variável, vencimentos da semana saem da agenda e receber de terceiro não é entrada do fluxo")
     void deveMontarOsInsumosDoDia() {
@@ -276,7 +258,6 @@ class InsightContextTest {
         InsightSink sink = new InsightSink();
         DailyInsights.compute(day, sink);
         Insight budget = sink.insights().stream().filter(i -> i.type().equals("DAILY_BUDGET")).findFirst().orElseThrow();
-        // 4.000 recebidos - 300 consumidos = 3.700 em 22 dias (10 a 31 de outubro) = 168,18
         assertThat(budget.params()).containsEntry("daysLeft", "22").containsEntry("free", "3700.00").containsEntry("amount", "168.18");
     }
 

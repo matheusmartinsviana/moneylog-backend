@@ -17,10 +17,6 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T75: leitura de dívidas (status e saldo derivados das quitações, atraso pelo relógio), carregamento único dos registros
- * (o razão em memória fecha com o SQL dos livros) e o saldo por pessoa.
- */
 @DisplayName("Dívidas: persistência, leitura e carregamento único (T75)")
 class DebtReadsIT extends E4ItBase {
 
@@ -40,7 +36,6 @@ class DebtReadsIT extends E4ItBase {
         assertThat(debt.get("overdue").asBoolean()).isFalse();
         assertThat(debt.get("cancelable").asBoolean()).isTrue();
 
-        // o relógio vira: depois da previsão e com saldo, a dívida está atrasada (derivado, sem job)
         advanceTo(NOV_05.plusSeconds(86_400L * 2));
         assertThat(debt(debtId).get("overdue").asBoolean()).isTrue();
         assertThat(upcoming("from=2026-11-07&to=2026-11-30").get("items").get(0).get("bucket").asString()).isEqualTo("OVERDUE");
@@ -63,7 +58,6 @@ class DebtReadsIT extends E4ItBase {
         assertThat(book("ACCOUNT")).isEqualTo(2_000_000L - 30_000L + 10_000L - 5_000L);
         assertThat(money(netWorth, "accounts")).isEqualTo("19750.00");
         assertThat(ledgerTotal()).isZero();
-        // Σ do patrimônio = contas + recebíveis + passivos = 19.750 + 200 − 150
         assertThat(money(netWorth, "total")).isEqualTo("19800.00");
         assertThat(accountBalance()).isEqualTo("19750.00");
     }
@@ -72,7 +66,6 @@ class DebtReadsIT extends E4ItBase {
     @DisplayName("CA3: estado gravado corrompido (quitações acima do principal) é DEBT_STATE_INCONSISTENT, sem retorno parcial: 500 sem vazar a mensagem")
     void deveRecusarEstadoCorrompido() throws Exception {
         String debtId = loan("300.00", "2026-10-10", joao, null).get("debt").get("id").asString();
-        // duas quitações ativas gravadas por SQL, Σ = 500 > principal 300
         committed(() -> {
             for (int i = 0; i < 2; i++) {
                 jdbc.update("""
@@ -136,7 +129,6 @@ class DebtReadsIT extends E4ItBase {
 
         JsonNode list = okBody(get("/v1/people?q=jo"));
         assertThat(money(list.get("items").get(0), "net")).isEqualTo("110.00");
-        // Maria deve ao usuário nada; o usuário deve 80 à Maria: net negativo e direção PAYABLE
         createdBody(post("/v1/debts", "{\"personId\":\"" + maria + "\",\"direction\":\"PAYABLE\",\"principal\":\"80.00\",\"date\":\"2026-10-10\","
                 + "\"description\":\"Devo\"}"));
         JsonNode mariaView = okBody(get("/v1/people/" + maria));

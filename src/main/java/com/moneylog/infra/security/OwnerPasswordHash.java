@@ -6,9 +6,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
-/**
- * Resolve e valida o hash BCrypt do dono. Nunca imprime o hash (nem o parcial) nas mensagens de erro.
- */
 public final class OwnerPasswordHash {
 
     private static final Pattern BCRYPT = Pattern.compile("^\\$2[aby]\\$(\\d{2})\\$[./A-Za-z0-9]{53}$");
@@ -21,14 +18,12 @@ public final class OwnerPasswordHash {
         this.cost = cost;
     }
 
-    /** Como {@link #resolve}, mas {@code null} quando nenhum hash foi informado (a senha vive só no banco: ADR-015). */
     public static OwnerPasswordHash resolveOptional(String direct, String file) {
         boolean noFile = file == null || file.isBlank();
         boolean noDirect = direct == null || unquote(direct.strip()).isBlank();
         return noFile && noDirect ? null : resolve(direct, file);
     }
 
-    /** O arquivo, se informado, vale mais que o valor direto. */
     public static OwnerPasswordHash resolve(String direct, String file) {
         String raw;
         if (file != null && !file.isBlank()) {
@@ -60,7 +55,6 @@ public final class OwnerPasswordHash {
         return value;
     }
 
-    /** Custo (work factor) do hash do dono; o hash fictício usa o mesmo, para igualar o tempo (S-86). */
     public int cost() {
         return cost;
     }

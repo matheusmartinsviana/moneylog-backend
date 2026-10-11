@@ -17,7 +17,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/** Fatura histórica (ADR-014). Ordem de travas: o cartão (a cadeia de faturas é dele, ADR-006 §5); a cadeia só é lida depois da trava. */
 public class CreateHistoricalInvoiceUseCaseImpl implements CreateHistoricalInvoiceUseCase {
 
     private final CardGateway cards;

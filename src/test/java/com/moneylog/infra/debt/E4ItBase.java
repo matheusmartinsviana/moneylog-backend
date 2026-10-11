@@ -31,11 +31,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * Base dos ITs da Etapa 4 (pessoas, dívidas, divisão de despesa e recorrências). Cenário padrão: Nubank CHECKING 20.000,00,
- * cartão Roxinho (limite 10.000,00, fecha 25, vence 5), categorias Alimentação, Assinaturas, Contas (despesa) e Salário (receita),
- * pessoas João e Maria; relógio 10/10/2026 em {@code America/Sao_Paulo}. Toda requisição e resposta é validada contra o contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 public abstract class E4ItBase {
@@ -87,9 +82,6 @@ public abstract class E4ItBase {
         maria = person("Maria");
     }
 
-    // ---------------------------------------------------------------- relógio e transações
-
-    /** Avança o relógio e renova o token (o JWT expira pelo relógio do contexto). */
     protected void advanceTo(Instant instant) {
         clock.set(instant);
         bearer = auth.bearer(userId);
@@ -98,8 +90,6 @@ public abstract class E4ItBase {
     protected void committed(Runnable work) {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> work.run());
     }
-
-    // ---------------------------------------------------------------- requisições
 
     protected MockHttpServletRequestBuilder get(String url) {
         return MockMvcRequestBuilders.get(url).header(HttpHeaders.AUTHORIZATION, bearer);
@@ -135,7 +125,6 @@ public abstract class E4ItBase {
         return objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
-    /** POST /v1/transactions esperando 201 e contrato conforme. */
     protected JsonNode created(String json) throws Exception {
         return body(createTx(json).andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andReturn());
     }
@@ -148,8 +137,6 @@ public abstract class E4ItBase {
         return body(mockMvc.perform(request).andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andReturn());
     }
 
-    // ---------------------------------------------------------------- cenário
-
     protected String category(String name, CategoryKind kind) {
         Category category = Category.create(UUID.randomUUID(), userId, name, kind);
         committed(() -> SqlFixtures.insertCategory(jdbc, category));
@@ -160,7 +147,6 @@ public abstract class E4ItBase {
         return createdBody(post("/v1/people", "{\"name\":\"" + name + "\"}")).get("id").asString();
     }
 
-    /** {@code POST /v1/transactions} de empréstimo ({@code LOAN_GIVEN}) à pessoa, devolvendo a movimentação. */
     protected JsonNode loan(String amount, String date, String personId, String expectedDate) throws Exception {
         return created("{\"type\":\"LOAN_GIVEN\",\"amount\":\"" + amount + "\",\"date\":\"" + date + "\",\"description\":\"Empréstimo\","
                 + "\"accountId\":\"" + nubank + "\",\"newDebt\":{\"personId\":\"" + personId + "\""
@@ -209,13 +195,11 @@ public abstract class E4ItBase {
         return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE user_id = ?", Long.class, userId);
     }
 
-    /** Σ (centavos) dos lançamentos ativos de um tipo de livro. */
     protected long book(String bookType) {
         return jdbc.queryForObject("SELECT coalesce(sum(amount_cents), 0) FROM ledger_postings WHERE user_id = ? AND book_type = ? AND active",
                 Long.class, userId, bookType);
     }
 
-    /** O razão do usuário fecha em zero (partidas dobradas). */
     protected long ledgerTotal() {
         return jdbc.queryForObject("SELECT coalesce(sum(amount_cents), 0) FROM ledger_postings WHERE user_id = ? AND active", Long.class,
                 userId);

@@ -20,17 +20,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.FinancialDates;
 
-/**
- * Compromisso acompanhado (ADR-014): o que o usuário acompanha sem que seja dívida própria no sentido de {@code Debt}.
- *
- * <ul>
- *   <li>{@link CommitmentKind#TRACKED_THIRD_PARTY}: empréstimo no nome de terceiro. Guarda só o que foi informado (parcelas pagas e
- *       total, valor pago, próximo vencimento). <b>O saldo restante não é calculado</b> (nem por proporção) e fica {@code null}.</li>
- *   <li>{@link CommitmentKind#LONG_TERM_PROJECT}: cronograma próprio. {@code paid} = Σ itens pagos; {@code total} (opcional) tem de ser
- *       exatamente Σ itens; saldo nominal = total − pago; progresso = pago ÷ total (4 casas).</li>
- * </ul>
- * Não há postings: nada aqui mexe em caixa, consumo, receita ou patrimônio, então não existe caminho para dupla contagem.
- */
 public final class TrackedCommitment {
 
     public static final int NAME_MAX_LENGTH = 100;
@@ -123,14 +112,12 @@ public final class TrackedCommitment {
         }
     }
 
-    /** Projeto de longo prazo com cronograma. {@code total} (opcional) tem de fechar com Σ do cronograma. */
     public static TrackedCommitment longTermProject(UUID id, UUID userId, String name, String counterparty, String notes, Money total,
                                                     List<ScheduleItem> schedule) {
         return new TrackedCommitment(id, userId, CommitmentKind.LONG_TERM_PROJECT, name, counterparty, notes, total, null, null, null,
                 null, schedule);
     }
 
-    /** Empréstimo no nome de terceiro: o saldo exato não é conhecido e <b>não é calculado</b>. */
     public static TrackedCommitment trackedThirdParty(UUID id, UUID userId, String name, String counterparty, String notes,
                                                       int installmentsTotal, int installmentsPaid, Money paidAmount,
                                                       LocalDate nextDueDate) {
@@ -138,7 +125,6 @@ public final class TrackedCommitment {
                 installmentsTotal, installmentsPaid, nextDueDate, List.of());
     }
 
-    /** Reidratação (o mesmo construtor valida). */
     public static TrackedCommitment restore(UUID id, UUID userId, CommitmentKind kind, String name, String counterparty, String notes,
                                             Money total, Money informedPaid, Integer installmentsTotal, Integer installmentsPaid,
                                             LocalDate nextDueDate, List<ScheduleItem> schedule) {
@@ -146,7 +132,6 @@ public final class TrackedCommitment {
                 installmentsPaid, nextDueDate, schedule);
     }
 
-    /** Marca um item do cronograma como pago em {@code paidOn} (só o registro de acompanhamento: nenhuma conta é movimentada). */
     public void markItemPaid(int position, LocalDate paidOn) {
         FinancialDates.requireInWindow(paidOn, "paidOn");
         if (kind != CommitmentKind.LONG_TERM_PROJECT) {
@@ -160,12 +145,10 @@ public final class TrackedCommitment {
         schedule.set(position - 1, item.markPaid(paidOn));
     }
 
-    /** Atualiza o que o usuário informou do empréstimo de terceiro (parcelas pagas, valor pago, próximo vencimento, observações). */
     public void updateProgress(int newInstallmentsPaid, Money newPaidAmount, LocalDate newNextDueDate, String newNotes) {
         updateProgress(newInstallmentsPaid, newPaidAmount, newNextDueDate, newNotes, null, null);
     }
 
-    /** Como {@link #updateProgress(int, Money, LocalDate, String)}; {@code newName} e {@code newCounterparty} nulos não mudam (corrigir a titularidade, por exemplo). */
     public void updateProgress(int newInstallmentsPaid, Money newPaidAmount, LocalDate newNextDueDate, String newNotes, String newName,
                                String newCounterparty) {
         if (newName != null && (newName.isBlank() || newName.strip().length() > NAME_MAX_LENGTH)
@@ -197,9 +180,6 @@ public final class TrackedCommitment {
         this.notes = newNotes;
     }
 
-    // ------------------------------------------------------------------ derivados (só leitura)
-
-    /** Pago: Σ itens pagos (projeto) ou o valor informado (terceiro; {@code null} se não informado). */
     public Money paid() {
         if (kind == CommitmentKind.LONG_TERM_PROJECT) {
             return Money.sum(schedule.stream().filter(ScheduleItem::isPaid).map(ScheduleItem::amount).toList(), CurrencyCode.BRL);
@@ -207,7 +187,6 @@ public final class TrackedCommitment {
         return informedPaid;
     }
 
-    /** Total do contrato = Σ do cronograma (projeto); {@code null} no compromisso de terceiro (nunca inventado). */
     public Money nominalTotal() {
         if (kind != CommitmentKind.LONG_TERM_PROJECT) {
             return null;
@@ -215,13 +194,11 @@ public final class TrackedCommitment {
         return Money.sum(schedule.stream().map(ScheduleItem::amount).toList(), CurrencyCode.BRL);
     }
 
-    /** Saldo nominal = total − pago (projeto); {@code null} no compromisso de terceiro: o saldo exato não é conhecido nem estimado. */
     public Money nominalBalance() {
         Money t = nominalTotal();
         return t == null ? null : t.subtract(paid());
     }
 
-    /** Progresso pago ÷ total, 4 casas (projeto); {@code null} sem total conhecido. */
     public BigDecimal progress() {
         Money t = nominalTotal();
         if (t == null) {
@@ -230,30 +207,25 @@ public final class TrackedCommitment {
         return BigDecimal.valueOf(paid().cents()).divide(BigDecimal.valueOf(t.cents()), 4, RoundingMode.HALF_EVEN);
     }
 
-    /** Pendente que o usuário paga direto (sem o financiamento) — o que o cronograma de caixa mostra. */
     public Money directPending() {
         return Money.sum(schedule.stream().filter(i -> !i.isPaid() && i.type() != ScheduleItemType.FINANCING).map(ScheduleItem::amount)
                 .toList(), CurrencyCode.BRL);
     }
 
-    /** Pendente de financiamento/FGTS: parte do saldo nominal que não é despesa nem dinheiro recebido. */
     public Money financingPending() {
         return Money.sum(schedule.stream().filter(i -> !i.isPaid() && i.type() == ScheduleItemType.FINANCING).map(ScheduleItem::amount)
                 .toList(), CurrencyCode.BRL);
     }
 
-    /** Próximo item pendente com data (o mais cedo; o financiamento sem data nunca é "o próximo"). */
     public Optional<ScheduleItem> nextItem() {
         return schedule.stream().filter(i -> !i.isPaid() && i.dueDate() != null && i.type() != ScheduleItemType.FINANCING)
                 .min(java.util.Comparator.comparing(ScheduleItem::dueDate).thenComparing(ScheduleItem::position));
     }
 
-    /** Vencimento do próximo compromisso: o do próximo item (projeto) ou o informado (terceiro). */
     public LocalDate nextDueDate() {
         return kind == CommitmentKind.LONG_TERM_PROJECT ? nextItem().map(ScheduleItem::dueDate).orElse(null) : nextDueDate;
     }
 
-    /** Pendente com data de pagamento direto, por mês de vencimento (o cronograma do projeto na curva de vencimentos). */
     public Map<YearMonth, Money> pendingByMonth() {
         Map<YearMonth, Money> result = new TreeMap<>();
         for (ScheduleItem i : schedule) {

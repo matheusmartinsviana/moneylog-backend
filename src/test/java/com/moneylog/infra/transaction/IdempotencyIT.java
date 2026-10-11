@@ -42,10 +42,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T26b: idempotência real de {@code POST /v1/transactions} (S-72, S-87). Cenário de T26a (Nubank 20.000,00, relógio em
- * 10/10/2026 15:00 UTC), com relógio avançável para a validade de 24 h.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Idempotência da criação de movimentações (T26b)")
@@ -126,7 +122,6 @@ class IdempotencyIT {
         UUID key = UUID.randomUUID();
         JsonNode first = body(create(expense("100.00"), key).andExpect(status().isCreated()).andExpect(ContractValidation.conforms()).andReturn());
 
-        // alguém editou o recurso entre os envios (a edição pela API é T27): o replay traz a versão nova
         committed(() -> jdbc.update("update transactions set description = 'Editada', version = version + 1 where id = ?",
                 UUID.fromString(first.get("id").asString())));
         MvcResult replay = create(expense("100.00"), key).andExpect(status().isCreated()).andExpect(ContractValidation.conforms())

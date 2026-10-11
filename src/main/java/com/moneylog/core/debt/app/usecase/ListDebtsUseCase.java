@@ -9,7 +9,6 @@ import com.moneylog.core.sk.page.Slice;
 
 public interface ListDebtsUseCase {
 
-    /** Ordem {@code date desc, id desc}. {@code status} e {@code overdue} são derivados (S-41, S-145). */
     Slice<DebtView> handle(ListDebtsQuery query);
 
     record ListDebtsQuery(UUID userId, DebtFilter filter, PageQuery page) {

@@ -18,10 +18,6 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T61 (QA), critério 6: V3.01 e V3.02 sobre uma base da Etapa 2 com dados. Só índices: nenhum dado muda, os índices são
- * válidos, parciais como documentado e o planejador os usa nas consultas que justificam cada um.
- */
 @Tag("i")
 @DisplayName("QA T61: migrações V3.01 e V3.02 sobre dados da Etapa 2")
 class CardMigrationQaIT {
@@ -58,7 +54,7 @@ class CardMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(31); // V8.17 (dispensas de insights, ADR-019) + V8.16 (fotos das metas e destaque, ADR-018) + V8.15 (competência de renda, ADR-017) + V8.14 (metas de medida e plano, ADR-016) + V8.13 (fatura histórica) + V8.12 (limite opcional do cartão) +  V8.11 (recebimentos de terceiros) + V8.10 (senha do dono, ADR-015) + V8.09 (fechamento confirmado do cartão) + V8.0x (ADR-015) + V8.05 a V8.08 (ADR-014) + V8.02 a V8.04 (visão de dívidas), V7.00 a V7.03, V8.00 e V8.01 (Etapas 7 e 8) + V3.01 e V3.02 (Etapa 3), V4.00 a V4.02 (Etapa 4), V5.00 (Etapa 5) e V6.00, V6.01, V6.02 (Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(31);
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 
@@ -75,7 +71,6 @@ class CardMigrationQaIT {
             assertThat(jdbc.queryForObject("select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname in "
                     + "('ix_transactions_user_card','ix_installments_user_transaction','ix_ledger_postings_installment','ix_transactions_invoice') and not i.indisvalid", Long.class)).isZero();
 
-            // o planejador usa cada índice na consulta que o justifica (seqscan desligado para o teste não depender do tamanho da tabela)
             jdbc.execute("analyze");
             List<String> plans = new java.util.ArrayList<>();
             jdbc.execute((java.sql.Connection c) -> {
@@ -93,7 +88,6 @@ class CardMigrationQaIT {
             assertThat(plans.get(2)).contains("ix_ledger_postings_installment");
             assertThat(plans.get(3)).contains("ix_transactions_invoice");
 
-            // o esquema da Etapa 3 aceita e recusa o que o domínio espera: fechamento único por cartão e vencimento posterior
             assertThat(jdbc.queryForObject("select count(*) from information_schema.table_constraints where table_name = 'credit_card_invoices' and constraint_name like '%due_after_closing%'", Long.class)).isEqualTo(1L);
         }
     }

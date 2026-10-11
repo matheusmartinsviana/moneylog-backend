@@ -20,17 +20,6 @@ import com.moneylog.core.note.exception.NoteExceptions.NoteStateInconsistentExce
 import com.moneylog.core.note.exception.NoteExceptions.NoteWikilinkLimitReachedException;
 import com.moneylog.core.note.exception.NoteExceptions.NoteTrashedException;
 
-/**
- * Nota do vault (D1 §5, S-157 a S-166): texto Markdown em um caminho, com tags, wikilinks e vínculos explícitos.
- *
- * <ul>
- *   <li>O texto é guardado <b>como foi escrito</b> (frontmatter incluído, exceto a chave reservada {@code moneylog}); tags, título e
- *       wikilinks são derivados dele a cada gravação.</li>
- *   <li>Os wikilinks são recalculados quando o texto muda; os vínculos explícitos só mudam por {@link #replaceExplicitLinks}.</li>
- *   <li>Lixeira ({@code trashedAt}): a nota não é editada, movida nem vinculada até ser restaurada.</li>
- *   <li>Nada aqui toca razão, saldo ou qualquer cálculo financeiro.</li>
- * </ul>
- */
 public final class Note {
 
     private final UUID id;
@@ -57,7 +46,6 @@ public final class Note {
         return note;
     }
 
-    /** Reidratação: confia no que foi gravado, mas recusa vínculo de origem trocada. */
     public static Note restore(UUID id, UUID userId, NotePath path, String title, String body, Set<String> tags, List<NoteLink> links,
                                Instant trashedAt) {
         Note note = new Note(id, userId, path, trashedAt);
@@ -73,17 +61,11 @@ public final class Note {
         return note;
     }
 
-    // ------------------------------------------------------------------ comandos
-
-    /** Edição do usuário. */
     public void edit(String newBody, WikilinkResolver resolver) {
         ensureNotTrashed();
         applyBody(newBody, resolver);
     }
 
-    /**
-     * Reescrita pelo sistema (renomear outra nota): vale também na lixeira, para a nota restaurada não ficar com link velho.
-     */
     public void rewriteBody(String newBody, WikilinkResolver resolver) {
         applyBody(newBody, resolver);
     }
@@ -108,13 +90,11 @@ public final class Note {
         this.trashedAt = null;
     }
 
-    /** Troca todos os vínculos explícitos (já validados contra os alvos). Duplicatas somem; o limite é de 100. */
     public void replaceExplicitLinks(List<NoteLink> links) {
         ensureNotTrashed();
         setExplicit(links);
     }
 
-    /** Resolve de novo os wikilinks do corpo contra o índice atual (nota criada, movida, apagada ou restaurada). */
     public void reresolve(WikilinkResolver resolver) {
         for (int i = 0; i < wikilinks.size(); i++) {
             NoteLink link = wikilinks.get(i);
@@ -125,11 +105,8 @@ public final class Note {
         }
     }
 
-    // ------------------------------------------------------------------ interno
-
     private void applyBody(String newBody, WikilinkResolver resolver) {
         NoteContent content = NoteContent.analyze(newBody);
-        // distintos pelo alvo (sem .md, caixa nem acento), na ordem do texto; mais que o limite é recusado (nenhum link fica sem índice)
         Map<String, Wikilink> distinct = new LinkedHashMap<>();
         for (Wikilink link : content.wikilinks()) {
             distinct.putIfAbsent(NoteLink.wikilinkIdentity(link.target()), link);
@@ -142,7 +119,6 @@ public final class Note {
             UUID resolved = resolver.resolve(link).orElse(null);
             links.add(NoteLink.wikilink(link, resolved, NoteSnippets.around(newBody, link.start(), link.end(), NoteLimits.SNIPPET_MAX)));
         }
-        // só depois de tudo validado a nota muda (uma recusa nunca deixa a nota pela metade)
         this.body = newBody;
         this.title = content.titleFor(path);
         this.tags = new LinkedHashSet<>(content.tags());
@@ -173,8 +149,6 @@ public final class Note {
             throw new NoteTrashedException();
         }
     }
-
-    // ------------------------------------------------------------------ leitura
 
     public UUID id() {
         return id;
@@ -208,7 +182,6 @@ public final class Note {
         return List.copyOf(explicitLinks);
     }
 
-    /** Wikilinks seguidos dos vínculos explícitos. */
     public List<NoteLink> links() {
         List<NoteLink> all = new ArrayList<>(wikilinks);
         all.addAll(explicitLinks);
@@ -223,7 +196,6 @@ public final class Note {
         return trashedAt != null;
     }
 
-    /** Ids das notas que este texto referencia (wikilinks resolvidos e vínculos NOTE). */
     public Collection<UUID> referencedNotes() {
         Set<UUID> ids = new LinkedHashSet<>();
         links().stream().filter(l -> l.type() == NoteLinkType.NOTE && l.targetId() != null).forEach(l -> ids.add(l.targetId()));

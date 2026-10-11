@@ -6,10 +6,6 @@ import java.util.Objects;
 
 import com.moneylog.core.sk.time.TimeExceptions.InvalidDayOfMonthException;
 
-/**
- * Dia do mês de 1 a 31 com "clamp" para o último dia do mês (D1 §2.1): dia 31 em fevereiro de 2027 é 28/02/2027
- * e em fevereiro de 2028 é 29/02/2028. Usado no fechamento/vencimento do cartão e na recorrência.
- */
 public record DayOfMonthRule(int day) {
 
     public DayOfMonthRule {

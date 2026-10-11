@@ -202,7 +202,6 @@ class CreditCardInvoiceTest {
             InvoiceChain chain = s.chain();
             assertThat(chain.invoice(NOV_CLOSING).creditCarry()).isEqualTo(Money.of("90.00"));
             assertThat(chain.invoice(NOV_CLOSING).total()).isEqualTo(Money.of("1283.00"));
-            // ref. dez: parcela 2/6 (200) + parcela 1/3 tardia (30) − crédito transportado (90) = 140
             assertThat(chain.invoice(DEC_CLOSING).total()).isEqualTo(Money.of("230.00"));
             assertThat(chain.invoice(DEC_CLOSING).outstanding()).isEqualTo(Money.of("140.00"));
         }
@@ -222,7 +221,6 @@ class CreditCardInvoiceTest {
             InvoiceScenario s = InvoiceScenario.comCompraParcelada();
             s.pay("200.00", NOV_CLOSING, d("2026-11-05"));
             s.pay("200.00", DEC_CLOSING, d("2026-12-05"));
-            // hoje 10/12: ref. nov e dez pagas; compra datada de 20/10 em 3x
             Transaction tardia = s.buy("300.00", 3, d("2026-10-20"), d("2026-12-10"));
             assertThat(tardia.installments()).extracting(TransactionInstallment::invoiceClosingDate)
                     .containsExactly(d("2026-12-25"), d("2027-01-25"), d("2027-02-25"));

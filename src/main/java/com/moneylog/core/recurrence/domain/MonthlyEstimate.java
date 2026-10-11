@@ -10,11 +10,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Custo fixo mensal e receita recorrente mensal <b>estimados</b> (D1 §2.7): Σ das recorrências ativas <b>e não encerradas</b> (S-235: com ocorrência hoje ou depois) normalizadas
- * para o mês (semanal × 52/12, diário × 365/12, anual ÷ 12, personalizado ÷ intervalo). A soma é feita em fração
- * exata e arredondada <b>uma vez</b>, em centavos, com {@code HALF_EVEN}. Sempre rotulado como estimativa.
- */
 public record MonthlyEstimate(Money fixedCosts, Money recurringIncome, boolean estimate) {
 
     public static MonthlyEstimate of(Collection<RecurringTransaction> recurrences, LocalDate today) {

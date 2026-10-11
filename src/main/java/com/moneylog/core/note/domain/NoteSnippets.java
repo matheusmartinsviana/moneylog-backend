@@ -1,6 +1,5 @@
 package com.moneylog.core.note.domain;
 
-/** Trechos de texto puro (nunca HTML) para contexto de backlink e resultado de busca. */
 public final class NoteSnippets {
 
     private static final String ELLIPSIS = "…";
@@ -8,7 +7,6 @@ public final class NoteSnippets {
     private NoteSnippets() {
     }
 
-    /** Até {@code max} caracteres em torno de {@code [start, end)}, com espaços e quebras de linha colapsados. */
     public static String around(String text, int start, int end, int max) {
         int length = end - start;
         if (length >= max) {
@@ -25,9 +23,6 @@ public final class NoteSnippets {
         return limit(prefix + collapse(text.substring(from, to)).strip() + suffix, max);
     }
 
-    /**
-     * Trecho em torno da primeira ocorrência de {@code query} (sem diferenciar caixa nem acento); sem ocorrência, o início do texto.
-     */
     public static String aroundTerm(String text, String query, int max) {
         String folded = TextFolding.fold(query);
         if (!folded.isEmpty()) {
@@ -52,7 +47,6 @@ public final class NoteSnippets {
         return head(text, max);
     }
 
-    /** Início do texto, colapsado, com até {@code max} caracteres. */
     public static String head(String text, int max) {
         return limit(collapse(text).strip(), max);
     }

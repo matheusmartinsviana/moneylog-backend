@@ -4,7 +4,6 @@ import com.moneylog.core.finance.app.goals.usecase.GoalPhotoUseCases.GetGoalPhot
 import com.moneylog.core.goal.app.gateways.PhotoStorage;
 import com.moneylog.core.goal.exception.GoalExceptions.GoalPhotoNotFoundException;
 
-/** Lê os bytes pela porta {@link PhotoStorage}, que filtra por usuário e meta. Não carrega a meta nem os dados financeiros. */
 public class GetGoalPhotoContentUseCaseImpl implements GetGoalPhotoContentUseCase {
 
     private final PhotoStorage storage;

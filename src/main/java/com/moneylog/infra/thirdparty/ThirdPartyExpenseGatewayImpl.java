@@ -11,7 +11,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.thirdparty.app.gateways.ThirdPartyExpenseGateway;
 import com.moneylog.core.thirdparty.domain.ThirdPartyExpense;
 
-/** {@code third_party_expenses} (V8.07) por JDBC; sempre filtra por usuário. */
 public class ThirdPartyExpenseGatewayImpl implements ThirdPartyExpenseGateway {
 
     private final JdbcTemplate jdbc;

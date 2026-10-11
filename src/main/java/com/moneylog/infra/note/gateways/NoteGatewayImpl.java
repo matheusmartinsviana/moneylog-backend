@@ -45,13 +45,8 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.note.persistence.NoteEntity;
 import com.moneylog.infra.note.persistence.NoteRepositoryJpa;
 
-/**
- * {@link NoteGateway} sobre JPA (a nota) e JDBC (tags, vínculos e busca). Tags e vínculos são regravados por inteiro a cada {@code save}. A
- * busca é {@code unaccent} + {@code ILIKE} com os curingas ({@code %}, {@code _}, {@code \}) do termo escapados.
- */
 public class NoteGatewayImpl implements NoteGateway {
 
-    /** Espaço de nomes da trava de vault (evita colidir com outros usos de advisory lock). */
     private static final long LOCK_NAMESPACE = 0x6D6C6E6F74650000L;
 
     private static final String LINK_COLUMNS = "l.note_id, l.origin, l.target_type, l.target_note_id, l.target_transaction_id, l.target_account_id, "
@@ -64,7 +59,6 @@ public class NoteGatewayImpl implements NoteGateway {
     private final IdGenerator ids;
     private final TimeProvider time;
 
-    /** Limite de tempo de uma busca de texto (S-279): {@code unaccent + ILIKE} varre o corpo todo, e 5.000 notas grandes levam segundos. */
     public static final int SEARCH_TIMEOUT_SECONDS = 10;
 
     private final NamedParameterJdbcTemplate searchNamed;
@@ -83,8 +77,6 @@ public class NoteGatewayImpl implements NoteGateway {
         this.ids = ids;
         this.time = time;
     }
-
-    // ------------------------------------------------------------------ trava e gravação
 
     @Override
     public void lockVault(UUID userId) {
@@ -175,11 +167,8 @@ public class NoteGatewayImpl implements NoteGateway {
         });
     }
 
-    /** Ordem das colunas {@code target_*_id} do INSERT (posições 7 a 14). */
     private static final List<NoteLinkType> TARGET_COLUMNS = List.of(NoteLinkType.NOTE, NoteLinkType.TRANSACTION, NoteLinkType.ACCOUNT,
             NoteLinkType.CARD, NoteLinkType.INVOICE, NoteLinkType.PERSON, NoteLinkType.DEBT, NoteLinkType.GOAL);
-
-    // ------------------------------------------------------------------ leitura
 
     @Override
     public Optional<Versioned<Note>> findById(UUID userId, UUID noteId) {
@@ -283,8 +272,6 @@ public class NoteGatewayImpl implements NoteGateway {
         return jdbc.queryForList("SELECT DISTINCT note_id FROM note_links WHERE user_id = ? AND origin = 'WIKILINK' AND target_note_id = ?",
                 UUID.class, userId, targetNoteId);
     }
-
-    // ------------------------------------------------------------------ busca, backlinks, tags
 
     @Override
     public Slice<NoteSummary> search(NoteQuery q) {

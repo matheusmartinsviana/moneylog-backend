@@ -6,10 +6,6 @@ import java.util.UUID;
 
 import com.moneylog.core.goal.exception.GoalExceptions.GoalStateInconsistentException;
 
-/**
- * Metadados de uma foto da meta (ADR-018). Os bytes nunca moram aqui: ficam atrás da porta {@code PhotoStorage}. A posição é a da lista
- * da meta (0 = capa). {@code sizeBytes} soma a versão de exibição e a miniatura (é o que conta na cota do usuário).
- */
 public record GoalPhoto(UUID id, int width, int height, long sizeBytes, Instant createdAt) {
 
     public GoalPhoto {

@@ -10,16 +10,11 @@ import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AccountNotCashException;
 
-/** Regras da conta de pagamento padrão do cartão (a que o pagamento da fatura usa por padrão, S-123). */
 final class CardAccounts {
 
     private CardAccounts() {
     }
 
-    /**
-     * A conta existe (de outro usuário é como se não existisse), está ativa e é {@code CASH}: o pagamento de fatura sai
-     * de conta líquida (S-53).
-     */
     static void requireUsablePaymentAccount(AccountGateway accounts, UUID userId, UUID accountId) {
         if (accountId == null) {
             return;

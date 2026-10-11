@@ -34,12 +34,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Corpo do {@code POST /v1/transactions}, discriminado por {@code type} (contrato: {@code TransactionInput}). Os tipos
- * que existem no domínio mas não nesta etapa caem em {@link Unavailable} e respondem {@code 422}, não {@code 400}
- * (S-58); um {@code type} que nem existe no domínio é {@code 400}. Campo desconhecido é {@code 400} (o contrato tem
- * {@code additionalProperties: false}); o {@code type}, lido como discriminador (visible), é ignorado nos tipos concretos.
- */
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type", visible = true,
         defaultImpl = TransactionInput.Unavailable.class)
 @JsonSubTypes({
@@ -57,12 +51,10 @@ public sealed interface TransactionInput {
 
     String AMOUNT_PATTERN = "^\\d{1,13}(\\.\\d{1,2})?$";
 
-    /** Competência {@code AAAA-MM} (mês 01 a 12); a janela 2000-01..2100-12 é regra de domínio ({@code 422 INCOME_COMPETENCE_INVALID}). */
     String COMPETENCE_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])$";
 
     CreateTransactionCommand toCommand(UUID userId);
 
-    /** {@code version} do lock otimista: só o {@code PUT} usa (obrigatória lá, o controller confere); no {@code POST} é ignorada. */
     Long version();
 
     static Common common(UUID userId, String amount, LocalDate date, String description, String notes) {
@@ -81,14 +73,12 @@ public sealed interface TransactionInput {
         }
     }
 
-    /** Parte de uma despesa dividida ({@code ExpenseShareInput}): o que a pessoa deve e a dívida que nasce. */
     record ShareInput(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @Valid NewDebtInput newDebt) {
         Share toShare() {
             return new Share(Money.of(amount, CurrencyCode.BRL), newDebt.toSpec());
         }
     }
 
-    /** Dívida que nasce com a movimentação ({@code NewDebtInput}). Validada nos dois grupos (padrão e {@link Strict}). */
     record NewDebtInput(@NotNull(groups = {Default.class, Strict.class}) UUID personId,
                         @DateInWindow(groups = {Default.class, Strict.class}) LocalDate expectedDate,
                         @Size(max = 200, groups = {Default.class, Strict.class}) @NoControlChars(groups = {Default.class, Strict.class}) String description) {
@@ -143,10 +133,6 @@ public sealed interface TransactionInput {
         }
     }
 
-    /**
-     * Reembolso em conta ({@code accountId}) ou no cartão ({@code cardId}): informe exatamente um dos dois (o contrato
-     * descreve a exclusividade com {@code not}/{@code if}; aqui ela vira {@code 400}).
-     */
     @JsonIgnoreProperties("type")
     record Refund(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
                   @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, UUID accountId,
@@ -164,27 +150,15 @@ public sealed interface TransactionInput {
         }
     }
 
-    /** Grupo de validação da compra no cartão: o {@code POST} e o {@code PUT} (edição limitada, S-121) validam. */
     interface Strict {
     }
 
-    /**
-     * Tipos cujas restrições ficam no grupo {@link Strict}: o controller as aplica no {@code POST} (e no {@code PUT} da compra no
-     * cartão). Os de dívida não têm edição ({@code 422 TRANSACTION_NOT_EDITABLE}): o {@code PUT} com o corpo mínimo do contrato
-     * ({@code UnavailableTransactionUpdate}) chega ao caso de uso, que recusa.
-     */
     interface StrictValidated {
     }
 
-    /** Tipos sem edição por {@code PUT} (emprestar, receber, pagar): o {@code PUT} chega ao caso de uso, que recusa, sem exigir {@code version}. */
     interface NotEditable {
     }
 
-    /**
-     * Compra no cartão ({@code CARD_PURCHASE}). Suas restrições ficam no grupo {@link Strict}: o controller as aplica no
-     * {@code POST} e no {@code PUT} (corpo inteiro + {@code version}; só descrição, categoria e observação mudam, S-121).
-     * O {@code type} não vem do Bean Validation porque o discriminador já o define.
-     */
     @JsonIgnoreProperties("type")
     record CardPurchase(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                         @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
@@ -200,10 +174,6 @@ public sealed interface TransactionInput {
         }
     }
 
-    /**
-     * Dinheiro emprestado ({@code LoanGivenInput}): informe {@code newDebt} <b>ou</b> {@code debtId} (este só para recusar com o
-     * motivo certo). Sem corpo completo (PUT mínimo), vira {@link Unavailable} e o caso de uso recusa a edição.
-     */
     @JsonIgnoreProperties("type")
     record LoanGiven(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                      @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
@@ -227,10 +197,6 @@ public sealed interface TransactionInput {
         }
     }
 
-    /**
-     * Dinheiro recebido ({@code MoneyReceivedInput}): devolução ({@code debtId}) ou captação ({@code newDebt}); exatamente um.
-     * Nunca é receita (PR 01).
-     */
     @JsonIgnoreProperties("type")
     record MoneyReceived(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                          @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
@@ -254,7 +220,6 @@ public sealed interface TransactionInput {
         }
     }
 
-    /** Pagamento de dívida ({@code DebtPaymentInput}). */
     @JsonIgnoreProperties("type")
     record DebtPayment(@NotNull(groups = Strict.class) @Pattern(regexp = AMOUNT_PATTERN, groups = Strict.class) String amount,
                        @NotNull(groups = Strict.class) @DateInWindow(groups = Strict.class) LocalDate date,
@@ -271,7 +236,6 @@ public sealed interface TransactionInput {
         }
     }
 
-    /** O contrato deixa esses tipos abertos (campos definidos na etapa de cada um): ignora o que não conhece. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     record Unavailable(@NotNull TransactionType type, Long version) implements TransactionInput {
         @Override

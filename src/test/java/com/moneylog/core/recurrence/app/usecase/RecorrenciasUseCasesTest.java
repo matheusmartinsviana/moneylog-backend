@@ -69,7 +69,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AccountNotCashException;
 
-/** T79: casos de uso de recorrência (criar, editar, encerrar, desativar, ler, listar, ocorrências e custo fixo) com a porta em memória. */
 @DisplayName("Recorrências: casos de uso (T79)")
 class RecorrenciasUseCasesTest {
 
@@ -222,7 +221,6 @@ class RecorrenciasUseCasesTest {
         assertThat(edited.recurrence().schedule().endDate()).isEqualTo(LocalDate.of(2026, 12, 31));
         assertThat(edited.stored().version()).isEqualTo(1);
         assertThat(edited.monthlyEstimate()).isEqualTo(Money.of("129.90"));
-        // a conta arquivada depois não impede de corrigir o valor (a conta não mudou)
         Account archived = Account.restore(NUBANK_ID, USER_ID, "Nubank", nubank.type(), "Nubank", nubank.openingBalance(), nubank.openingDate(),
                 AccountStatus.ARCHIVED, 3L);
         when(accounts.findById(USER_ID, nubank.id())).thenReturn(Optional.of(new Persisted<>(archived, NOW, NOW)));
@@ -234,7 +232,6 @@ class RecorrenciasUseCasesTest {
                 PaymentMethod.PIX, null, null, 2))).isInstanceOf(RecurrenceNotFoundException.class);
         assertThatThrownBy(() -> update.handle(new UpdateRecurrenceCommand(USER_ID, id, Money.of("1.00"), "x", bills.id(), nubank.id(), PaymentMethod.PIX,
                 roxinho.id(), null, 2))).isInstanceOf(InvalidRecurrenceException.class);
-        // trocar para uma conta/categoria/cartão novos revalida (aqui a conta nova é de outro usuário: não encontrada)
         assertThatThrownBy(() -> update.handle(new UpdateRecurrenceCommand(USER_ID, id, Money.of("1.00"), "x", bills.id(), UUID.randomUUID(),
                 PaymentMethod.PIX, null, null, 2))).isInstanceOf(AccountNotFoundException.class);
         assertThatThrownBy(() -> update.handle(new UpdateRecurrenceCommand(USER_ID, id, Money.of("1.00"), "x", UUID.randomUUID(), nubank.id(),
@@ -298,13 +295,11 @@ class RecorrenciasUseCasesTest {
                 OccurrenceStatus.SKIPPED, OccurrenceStatus.PENDING);
         assertThat(all.items().get(0).overdue()).isTrue();
         assertThat(all.items().get(1).overdue()).isFalse();
-        // com from, a janela é estrita
         var window = occurrences.handle(new ListOccurrencesQuery(USER_ID, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31),
                 OccurrenceStatus.PENDING, PageQuery.first()));
         assertThat(window.items()).extracting(OccurrenceView::date).containsExactly(LocalDate.of(2026, 10, 10), LocalDate.of(2026, 12, 10));
         var skipped = occurrences.handle(new ListOccurrencesQuery(USER_ID, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 12, 31), OccurrenceStatus.SKIPPED, PageQuery.first()));
         assertThat(skipped.items()).hasSize(1);
-        // to padrão = from + 30 dias
         var defaults = occurrences.handle(new ListOccurrencesQuery(USER_ID, LocalDate.of(2026, 10, 1), null, OccurrenceStatus.PENDING, PageQuery.first()));
         assertThat(defaults.items()).extracting(OccurrenceView::date).containsExactly(LocalDate.of(2026, 10, 10));
         var firstPage = occurrences.handle(new ListOccurrencesQuery(USER_ID, null, LocalDate.of(2026, 12, 31), null, new PageQuery(1, 2)));
@@ -312,7 +307,6 @@ class RecorrenciasUseCasesTest {
         assertThat(firstPage.hasNext()).isTrue();
         assertThatThrownBy(() -> occurrences.handle(new ListOccurrencesQuery(USER_ID, LocalDate.of(2026, 12, 1), LocalDate.of(2026, 10, 1), null, PageQuery.first())))
                 .isInstanceOf(IllegalArgumentException.class);
-        // a realizada vem da movimentação ativa gerada (com o valor real)
         Transaction realized = model.realize(LocalDate.of(2026, 10, 10), UUID.fromString("00000000-0000-0000-0000-0000000e1001"), Money.of("124.90"),
                 nubank, bills);
         transactions.add(realized);
@@ -351,7 +345,6 @@ class RecorrenciasUseCasesTest {
         assertThat(ended.ended()).isTrue();
         assertThat(ended.monthlyEstimate()).isEqualTo(Money.of("0.00"));
         assertThat(ended.recurrence().isActive()).as("encerrar não desativa").isTrue();
-        // as vencidas e não realizadas continuam pendentes (S-20), o que é coerente com o /upcoming
         assertThat(ended.nextOccurrence()).isEqualTo(LocalDate.of(2026, 1, 10));
         assertThat(get.handle(new GetRecurrenceQuery(USER_ID, running.recurrence().id())).ended()).isTrue();
         assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID)).fixedCosts()).isEqualTo(Money.of("0.00"));
@@ -373,11 +366,9 @@ class RecorrenciasUseCasesTest {
         assertThat(stored.schedule().endDate()).isEqualTo(LocalDate.of(2026, 3, 10));
         assertThat(stored.amount()).isEqualTo(Money.of("119.00"));
         assertThat(recurrences.findVersioned(USER_ID, id).orElseThrow().version()).isEqualTo(version);
-        // um endDate de hoje em diante é explícito: reabre
         RecurrenceView reopened = update.handle(new UpdateRecurrenceCommand(USER_ID, id, Money.of("130.00"), "Internet", bills.id(), nubank.id(), PaymentMethod.PIX,
                 null, LocalDate.of(2026, 12, 10), version));
         assertThat(reopened.ended()).isFalse();
-        // numa em curso com fim futuro, remover o fim continua válido
         RecurrenceView removed = update.handle(new UpdateRecurrenceCommand(USER_ID, id, Money.of("130.00"), "Internet", bills.id(), nubank.id(), PaymentMethod.PIX,
                 null, null, reopened.stored().version()));
         assertThat(removed.recurrence().schedule().endDate()).isNull();
@@ -396,7 +387,6 @@ class RecorrenciasUseCasesTest {
     @Test
     @DisplayName("S-240: as pendentes vencidas vêm limitadas às 500 mais recentes (overdueTruncated); realizadas, puladas e futuras não; em 500 exatas não trunca")
     void deveLimitarAsVencidasPendentes() {
-        // diária desde 01/01/2025: mais de 500 vencidas até 09/10/2026
         RecurrenceView daily = create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.EXPENSE, Money.of("1.00"), "Diária", bills.id(), nubank.id(),
                 PaymentMethod.PIX, null, Frequency.DAILY, null, null, LocalDate.of(2025, 1, 1), null, null));
         long overdue = LocalDate.of(2025, 1, 1).until(TODAY, java.time.temporal.ChronoUnit.DAYS);
@@ -404,7 +394,6 @@ class RecorrenciasUseCasesTest {
         var listing = occurrences.handle(new ListOccurrencesQuery(USER_ID, null, TODAY.plusDays(5), OccurrenceStatus.PENDING, new PageQuery(1, 50)));
         assertThat(listing.overdueTruncated()).isTrue();
         assertThat(listing.items()).hasSize(50);
-        // percorre todas as páginas: 500 vencidas (as mais recentes) + hoje + 5 futuras = 506
         java.util.List<OccurrenceView> all = new ArrayList<>();
         for (int page = 1; page < 40; page++) {
             var slice = occurrences.handle(new ListOccurrencesQuery(USER_ID, null, TODAY.plusDays(5), OccurrenceStatus.PENDING, new PageQuery(page, 50)));
@@ -417,10 +406,8 @@ class RecorrenciasUseCasesTest {
         assertThat(all.stream().filter(OccurrenceView::overdue)).hasSize(500);
         assertThat(all.get(0).date()).isEqualTo(TODAY.minusDays(500)).as("a mais antiga mantida: as 500 mais recentes");
         assertThat(all).isSortedAccordingTo(java.util.Comparator.comparing(OccurrenceView::date));
-        // sem vencidas além do teto, não trunca; a janela com from só traz o que está dentro
         var window = occurrences.handle(new ListOccurrencesQuery(USER_ID, TODAY.minusDays(499), TODAY, OccurrenceStatus.PENDING, new PageQuery(1, 50)));
         assertThat(window.overdueTruncated()).isFalse();
-        // exatamente 500 vencidas: não trunca
         var exactly = occurrences.handle(new ListOccurrencesQuery(USER_ID, TODAY.minusDays(500), TODAY, OccurrenceStatus.PENDING, new PageQuery(1, 50)));
         assertThat(exactly.overdueTruncated()).isFalse();
         var oneMore = occurrences.handle(new ListOccurrencesQuery(USER_ID, TODAY.minusDays(501), TODAY, OccurrenceStatus.PENDING, new PageQuery(1, 50)));

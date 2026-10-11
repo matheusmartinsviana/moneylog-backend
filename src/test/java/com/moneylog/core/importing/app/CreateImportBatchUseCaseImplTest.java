@@ -245,7 +245,6 @@ class CreateImportBatchUseCaseImplTest {
         when(idempotency.find(eq(USER), any(), eq(key))).thenAnswer(inv -> Optional.of(new ImportIdempotencyGateway.Claim(lastHash(captor), previous.id())));
         when(batches.find(USER, previous.id())).thenReturn(Optional.of(previous));
 
-        // primeira chamada só para descobrir o hash que o caso de uso calcula
         when(idempotency.claim(any(), any(), eq(key), captor.capture(), any(), any(), any())).thenReturn(false);
         var replay = useCase.handle(new CreateImportBatchCommand(USER, NUBANK, null, CSV.getBytes(StandardCharsets.UTF_8), null, null, key));
 

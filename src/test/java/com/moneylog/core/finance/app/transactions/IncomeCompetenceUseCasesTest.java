@@ -56,7 +56,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IncomeCompetenceInvalidException;
 
-/** ADR-017: criar e editar uma receita com {@code incomeCompetence}; a revisão guarda o estado anterior e os lançamentos novos levam a competência. */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("Casos de uso: receita com competência de renda (ADR-017)")
@@ -136,7 +135,6 @@ class IncomeCompetenceUseCasesTest {
         assertThat(entries.getValue()).filteredOn(e -> e.posting().bookType() == BookType.ACCOUNT)
                 .singleElement().satisfies(e -> assertThat(e.posting().effectiveDate()).isEqualTo(ADIANTAMENTO));
         assertThat(entries.getValue().stream().map(e -> e.posting().amount().cents()).reduce(0L, Long::sum)).isZero();
-        // o impacto no caixa é o valor inteiro, hoje: a competência não muda o caixa
         assertThat(details.impact().cash()).isEqualTo(Money.of("1500.00"));
         assertThat(details.transaction().incomeCompetence()).isEqualTo(Competence.of(2026, 10));
     }

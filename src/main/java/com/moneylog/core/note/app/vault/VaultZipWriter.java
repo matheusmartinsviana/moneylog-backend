@@ -17,17 +17,11 @@ import com.moneylog.core.note.domain.Note;
 import com.moneylog.core.note.domain.NoteLink;
 import com.moneylog.core.note.domain.NoteLinkType;
 
-/**
- * Escreve uma nota como arquivo {@code .md} do zip compatível com o Obsidian: o caminho da nota, o texto como foi escrito e, se houver
- * vínculos explícitos, a chave {@code moneylog.links} no frontmatter (criado se não existe). As demais chaves do frontmatter e o corpo saem
- * byte a byte.
- */
 public final class VaultZipWriter {
 
     private VaultZipWriter() {
     }
 
-    /** Escreve a nota e devolve quantos bytes (descomprimidos) o arquivo tem. */
     public static int write(ZipOutputStream zip, Note note, Instant modified, Map<UUID, String> pathById, Map<UUID, String> trashedPathById)
             throws IOException {
         ZipEntry entry = new ZipEntry(note.path().value());
@@ -39,12 +33,10 @@ public final class VaultZipWriter {
         return data.length;
     }
 
-    /** O texto do arquivo exportado. */
     public static String textOf(Note note, Map<UUID, String> pathById, Map<UUID, String> trashedPathById) {
         return Frontmatter.withMoneylogLinks(note.body(), refsOf(note, pathById, trashedPathById));
     }
 
-    /** Vínculos explícitos como {@code moneylog.links}; NOTE para nota da lixeira vai por caminho com {@code state: trashed} (S-275). */
     static List<LinkRef> refsOf(Note note, Map<UUID, String> pathById, Map<UUID, String> trashedPathById) {
         List<LinkRef> refs = new ArrayList<>();
         for (NoteLink link : note.explicitLinks()) {

@@ -8,10 +8,6 @@ import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Rate limit do login em memória (ADR-003): no máximo {@code maxFailures} falhas por IP numa janela deslizante. Correto
- * para uma instância; com mais de uma, o contador precisa de armazenamento compartilhado (pendência do deploy).
- */
 public class LoginRateLimiter {
 
     private final Clock clock;
@@ -25,7 +21,6 @@ public class LoginRateLimiter {
         this.window = window;
     }
 
-    /** @throws TooManyAttemptsException se o IP já estourou o limite na janela */
     public void ensureNotBlocked(String ip) {
         Deque<Instant> attempts = failures.get(ip);
         if (attempts == null) {
@@ -41,7 +36,6 @@ public class LoginRateLimiter {
         }
     }
 
-    /** A partir deste tamanho, {@link #recordFailure} varre as chaves cujas falhas já saíram da janela. */
     private static final int PRUNE_THRESHOLD = 1_000;
 
     public void recordFailure(String ip) {
@@ -56,7 +50,6 @@ public class LoginRateLimiter {
         }
     }
 
-    /** Login bem-sucedido zera o contador do IP. */
     public void reset(String ip) {
         failures.remove(ip);
     }

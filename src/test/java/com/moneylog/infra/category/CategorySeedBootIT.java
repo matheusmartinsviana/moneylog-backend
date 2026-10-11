@@ -14,7 +14,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 
-/** B2: o seed de categorias roda em todo boot (não só na criação do dono) e é idempotente. */
 @IntegrationTest
 @DisplayName("Seed de categorias no boot (B2)")
 class CategorySeedBootIT {

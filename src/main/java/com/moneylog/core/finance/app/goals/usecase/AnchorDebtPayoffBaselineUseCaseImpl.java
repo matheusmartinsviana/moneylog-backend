@@ -33,7 +33,6 @@ public class AnchorDebtPayoffBaselineUseCaseImpl implements AnchorDebtPayoffBase
         Goal goal = goals.findById(command.userId(), command.goalId()).map(Versioned::value)
                 .orElseThrow(() -> new GoalNotFoundException(command.goalId()));
         FinancialRecords loaded = records.load(command.userId());
-        // a mesma fonte das leituras (GET /v1/debts/overview, balances do dashboard, recurrences/summary): a baseline e o progresso saem da mesma conta
         GoalMetric metric = goal.kind() == GoalKind.METRIC ? goal.metric() : GoalMetric.TOTAL_DEBT;
         Money value = model.metricValue(command.userId(), metric, loaded);
         goal.anchorBaseline(value, time.now());

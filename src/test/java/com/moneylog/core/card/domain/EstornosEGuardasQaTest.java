@@ -21,10 +21,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 
-/**
- * T12 (QA): estornos e guardas de cartão nas bordas do relógio (D1 §2.4 regra 1, S-36) e a correção recomendada
- * (cancelar parcelas restantes + reembolso) fechando sem dupla contagem.
- */
 @DisplayName("Estornos e guardas do cartão (T12, QA)")
 class EstornosEGuardasQaTest {
 
