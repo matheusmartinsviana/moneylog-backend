@@ -9,17 +9,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Redator de privacidade (S-182, PR 00 §27): tudo que sai de uma descrição passa por aqui antes de ir à prévia.
- *
- * <ul>
- *   <li>PIX/TED/DOC: o nome do favorecido <b>não vai ao provedor</b>; sai só o tipo da operação ({@code [PIX]});</li>
- *   <li>e-mail, CPF, CNPJ, telefone, cartão (13 a 19 dígitos) e qualquer sequência de 6 dígitos ou mais viram marcadores;</li>
- *   <li>nomes de pessoas cadastradas viram {@code Pessoa A}, {@code Pessoa B}...</li>
- * </ul>
- *
- * Maiúsculas e acentos são normalizados (a saída é em maiúsculas sem acento). {@code types} lista os tipos mascarados, nunca os valores.
- */
 public final class Redactor {
 
     public record Result(String text, Set<String> types) {
@@ -31,7 +20,6 @@ public final class Redactor {
 
     private final List<String> personNames;
 
-    /** @param personNames nomes das pessoas cadastradas, na ordem que define "Pessoa A", "Pessoa B"... */
     public Redactor(List<String> personNames) {
         List<String> clean = new ArrayList<>();
         for (String name : personNames) {

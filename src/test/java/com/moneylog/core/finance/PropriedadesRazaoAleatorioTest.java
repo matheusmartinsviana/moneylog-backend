@@ -48,22 +48,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.domain.TransactionVoidPolicy;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 
-/**
- * T12 (QA): teste de propriedade sem dependência nova. Para cada semente fixa, gera uma sequência aleatória de
- * operações válidas (despesa, receita, transferência, investimento, compra parcelada com data retroativa, reembolso no
- * cartão, pagamento parcial/total/a maior/antecipado, estorno com guarda e cancelamento de parcelas) com "hoje"
- * avançando, e verifica depois de <b>cada</b> passo as invariantes de D1 §4:
- * <ol>
- *   <li>Σ de todos os postings ativos = 0 e cada grupo de origem (e de parcela) fecha em zero;</li>
- *   <li>sem dupla contagem: Σ EXPENSE = despesas + parcelas não canceladas − reembolsos; pagamento, transferência e
- *       investimento nunca tocam EXPENSE/INCOME; Σ das parcelas = valor da compra;</li>
- *   <li>invariante do cartão: Σ outstanding − creditCarry final = −(saldo do livro CARD em todas as datas);</li>
- *   <li>limite disponível = limite + saldo CARD (S-46);</li>
- *   <li>fatura PAID nunca recebe item novo e item em fatura fechada não paga é lançamento tardio (S-14);</li>
- *   <li>lista × dashboard: identidade do consumo e EntryReport = ConsumptionReport em toda competência tocada;</li>
- *   <li>fluxo de caixa líquido = Σ postings de movimentação nas contas CASH.</li>
- * </ol>
- */
 @DisplayName("Propriedades do razão com sequências aleatórias de operações (T12, QA)")
 class PropriedadesRazaoAleatorioTest {
 
@@ -93,8 +77,6 @@ class PropriedadesRazaoAleatorioTest {
         }
         assertThat(executed).isGreaterThan(STEPS / 2);
     }
-
-    // ------------------------------------------------------------------ geração
 
     static String apply(FinanceScenarioFactory s, Random r, LocalDate today, Instant now) {
         int kind = r.nextInt(100);
@@ -173,7 +155,6 @@ class PropriedadesRazaoAleatorioTest {
                     target.closingDate(), chain, today));
             return "INVOICE_PAYMENT " + amount + " em " + target.closingDate() + " (" + target.statusAt(today) + ")";
         } catch (InvalidInvoiceOperationException e) {
-            // fatura corrente vazia e já paga pelo crédito transportado não aceita pagamento: tudo bem
             return null;
         }
     }
@@ -212,12 +193,9 @@ class PropriedadesRazaoAleatorioTest {
         return Money.ofCents(min + r.nextLong(max - min), CurrencyCode.BRL);
     }
 
-    // ------------------------------------------------------------------ invariantes
-
     private static void assertItemAllocation(InvoiceChain before, LocalDate closing, boolean lateEntry, LocalDate today, String what) {
         InvoiceStatus status = before.statusOf(closing, today);
         if (status == InvoiceStatus.PAID && before.isUntouchedIssued(closing, today)) {
-            // ADR-014: fatura emitida (fechada, no prazo) e ainda sem nenhum movimento não foi paga por ninguém: recebe o item como lançamento tardio
             assertThat(lateEntry).as("item em fatura emitida e vazia é lançamento tardio — " + what).isTrue();
             return;
         }
@@ -232,7 +210,6 @@ class PropriedadesRazaoAleatorioTest {
         Ledger ledger = records.ledger();
         Money zero = Money.zero(CurrencyCode.BRL);
 
-        // 1. razão fecha em zero, no total e por grupo de origem/parcela
         assertThat(ledger.sum(e -> true)).as(ctx + ": Σ postings ativos").isEqualTo(zero);
         Map<String, Money> groups = new HashMap<>();
         for (LedgerEntry e : ledger.entries()) {
@@ -241,7 +218,6 @@ class PropriedadesRazaoAleatorioTest {
         }
         groups.forEach((k, v) -> assertThat(v).as(ctx + ": grupo " + k).isEqualTo(zero));
 
-        // 2. sem dupla contagem
         Money expected = zero;
         for (Transaction t : s.transactions) {
             if (t.type() == TransactionType.CARD_PURCHASE) {
@@ -278,7 +254,6 @@ class PropriedadesRazaoAleatorioTest {
             }
         }
 
-        // 3. invariante do cartão (D1 §4, item 11)
         InvoiceChain chain = s.chain();
         Money sumOutstanding = Money.sum(chain.invoices().stream().map(CreditCardInvoice::outstanding).toList(), CurrencyCode.BRL);
         Money cardBook = ledger.balanceAllDates(BookRef.card(s.roxinho.id()));
@@ -290,11 +265,9 @@ class PropriedadesRazaoAleatorioTest {
         assertThat(chain.invoices().stream().filter(i -> i.statusAt(today) == InvoiceStatus.OPEN).count())
                 .as(ctx + ": no máximo uma fatura OPEN").isLessThanOrEqualTo(1);
 
-        // 4. limite disponível
         assertThat(AvailableLimitCalculator.calculate(s.roxinho, ledger.entries().stream().map(LedgerEntry::posting).toList()).available())
                 .as(ctx + ": limite disponível").isEqualTo(s.roxinho.limit().add(cardBook));
 
-        // 6. lista × dashboard em todas as competências tocadas
         Competence from = Competence.from(START);
         Competence to = Competence.from(today).plusMonths(12);
         for (Competence c = from; !c.isAfter(to); c = c.plusMonths(1)) {
@@ -307,7 +280,6 @@ class PropriedadesRazaoAleatorioTest {
                     .isEqualTo(report.income());
         }
 
-        // 7. fluxo de caixa = postings de movimentação nas contas CASH
         CashFlowReport flow = CashFlowReport.between(records, ledger, START, today.plusYears(1));
         Money cashPostings = ledger.sum(e -> e.source().type() == PostingSourceType.TRANSACTION
                 && e.posting().bookType() == BookType.ACCOUNT

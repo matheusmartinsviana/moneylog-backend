@@ -5,7 +5,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Datas de extrato: {@code dd/MM/yyyy}, {@code yyyy-MM-dd}, {@code dd/MM/yy}, {@code dd-MM-yyyy}, {@code dd.MM.yyyy} e {@code yyyyMMdd}. Data impossível (31/02) → vazio. */
 public final class DateParser {
 
     private static final Pattern BR = Pattern.compile("^(\\d{1,2})[/.\\-](\\d{1,2})[/.\\-](\\d{4}|\\d{2})(?:[ T].*)?$");

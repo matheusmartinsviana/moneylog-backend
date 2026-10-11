@@ -15,7 +15,6 @@ import com.moneylog.core.debt.domain.Person;
 import com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Monta {@link DebtView}: pessoas, categorias e datas das quitações lidas em lote (sem consulta por item). */
 public final class DebtViews {
 
     private DebtViews() {

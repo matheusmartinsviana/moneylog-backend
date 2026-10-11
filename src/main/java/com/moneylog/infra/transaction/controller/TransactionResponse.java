@@ -21,7 +21,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.card.controller.InvoiceRefResponse;
 import com.moneylog.infra.debt.controller.DebtSummaryResponse;
 
-/** Saída de movimentação (contrato: {@code Transaction}), com os nomes genéricos de S-90. */
 public record TransactionResponse(UUID id, TransactionType type, TransactionStatus status, Money amount, LocalDate date,
                                   String description, String notes, Ref category, Ref card, Ref account, Ref counterpartAccount,
                                   PaymentMethod method, String direction, String adjustmentKind, String reason, RefundOf refundOf,
@@ -43,7 +42,6 @@ public record TransactionResponse(UUID id, TransactionType type, TransactionStat
     public record ImpactResponse(Money cash, List<ConsumptionResponse> consumption, Money netWorth, Money commitment) {
     }
 
-    /** Parcela da compra no cartão (contrato: {@code Installment}); o status é derivado da fatura. */
     public record InstallmentResponse(int number, int total, Money amount, String competence, UUID invoiceId,
                                       String invoiceReferenceMonth, LocalDate invoiceDueDate, InstallmentStatus status,
                                       boolean lateEntry) {

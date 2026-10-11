@@ -38,7 +38,6 @@ import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 import com.moneylog.infra.web.validation.NoControlChars;
 
-/** Pessoas (D1 §2.6, S-138, S-142): criar, listar, editar, arquivar e desarquivar. Nenhuma é apagada. */
 @RestController
 @RequestMapping("/v1/people")
 @Validated
@@ -61,7 +60,6 @@ public class PersonController {
         this.unarchive = unarchive;
     }
 
-    /** {@code status} padrão {@code ACTIVE}. */
     @GetMapping
     public SliceResponse<PersonResponse> list(@CurrentUser UUID userId, @RequestParam(required = false) PersonStatus status,
                                               @RequestParam(required = false) @Size(max = 100) @NoControlChars String q,
@@ -98,7 +96,6 @@ public class PersonController {
         return PersonResponse.of(unarchive.handle(new UnarchivePersonCommand(userId, id)));
     }
 
-    /** {@code PersonStatus} do contrato. */
     public enum PersonStatus {
         ACTIVE,
         ARCHIVED

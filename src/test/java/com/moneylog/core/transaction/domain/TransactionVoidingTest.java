@@ -23,10 +23,6 @@ import com.moneylog.core.debt.exception.DebtExceptions.DebtNotFoundException;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidContextMissingException;
 
-/**
- * M1: um único ponto de estorno escolhe a guarda pelo tipo e aplica o efeito na dívida; {@code voidTransaction} não é
- * público; a dívida é validada antes de a movimentação mudar.
- */
 @DisplayName("Ponto único de estorno (M1)")
 class TransactionVoidingTest {
 
@@ -113,7 +109,7 @@ class TransactionVoidingTest {
         Debt debt = umEmprestimoAoJoao().debt();
         Transaction quitacao = DebtTransactions.moneyReceived(umHeader(UUID.fromString("00000000-0000-0000-0000-0000000e0b09")),
                 Money.of("100.00"), AccountTestFactory.umaContaCorrente(), debt).transaction();
-        debt.voidSettlement(quitacao.id()); // a dívida já não tem essa quitação ativa
+        debt.voidSettlement(quitacao.id());
 
         assertThatThrownBy(() -> TransactionVoiding.voidTransaction(quitacao, VoidContext.of("erro", NOW, HOJE).withDebt(debt)))
                 .isInstanceOf(DebtNotFoundException.class);

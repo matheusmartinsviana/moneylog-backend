@@ -16,12 +16,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/**
- * BUG-QA-05: percent-encoding inválido na query ({@code %ZZ}, {@code %} solto, {@code %C0%AF} = UTF-8 inválido) fazia o container falhar ao ler os
- * parâmetros e a resposta saía {@code 500}. Aqui a query é validada <b>antes</b> de qualquer leitura de parâmetro e a recusa vira
- * {@code 400 problem+json} do contrato (o mesmo formato do firewall, via {@link RequestRejectedHandler}). Vale para todas as rotas {@code /v1/**}.
- * A query nunca vai para a mensagem nem para o log.
- */
 public class QueryStringGuardFilter extends OncePerRequestFilter {
 
     private final RequestRejectedHandler rejectedHandler;
@@ -45,7 +39,6 @@ public class QueryStringGuardFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    /** Cada {@code %} é seguido de dois hexadecimais e os bytes decodificados são UTF-8 bem formado. */
     static boolean validPercentEncoding(String query) {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         for (int i = 0; i < query.length(); i++) {

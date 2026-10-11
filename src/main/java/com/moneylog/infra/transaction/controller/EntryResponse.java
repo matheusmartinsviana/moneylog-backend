@@ -12,10 +12,8 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** {@code EntrySlice} do contrato: lançamentos da competência + {@code totals} do filtro inteiro (S-79). */
 public record EntryResponse(List<Item> items, boolean hasNext, Totals totals, List<DebtItem> debtItems) {
 
-    /** Linha de consumo que nasce de dívida sem movimentação (S-137); contrato: {@code DebtEntry}. */
     public record DebtItem(UUID debtId, LocalDate date, String competence, String description, CategoryRef category, Money amount) {
     }
 

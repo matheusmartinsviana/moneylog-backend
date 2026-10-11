@@ -32,11 +32,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T98 (QA): volume. 10.000 e 50.000 movimentações com 12 reservas: tempo e memória do CSV, do backup e das leituras que carregam o
- * {@code FinancialRecords} inteiro (dashboard, resumo, projeção com tendência, metas, contas). Mede e imprime; os limites são os documentados na
- * S-257 (CSV 15 s, backup 30 s para 10.000) e um teto de 60 s por leitura para 50.000.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: volume de 10.000 e 50.000 movimentações")
@@ -109,7 +104,6 @@ class GoalVolumeQaIT {
         return ms;
     }
 
-    /** BUG-QA-02: o banco é compartilhado com as outras suítes; o que este teste semeia (~150 mil lançamentos) sai ao fim, por {@code user_id}. */
     private void cleanUp(Actor a) {
         new TransactionTemplate(tm).executeWithoutResult(s -> {
             jdbc.update("DELETE FROM goal_reservations WHERE user_id = ?", a.id);
@@ -159,7 +153,6 @@ class GoalVolumeQaIT {
         assertThat(Math.max(Math.max(dash, sum), Math.max(Math.max(proj, goals), accounts))).as("leituras").isLessThan(readLimitMs);
     }
 
-    /** Linhas do CSV (CRLF; as aspas dobradas e a quebra dentro de aspas não aparecem nesses dados). */
     private static final class CsvLines {
         static int count(String text) {
             int n = 0;

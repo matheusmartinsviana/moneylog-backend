@@ -33,11 +33,6 @@ import com.moneylog.core.transaction.domain.VoidContext;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionTypeNotAvailableException;
 
-/**
- * Estorno (T27): {@code TransactionVoiding} é o único caminho (M1). As contas que a movimentação toca e a soma dos
- * reembolsos ativos entram no contexto, e a policy recusa conta arquivada e despesa com reembolso ativo. Se o domínio
- * recusa, nada é gravado.
- */
 public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
 
     private final TransactionGateway transactions;
@@ -48,19 +43,16 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
     private final TimeProvider time;
     private final DebtGateway debts;
 
-    /** Só os tipos em conta (Etapa 2): movimentação de cartão responde {@code TRANSACTION_TYPE_NOT_AVAILABLE}. */
     public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, LedgerWriteGateway ledger,
                                       TransactionDetailsAssembler assembler, TimeProvider time) {
         this(transactions, accounts, null, ledger, assembler, time);
     }
 
-    /** Tipos em conta e de cartão (Etapa 3). */
     public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, CardGateway cards,
                                       LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time) {
         this(transactions, accounts, cards, ledger, assembler, time, null);
     }
 
-    /** Tipos em conta, de cartão e de dívida (Etapa 4): o estorno consulta e atualiza as dívidas da movimentação. */
     @SuppressWarnings("java:S107")
     public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, CardGateway cards,
                                       LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time,
@@ -77,16 +69,13 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
     @Override
     public TransactionDetails handle(VoidTransactionCommand command) {
         UUID userId = command.userId();
-        // B1: trava a linha antes de somar os reembolsos ativos; um reembolso novo da despesa espera este estorno.
         transactions.lockForUpdate(userId, command.transactionId());
         Transaction transaction = transactions.findById(userId, command.transactionId()).map(Persisted::value)
                 .orElseThrow(() -> new TransactionNotFoundException(command.transactionId()));
         if (transaction.cardId() != null) {
             return voidCardTransaction(userId, command, transaction);
         }
-        // Etapa 4: dívidas depois do cartão e antes das contas (ordem global): a da movimentação, ou as da despesa dividida
         List<Versioned<Debt>> linkedDebts = lockLinkedDebts(userId, transaction);
-        // BUG-QA-08: trava as contas em ordem de id antes de lê-las; arquivar e estornar se serializam
         java.util.stream.Stream.of(transaction.accountId(), transaction.counterpartAccountId()).filter(java.util.Objects::nonNull)
                 .sorted().distinct().forEach(accountId -> accounts.lockForUpdate(userId, accountId));
         List<Account> touched = new ArrayList<>();
@@ -109,7 +98,6 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
 
         Persisted<Transaction> saved = transactions.update(transaction);
         ledger.deactivateBySource(userId, PostingSourceType.TRANSACTION, transaction.id(), VOID_REASON, now);
-        // a origem estornada encerra a dívida ({@code VOIDED}); a quitação estornada só devolve o status (derivado), sem gravar
         for (Versioned<Debt> linked : linkedDebts) {
             if (linked.value().closure() != null) {
                 debts.update(linked.value(), linked.version());
@@ -118,10 +106,6 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
         return assembler.assemble(saved);
     }
 
-    /**
-     * As dívidas ligadas à movimentação, travadas (em ordem de id) e relidas depois da trava: a dívida de uma quitação, de uma
-     * origem ({@code LOAN_GIVEN}, captação) ou as partes de uma despesa dividida. Sem dívidas ligadas, lista vazia.
-     */
     private List<Versioned<Debt>> lockLinkedDebts(UUID userId, Transaction transaction) {
         if (debts == null) {
             return List.of();
@@ -140,18 +124,10 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
         return linked;
     }
 
-    /**
-     * Estorno de movimentação de cartão (S-36, S-122): trava o cartão (a cadeia de faturas é dele) e depois a conta (só o
-     * pagamento de fatura tem), lê a cadeia só depois das travas e deixa a guarda ao domínio ({@code CardVoidRules}):
-     * compra com parcela em fatura fechada e crédito em fatura fechada → {@code TRANSACTION_IN_CLOSED_INVOICE}; compra com
-     * reembolso ativo → {@code TRANSACTION_HAS_ACTIVE_REFUNDS}. O pagamento de fatura é sempre estornável e o status da
-     * fatura é recalculado (é derivado); com a conta arquivada, não (S-73).
-     */
     private TransactionDetails voidCardTransaction(UUID userId, VoidTransactionCommand command, Transaction transaction) {
         if (cards == null) {
             throw new TransactionTypeNotAvailableException(transaction.type());
         }
-        // ordem global: movimentação (já travada) → cartão → conta
         cards.lockForUpdate(userId, transaction.cardId());
         if (transaction.accountId() != null) {
             accounts.lockForUpdate(userId, transaction.accountId());

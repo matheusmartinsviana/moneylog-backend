@@ -3,19 +3,11 @@ package com.moneylog.core.note.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Localiza o código do Markdown (blocos cercados por {@code ```} ou {@code ~~~} e trechos entre crases) para que links e tags dentro
- * dele <b>não</b> sejam lidos nem reescritos. Não renderiza nada: só devolve intervalos {@code [início, fim)} do texto.
- */
 public final class MarkdownCode {
 
     private MarkdownCode() {
     }
 
-    /**
-     * Intervalos de código a partir de {@code from}, em ordem crescente e sem sobreposição: blocos cercados, blocos <b>indentados</b> (4
-     * espaços ou tabulação depois de linha em branco, fora de listas) e trechos entre crases.
-     */
     public static List<int[]> ranges(String text, int from) {
         List<int[]> ranges = new ArrayList<>();
         int n = text.length();
@@ -29,7 +21,6 @@ public final class MarkdownCode {
         return ranges;
     }
 
-    /** Blocos de código (cercados e indentados), em ordem. */
     private static List<int[]> blockRanges(String text, int from) {
         List<int[]> blocks = new ArrayList<>();
         int n = text.length();
@@ -101,7 +92,6 @@ public final class MarkdownCode {
         return true;
     }
 
-    /** Quatro espaços ou uma tabulação no começo (a linha em branco não conta). */
     private static boolean isIndented(String text, int start, int end) {
         if (start < end && text.charAt(start) == '\t') {
             return true;
@@ -109,7 +99,6 @@ public final class MarkdownCode {
         return end - start >= 4 && text.startsWith("    ", start);
     }
 
-    /** {@code -}, {@code *}, {@code +} ou {@code 1.}/{@code 1)} seguido de espaço, depois de qualquer indentação. */
     private static boolean isListItem(String text, int start, int end) {
         int k = start;
         while (k < end && (text.charAt(k) == ' ' || text.charAt(k) == '\t')) {
@@ -130,12 +119,10 @@ public final class MarkdownCode {
                 && (text.charAt(k + digits + 1) == ' ' || text.charAt(k + digits + 1) == '\t');
     }
 
-    /** {@code true} se {@code pos} cai dentro de algum intervalo. */
     public static boolean covers(List<int[]> ranges, int pos) {
         return rangeAt(ranges, pos) != null;
     }
 
-    /** O intervalo que contém {@code pos}, ou {@code null}. */
     public static int[] rangeAt(List<int[]> ranges, int pos) {
         int low = 0;
         int high = ranges.size() - 1;
@@ -214,7 +201,6 @@ public final class MarkdownCode {
         return true;
     }
 
-    /** Trechos entre crases iguais, sem atravessar linha em branco; {@code \`} escapa a crase. */
     private static void inlineSpans(String text, int from, int to, List<int[]> out) {
         int j = from;
         while (j < to) {

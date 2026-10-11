@@ -41,7 +41,6 @@ public class SetupPasswordUseCaseImpl implements SetupPasswordUseCase {
         User owner = users.findOwner().orElseThrow(InvalidSetupCodeException::new);
         OwnerAccess access = users.findAccess(owner.id()).orElseThrow(InvalidSetupCodeException::new);
 
-        // Sem curto-circuito: as quatro verificações sempre rodam, e o código é comparado em tempo constante.
         boolean emailOk = owner.email().equals(normalizeOrNull(command.email()));
         boolean codeOk = command.setupCode() != null
                 && SetupCode.sameHash(SetupCode.hash(command.setupCode()), access.setupCodeHash());

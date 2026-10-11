@@ -27,10 +27,6 @@ import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 import com.moneylog.util.SyntheticImages;
 
-/**
- * T255 e T257 (ADR-018): fotos e destaque das metas pela API real, com Postgres real e imagens SINTÉTICAS geradas no teste. O validador de
- * contrato não lê o corpo multipart do MockMvc: o envio é conferido só pela resposta ({@code responseOnly}).
- */
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("Fotos e destaque das metas de sonho: envio higienizado, limites, isolamento, idempotência e destaque único (T255, T257)")
 class GoalPhotosIT extends E4ItBase {
@@ -83,8 +79,6 @@ class GoalPhotosIT extends E4ItBase {
     private long count(String table, String goalId) {
         return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE goal_id = ?::uuid", Long.class, goalId);
     }
-
-    // ---------------------------------------------------------------- envio e leitura
 
     @Test
     @DisplayName("o envio devolve 201 + Location e a foto (id, position, width, height); a meta passa a trazer photos e coverPhotoId; os bytes ficam em tabela separada")
@@ -155,8 +149,6 @@ class GoalPhotosIT extends E4ItBase {
         }
     }
 
-    // ---------------------------------------------------------------- arquivos hostis
-
     @Test
     @DisplayName("arquivo falso renomeado, HTML/SVG/ZIP com extensão de imagem, imagem corrompida, pixel-bomb e imagem enorme: rejeitados sem 500 e sem gravar nada")
     void deveRejeitarArquivosHostis() throws Exception {
@@ -203,10 +195,8 @@ class GoalPhotosIT extends E4ItBase {
 
         assertThat(body(result).get("id").asString()).isNotBlank();
         assertThat(output.getAll()).doesNotContain("segredo-do-nome").doesNotContain("../").doesNotContain(SyntheticImages.GPS_SENTINEL);
-        assertThat(output.getAll()).contains("Foto de meta enviada"); // o log leva só ids e tamanho
+        assertThat(output.getAll()).contains("Foto de meta enviada");
     }
-
-    // ---------------------------------------------------------------- limites
 
     @Test
     @DisplayName("a 9ª foto da meta é 422 GOAL_PHOTO_LIMIT_REACHED e nada é gravado")
@@ -226,7 +216,6 @@ class GoalPhotosIT extends E4ItBase {
     @DisplayName("cota do usuário: 40 fotos em qualquer meta, ou 40 MB, bloqueiam o envio com 422 GOAL_PHOTO_QUOTA_EXCEEDED")
     void deveLimitarPorUsuario() throws Exception {
         String id = sonho();
-        // 5 metas x 8 fotos já guardadas (linhas mínimas; sem bytes: a cota conta os metadados)
         for (int g = 0; g < 5; g++) {
             String other = g == 0 ? id : sonho();
             for (int p = 0; p < 8; p++) {
@@ -242,7 +231,7 @@ class GoalPhotosIT extends E4ItBase {
         rejected(free, "mb.jpg", small, 422, "GOAL_PHOTO_QUOTA_EXCEEDED");
         committed(() -> jdbc.update("DELETE FROM goal_photos WHERE user_id = ?", userId));
 
-        uploaded(free, small); // liberada a cota, o envio volta a funcionar
+        uploaded(free, small);
     }
 
     private void insertPhotoRow(String goalId, int position, long sizeBytes) {
@@ -263,8 +252,6 @@ class GoalPhotosIT extends E4ItBase {
                 .andExpect(jsonPath("$.code").value("GOAL_FEATURED_KIND_NOT_SUPPORTED")).andExpect(ContractValidation.conforms());
     }
 
-    // ---------------------------------------------------------------- isolamento
-
     @Test
     @DisplayName("o usuário B recebe 404 ao ler, enviar, reordenar, definir capa, remover ou destacar a meta/foto de A, e nada muda")
     void deveIsolarUsuarios() throws Exception {
@@ -282,14 +269,10 @@ class GoalPhotosIT extends E4ItBase {
 
         assertThat(count("goal_photos", id)).isEqualTo(1);
         assertThat(okBody(get("/v1/goals/" + id)).get("featured").asBoolean()).isFalse();
-        // B também não enxerga a foto de A pelo id de uma meta própria
         String otherGoal = createdBody(postAs(other, "/v1/goals", SONHO)).get("id").asString();
         assertThat(content(other, otherGoal, photoId, "").getResponse().getStatus()).isEqualTo(404);
-        // e o A segue lendo
         assertThat(content(bearer, id, photoId, "").getResponse().getStatus()).isEqualTo(200);
     }
-
-    // ---------------------------------------------------------------- idempotência
 
     @Test
     @DisplayName("Idempotency-Key: repetir a chave com o mesmo arquivo devolve a mesma foto e uma só linha; outro arquivo com a mesma chave é 409 IDEMPOTENCY_KEY_REUSED")
@@ -306,8 +289,6 @@ class GoalPhotosIT extends E4ItBase {
                 .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
         assertThat(count("goal_photos", id)).isEqualTo(1);
     }
-
-    // ---------------------------------------------------------------- ordem, capa, remoção
 
     @Test
     @DisplayName("reordenar, capa e remover devolvem a meta atualizada; remover a capa promove a próxima e os bytes somem; ordem com id faltando ou duplicado é 422 GOAL_PHOTOS_ORDER_MISMATCH")
@@ -348,8 +329,6 @@ class GoalPhotosIT extends E4ItBase {
         goal.get("photos").forEach(p -> ids.add(p.get("id").asString()));
         return ids;
     }
-
-    // ---------------------------------------------------------------- destaque
 
     @Test
     @DisplayName("uma só meta em destaque: marcar B desmarca A (resposta traz B); o filtro featured=true devolve só B; arquivar B limpa o destaque; meta arquivada é 422 GOAL_ARCHIVED")

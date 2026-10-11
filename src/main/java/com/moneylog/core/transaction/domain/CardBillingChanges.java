@@ -12,31 +12,17 @@ import com.moneylog.core.card.domain.BillingChange;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.TransactionInstallment;
 
-/**
- * Mudança de fechamento/vencimento com a realocação das faturas {@code FUTURE} (D1 §2.5.1 regra 6, S-42, C1). Fica no
- * pacote de movimentação porque precisa das parcelas e dos créditos; a regra de realocação é a função pura de
- * {@link BillingChange}.
- *
- * <p>Tudo é calculado antes de mudar qualquer coisa: se algum item não puder ser realocado, nem o cartão nem as
- * movimentações mudam. O caso de uso grava o cartão (regras) e as movimentações devolvidas na mesma transação.
- */
 public final class CardBillingChanges {
 
     private CardBillingChanges() {
     }
 
-    /**
-     * Troca os dias do cartão e realoca as parcelas e os créditos das faturas afetadas.
-     *
-     * @param transactions todas as movimentações do cartão (ativas e estornadas; as de outros cartões são ignoradas)
-     * @return as movimentações que mudaram de fatura (para o gateway gravar)
-     */
     public static List<Transaction> changeBillingDays(CreditCard card, Collection<Transaction> transactions, int newClosingDay,
                                                       int newDueDay, LocalDate today) {
         Objects.requireNonNull(card, "card");
         Objects.requireNonNull(transactions, "transactions");
         List<Transaction> ofCard = transactions.stream().filter(t -> card.id().equals(t.cardId())).toList();
-        CardInvoices.chainFor(card, ofCard); // a cadeia atual precisa estar consistente antes da mudança
+        CardInvoices.chainFor(card, ofCard);
 
         BillingChange change = card.planBillingChange(newClosingDay, newDueDay, today);
         Map<Transaction, List<TransactionInstallment>> installments = new LinkedHashMap<>();
@@ -63,7 +49,7 @@ public final class CardBillingChanges {
         card.applyBillingChange(change);
         installments.forEach(Transaction::reallocateInstallments);
         credits.forEach(Transaction::reallocateInvoice);
-        CardInvoices.chainFor(card, ofCard); // e consistente depois dela
+        CardInvoices.chainFor(card, ofCard);
 
         List<Transaction> changed = new ArrayList<>(installments.keySet());
         credits.keySet().stream().filter(t -> !changed.contains(t)).forEach(changed::add);

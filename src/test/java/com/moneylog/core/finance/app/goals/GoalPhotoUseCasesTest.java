@@ -149,7 +149,7 @@ class GoalPhotoUseCasesTest {
 
         assertThatThrownBy(() -> upload(SECOND_GOAL_ID, jpeg)).isInstanceOf(GoalPhotoQuotaExceededException.class);
 
-        build(new PhotoLimits(8, 40, 100, PhotoLimits.MAX_UPLOAD_BYTES, PhotoLimits.MAX_PIXELS, PhotoLimits.MAX_SIDE)); // 100 bytes no total
+        build(new PhotoLimits(8, 40, 100, PhotoLimits.MAX_UPLOAD_BYTES, PhotoLimits.MAX_PIXELS, PhotoLimits.MAX_SIDE));
         assertThatThrownBy(() -> upload(GOAL_ID, jpeg)).isInstanceOf(GoalPhotoQuotaExceededException.class);
     }
 
@@ -246,7 +246,6 @@ class GoalPhotoUseCasesTest {
         assertThat(goals.findFeatured(USER_ID)).isEmpty();
     }
 
-    /** Captura o hash do comando que o caso de uso reivindicou. */
     private static final class ArgumentCaptorHash implements org.mockito.ArgumentMatcher<String> {
         String hash;
 

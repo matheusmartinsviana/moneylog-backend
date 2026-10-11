@@ -26,9 +26,6 @@ import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Coluna "Compromisso" dos 9 casos do PR 01 (D1 §3), com os números exatos.
- */
 @DisplayName("Compromissos dos casos do PR 01 (T8b CA1)")
 class CompromissosPR01Test {
 

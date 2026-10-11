@@ -42,7 +42,6 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.SqlFixtures;
 
-/** T24: o razão gravado em {@code ledger_postings} e lido de volta (CA1 a CA7). */
 @IntegrationTest
 @Transactional
 @DisplayName("Persistência do razão (T24)")
@@ -144,7 +143,6 @@ class LedgerPersistenceIT {
             assertThat(((java.sql.Timestamp) row.get("deactivated_at")).toInstant()).isEqualTo(NOW);
         });
         assertThat(jdbc.queryForObject("SELECT count(*) FROM ledger_postings WHERE active", Integer.class)).isEqualTo(4);
-        // repetir não desativa de novo
         assertThat(write.deactivateBySource(USER_ID, PostingSourceType.TRANSACTION, first.id(), "VOID", NOW)).isZero();
     }
 
@@ -176,7 +174,6 @@ class LedgerPersistenceIT {
             for (int i = 0; i < 50; i++) {
                 boolean active = i % 5 != 0;
                 UUID account = UUID.randomUUID();
-                // abertura de conta (sem FK de transação); metade em cada livro, para o índice por livro também ter dados
                 postings.add(new Object[] {UUID.randomUUID(), user, UUID.randomUUID(), account, "2026-10",
                         Date.valueOf(OPENING), 1_000L + i, active, active ? null : now, active ? null : "VOID", now, now});
             }
@@ -238,7 +235,6 @@ class LedgerPersistenceIT {
         FinancialRecords records = new FinancialRecords(List.of(scenario.nubank, scenario.xp, scenario.xpInvest), List.of(),
                 scenario.transactions, List.of());
 
-        // o Nubank e a Alimentação do cenário têm os mesmos ids das linhas do @BeforeEach: troca pelas do cenário
         jdbc.update("DELETE FROM categories WHERE id = ?", alimentacao.id());
         jdbc.update("DELETE FROM accounts WHERE id = ?", nubank.id());
         for (Account account : records.accounts()) {

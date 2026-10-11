@@ -12,10 +12,6 @@ import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCas
 import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCaseImpl;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Ligação dos relatórios do redesign (T184, T185): leituras puras, cada uma num instantâneo só ({@code REPEATABLE_READ} somente leitura,
- * ADR-008): o razão e as categorias saem do mesmo estado do banco. Sem travas de escrita.
- */
 @Configuration(proxyBeanMethods = false)
 public class ReportConfig {
 

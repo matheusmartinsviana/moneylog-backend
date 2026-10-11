@@ -54,10 +54,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 
-/**
- * Casos de uso de insights com Mockito: <b>uma leitura do razão, uma de recorrências e nenhuma de metas por requisição</b> (ADR-008, ADR-019),
- * dispensa gravada só na inserção, revogação por {@code revoked_at}. Dados sintéticos; relógio fixo em 10/10/2026.
- */
 @DisplayName("Casos de uso de insights (T286, T293): 1 leitura por requisição, dispensa e restauração")
 class InsightUseCasesTest {
 
@@ -175,7 +171,7 @@ class InsightUseCasesTest {
     @Test
     @DisplayName("limite e hasNext: o corte respeita a ordem e avisa que há mais")
     void devePaginar() {
-        clock[0] = LocalDate.of(2026, 10, 21); // o cartão fecha em 25/10: a fatura que fecha em breve é o segundo insight do dia
+        clock[0] = LocalDate.of(2026, 10, 21);
         InsightsView all = daily.handle(new DailyQuery(USER_ID, null, false, 0, 50));
         assertThat(all.items().size()).isGreaterThanOrEqualTo(2);
 
@@ -240,7 +236,6 @@ class InsightUseCasesTest {
     void naoDeveDispensarIdAlheio() {
         InsightItem budget = firstDaily("DAILY_BUDGET");
         UUID other = UUID.fromString("00000000-0000-0000-0000-00000000bbbb");
-        // o id é um hash que inclui o usuário: para o outro usuário, o mesmo id não corresponde a nenhum insight dele
         assertThatThrownBy(() -> dismiss.handle(new DismissCommand(other, budget.id(), Scope.TODAY))).isInstanceOf(InsightNotFoundException.class);
         assertThatThrownBy(() -> dismiss.handle(new DismissCommand(USER_ID, "ins_" + "0".repeat(32), Scope.TODAY)))
                 .isInstanceOf(InsightNotFoundException.class);

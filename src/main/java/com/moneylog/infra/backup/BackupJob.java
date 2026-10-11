@@ -6,7 +6,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.moneylog.core.backup.app.BackupService;
 
-/** Backup agendado (opcional, {@code moneylog.backup.enabled=true}). Falha vira log de erro sem detalhe do dump; não derruba o app. */
 public class BackupJob {
 
     private static final Logger log = LoggerFactory.getLogger(BackupJob.class);

@@ -176,7 +176,6 @@ class FrontmatterTest {
         Frontmatter.Block block = Frontmatter.locate(text).orElseThrow();
         String yaml = text.substring(block.yamlStart(), block.yamlEnd());
         assertThatThrownBy(() -> Frontmatter.parseYaml(yaml)).as(text).isInstanceOf(NoteFrontmatterInvalidException.class);
-        // e o texto continua inteiro como corpo, sem nada interpretado
         assertThat(Frontmatter.parse(text).present()).as(text).isFalse();
         assertThat(Frontmatter.parse(text).data()).isEmpty();
     }

@@ -28,10 +28,6 @@ import com.moneylog.infra.export.controller.ExportRateLimiter;
 import com.moneylog.infra.note.controller.NoteResponses.ImportReportResponse;
 import com.moneylog.infra.security.CurrentUser;
 
-/**
- * Exportar e importar o vault como zip compatível com o Obsidian (S-157): não existe "conectar pasta local" em PWA. Compartilha o limite de
- * taxa das exportações (6 por minuto por usuário). O zip importado nunca é extraído para disco.
- */
 @RestController
 @RequestMapping("/v1/vault")
 public class VaultController {
@@ -46,11 +42,9 @@ public class VaultController {
         this.rateLimiter = rateLimiter;
     }
 
-    /** Zip montado em lotes num arquivo temporário e enviado com Content-Length; só notas ativas (a lixeira não vai). Download, nunca cacheado. */
     @GetMapping(value = "/export", produces = "application/zip")
     public void export(@CurrentUser UUID userId, HttpServletResponse response) throws IOException {
         rateLimiter.acquire(userId);
-        // o zip é montado (e os limites conferidos) ANTES do cabeçalho 200: falha é erro normal, e o Content-Length revela download cortado
         try (VaultExport vault = export.handle(new ExportVaultQuery(userId))) {
             response.setContentType("application/zip");
             response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + vault.fileName() + "\"");
@@ -70,7 +64,6 @@ public class VaultController {
         return ImportReportResponse.of(importVault.handle(new ImportVaultCommand(userId, new MultipartZipSource(file), mode)));
     }
 
-    /** O arquivo do upload (em memória ou em disco temporário do container), aberto quantas vezes for preciso. */
     private record MultipartZipSource(MultipartFile file) implements ZipSource {
         @Override
         public InputStream open() throws IOException {

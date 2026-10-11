@@ -43,10 +43,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T43 (QA), critério 4: matriz de segurança de toda operação protegida do contrato. Cada violação é acumulada e o teste
- * falha listando todas (em vez de parar na primeira).
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: matriz de segurança")
@@ -82,7 +78,6 @@ class SecurityMatrixQaIT {
         b = world.new Actor("sec-b").withExpense();
     }
 
-    /** Operação protegida do contrato com seu corpo válido do usuário A. */
     private record Op(String name, HttpMethod method, String path, String body, boolean idempotent) {
     }
 
@@ -126,8 +121,6 @@ class SecurityMatrixQaIT {
         }
         return r;
     }
-
-    // ---------------------------------------------------------------- tokens
 
     private String sign(String secretText, JWTClaimsSet claims) throws Exception {
         JWSObject jws = new JWSObject(new JWSHeader(JWSAlgorithm.HS256), new Payload(claims.toJSONObject()));
@@ -192,15 +185,15 @@ class SecurityMatrixQaIT {
                 auths.add("Bearer " + tokens.get(i) + "#" + i);
             }
             auths.add("Basic " + b64("owner:senha"));
-            auths.add(a.bearer.substring(7)); // sem o esquema
-            auths.add("bearer " + a.bearer.substring(7).replace("Bearer ", "")); // esquema em minúsculas é válido na RFC 7235
+            auths.add(a.bearer.substring(7));
+            auths.add("bearer " + a.bearer.substring(7).replace("Bearer ", ""));
             for (String header : auths) {
                 String where = op.name() + " [" + (header == null ? "sem header" : header.contains("#") ? "token#" + header.substring(header.lastIndexOf('#') + 1) : header.substring(0, Math.min(18, header.length()))) + "]";
                 MvcResult r = mvc.perform(build(op, header == null ? null : header.contains("#") ? header.substring(0, header.lastIndexOf('#')) : header)).andReturn();
                 checks++;
                 boolean lowerCaseScheme = header != null && header.startsWith("bearer ");
                 if (lowerCaseScheme) {
-                    continue; // tratado em outro teste (apenas informativo)
+                    continue;
                 }
                 if (r.getResponse().getStatus() != 401) {
                     violations.add(where + ": status " + r.getResponse().getStatus() + " " + r.getResponse().getContentAsString());
@@ -293,8 +286,6 @@ class SecurityMatrixQaIT {
         assertThat(r.getResponse().getStatus()).isEqualTo(401);
     }
 
-    // ---------------------------------------------------------------- outro usuário
-
     @Test
     @DisplayName("B não lê, edita, arquiva nem estorna recursos de A: 404 com o code do recurso, nada muda e A não aparece nas listas de B")
     void outroUsuarioNaoAcessaRecursosDeA() throws Exception {
@@ -313,7 +304,6 @@ class SecurityMatrixQaIT {
                 {"GET", "/v1/transactions/" + a.expenseTx, null, "TRANSACTION_NOT_FOUND"},
                 {"PUT", "/v1/transactions/" + a.expenseTx, QaWorld.expense(b.nubank, b.food, "9.00", "2026-10-10", "hack").replace("}", ",\"version\":0}"), "TRANSACTION_NOT_FOUND"},
                 {"POST", "/v1/transactions/" + a.expenseTx + "/void", "{\"reason\":\"hack\"}", "TRANSACTION_NOT_FOUND"},
-                // referências a recursos de A em escritas de B
                 {"POST", "/v1/transactions", QaWorld.expense(a.nubank, b.food, "1.00", "2026-10-10", "x"), "ACCOUNT_NOT_FOUND"},
                 {"POST", "/v1/transactions", QaWorld.expense(b.nubank, a.food, "1.00", "2026-10-10", "x"), "CATEGORY_NOT_FOUND"},
                 {"POST", "/v1/transactions", QaWorld.income(b.nubank, a.salary, "1.00", "2026-10-10"), "CATEGORY_NOT_FOUND"},
@@ -341,14 +331,12 @@ class SecurityMatrixQaIT {
             String where = c[0] + " " + c[1] + " " + (c[2] == null ? "" : c[2].substring(0, Math.min(40, c[2].length())));
             String code = c[3];
             if (code == null) {
-                // reembolso de uma despesa de A: o acervo de B não tem a original
                 code = "TRANSACTION_NOT_FOUND";
             }
             if (code.equals("LIST_EMPTY")) {
                 if (status != 200 || res.getResponse().getContentAsString().contains(a.expenseTx)) {
                     violations.add(where + ": status " + status + " ou vazou transação de A");
                 } else if (om.readTree(res.getResponse().getContentAsString()).get("items").size() != 0 && !c[1].contains("zzz")) {
-                    // filtro por conta/categoria de A no usuário B deve devolver vazio
                     violations.add(where + ": lista de B por id de A não está vazia: " + res.getResponse().getContentAsString());
                 }
                 continue;
@@ -374,7 +362,6 @@ class SecurityMatrixQaIT {
             }
         }
 
-        // listas de B nunca contêm ids de A
         for (String url : List.of("/v1/accounts?pageSize=50", "/v1/categories?includeArchived=true", "/v1/transactions?pageSize=50",
                 "/v1/entries?competence=2026-10&pageSize=50")) {
             String text = b.req(HttpMethod.GET, url, null).toString();
@@ -409,8 +396,6 @@ class SecurityMatrixQaIT {
         System.out.println("QA-INJECT status=" + r.getResponse().getStatus() + " body=" + r.getResponse().getContentAsString());
         assertThat(jdbc.queryForObject("select count(*) from accounts where user_id = ? and name = 'Inj'", Integer.class, a.id)).isZero();
     }
-
-    // ---------------------------------------------------------------- refresh e logout: Origin
 
     @Test
     @DisplayName("Origin inválido no refresh e no logout: ausente, 'null', vazio, outro host, prefixo/sufixo do permitido, esquema http, porta, com caminho")

@@ -45,7 +45,6 @@ import com.moneylog.infra.person.gateways.PersonGatewayImpl;
 import com.moneylog.infra.person.persistence.PersonRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/** Ligação das features pessoa e dívida (Etapa 4): gateways e casos de uso transacionais de pessoas e de leitura de dívidas. */
 @Configuration(proxyBeanMethods = false)
 public class DebtConfig {
 

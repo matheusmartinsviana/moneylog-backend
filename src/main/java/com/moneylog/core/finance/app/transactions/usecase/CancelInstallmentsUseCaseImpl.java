@@ -28,12 +28,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.Transaction
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidReasonRequiredException;
 
-/**
- * Cancelamento das parcelas restantes (T57). Ordem de travas (a global): a linha da movimentação → a linha do cartão; a
- * cadeia só é lida depois das travas, e a decisão ("fatura {@code FUTURE}/{@code OPEN}") é tomada sobre o estado
- * <b>anterior</b> ao cancelamento. Grava, na mesma transação: a movimentação (versão e parcelas), a revisão com o estado
- * anterior e o motivo, e a desativação dos lançamentos das parcelas canceladas.
- */
 public class CancelInstallmentsUseCaseImpl implements CancelInstallmentsUseCase {
 
     private final TransactionGateway transactions;
@@ -74,12 +68,10 @@ public class CancelInstallmentsUseCaseImpl implements CancelInstallmentsUseCase 
                 .orElseThrow(() -> new CardNotFoundException(current.cardId()));
         List<Transaction> ofCard = transactions.findAllOfCard(userId, card.id());
         InvoiceChain chain = CardInvoices.chainFor(card, ofCard);
-        // a cópia lida junto com a cadeia é a que muda; `current` fica intacta para a revisão (estado anterior)
         Transaction purchase = ofCard.stream().filter(t -> t.id().equals(current.id())).findFirst()
                 .orElseThrow(() -> new TransactionNotFoundException(current.id()));
         List<UUID> before = purchase.installments().stream().filter(i -> !i.isCanceled()).map(TransactionInstallment::id).toList();
         Instant now = time.now();
-        // S-218: a soma é lida sob a trava da movimentação (reembolsos ligados a ela se serializam nessa linha)
         Money activeRefunds = transactions.sumActiveRefundsOf(userId, purchase.id());
         CardTransactions.cancelRemainingInstallments(purchase, chain, time.today(), now, activeRefunds);
         List<UUID> canceled = purchase.installments().stream().filter(i -> i.isCanceled() && before.contains(i.id()))

@@ -15,10 +15,6 @@ import com.moneylog.core.insights.domain.Insight.Severity;
 import com.moneylog.core.insights.domain.InsufficientData.Reason;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Insights do dia (ADR-019): funções puras {@code (DayFacts) -> insights}. O "dia" é o {@code LocalDate} do fuso do usuário; contar dias é sempre
- * {@link ChronoUnit#DAYS} entre datas locais (nunca 24 h em milissegundos), então virada de mês, fevereiro bissexto e fuso não deslocam nada.
- */
 public final class DailyInsights {
 
     public static final String DAILY_BUDGET = "DAILY_BUDGET";
@@ -40,9 +36,6 @@ public final class DailyInsights {
         cardClosingSoon(f, sink);
     }
 
-    // ------------------------------------------------------------------ orçamento do dia
-
-    /** {@code max(0, livreRestante) / (D − d + 1)}, contando hoje; arredonda para baixo (não promete centavo que não há). */
     static void dailyBudget(DayFacts f, InsightSink sink) {
         MonthFacts.Budget budget = f.budget();
         if (budget == null || !budget.received().isPositive()) {
@@ -67,8 +60,6 @@ public final class DailyInsights {
                 Thresholds.PRIORITY_MAX, null, null, null, perDay.cents()));
     }
 
-    // ------------------------------------------------------------------ hoje contra a média
-
     static void todayVsAverage(DayFacts f, InsightSink sink) {
         if (f.dayOfMonth() < Thresholds.TODAY_VS_AVERAGE_MIN_DAYS || f.variableBefore().isEmpty()) {
             sink.insufficient(TODAY_VS_AVERAGE, Reason.PARTIAL_MONTH, Math.max(0, Thresholds.TODAY_VS_AVERAGE_MIN_DAYS - f.dayOfMonth()));
@@ -90,8 +81,6 @@ public final class DailyInsights {
         sink.emit(day(f, TODAY_VS_AVERAGE, "insight.today.high", params, List.of("spending.daily"), Severity.ATTENTION, 70, Basis.HISTORY,
                 new Confidence(f.variableBefore().size(), f.dayOfMonth() - 1, null), null, f.variableToday().cents()));
     }
-
-    // ------------------------------------------------------------------ vencimentos da semana
 
     static void dueSoon(DayFacts f, InsightSink sink) {
         if (f.dueWeek().isEmpty()) {
@@ -125,13 +114,6 @@ public final class DailyInsights {
         sink.emit(day(f, DUE_SOON, key, params, refs, severity, 85, Basis.KNOWN_SCHEDULE, null, null, total.cents()));
     }
 
-    // ------------------------------------------------------------------ saldo mínimo previsto
-
-    /**
-     * {@code saldo[i] = saldo de hoje + Σ(entradas conhecidas − saídas conhecidas até i)}, i = 0..30. Só agenda conhecida (faturas, parcelas,
-     * dívidas, recorrências, lançamentos futuros); entradas só de recorrência e lançamento futuro, nunca "a receber de terceiros" (ADR-014).
-     * Não prevê gasto novo: {@code basis = KNOWN_SCHEDULE}.
-     */
     static void minBalanceForecast(DayFacts f, InsightSink sink) {
         if (!f.hasCashAccounts()) {
             sink.insufficient(MIN_BALANCE_FORECAST, Reason.NO_ACCOUNTS);
@@ -180,12 +162,6 @@ public final class DailyInsights {
                 min.abs().cents()));
     }
 
-    // ------------------------------------------------------------------ lançamento atípico
-
-    /**
-     * Lançamento de hoje {@code x} acima do p95 da categoria (n &gt;= 20 nos 6 fechados) ou, com 8 &lt;= n &lt; 20, com {@code z robusto >= 3,5};
-     * e {@code x >= 2 × mediana} e {@code x >= R$ 50}. Menos de 8 observações: não emite.
-     */
     static void atypicalEntry(DayFacts f, InsightSink sink) {
         if (f.todayEntries().isEmpty()) {
             return;
@@ -231,8 +207,6 @@ public final class DailyInsights {
             sink.insufficient(ATYPICAL_ENTRY, Reason.HISTORY);
         }
     }
-
-    // ------------------------------------------------------------------ fatura que fecha
 
     static void cardClosingSoon(DayFacts f, InsightSink sink) {
         for (DayFacts.Closing closing : f.closings()) {

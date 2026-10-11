@@ -51,14 +51,6 @@ import com.moneylog.infra.security.TooManyAttemptsException;
 import com.moneylog.infra.exception.RequestValidationException.FieldIssue;
 import com.moneylog.infra.web.TraceIdFilter;
 
-/**
- * Converte toda falha em {@code ProblemDetail} (RFC 9457, {@code application/problem+json}) com extensões
- * {@code code} (estável, é o que o front traduz) e {@code traceId} (igual ao header {@code X-Trace-Id}).
- *
- * <p>Mapeia pela classe base das exceções de domínio (BE 04): {@link NotFoundException} → 404,
- * {@link BusinessRuleException} → 422, {@link ConflictException} → 409. Erros de entrada → 400
- * {@code VALIDATION_FAILED} com {@code errors[]}. O {@code 500} nunca devolve a mensagem interna.
- */
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
@@ -68,20 +60,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public static final String FORBIDDEN = "FORBIDDEN";
     public static final String CONFLICT = "CONFLICT";
 
-    /** 40P01 deadlock detectado, 55P03 trava indisponível, 40001 falha de serialização. */
     private static final java.util.Set<String> LOCK_SQL_STATES = java.util.Set.of("40P01", "55P03", "40001");
 
     private static final URI ABOUT_BLANK = URI.create("about:blank");
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-    // ---------------------------------------------------------------- domínio
 
     @ExceptionHandler(NotFoundException.class)
     ResponseEntity<Object> handleNotFound(NotFoundException ex, HttpServletRequest request) {
         return respond(HttpStatus.NOT_FOUND, ex.code(), ex.getMessage(), request);
     }
 
-    /** Mesmo 422 e {@code detail} de sempre, mais {@code position} e {@code cause} estruturados (contrato 2.10.0). */
     @ExceptionHandler(com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException.class)
     ResponseEntity<Object> handleImportApplyFailed(
             com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException ex, HttpServletRequest request) {
@@ -101,7 +89,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.CONFLICT, ex.code(), ex.getMessage(), request);
     }
 
-    /** IA (Etapa 8): limite diário → 429; provedor indisponível/disjuntor aberto → 503. Mensagens genéricas, sem eco do provedor. */
     @ExceptionHandler(AiRateLimitedException.class)
     ResponseEntity<Object> handleAiRateLimited(AiRateLimitedException ex, HttpServletRequest request) {
         return respond(HttpStatus.TOO_MANY_REQUESTS, ex.code(), ex.getMessage(), request);
@@ -117,16 +104,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.UNAUTHORIZED, ex.code(), ex.getMessage(), request);
     }
 
-    /** Lock otimista que escapou da checagem de versão do caso de uso (corrida entre duas edições). */
     @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
     ResponseEntity<Object> handleOptimisticLock(ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
         return respond(HttpStatus.CONFLICT, "VERSION_CONFLICT", "O registro foi alterado por outra requisição.", request);
     }
 
-    /**
-     * Falha de trava ou deadlock entre transações concorrentes (B2, S-215): o Postgres derrubou esta; nada foi gravado e
-     * repetir a requisição é seguro. {@code 409 CONFLICT} com {@code Retry-After} e mensagem genérica, nunca 500.
-     */
     ResponseEntity<Object> lockFailure(Exception ex, HttpServletRequest request) {
         log.warn("Falha de trava/deadlock (traceId={}): {}", TraceIdFilter.of(request), ex.toString());
         ProblemDetail problem = problem(HttpStatus.CONFLICT, CONFLICT,
@@ -134,7 +116,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).header(HttpHeaders.RETRY_AFTER, "1").body(problem);
     }
 
-    /** Percorre a cadeia de causas: exceção de trava do Spring/JPA/Hibernate ou SQLState de deadlock/trava/serialização. */
     static boolean isLockFailure(Throwable ex) {
         for (Throwable t = ex; t != null; t = t.getCause() == t ? null : t.getCause()) {
             if (t instanceof PessimisticLockingFailureException || t instanceof PessimisticLockException
@@ -150,9 +131,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return false;
     }
 
-    // ---------------------------------------------------------------- segurança
-
-    /** Sem token, token inválido ou expirado (chega aqui pelo entry point do Spring Security e por controllers). */
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<Object> handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
         return respond(HttpStatus.UNAUTHORIZED, UNAUTHENTICATED, "Autenticação necessária.", request);
@@ -177,7 +155,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .body(problem);
     }
 
-    /** Subclasse direta de {@link DomainException}: invariante interna quebrada (bug), nunca erro do usuário. */
     @ExceptionHandler(DomainException.class)
     ResponseEntity<Object> handleInvariant(DomainException ex, HttpServletRequest request) {
         return internalError(ex, request);
@@ -185,7 +162,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<Object> handleUnexpected(Exception ex, HttpServletRequest request) {
-        // deadlock/trava pode chegar embrulhado (JpaSystemException, TransactionSystemException...): olha a cadeia de causas
         return isLockFailure(ex) ? lockFailure(ex, request) : internalError(ex, request);
     }
 
@@ -195,14 +171,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 "Erro inesperado. Informe o traceId ao suporte.", request);
     }
 
-    // ---------------------------------------------------------------- entrada (400)
-
     @ExceptionHandler(RequestValidationException.class)
     ResponseEntity<Object> handleRequestValidation(RequestValidationException ex, HttpServletRequest request) {
         return validationFailed(ex.issues(), request);
     }
 
-    /** Valor de caminho inválido com código próprio (ex.: {@code SUMMARY_MONTH_INVALID}): 400 com esse {@code code} e o campo em {@code errors[]}. */
     @ExceptionHandler(InvalidPathValueException.class)
     ResponseEntity<Object> handleInvalidPathValue(InvalidPathValueException ex, HttpServletRequest request) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ex.code(), "Dados inválidos.", request);
@@ -259,7 +232,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         if (ex.getCause() instanceof StreamReadException) {
             issue = new FieldIssue("body", "MALFORMED_JSON", "O corpo não é um JSON válido.");
         } else if (ex.getCause() instanceof UnrecognizedPropertyException unknown) {
-            // o caminho do Jackson já termina no campo desconhecido (ex.: openingBalance.x)
             issue = new FieldIssue(jacksonPath(unknown), "UNKNOWN_FIELD",
                     "Campo desconhecido: '" + unknown.getPropertyName() + "'.");
         } else if (ex.getCause() instanceof JacksonException jackson) {
@@ -311,7 +283,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return "request";
     }
 
-    /** Upload acima do teto do container (importação do vault, S-162): sobrescreve o tratador herdado, com o código do limite do caso de uso. */
     @Override
     protected ResponseEntity<Object> handleMaxUploadSizeExceededException(org.springframework.web.multipart.MaxUploadSizeExceededException ex,
                                                                           HttpHeaders headers, HttpStatusCode status, WebRequest request) {
@@ -322,14 +293,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.UNPROCESSABLE_ENTITY, "VAULT_IMPORT_TOO_LARGE", "O arquivo enviado passa do limite de 20 MB.", servlet);
     }
 
-    /** Multipart malformado (sem boundary, sem fechamento, corpo cortado): é erro do cliente, 400 {@code VALIDATION_FAILED}, nunca 500. */
     @ExceptionHandler(org.springframework.web.multipart.MultipartException.class)
     ResponseEntity<Object> handleMultipart(org.springframework.web.multipart.MultipartException ex, HttpServletRequest request) {
         log.debug("Multipart inválido (traceId={}): {}", TraceIdFilter.of(request), ex.toString());
         return validationFailed(List.of(new FieldIssue("file", "INVALID_FORMAT", "O envio multipart está malformado.")), request);
     }
-
-    // ---------------------------------------------------------------- demais erros do Spring MVC (404, 405, 415...)
 
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(Exception ex, Object body, HttpHeaders headers,
@@ -340,8 +308,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         }
         return response;
     }
-
-    // ---------------------------------------------------------------- montagem
 
     private ResponseEntity<Object> validationFailed(List<FieldIssue> issues, HttpServletRequest request) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, VALIDATION_FAILED, "Dados inválidos.", request);
@@ -386,7 +352,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ((ServletWebRequest) request).getRequest();
     }
 
-    /** {@code NotBlank} → {@code NOT_BLANK}. */
     static String constraintCode(String constraint) {
         if (constraint == null || constraint.isBlank()) {
             return "INVALID";

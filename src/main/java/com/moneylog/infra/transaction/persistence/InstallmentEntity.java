@@ -13,10 +13,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/**
- * Linha de {@code transaction_installments}: uma parcela da {@code CARD_PURCHASE}. {@code PENDING}/{@code PAID}/
- * {@code OVERDUE} são derivados do status da fatura; o único estado gravado é o cancelamento ({@code canceled_at}).
- */
 @Entity
 @Table(name = "transaction_installments")
 public class InstallmentEntity {
@@ -91,7 +87,6 @@ public class InstallmentEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o que muda numa parcela: o cancelamento e a fatura (realocação da mudança de dias, S-42). */
     public void apply(UUID newInvoiceId, Instant newCanceledAt, Instant now) {
         boolean changed = !invoiceId.equals(newInvoiceId) || !java.util.Objects.equals(canceledAt, newCanceledAt);
         if (changed) {

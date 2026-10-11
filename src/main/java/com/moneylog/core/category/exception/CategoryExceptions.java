@@ -7,9 +7,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/**
- * Exceções da feature categoria.
- */
 public final class CategoryExceptions {
 
     private CategoryExceptions() {
@@ -21,7 +18,6 @@ public final class CategoryExceptions {
         }
     }
 
-    /** A categoria de sistema usada como padrão (Outros / Outras receitas) não existe ou está arquivada para o usuário. */
     public static class DefaultCategoryUnavailableException extends BusinessRuleException {
         public DefaultCategoryUnavailableException(String systemKey) {
             super("DEFAULT_CATEGORY_UNAVAILABLE", "A categoria padrão (" + systemKey
@@ -77,7 +73,6 @@ public final class CategoryExceptions {
         }
     }
 
-    /** Nome único por {@code kind} entre as categorias não arquivadas, sem diferenciar maiúsculas (S-70). */
     public static class CategoryNameTakenException extends ConflictException {
         public CategoryNameTakenException(String name) {
             super("CATEGORY_NAME_TAKEN", "Já existe uma categoria ativa chamada \"" + name + "\" nesse tipo.");

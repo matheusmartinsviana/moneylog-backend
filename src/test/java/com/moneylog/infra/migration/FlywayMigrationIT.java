@@ -26,10 +26,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.moneylog.util.IntegrationTest;
 
-/**
- * T11: as migrações aplicam num Postgres 17 real e as constraints/índices citados existem com o nome exato
- * e reforçam as invariantes de D1. Cada cenário roda numa transação que sofre rollback no fim.
- */
 @IntegrationTest
 @DisplayName("Migrações Flyway iniciais (T11)")
 class FlywayMigrationIT {
@@ -49,8 +45,6 @@ class FlywayMigrationIT {
 
     @Autowired
     private PlatformTransactionManager transactionManager;
-
-    // ---------------------------------------------------------------- CA1 / CA10: nomes
 
     @Test
     @DisplayName("todas as constraints citadas existem em pg_constraint com o nome exato")
@@ -76,7 +70,6 @@ class FlywayMigrationIT {
         assertThat(indexDef("uq_transactions_user_dedup_active"))
                 .contains("UNIQUE").contains("(user_id, dedup_key)").contains("'ACTIVE'").contains("dedup_key IS NOT NULL");
         assertThat(indexDef("uq_transactions_recurrence_occurrence")).contains("UNIQUE").contains("(recurrence_id, occurrence_date)");
-        // V4.01: a origem pode servir a mais de uma dívida (despesa dividida): o índice único virou índice comum
         assertThat(indexDef("ix_debts_origin_transaction")).doesNotContain("UNIQUE").contains("origin_transaction_id IS NOT NULL");
         assertThat(indexDef("ix_ledger_postings_book")).contains("(user_id, book_type, book_id, effective_date)").contains("WHERE active");
         assertThat(indexDef("ix_ledger_postings_competence")).contains("(user_id, book_type, competence)").contains("WHERE active");
@@ -91,8 +84,6 @@ class FlywayMigrationIT {
         assertThat(deferred).isTrue();
     }
 
-    // ---------------------------------------------------------------- CA2: colunas
-
     @Test
     @DisplayName("todas as tabelas têm id UUID sem default, user_id NOT NULL e timestamps TIMESTAMPTZ")
     void deveSeguirConvencoesDeColunas() {
@@ -101,10 +92,7 @@ class FlywayMigrationIT {
                         + " AND table_name <> 'flyway_schema_history'", String.class);
         assertThat(tables).contains("users", "categories", "accounts", "credit_cards", "credit_card_billing_rules",
                 "credit_card_invoices", "persons", "debts", "transactions", "transaction_installments", "ledger_postings");
-        // Etapas 7 e 8: tabelas de preferência/mapeamento têm user_id como chave (sem id nem created_at) e as de registro
-        // imutável (notificações, assinaturas push, prévias e análises de IA, regras aprendidas) não têm updated_at.
         Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs");
-        // filhas do lote ou da foto: nascem e morrem com o pai (goal_photo_blobs tem photo_id como chave, ADR-018)
         Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs");
         Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts", "insight_dismissals");
         for (String table : tables) {
@@ -156,8 +144,6 @@ class FlywayMigrationIT {
                 "deactivation_reason");
     }
 
-    // ---------------------------------------------------------------- CA3: valor positivo
-
     @ParameterizedTest(name = "amount_cents = {0}")
     @ValueSource(longs = {0, -100})
     @DisplayName("transactions rejeita amount_cents <= 0 (ck_transactions_amount_positive)")
@@ -178,8 +164,6 @@ class FlywayMigrationIT {
             assertViolation(() -> insertInstallment(purchase, 1, cents), "ck_installments_amount_positive");
         });
     }
-
-    // ---------------------------------------------------------------- CA4: faturas e parcelas
 
     @Nested
     @DisplayName("faturas e parcelas")
@@ -227,8 +211,6 @@ class FlywayMigrationIT {
         }
     }
 
-    // ---------------------------------------------------------------- CA5: dedup
-
     @Nested
     @DisplayName("deduplicação (uq_transactions_user_dedup_active)")
     class Dedup {
@@ -266,8 +248,6 @@ class FlywayMigrationIT {
         }
     }
 
-    // ---------------------------------------------------------------- CA6: recorrência
-
     @Test
     @DisplayName("duas realizações ativas da mesma ocorrência violam uq_transactions_recurrence_occurrence")
     void deveRejeitarOcorrenciaRealizadaDuasVezes() {
@@ -290,8 +270,6 @@ class FlywayMigrationIT {
             assertThatCode(() -> insertRealization(UUID.randomUUID(), recurrence, "ACTIVE")).doesNotThrowAnyException();
         });
     }
-
-    // ---------------------------------------------------------------- CA7: ledger_postings
 
     @Nested
     @DisplayName("ledger_postings")
@@ -369,8 +347,6 @@ class FlywayMigrationIT {
         }
     }
 
-    // ---------------------------------------------------------------- CA8: dívidas
-
     @Nested
     @DisplayName("debts")
     class Dividas {
@@ -430,8 +406,6 @@ class FlywayMigrationIT {
             });
         }
     }
-
-    // ---------------------------------------------------------------- CA9: enums e limites
 
     @Test
     @DisplayName("ck_transactions_type tem exatamente os 11 tipos do PR 01")
@@ -503,14 +477,11 @@ class FlywayMigrationIT {
         for (var resource : resources) {
             String sql = new String(resource.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8)
                     .replaceAll("--[^\n]*", "").toUpperCase()
-                    // "ON DELETE CASCADE" é regra de FK (V6.00: tags e vínculos seguem a nota), não um comando que apague dados
                     .replace("ON DELETE CASCADE", "");
             assertThat(sql).as(resource.getFilename()).doesNotContain("DROP TABLE").doesNotContain("DROP COLUMN")
                     .doesNotContain("DROP SCHEMA").doesNotContain("TRUNCATE").doesNotContain("DELETE ");
         }
     }
-
-    // ---------------------------------------------------------------- helpers
 
     private void inRollback(Consumer<JdbcTemplate> work) {
         TransactionTemplate template = new TransactionTemplate(transactionManager);
@@ -520,7 +491,6 @@ class FlywayMigrationIT {
         });
     }
 
-    /** O Postgres aborta a transação depois da violação; por isso cada violação fica num savepoint. */
     private void assertViolation(Runnable insert, String constraint) {
         jdbc.execute("SAVEPOINT before_violation");
         assertThatThrownBy(insert::run)
@@ -597,7 +567,6 @@ class FlywayMigrationIT {
     private UUID insertImported(UUID id, String status, String dedupKey) {
         boolean voided = status.equals("VOIDED");
         UUID batch = UUID.randomUUID();
-        // V7.00: transactions.import_batch_id tem FK para import_batches
         jdbc.update("""
                 INSERT INTO import_batches (id, user_id, account_id, format, file_sha256, status, created_at, updated_at)
                 VALUES (?, ?, ?, 'CSV', ?, 'APPLIED', ?, ?)""", batch, USER, ACCOUNT, KEY, NOW, NOW);
@@ -611,7 +580,6 @@ class FlywayMigrationIT {
         return id;
     }
 
-    /** Recorrência mensal de 119,00 (V4.02): a realização aponta para ela por FK composta. */
     private UUID insertRecurrence() {
         UUID id = UUID.randomUUID();
         jdbc.update("""

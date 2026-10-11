@@ -11,11 +11,6 @@ import com.moneylog.core.card.exception.CardExceptions.InvalidInstallmentExcepti
 import com.moneylog.core.card.exception.CardExceptions.NoInstallmentsToCancelException;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Parcelamento de uma compra no cartão (D1 §2.5.2): {@code N} parcelas {@code k/N} com {@code Money.allocate(N)}
- * (soma exata, resto na primeira, S-3). A parcela 1 cai na competência da compra; a parcela k tem data efetiva = data
- * da compra + (k−1) meses (clamp no fim do mês) e fica na fatura da parcela 1 + (k−1) ciclos.
- */
 public final class InstallmentPlan {
 
     public static final int MIN_INSTALLMENTS = 1;
@@ -30,11 +25,6 @@ public final class InstallmentPlan {
         }
     }
 
-    /**
-     * Gera as parcelas.
-     *
-     * @param allocations fatura e lançamento tardio de cada parcela ({@link InvoiceAllocator}), na ordem 1..N
-     */
     public static List<TransactionInstallment> generate(UUID transactionId, Money amount, int count, LocalDate purchaseDate,
                                                         List<InvoiceAllocator.Allocation> allocations) {
         validateCount(count);
@@ -52,11 +42,6 @@ public final class InstallmentPlan {
         return List.copyOf(installments);
     }
 
-    /**
-     * Parcelas de uma compra em andamento (ADR-013): só as {@code remaining} últimas, numeradas {@code (total−remaining+1)..total},
-     * cada uma com o valor informado (sem {@code allocate}). A 1ª da lista é a próxima a vencer e a data efetiva dela é
-     * {@code firstDate}; as seguintes, +1 mês cada.
-     */
     public static List<TransactionInstallment> generateOngoing(UUID transactionId, Money installmentAmount, int total, int remaining,
                                                                LocalDate firstDate, List<InvoiceAllocator.Allocation> allocations) {
         validateCount(total);
@@ -77,10 +62,6 @@ public final class InstallmentPlan {
         return List.copyOf(installments);
     }
 
-    /**
-     * Cancelamento das parcelas restantes (D1 §2.5.2): as parcelas em faturas {@code FUTURE}/{@code OPEN} viram
-     * {@code CANCELED}; as de faturas fechadas não mudam.
-     */
     public static List<TransactionInstallment> cancelRemaining(List<TransactionInstallment> installments, InvoiceChain chain,
                                                                LocalDate today, Instant now) {
         List<TransactionInstallment> result = installments.stream()

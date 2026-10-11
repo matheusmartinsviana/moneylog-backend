@@ -59,11 +59,6 @@ import com.moneylog.util.FixedClockConfig;
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T52: parcelas e faturas persistidas, id determinístico, materialização preguiçosa, concorrência do
- * {@code findOrCreate}, reidratação e carregamento único com cartões (S-79, ADR-006). Os agregados vêm das fábricas do
- * domínio e passam pelos gateways reais; o relógio é 10/10/2026.
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Parcelas e faturas persistidas (T52)")
@@ -137,8 +132,6 @@ class CardPersistenceIT {
         return CardTransactions.purchase(header(date, "Compra"), Money.of(amount), card, food, installments, InvoiceChain.empty(card), date);
     }
 
-    // ---------------------------------------------------------------- CA1
-
     @Test
     @DisplayName("CA1: compra de 1.200 em 6x gravada: 6 parcelas, 6 faturas (uma por fechamento) e postings por parcela com installment_id; reidrata igual")
     void deveGravarEReidratarACompraParcelada() {
@@ -188,8 +181,6 @@ class CardPersistenceIT {
         assertThat(loaded.version()).isZero();
     }
 
-    // ---------------------------------------------------------------- CA2
-
     @Test
     @DisplayName("CA2: duas transações no mesmo ciclo fazem findOrCreate do mesmo fechamento: uma linha, o mesmo id e nenhuma exceção (20 repetições)")
     void deveCriarUmaLinhaSoEmCorrida() throws Exception {
@@ -228,8 +219,6 @@ class CardPersistenceIT {
         return new TransactionTemplate(transactionManager).execute(status -> work.get());
     }
 
-    // ---------------------------------------------------------------- CA3
-
     @Test
     @DisplayName("CA3: o id da linha é sempre o determinístico de (cartão, fechamento) e fatura sem item não tem linha")
     void deveTerIdDeterministicoESemLinhaVazia() {
@@ -243,12 +232,9 @@ class CardPersistenceIT {
             LocalDate closing = ((Date) invoice.get("closing_date")).toLocalDate();
             assertThat(invoice.get("id")).isEqualTo(InvoiceIds.of(card.id(), closing));
         }
-        // a corrente vazia de outro ciclo continua sem linha
         assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_card_invoices WHERE card_id = ? AND closing_date = ?", Integer.class,
                 card.id(), Date.valueOf("2026-09-25"))).isZero();
     }
-
-    // ---------------------------------------------------------------- CA4
 
     @Test
     @DisplayName("CA4: reembolso de 50 em 12/10 e pagamento de 150 gravados preservam fatura e lançamento tardio; a cadeia reconstruída bate")
@@ -307,7 +293,6 @@ class CardPersistenceIT {
                         }
                     }
                 } catch (DomainException expected) {
-                    // a regra de negócio recusou este passo do cenário: segue com o que existe
                 }
             }
             card = scenarioCard;
@@ -339,8 +324,6 @@ class CardPersistenceIT {
             assertThat(b.get(i).items()).hasSameSizeAs(a.get(i).items());
         }
     }
-
-    // ---------------------------------------------------------------- CA5
 
     @Test
     @DisplayName("CA5: carregamento único traz o cartão com as regras e as movimentações; pagas as 6 faturas, o livro CARD fecha em zero (memória e SQL)")
@@ -386,8 +369,6 @@ class CardPersistenceIT {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM credit_card_billing_rules WHERE card_id = ?", Integer.class, changing.id())).isEqualTo(2);
     }
 
-    // ---------------------------------------------------------------- CA6
-
     @Test
     @DisplayName("CA6: parcela apontando para fatura de outro cartão é TransactionStateInconsistentException (nada parcial)")
     void deveRecusarEstadoInconsistente() {
@@ -415,8 +396,6 @@ class CardPersistenceIT {
 
         assertThatThrownBy(() -> transactions.findById(userId, purchase.id())).isInstanceOf(TransactionStateInconsistentException.class);
     }
-
-    // ---------------------------------------------------------------- estorno, isolamento
 
     @Test
     @DisplayName("estornar a compra grava VOIDED, cancela as parcelas e desativa os lançamentos; a cadeia fica com total zero")

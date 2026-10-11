@@ -41,17 +41,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Calculadora da visão total de dívidas (ADR-013, D1 §2.11). Função pura sobre {@link FinancialRecords}: o saldo devedor é lido do
- * <b>estado</b> das faturas e das dívidas, nunca somando movimentos, então compra → parcela → fatura → pagamento não conta em dobro.
- *
- * <ul>
- *   <li>Cartão: Σ {@code outstanding} de todas as faturas não {@code PAID} (aberta, fechada, vencida e futura), líquido do crédito
- *       transportado (decisão P2). Não usa {@code committedFuture} (bruto).</li>
- *   <li>Pessoas e outras: Σ {@code outstanding} das dívidas {@code PAYABLE} {@code OPEN}/{@code PARTIALLY_SETTLED}, inclusive sem data;
- *       com pessoa vai em "pessoas", com credor livre em "outras". {@code RECEIVABLE} nunca entra ({@code receivablesInfo}).</li>
- * </ul>
- */
 public final class DebtOverviewCalculator {
 
     public static final int MIN_MONTHS = 1;
@@ -63,7 +52,6 @@ public final class DebtOverviewCalculator {
     private DebtOverviewCalculator() {
     }
 
-    /** O que se deve em cada parte, mais os compromissos datados que alimentam o cronograma. */
     record Positions(Cards cards, DebtGroup people, DebtGroup other, Money receivables, boolean hasRecords, List<Obligation> obligations) {
 
         Money total() {
@@ -71,7 +59,6 @@ public final class DebtOverviewCalculator {
         }
     }
 
-    /** Um valor devido e quando vence ({@code dueDate} nulo = sem data). */
     record Obligation(Part part, Money amount, LocalDate dueDate, boolean overdue) {
     }
 
@@ -81,12 +68,10 @@ public final class DebtOverviewCalculator {
         OTHER
     }
 
-    /** Total de dívidas hoje: a mesma conta da visão, usada pela meta de quitação (um número só). */
     public static Money total(FinancialRecords records, LocalDate today) {
         return positions(records, Map.of(), today).total();
     }
 
-    /** As três partes do total hoje (mesma conta de {@code overview().parts()}); usada pelas metas de medida. */
     public static Parts parts(FinancialRecords records, LocalDate today) {
         Positions p = positions(records, Map.of(), today);
         return new Parts(p.cards().total(), p.people().total(), p.other().total());
@@ -104,8 +89,6 @@ public final class DebtOverviewCalculator {
                 p.other(), p.receivables(), p.hasRecords(), recurrence.fixedCosts(), income, new Liquidity(inAccounts, available),
                 comparison(total, recurrence.fixedCosts(), income, inAccounts), schedule(p, total, today, months));
     }
-
-    // ------------------------------------------------------------------ posições
 
     static Positions positions(FinancialRecords records, Map<UUID, String> personNames, LocalDate today) {
         List<Obligation> obligations = new ArrayList<>();
@@ -182,7 +165,6 @@ public final class DebtOverviewCalculator {
         }
         Money total = invoiced.add(future);
 
-        // por compra: parcelas não canceladas em faturas não pagas (a parcela ainda é dívida)
         Money otherCharges = ZERO;
         List<Plan> plans = new ArrayList<>();
         for (Transaction purchase : ofCard) {
@@ -216,8 +198,6 @@ public final class DebtOverviewCalculator {
         return new CardItem(card.id(), card.name(), total, invoiced, future, otherCharges, adjustment, plans);
     }
 
-    // ------------------------------------------------------------------ renda e comparação
-
     private static Income income(Money recurringIncome, Money lastFullMonthIncome) {
         if (recurringIncome.isPositive()) {
             return new Income(recurringIncome, IncomeSource.RECURRING_ESTIMATE);
@@ -240,8 +220,6 @@ public final class DebtOverviewCalculator {
         return BigDecimal.valueOf(numerator.cents()).divide(BigDecimal.valueOf(denominator.cents()), RATIO_SCALE, RoundingMode.HALF_UP);
     }
 
-    // ------------------------------------------------------------------ cronograma
-
     private static Schedule schedule(Positions p, Money total, LocalDate today, int months) {
         Competence first = Competence.from(today);
         Competence lastInHorizon = first.plusMonths(months - 1L);
@@ -262,7 +240,6 @@ public final class DebtOverviewCalculator {
                 if (competence.isAfter(lastInHorizon)) {
                     beyond = beyond.add(o.amount());
                 } else {
-                    // vencimento antes do mês de hoje e não vencido não existe (vencer é ficar antes de hoje); defensivo: cai no 1º mês
                     Money[] bucket = buckets.get(competence.isBefore(first) ? first : competence);
                     bucket[o.part().ordinal()] = bucket[o.part().ordinal()].add(o.amount());
                 }
@@ -287,7 +264,6 @@ public final class DebtOverviewCalculator {
         } else if (beyond.isPositive()) {
             reason = PayoffReason.BEYOND_HORIZON;
         } else if (total.isPositive()) {
-            // o vencido é considerado pago no 1º mês
             payoff = lastWithValue != null ? lastWithValue : first;
         }
         return new Schedule(months, points, overdue, undated, beyond, payoff, reason);

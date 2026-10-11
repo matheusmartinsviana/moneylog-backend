@@ -39,7 +39,6 @@ import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionStateInconsistentException;
 
-/** T45: reidratação de {@link Transaction} para o mapper da infra. */
 @DisplayName("Transaction.restore (T45)")
 class TransactionRestoreTest {
 
@@ -69,12 +68,10 @@ class TransactionRestoreTest {
     private static Transaction compraComParcelasCanceladas() {
         InvoiceScenario scenario = InvoiceScenario.comCompraParcelada();
         Transaction compra = scenario.get(InvoiceScenario.PURCHASE_6X_ID);
-        // depois do fechamento de 25/10 a parcela 1/6 fica (fatura fechada); as 5 seguintes são canceladas
         CardTransactions.cancelRemainingInstallments(compra, scenario.chain(), LocalDate.of(2026, 10, 26), NOW);
         return compra;
     }
 
-    /** Uma movimentação de cada tipo (e variações), incluindo estornadas e com parcelas canceladas. */
     static Stream<Arguments> movimentacoes() {
         Transaction despesa = umaDespesaPix();
         InvoiceScenario scenario = InvoiceScenario.comFaturaDe1283();
@@ -325,7 +322,6 @@ class TransactionRestoreTest {
         assertThat(restored.userId()).isEqualTo(USER_ID);
     }
 
-    /** Copia o estado trocando os campos que variam entre os cenários. */
     private static TransactionState com(TransactionState s, long version, TransactionStatus status, String voidReason,
                                         Instant voidedAt, List<TransactionInstallment> installments) {
         return new TransactionState(s.id(), s.userId(), s.type(), s.amount(), s.date(), s.description(), s.notes(), s.origin(),

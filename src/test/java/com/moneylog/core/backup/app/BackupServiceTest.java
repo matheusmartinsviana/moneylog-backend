@@ -29,7 +29,6 @@ class BackupServiceTest {
     @TempDir
     Path dir;
 
-    /** Dumper de teste: "dump" é um texto fixo; guarda o que restaurou. */
     static class FakeDumper implements DatabaseDumper {
         String restored;
 

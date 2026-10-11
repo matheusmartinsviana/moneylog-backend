@@ -21,7 +21,6 @@ import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 
-/** Peças de teste da Etapa 6: relógio fixo, ids sequenciais, idempotência em memória e construtor de zip. */
 public final class NoteTestKit {
 
     public static final Instant NOW = Instant.parse("2026-10-05T12:00:00Z");
@@ -50,7 +49,6 @@ public final class NoteTestKit {
         };
     }
 
-    /** Ids {@code 00000000-0000-0000-0001-0000000000NN}, em sequência. */
     public static IdGenerator ids() {
         AtomicLong counter = new AtomicLong();
         return () -> new UUID(1L, counter.incrementAndGet());
@@ -79,7 +77,6 @@ public final class NoteTestKit {
         }
     }
 
-    /** Monta um zip em memória. */
     public static final class Zip {
         private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         private final ZipOutputStream out = new ZipOutputStream(bytes);
@@ -137,7 +134,6 @@ public final class NoteTestKit {
         };
     }
 
-    /** O mesmo conteúdo, declarando outro tamanho (para o limite de 20 MB sem alocar 20 MB). */
     public static ZipSource sourceWithSize(byte[] data, long size) {
         return new ZipSource() {
             @Override

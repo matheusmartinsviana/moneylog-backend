@@ -31,7 +31,6 @@ import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/** Prévia da compra em andamento: monta a mesma compra da criação ({@code plan}) e a descarta. Não trava; roda somente leitura. */
 public class PreviewOngoingInstallmentsUseCaseImpl implements PreviewOngoingInstallmentsUseCase {
 
     private final CardGateway cards;

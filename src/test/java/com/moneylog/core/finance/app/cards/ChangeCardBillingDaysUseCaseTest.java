@@ -44,10 +44,6 @@ import com.moneylog.core.transaction.app.gateways.TransactionGateway;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.util.factory.TransactionTestFactory;
 
-/**
- * T58: mudança de fechamento/vencimento e a prévia, sobre o cenário (Notebook 1.200 em 6x em 10/10: faturas de 25/10 a
- * 25/03; relógio 10/10). A regra nova vale da fatura seguinte à corrente (a que fecha 25/11 no calendário atual, S-42).
- */
 @DisplayName("Mudança de fechamento/vencimento e prévia (T58)")
 class ChangeCardBillingDaysUseCaseTest {
 
@@ -143,7 +139,6 @@ class ChangeCardBillingDaysUseCaseTest {
                 .hasFieldOrPropertyWithValue("code", "CARD_BILLING_CHANGE_STALE");
         assertThatThrownBy(() -> change.handle(command(10, 5, null, 0))).isInstanceOf(BillingChangeNotConfirmedException.class)
                 .hasFieldOrPropertyWithValue("code", "CARD_BILLING_CHANGE_NOT_CONFIRMED");
-        // a virada do dia: em 30/10 a corrente é a de 25/11 e a primeira afetada passa a ser a de 25/12
         when(time.today()).thenReturn(LocalDate.of(2026, 10, 30));
         assertThatThrownBy(() -> change.handle(command(10, 5, NOV_25, 0))).isInstanceOf(CardBillingChangeStaleException.class);
         change.handle(command(10, 5, LocalDate.of(2026, 12, 25), 0));

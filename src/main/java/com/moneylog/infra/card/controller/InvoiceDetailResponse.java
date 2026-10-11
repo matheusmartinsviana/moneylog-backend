@@ -8,13 +8,11 @@ import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.finance.app.cards.InvoiceDetails;
 import com.moneylog.core.sk.money.Money;
 
-/** Saída de fatura com itens e pagamentos (contrato: {@code Invoice}). */
 public record InvoiceDetailResponse(UUID id, UUID cardId, String referenceMonth, LocalDate periodStart, LocalDate closingDate,
                                     LocalDate dueDate, InvoiceStatus status, Money total, Money carryIn, Money paid,
                                     Money outstanding, Money creditCarry, boolean hasLateEntries, List<ItemResponse> items,
                                     List<PaymentResponse> payments) {
 
-    /** Item da fatura (contrato: {@code InvoiceItem}). */
     public record ItemResponse(String kind, UUID transactionId, String description, Integer number, Integer totalInstallments,
                                Money amount, LocalDate date, boolean lateEntry) {
         public static ItemResponse of(InvoiceDetails.Item item) {
@@ -23,7 +21,6 @@ public record InvoiceDetailResponse(UUID id, UUID cardId, String referenceMonth,
         }
     }
 
-    /** Pagamento da fatura (contrato: {@code InvoicePayment}). */
     public record PaymentResponse(UUID transactionId, UUID accountId, Money amount, LocalDate date) {
         public static PaymentResponse of(InvoiceDetails.Payment payment) {
             return new PaymentResponse(payment.transactionId(), payment.accountId(), payment.amount(), payment.date());

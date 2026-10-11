@@ -36,12 +36,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T113 (QA), critério 3 (propriedade): operações aleatórias (criar, editar, renomear/mover, lixeira, restaurar, esvaziar) sobre notas com wikilinks
- * de todas as formas (nome, caminho, .md, caixa/acento trocados, alias, seção, embed, espaços, dentro de código inline e de bloco), com um oráculo
- * independente do código de produção. Depois de cada operação: todo wikilink gravado resolve como o oráculo manda; renomear reescreve exatamente os
- * links que apontavam para a nota movida (e mais nada, byte a byte), nenhum link vira órfão por causa do rename, e os backlinks batem.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: propriedade de wikilinks, renomear/mover, lixeira e backlinks (oráculo independente, semente fixa)")
@@ -72,9 +66,6 @@ class NotePropertyQaIT {
         w = new CardQaWorld(mvc, om, jdbc, auth, tm, clock);
     }
 
-    // ------------------------------------------------------------------------------------------------ modelo
-
-    /** Um pedaço de uma linha: texto, link, código inline, ou um bloco de código cercado (a linha inteira). */
     private record Seg(char kind, String target, String section, String alias, boolean embed, String padL, String padR, String text) {
         static Seg text(String t) {
             return new Seg('T', null, null, null, false, "", "", t);
@@ -145,8 +136,6 @@ class NotePropertyQaIT {
         }
     }
 
-    // ------------------------------------------------------------------------------------------------ oráculo (independente do código de produção)
-
     private static String fold(String s) {
         String d = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
         return Normalizer.normalize(d.toLowerCase(Locale.ROOT), Normalizer.Form.NFC);
@@ -186,8 +175,6 @@ class NotePropertyQaIT {
         return Comparator.<NoteM>comparingInt(n -> n.path.length()).thenComparing(n -> fold(noExt(n.path))).thenComparing(n -> java.util.UUID.fromString(n.id)).compare(x, y);
     }
 
-    // ------------------------------------------------------------------------------------------------ gerador
-
     private static final String[] NAMES = {"Revisão", "revisao", "REVISÃO", "MacBook", "macbook", "Café", "cafe", "Ação", "acao", "Ünï", "uni", "ß", "SS", "İstanbul", "istanbul",
             "100%", "x_y", "o'brien", "a&b", "(plano)", "uma frase longa", "uma  frase  longa", "emoji 🚀", "日本語", "ǅ", "Mixed Case", "e", "é", "É", "a.b"};
     private static final String[] FOLDERS = {"", "", "", "p/", "q/", "p/q/", "diário/", "Ações/2026/"};
@@ -200,7 +187,6 @@ class NotePropertyQaIT {
         return FOLDERS[r.nextInt(FOLDERS.length)] + name(r) + ".md";
     }
 
-    /** Caminho livre de equivalência por acento/caixa com qualquer outra nota (esse empate é o BUG-QA-08, coberto à parte). */
     private String freshPath(Random r, Vault v, String exceptId) {
         for (int i = 0; i < 30; i++) {
             String path = randomPath(r);
@@ -254,11 +240,8 @@ class NotePropertyQaIT {
         return segs;
     }
 
-    // ------------------------------------------------------------------------------------------------ verificações
-
     private void check(Actor a, Vault v, String label, List<String> violations) throws Exception {
         List<NoteM> active = v.active();
-        // 1) o conjunto de notas bate
         Map<String, String> dbNotes = new HashMap<>();
         jdbc.query("select id, path, deleted_at is not null as trashed from notes where user_id = ?", rs -> {
             dbNotes.put(rs.getString("id"), rs.getString("path") + "|" + rs.getBoolean("trashed"));
@@ -269,7 +252,6 @@ class NotePropertyQaIT {
             violations.add(label + ": notas no banco diferem do modelo: " + dbNotes + " x " + modelNotes);
             return;
         }
-        // 2) cada nota: corpo e wikilinks gravados
         Set<String> expectedBacklinks = new TreeSet<>();
         Map<String, Set<String>> backlinksByTarget = new HashMap<>();
         for (NoteM n : v.byId.values()) {
@@ -304,7 +286,6 @@ class NotePropertyQaIT {
                 violations.add(label + ": wikilinks de " + n.path + (n.trashed ? " (lixeira)" : "") + " divergem do oráculo. faltam " + translate(missing, v) + " sobram " + translate(extra, v) + " corpo=[" + n.body().replace("\n", "\\n") + "] real=" + translate(actual, v));
             }
         }
-        // 3) backlinks (amostra)
         for (NoteM n : active) {
             JsonNode slice = a.getOk("/v1/notes/" + n.id + "/backlinks?pageSize=50");
             Set<String> got = new TreeSet<>();
@@ -314,7 +295,6 @@ class NotePropertyQaIT {
                 violations.add(label + ": backlinks de " + n.path + ": api=" + got + " oráculo=" + want);
             }
         }
-        // 4) nenhum link aponta para a lixeira
         long toTrash = jdbc.queryForObject("select count(*) from note_links l join notes t on t.id = l.target_note_id where l.user_id = ? and l.origin = 'WIKILINK' and t.deleted_at is not null", Long.class, a.id);
         if (toTrash != 0) {
             violations.add(label + ": " + toTrash + " wikilinks apontam para notas na lixeira");
@@ -332,8 +312,6 @@ class NotePropertyQaIT {
         }
         return out.toString();
     }
-
-    // ------------------------------------------------------------------------------------------------ operações
 
     @Test
     @DisplayName("BUG-QA-08: o nome escrito exatamente igual vence o nome só equivalente (acento/caixa)")
@@ -473,7 +451,6 @@ class NotePropertyQaIT {
         }
         assertThat(res.status()).as("%s mover %s -> %s: %s", label, m.path, newPath, res).isEqualTo(200);
         moves++;
-        // links que apontavam para M antes (oráculo), e o índice depois
         Map<String, String> beforeTarget = new HashMap<>();
         for (NoteM n : v.byId.values()) {
             for (int i = 0; i < n.segs.size(); i++) {
@@ -489,7 +466,6 @@ class NotePropertyQaIT {
         Set<String> rewrittenIds = new LinkedHashSet<>();
         res.node().get("rewrittenNotes").forEach(x -> rewrittenIds.add(x.get("id").asString()));
         for (NoteM n : v.byId.values()) {
-            // texto esperado como padrão: partes fixas literais e o alvo dos links de M como grupo
             StringBuilder regex = new StringBuilder();
             List<Integer> affected = new ArrayList<>();
             for (int i = 0; i < n.segs.size(); i++) {
@@ -509,11 +485,9 @@ class NotePropertyQaIT {
                 }
                 continue;
             }
-            // monta o regex a partir do corpo do modelo, trocando o alvo dos links afetados
             String model = n.body();
             int cursor = 0;
             List<Seg> render = n.segs;
-            // percorre os segmentos na ordem de renderização
             StringBuilder expectedFixed = new StringBuilder();
             for (int i = 0; i < render.size(); i++) {
                 Seg s = render.get(i);
@@ -554,11 +528,9 @@ class NotePropertyQaIT {
                 n.version = jdbc.queryForObject("select version from notes where id = ?::uuid", Long.class, n.id);
             }
         }
-        // versões das notas reescritas mudam no banco; sincroniza o modelo
         for (NoteM n : v.byId.values()) {
             n.version = jdbc.queryForObject("select version from notes where id = ?::uuid", Long.class, n.id);
         }
-        // links que NÃO apontavam para M e passaram a apontar (empate de caminho curto): registro
         for (NoteM n : v.byId.values()) {
             for (int i = 0; i < n.segs.size(); i++) {
                 String before = beforeTarget.get(n.id + "#" + i);
@@ -568,7 +540,6 @@ class NotePropertyQaIT {
                 }
             }
         }
-        // o corpo da própria nota movida (links para ela mesma) segue o mesmo padrão: o modelo foi atualizado acima quando afetado
         return "move " + oldPath + " -> " + m.path;
     }
 }

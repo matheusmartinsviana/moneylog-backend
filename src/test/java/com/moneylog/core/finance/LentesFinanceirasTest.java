@@ -138,7 +138,6 @@ class LentesFinanceirasTest {
         assertThat(NetWorth.at(s.records().ledger(), d("2026-10-20")).cardLiabilities()).isEqualTo(Money.of("300.00"));
     }
 
-    /** Um exemplo de cada tipo de movimentação e de cada origem, com um estorno. */
     static FinanceScenarioFactory cenarioCompleto() {
         FinanceScenarioFactory s = umCenarioBase();
         Transaction despesa = s.caso1DespesaPix();

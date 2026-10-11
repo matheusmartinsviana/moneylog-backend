@@ -13,10 +13,6 @@ import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/**
- * Recorrência como a API mostra: o modelo com a categoria, a conta ou o cartão, a próxima ocorrência <b>pendente</b> (as vencidas
- * contam, S-20) o estado derivado {@code ended} (S-235, sem ocorrência hoje nem depois) e o valor normalizado para o mês (0,00 se desativada ou encerrada), que é sempre uma <b>estimativa</b> (S-146).
- */
 public record RecurrenceView(Versioned<RecurringTransaction> stored, Category category, Account account, CreditCard card,
                              LocalDate nextOccurrence, Money monthlyEstimate, boolean ended) {
 
@@ -32,13 +28,11 @@ public record RecurrenceView(Versioned<RecurringTransaction> stored, Category ca
         return stored.updatedAt();
     }
 
-    /** Σ do valor normalizado para o mês dessa recorrência (0,00 se desativada ou encerrada). */
     public static Money monthlyEstimateOf(RecurringTransaction recurrence, LocalDate today) {
         MonthlyEstimate estimate = MonthlyEstimate.of(List.of(recurrence), today);
         return recurrence.direction() == FlowDirection.IN ? estimate.recurringIncome() : estimate.fixedCosts();
     }
 
-    /** A primeira ocorrência pendente (de hoje em até 12 meses, e as vencidas desde o início); {@code null} se não há. */
     public static LocalDate nextOccurrenceOf(RecurringTransaction recurrence, LocalDate today) {
         LocalDate horizon = (recurrence.schedule().startDate().isAfter(today) ? recurrence.schedule().startDate() : today).plusMonths(12);
         return recurrence.occurrences(recurrence.schedule().startDate(), horizon).stream().findFirst()

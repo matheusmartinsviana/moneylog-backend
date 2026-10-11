@@ -4,10 +4,6 @@ import java.util.Currency;
 
 import com.moneylog.core.sk.money.MoneyExceptions.UnsupportedCurrencyException;
 
-/**
- * Código de moeda ISO 4217. Só moedas com 2 casas decimais, porque {@link Money} guarda centavos.
- * O MVP usa só {@link #BRL} (S-2); o tipo existe para que a moeda viaje junto com o valor.
- */
 public record CurrencyCode(String value) {
 
     public static final CurrencyCode BRL = new CurrencyCode("BRL");

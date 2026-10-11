@@ -24,13 +24,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 
-/**
- * Edição (T27, S-68, S-73, S-81). A substituta é montada pelas mesmas fábricas da criação; a ordem de gravação é:
- * linha da movimentação (a checagem de versão e o lock da linha: duas edições concorrentes com a mesma versão
- * serializam aqui e a segunda recebe 409) → revisão do estado anterior → lançamentos antigos inativos ({@code EDIT}) →
- * lançamentos novos. A revisão sempre precede a troca dos lançamentos. Qualquer recusa de regra acontece antes de gravar
- * alguma coisa.
- */
 public class UpdateTransactionUseCaseImpl implements UpdateTransactionUseCase {
 
     private final TransactionGateway transactions;
@@ -57,7 +50,6 @@ public class UpdateTransactionUseCaseImpl implements UpdateTransactionUseCase {
     public TransactionDetails handle(UpdateTransactionCommand command) {
         CreateTransactionCommand body = command.body();
         UUID userId = body.userId();
-        // B1: trava a linha antes de ler a soma dos reembolsos (despesa) ou o saldo "já reembolsado" (reembolso).
         transactions.lockForUpdate(userId, command.transactionId());
         Transaction current = transactions.findById(userId, command.transactionId()).map(Persisted::value)
                 .orElseThrow(() -> new TransactionNotFoundException(command.transactionId()));
@@ -68,11 +60,9 @@ public class UpdateTransactionUseCaseImpl implements UpdateTransactionUseCase {
             throw new TransactionNotEditableException("o tipo não muda (é " + current.type() + ", veio " + body.type() + ").");
         }
         if (current.cardId() != null && current.type() != TransactionType.CARD_PURCHASE) {
-            // crédito no cartão e pagamento de fatura: não se editam (estorne e lance de novo, S-122)
             throw new TransactionNotEditableException("o crédito no cartão e o pagamento de fatura não são editáveis; estorne e lance de novo.");
         }
         if (current.debtId() != null) {
-            // emprestar, receber e pagar mexem na dívida (origem e quitações): não se editam; o caminho é estornar e lançar de novo
             throw new TransactionNotEditableException("a movimentação de dívida (emprestar, receber, pagar) não é editável; "
                     + "estorne (as guardas da dívida valem) e lance de novo.");
         }
@@ -97,7 +87,6 @@ public class UpdateTransactionUseCaseImpl implements UpdateTransactionUseCase {
         return assembler.assemble(saved);
     }
 
-    /** Conta arquivada (S-73): editar mudaria o saldo de uma conta que só arquiva zerada; o caminho é desarquivar. */
     private void ensureAccountsUsable(UUID userId, Transaction current) {
         for (UUID accountId : new UUID[] {current.accountId(), current.counterpartAccountId()}) {
             if (accountId != null) {
@@ -108,12 +97,6 @@ public class UpdateTransactionUseCaseImpl implements UpdateTransactionUseCase {
         }
     }
 
-    /**
-     * Edição limitada da compra no cartão (S-121): só descrição, categoria e observação. As parcelas e as faturas não mudam;
-     * os lançamentos são regravados na categoria nova (os das parcelas canceladas seguem inativos). Mesma ordem de gravação
-     * da edição comum: linha da movimentação (versão) → revisão do estado anterior → lançamentos antigos inativos →
-     * lançamentos novos. Travas: a movimentação (já travada) → o cartão.
-     */
     private TransactionDetails editCardPurchase(UpdateTransactionCommand command, Transaction current) {
         CreateTransactionCommand body = command.body();
         UUID userId = body.userId();

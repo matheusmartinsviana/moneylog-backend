@@ -39,11 +39,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 
-/**
- * Fuso e horário de verão (Q7): o "dia" é o {@code LocalDate} do fuso do usuário e a aritmética de dias nunca usa 24 h em milissegundos. A virada
- * de mês às 23:59 e às 00:00 de {@code America/Sao_Paulo}, a virada do horário de verão (a hora repetida em Nova York e a hora que não existe em
- * São Paulo, em 2018) e o ano bissexto não deslocam o dia nem o orçamento.
- */
 @DisplayName("Insights do dia: fuso, virada de mês e horário de verão (T300)")
 class InsightTimeZoneTest {
 

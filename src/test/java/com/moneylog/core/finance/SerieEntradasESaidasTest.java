@@ -43,7 +43,6 @@ class SerieEntradasESaidasTest {
         return series.points().stream().filter(p -> !day.isBefore(p.periodStart()) && !day.isAfter(p.periodEnd())).findFirst().orElseThrow();
     }
 
-    /** Receita 3.000 (05/10), despesa 100 (05/10) e reembolso de 50 dela (09/10), Pix 100 + notebook 1.200 em 6x (10/10), mais tudo que NÃO é consumo. */
     private FinanceScenarioFactory cenario() {
         FinanceScenarioFactory s = umCenarioBase();
         s.transactions.add(AccountTransactions.income(s.header(LocalDate.of(2026, 10, 5), "Salário"), Money.of("3000.00"), s.nubank, s.salario,

@@ -36,7 +36,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/** Aplicar o lote (T126): cada linha aceita vira movimentação pelo mesmo caminho da criação manual; qualquer falha desfaz o lote inteiro. */
 public class ApplyImportBatchUseCaseImpl implements ApplyImportBatchUseCase {
 
     static final String DEFAULT_DESCRIPTION = "Lançamento importado";
@@ -94,10 +93,6 @@ public class ApplyImportBatchUseCaseImpl implements ApplyImportBatchUseCase {
         return new ApplyResult(new ImportBatchView(batch, batches.counts(command.userId(), batch.id())), created);
     }
 
-    /**
-     * Reclassifica sob o lock do lote, com o estado de agora (outro lote pode ter sido aplicado depois da revisão): linha cuja chave já é de uma
-     * movimentação ativa (A2) ou transferência cuja outra ponta já é entrada/saída ativa (A1) falha com a posição da linha, sem 500 e sem gravar nada.
-     */
     private void guardAgainstDoubleCounting(UUID userId, ImportBatch batch, List<ImportBatchLine> accepted) {
         LocalDate min = accepted.stream().map(l -> l.line().date()).min(Comparator.naturalOrder()).orElseThrow();
         LocalDate max = accepted.stream().map(l -> l.line().date()).max(Comparator.naturalOrder()).orElseThrow();
@@ -115,7 +110,6 @@ public class ApplyImportBatchUseCaseImpl implements ApplyImportBatchUseCase {
         }
     }
 
-    /** Mesma chave e mesmo lote já aplicado: devolve o resultado atual. Chave de outro lote: 409. */
     private boolean alreadyAppliedWithThisKey(ApplyImportBatchCommand command, ImportBatch batch) {
         String hash = requestHash(command.batchId());
         Instant now = time.now();
@@ -133,7 +127,6 @@ public class ApplyImportBatchUseCaseImpl implements ApplyImportBatchUseCase {
         return batch.status() != com.moneylog.core.importing.domain.ImportBatchStatus.PENDING_REVIEW;
     }
 
-    /** {@code request_hash} é CHAR(64): SHA-256 (hex) do lote, igual nas duas pontas. */
     public static String requestHash(UUID batchId) {
         try {
             return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
@@ -149,7 +142,6 @@ public class ApplyImportBatchUseCaseImpl implements ApplyImportBatchUseCase {
         return new ApplyResult(new ImportBatchView(batch, batches.counts(userId, batch.id())), created);
     }
 
-    /** O comando da movimentação para a linha: conta → despesa/receita (ou uma transferência decidida); cartão → compra à vista. */
     static CreateTransactionCommand commandFor(UUID userId, ImportBatch batch, ImportBatchLine line) {
         String text = line.descriptionOverride() != null ? line.descriptionOverride() : line.line().description();
         if (text == null || text.isBlank()) {

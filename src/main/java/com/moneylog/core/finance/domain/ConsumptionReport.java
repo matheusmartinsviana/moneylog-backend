@@ -15,20 +15,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Lente de consumo e receita da competência (D1 §2.8, "Mês atual"):
- * <ul>
- *   <li>{@code income} = −Σ livro {@code INCOME} em M;</li>
- *   <li>{@code expensesPaid} = consumo vindo do tipo {@code EXPENSE}, com quebra por meio de pagamento;</li>
- *   <li>{@code credit} = consumo vindo de {@code CARD_PURCHASE} (por competência da parcela);</li>
- *   <li>{@code refunds} = Σ {@code REFUND} (conta e cartão), em valor positivo;</li>
- *   <li>{@code debtConsumption} = consumo que nasce de dívida {@code PAYABLE} sem movimentação com categoria ("um amigo pagou meu
- *       jantar", D1 §2.6.1, S-137): lançamento {@code EXPENSE} com origem {@code DEBT_RECOGNITION}, sem movimentação e sem caixa;</li>
- *   <li>{@code consumption} = Σ livro {@code EXPENSE} em M = expensesPaid + credit − refunds + debtConsumption (identidade testada);</li>
- *   <li>{@code investedNet}, {@code lent}, {@code received}: pela data da movimentação no mês;</li>
- *   <li>{@code net} = receitas − consumo (S-23).</li>
- * </ul>
- */
 public record ConsumptionReport(Competence competence, Money income, Money expensesPaid, Map<PaymentMethod, Money> expensesByMethod,
                                 Money credit, Money refunds, Money consumption, Money investedNet, Money lent, Money received,
                                 Money net, Money debtConsumption) {

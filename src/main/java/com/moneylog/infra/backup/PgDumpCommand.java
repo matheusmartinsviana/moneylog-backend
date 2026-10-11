@@ -12,10 +12,6 @@ import java.util.concurrent.TimeUnit;
 import com.moneylog.core.backup.app.BackupException;
 import com.moneylog.core.backup.app.DatabaseDumper;
 
-/**
- * {@code pg_dump -Fc} / {@code pg_restore} como processo. A senha vai por {@code PGPASSWORD} (nunca na linha de comando, que aparece em
- * {@code ps}); a saída de erro do processo não é copiada para a exceção (pode ecoar dados).
- */
 public class PgDumpCommand implements DatabaseDumper {
 
     private static final long TIMEOUT_MINUTES = 30;
@@ -34,7 +30,6 @@ public class PgDumpCommand implements DatabaseDumper {
         this.password = password;
     }
 
-    /** Lê host, porta e banco de uma URL JDBC {@code jdbc:postgresql://host:5432/db}. */
     public static PgDumpCommand fromJdbcUrl(String jdbcUrl, String user, String password) {
         URI uri = URI.create(jdbcUrl.replaceFirst("^jdbc:", ""));
         String db = uri.getPath() == null ? "" : uri.getPath().replaceFirst("^/", "");

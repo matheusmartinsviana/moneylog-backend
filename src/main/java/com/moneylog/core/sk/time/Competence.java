@@ -8,10 +8,6 @@ import java.util.Objects;
 
 import com.moneylog.core.sk.time.TimeExceptions.InvalidCompetenceException;
 
-/**
- * Mês de competência ({@code YearMonth}), usado na lente de consumo/receita (D1 §1.2).
- * A competência de um posting é o mês da data efetiva dele, exceto na receita com competência declarada (ADR-017). Formato textual: {@code AAAA-MM}.
- */
 public record Competence(YearMonth value) implements Comparable<Competence> {
 
     public Competence {

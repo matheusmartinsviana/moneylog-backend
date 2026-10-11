@@ -17,7 +17,6 @@ import com.moneylog.core.notification.domain.SummaryFrequency;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/** Casos de uso de notificações (Etapa 7). Todos filtram pelo usuário do token. */
 public interface NotificationUseCases {
 
     interface ListNotificationsUseCase {
@@ -29,15 +28,12 @@ public interface NotificationUseCases {
     }
 
     interface MarkNotificationReadUseCase {
-        /** Idempotente. */
         void handle(UUID userId, UUID notificationId);
     }
 
     interface MarkAllNotificationsReadUseCase {
         int handle(UUID userId);
     }
-
-    // ---- lembretes
 
     record ReminderCommand(UUID userId, String title, LocalDate remindOn, LocalTime remindAt, String note, String linkType, UUID linkId) {
     }
@@ -58,12 +54,9 @@ public interface NotificationUseCases {
         Reminder handle(UUID userId, UUID reminderId);
     }
 
-    /** Adia para {@code newDate} (a data mínima é decidida pelo chamador: amanhã, +N dias). */
     interface SnoozeReminderUseCase {
         Reminder handle(UUID userId, UUID reminderId, LocalDate newDate);
     }
-
-    // ---- configurações
 
     interface GetNotificationSettingsUseCase {
         NotificationSettings handle(UUID userId);
@@ -74,24 +67,18 @@ public interface NotificationUseCases {
     }
 
     interface SaveNotificationSettingsUseCase {
-        /** {@code 409 VERSION_CONFLICT} se a versão não é a atual. */
         NotificationSettings handle(SaveSettingsCommand command);
     }
 
-    // ---- geração e jobs
-
     interface GenerateNotificationsUseCase {
-        /** Gera as notificações do dia do usuário (idempotente); devolve quantas foram criadas agora. */
         int handle(UUID userId);
     }
 
     interface ArchiveOldNotificationsUseCase {
-        /** Arquiva as lidas há mais de 90 dias (S-179); devolve quantas. */
         int handle();
     }
 
     interface DispatchPushUseCase {
-        /** Envia o push das notificações elegíveis; devolve quantas saíram. Sem push ligado, não faz nada. */
         int handle();
     }
 
@@ -102,8 +89,6 @@ public interface NotificationUseCases {
     record DailyMessageView(DailyMessage message, String source, Instant generatedAt) {
         public static final String STATIC = "STATIC";
     }
-
-    // ---- push
 
     record SubscribeCommand(UUID userId, String endpoint, String p256dh, String auth, String userAgent) {
     }
@@ -116,7 +101,6 @@ public interface NotificationUseCases {
         void handle(UUID userId, UUID subscriptionId);
     }
 
-    /** Chave VAPID pública e se o push está ativo neste servidor (o front decide o fluxo). */
     interface GetPushStatusUseCase {
         PushStatus handle();
     }

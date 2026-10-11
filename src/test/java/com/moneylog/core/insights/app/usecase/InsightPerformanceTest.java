@@ -40,11 +40,6 @@ import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/**
- * Desempenho (T301, ADR-008): 5 anos de dados sintéticos (mais de 20 mil lançamentos). Cada requisição faz <b>uma</b> leitura do razão, inclusive o
- * histórico de 12 meses; o cálculo em memória fica abaixo de 500 ms (p95) numa máquina de desenvolvimento. O limite do teste é folgado
- * (3 s) para não ficar frágil em CI com carga; o número medido é impresso.
- */
 @DisplayName("Insights: 5 anos de dados, 1 leitura do razão por requisição (T301)")
 class InsightPerformanceTest {
 

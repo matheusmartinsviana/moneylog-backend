@@ -15,7 +15,6 @@ public class SkipOccurrenceUseCaseImpl implements SkipOccurrenceUseCase {
 
     @Override
     public OccurrenceView handle(SkipOccurrenceCommand command) {
-        // pular e realizar a mesma ocorrência se serializam na recorrência; a realizada é lida sob a trava
         recurrences.lockForUpdate(command.userId(), command.recurrenceId());
         RecurringTransaction recurrence = recurrences.findById(command.userId(), command.recurrenceId())
                 .orElseThrow(() -> new RecurrenceNotFoundException(command.recurrenceId()));

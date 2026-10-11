@@ -43,7 +43,6 @@ public class EnsureOwnerUseCaseImpl implements EnsureOwnerUseCase {
         return new OwnerEnsured(owner, false, previousEmail, reset);
     }
 
-    /** Idempotente: se o primeiro acesso já está pendente e sem senha, não faz nada (reinício não revoga de novo). */
     private boolean resetPassword(User owner) {
         OwnerAccess access = users.findAccess(owner.id()).orElse(null);
         if (access != null && !access.hasStoredPassword() && access.passwordSetupPending()) {

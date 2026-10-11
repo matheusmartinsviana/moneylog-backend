@@ -67,11 +67,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.Transaction
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidReasonRequiredException;
 
-/**
- * T57: estorno, cancelamento das parcelas restantes e edição limitada da compra no cartão, sobre o cenário (Notebook 1.200
- * em 6x e Mercado 1.083 à vista, em 10/10 e 12/10; fatura de 25/10 com 1.283). Cada leitura do gateway devolve uma <b>cópia</b>
- * da movimentação, como o banco: o que o caso de uso muda não vaza para a cadeia lida antes.
- */
 @DisplayName("Estorno, cancelamento de parcelas e edição de compra no cartão (T57)")
 class CardPurchaseLifecycleUseCasesTest {
 
@@ -112,7 +107,7 @@ class CardPurchaseLifecycleUseCasesTest {
         when(transactions.update(any())).thenAnswer(call -> new Persisted<>(call.getArgument(0), NOW, NOW));
         found(notebook);
         found(mercado);
-        found(scenario.pagarFatura("0.01", LocalDate.of(2026, 10, 25), OCT_10)); // pagamento qualquer, só para ter um INVOICE_PAYMENT
+        found(scenario.pagarFatura("0.01", LocalDate.of(2026, 10, 25), OCT_10));
         scenario.transactions.removeLast();
         TransactionDetailsAssembler assembler = new TransactionDetailsAssembler(transactions, accounts, categories, cards, time);
         cancel = new CancelInstallmentsUseCaseImpl(transactions, cards, revisions, ledger, assembler, time);
@@ -147,8 +142,6 @@ class CardPurchaseLifecycleUseCasesTest {
         verify(ledger, never()).deactivateByInstallments(any(), any(), anyCollection(), any(), any());
         verify(ledger, never()).append(any(), any());
     }
-
-    // ---------------------------------------------------------------- cancelar parcelas
 
     @Nested
     @DisplayName("cancelar as parcelas restantes")
@@ -242,8 +235,6 @@ class CardPurchaseLifecycleUseCasesTest {
         }
     }
 
-    // ---------------------------------------------------------------- estornar
-
     @Nested
     @DisplayName("estornar")
     class Estornar {
@@ -315,8 +306,6 @@ class CardPurchaseLifecycleUseCasesTest {
         }
     }
 
-    // ---------------------------------------------------------------- editar
-
     @Nested
     @DisplayName("editar (descrição, categoria e observação)")
     class Editar {
@@ -361,7 +350,7 @@ class CardPurchaseLifecycleUseCasesTest {
             found(purchase);
             assertThat(purchase.installments().stream().filter(i -> i.isCanceled())).hasSize(3);
             Transaction partial = scenario.compraNoCartao("300.00", 3);
-            when(time.today()).thenReturn(LocalDate.of(2026, 11, 26)); // a parcela 1 em fatura fechada, as outras abertas/futuras
+            when(time.today()).thenReturn(LocalDate.of(2026, 11, 26));
             CardTransactions.cancelRemainingInstallments(partial, scenario.chain(), LocalDate.of(2026, 11, 26), NOW);
             found(partial);
             assertThat(partial.installments().stream().filter(i -> i.isCanceled()).count()).isGreaterThanOrEqualTo(1);
@@ -420,8 +409,6 @@ class CardPurchaseLifecycleUseCasesTest {
             verify(ledger).append(eq(USER_ID), any());
         }
     }
-
-    // ---------------------------------------------------------------- flags
 
     @Test
     @DisplayName("flags: compra aberta é editable e voidable; em fatura fechada, voidBlockedBy TRANSACTION_IN_CLOSED_INVOICE; com reembolso, HAS_ACTIVE_REFUNDS; crédito não é editable")

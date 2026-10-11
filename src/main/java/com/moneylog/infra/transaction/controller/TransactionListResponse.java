@@ -5,7 +5,6 @@ import java.util.List;
 import com.moneylog.core.finance.app.transactions.TransactionListing;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code TransactionSlice} do contrato: página + {@code totals} do filtro inteiro (S-74, S-80). */
 public record TransactionListResponse(List<TransactionResponse> items, boolean hasNext, Totals totals) {
 
     public record Totals(int count, CashFlow cashFlow) {

@@ -25,11 +25,6 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.moneylog.infra.exception.GlobalExceptionHandler;
 import com.moneylog.util.ContractValidation;
 
-/**
- * Ajuste de contrato pedido pelo frontend: {@code UpcomingItem.bucket} pode ser ausente ou nulo (item sem data,
- * {@code undated}) e {@code refId} pode ser nulo. Nesta etapa nenhuma fonte de compromisso é persistida, então a API real
- * ainda não devolve item; este teste prova que o <b>contrato</b> aceita as formas, e reprova as inválidas.
- */
 @DisplayName("Contrato: UpcomingItem com bucket ausente/nulo e refId nulo")
 class UpcomingContractTest {
 

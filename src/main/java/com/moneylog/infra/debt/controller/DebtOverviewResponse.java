@@ -11,7 +11,6 @@ import com.moneylog.core.finance.domain.DebtOverview.IncomeSource;
 import com.moneylog.core.finance.domain.DebtOverview.PayoffReason;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code DebtOverview} do contrato (ADR-013): tudo calculado no backend; o front só exibe. Razões em texto com 4 casas. */
 public record DebtOverviewResponse(LocalDate asOf, Money total, Parts parts, Cards cards, DebtGroup people, DebtGroup other,
                                    Money receivablesInfo, boolean hasRecords, FixedCosts fixedCosts, Income income, Liquidity liquidity,
                                    Comparison comparison, Schedule schedule, PayoffGoal payoffGoal, Tracked tracked) {
@@ -60,10 +59,6 @@ public record DebtOverviewResponse(LocalDate asOf, Money total, Parts parts, Car
     public record Point(String competence, Money cards, Money people, Money other, Money total, Money remainingAfter) {
     }
 
-    /**
-     * Compromissos acompanhados (ADR-014): fora do {@code total}. {@code scheduleByMonth} é o pendente de pagamento direto por mês de
-     * vencimento (cronograma do projeto de longo prazo), à parte da curva das dívidas próprias.
-     */
     public record Tracked(List<TrackedItem> items, List<TrackedMonth> scheduleByMonth) {
     }
 

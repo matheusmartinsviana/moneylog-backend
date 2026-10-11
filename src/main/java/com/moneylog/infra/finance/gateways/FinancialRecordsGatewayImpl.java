@@ -43,15 +43,8 @@ import com.moneylog.infra.transaction.gateways.TransactionHydrator;
 import com.moneylog.infra.transaction.persistence.TransactionEntity;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/**
- * O único carregamento dos registros financeiros (S-79): contas, cartões (com as regras de fechamento), movimentações
- * (ativas e estornadas, com parcelas e faturas) com os lançamentos do razão, as dívidas (com as quitações e os lançamentos próprios) e as metas
- * com as reservas lógicas (Etapa 5). Tudo filtrado pelo {@code userId}. Os mesmos
- * {@link FinancialRecords} alimentam saldo das contas, lista, entries e dashboard.
- */
 public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
 
-    /** Tentativas de leitura num caso de uso de escrita antes de responder {@code 409} (BUG-QA-26). */
     private static final int READ_ATTEMPTS = 4;
     private static final Logger log = LoggerFactory.getLogger(FinancialRecordsGatewayImpl.class);
 
@@ -86,13 +79,6 @@ public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
         this.hydrator = hydrator;
     }
 
-    /**
-     * Carrega os registros. Em {@code REPEATABLE_READ} (leituras, {@code snapshotReadOnly}) todas as consultas veem um instantâneo só, e
-     * uma inconsistência é dado corrompido: propaga (fail-closed, S-94). Nos casos de uso de <b>escrita</b> ({@code READ COMMITTED},
-     * com travas já tomadas) cada consulta tem o seu instantâneo, e uma escrita de dívida ou de movimentação que confirma no meio
-     * da leitura aparece como estado inconsistente (BUG-QA-26): a leitura é refeita (a escrita já confirmou) e, se ainda
-     * inconsistente, a falha é <b>transitória</b>: {@code 409 CONFLICT} com {@code Retry-After} (S-220), nunca 500. Nada foi gravado.
-     */
     @Override
     public FinancialRecords load(UUID userId) {
         boolean writeTransaction = TransactionSynchronizationManager.isActualTransactionActive()
@@ -106,7 +92,6 @@ public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
                 return loadOnce(userId);
             } catch (DomainException e) {
                 last = e;
-                // as entidades já lidas ficam no contexto de persistência: sem limpar, a nova leitura devolveria as mesmas linhas
                 entityManager.flush();
                 entityManager.clear();
                 log.warn("Leitura inconsistente do razão (escrita concorrente), tentativa {}/{}: {}", attempt + 1, READ_ATTEMPTS, e.toString());
@@ -132,7 +117,6 @@ public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
                 debtHydrator.loadAll(userId, debts.findByUserId(userId)), loadGoals(userId));
     }
 
-    /** Metas com as reservas lógicas (S-147): não são lançamentos; só o {@code GoalReserves} as lê. */
     private List<Goal> loadGoals(UUID userId) {
         List<GoalEntity> entities = goals.findByUserId(userId);
         if (entities.isEmpty()) {

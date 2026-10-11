@@ -20,10 +20,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/**
- * Linha de {@code debts}. Só os fatos gravados (D1 §2.6): o status e o saldo são derivados das quitações (S-41); o que a linha
- * guarda do estado é o encerramento ({@code closure}).
- */
 @Entity
 @Table(name = "debts")
 public class DebtEntity {
@@ -37,7 +33,6 @@ public class DebtEntity {
     @Column(name = "person_id", updatable = false)
     private UUID personId;
 
-    /** Credor livre das "outras dívidas" (V8.04); {@code null} quando há pessoa. */
     @Column(name = "creditor_name", length = 100, updatable = false)
     private String creditorName;
 
@@ -68,7 +63,6 @@ public class DebtEntity {
     @Column(name = "origin_transaction_id", updatable = false)
     private UUID originTransactionId;
 
-    /** Categoria de despesa da dívida {@code PAYABLE} que nasceu de consumo (S-137, V4.01); {@code null} nas demais. */
     @Column(name = "category_id", updatable = false)
     private UUID categoryId;
 
@@ -118,7 +112,6 @@ public class DebtEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o que muda numa dívida existente: descrição, previsão e encerramento. A versão sobe a cada gravação. */
     public void apply(String newDescription, LocalDate newExpectedDate, DebtClosure newClosure, LocalDate newClosureDate,
                       String newClosureReason, Instant now) {
         this.description = newDescription;

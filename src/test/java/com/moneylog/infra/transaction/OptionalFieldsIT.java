@@ -30,7 +30,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/** Contrato 2.11.0: descrição, categoria, método, parcelas, saldo/data de abertura e prioridade opcionais, resolvidos no servidor. */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Campos opcionais: o servidor resolve os padrões (contrato 2.11.0)")

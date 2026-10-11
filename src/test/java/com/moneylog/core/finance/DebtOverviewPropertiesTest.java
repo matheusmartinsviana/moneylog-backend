@@ -34,12 +34,6 @@ import com.moneylog.core.transaction.domain.CardTransactions;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/**
- * T245 (propriedades da visão de dívidas), sem dependência nova: para cada semente, sequências aleatórias de compras (1 a 12x), compras em
- * andamento, pagamentos totais/parciais/a maior, cancelamentos, estornos, reembolsos e dívidas. Depois de cada passo:
- * total = Σ partes; cartão = Σ planos + à vista + ajuste (ajuste ≤ 0); cartão = −saldo do livro CARD + crédito transportado; pessoas + outras
- * = −Σ PAYABLE; overdue + Σ pontos + undated + beyondHorizon = total; e criar compra em andamento sem categoria não cria consumo.
- */
 @DisplayName("Propriedades da visão total de dívidas (T245, ADR-013)")
 class DebtOverviewPropertiesTest {
 
@@ -71,7 +65,6 @@ class DebtOverviewPropertiesTest {
                     s.transactions.add(tx);
                     assertThat(consumption(s)).as(ctx + ": compra em andamento não cria consumo").isEqualTo(consumptionBefore);
                 } catch (OngoingFirstInvoiceNotPayableException e) {
-                    // fatura paga: recusa esperada
                 }
             } else if (kind < 20) {
                 Debt debt = random.nextBoolean()
@@ -114,7 +107,6 @@ class DebtOverviewPropertiesTest {
             assertThat(card.adjustment().isPositive()).as(ctx + ": ajuste ≤ 0").isFalse();
             assertThat(card.total()).isEqualTo(card.invoiced().add(card.future()));
         }
-        // nada em dobro: o cartão é o saldo do livro CARD (mais o crédito transportado, que o estado líquido já abateu)
         Money cardBook = records.ledger().balanceAllDates(BookRef.card(s.roxinho.id()));
         assertThat(o.cards().total()).as(ctx + ": cartão = −livro CARD + crédito").isEqualTo(cardBook.negate().add(s.chain().creditBalance()));
         Money payables = records.ledger().sum(e -> e.posting().bookType() == BookType.PAYABLE);

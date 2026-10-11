@@ -25,10 +25,6 @@ import com.moneylog.infra.exception.GlobalExceptionHandler;
 
 import jakarta.persistence.PessimisticLockException;
 
-/**
- * B2/S-215: falha de trava ou deadlock vira {@code 409 CONFLICT} com {@code Retry-After} e mensagem genérica, nunca 500,
- * venha ela direta, embrulhada ou só como SQLState do Postgres. Qualquer outra falha continua 500 sem vazar a causa.
- */
 @DisplayName("Falha de trava/deadlock vira 409 CONFLICT (B2, S-215)")
 class LockFailureMappingTest {
 

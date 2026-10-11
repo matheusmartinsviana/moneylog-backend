@@ -11,10 +11,8 @@ public interface SearchUseCase {
     int MAX_LIMIT = 8;
     int DEFAULT_LIMIT = 5;
 
-    /** Busca global sem diferenciar acento nem caixa; leitura pura, só do usuário do token. */
     SearchResults handle(SearchQuery query);
 
-    /** @param q o termo; é aparado e validado ({@link SearchTerm}): inválido é erro de programação (a borda web já recusou com 400) */
     record SearchQuery(UUID userId, String q, int limit) {
 
         public SearchQuery {
@@ -24,7 +22,6 @@ public interface SearchUseCase {
             }
         }
 
-        /** Sem o termo (S-287: {@code q} fora do log). */
         @Override
         public String toString() {
             return "SearchQuery[userId=" + userId + ", limit=" + limit + "]";

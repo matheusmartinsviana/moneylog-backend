@@ -18,10 +18,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T96: {@code GET /v1/projections}. Cenário do plano (relógio 10/10/2026): Nubank 20.000,00; fatura de 1.283,00 vencendo 05/11; parcelas de 200,00 em
- * 05/12 a 05/04; Internet de 119,00 todo dia 10 (a partir de 10/11); salário recorrente de 3.000,00 todo dia 5 (a partir de 05/11); reserva de 8.500,00.
- */
 @DisplayName("Projeções determinísticas: série mensal, premissas, tendência opcional e coerência com o dashboard (T96)")
 class ProjectionIT extends E4ItBase {
 

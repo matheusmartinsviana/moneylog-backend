@@ -35,7 +35,6 @@ import com.moneylog.infra.account.controller.AccountRequests.AccountUpdate;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/** Contas (D1 §2.2): CRUD com saldo inicial como lançamento, arquivar e desarquivar. */
 @RestController
 @RequestMapping("/v1/accounts")
 public class AccountController {

@@ -38,10 +38,6 @@ import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * {@code Backup} do contrato (S-153): o JSON versionado ({@code schemaVersion}) com todos os dados financeiros do usuário. Nada de
- * usuário, hash de senha, refresh token nem chave de idempotência: só as entidades de negócio e o razão.
- */
 public record BackupResponse(int schemaVersion, Instant generatedAt, List<AccountItem> accounts, List<CategoryItem> categories,
                              List<CardItem> cards, List<TransactionItem> transactions, List<DebtItem> debts, List<PersonItem> people,
                              List<RecurrenceItem> recurrences, List<GoalItem> goals, List<PostingItem> ledgerPostings) {

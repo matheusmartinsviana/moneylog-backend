@@ -12,7 +12,6 @@ import com.moneylog.core.importing.parser.ColumnMapping;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/** Leituras da importação (cada uma filtra pelo usuário do token). */
 public interface ImportQueryUseCases {
 
     interface GetImportBatchUseCase {
@@ -27,7 +26,6 @@ public interface ImportQueryUseCases {
         Slice<ImportBatchLine> handle(UUID userId, UUID batchId, ImportLineStatus status, ImportLineFlag flag, PageQuery page);
     }
 
-    /** Descarta um lote ainda em revisão (nada foi aplicado, então nada é estornado). Lote aplicado/desfeito: 422. */
     interface DiscardImportBatchUseCase {
         void handle(UUID userId, UUID batchId);
     }
@@ -41,7 +39,6 @@ public interface ImportQueryUseCases {
     }
 
     interface GetImportMappingUseCase {
-        /** Falha com {@code IMPORT_MAPPING_NOT_FOUND} (404) se ainda não há mapeamento salvo para a conta/cartão. */
         ColumnMapping handle(UUID userId, UUID sourceId);
     }
 

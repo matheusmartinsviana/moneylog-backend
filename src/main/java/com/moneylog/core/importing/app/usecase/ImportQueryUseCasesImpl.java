@@ -27,7 +27,6 @@ import com.moneylog.core.importing.parser.ColumnMapping;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/** Implementações das leituras e dos cadastros leves da importação. */
 public final class ImportQueryUseCasesImpl {
 
     private ImportQueryUseCasesImpl() {

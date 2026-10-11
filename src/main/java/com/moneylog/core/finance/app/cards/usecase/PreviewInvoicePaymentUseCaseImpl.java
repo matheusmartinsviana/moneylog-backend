@@ -23,12 +23,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Prévia do pagamento (S-136). Monta o mesmo {@code INVOICE_PAYMENT} que o pagamento montaria
- * ({@link PayInvoiceUseCaseImpl#plan}, a mesma fábrica do domínio, com a mesma guarda de status e de valor), acrescenta-o
- * à cadeia em memória e descarta. A conta é uma conta líquida transitória (a conta real não muda o resultado, só o caixa).
- * Não trava nada: roda em transação somente leitura.
- */
 public class PreviewInvoicePaymentUseCaseImpl implements PreviewInvoicePaymentUseCase {
 
     private final InvoiceLookupGateway lookup;

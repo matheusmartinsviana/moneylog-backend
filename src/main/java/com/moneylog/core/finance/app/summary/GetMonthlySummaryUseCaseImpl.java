@@ -12,7 +12,6 @@ import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.finance.domain.MonthlySummary;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Não lê o razão por outro caminho (S-79): só {@link MonthlySummary#of} sobre o {@link FinancialRecords} carregado uma vez. */
 public class GetMonthlySummaryUseCaseImpl implements GetMonthlySummaryUseCase {
 
     private final FinancialRecordsGateway records;

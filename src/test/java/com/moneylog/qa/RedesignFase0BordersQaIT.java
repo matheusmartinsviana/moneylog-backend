@@ -37,11 +37,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T190 (QA independente): bordas dos relatórios e das variações. Mês e período inválidos, limite, valor máximo (teto S-78), categoria e conta
- * arquivadas, mês sem movimento, usuário sem contas, relógio em fronteiras de dia (inclusive a transição do horário de verão de 2018/2019) e
- * campos opcionais ausentes ou nulos conforme o contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T190: bordas dos relatórios (valor máximo, arquivados, fusos, parâmetros)")
@@ -147,7 +142,6 @@ class RedesignFase0BordersQaIT {
                 assertThat(change.get("since").asString()).isEqualTo(expectedSince.toString());
             }
         }
-        // usuário sem nenhuma conta
         UUID id = UUID.randomUUID();
         new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "bare-" + id + "@moneylog.com"));
         String bearer = auth.bearer(id);
@@ -175,7 +169,6 @@ class RedesignFase0BordersQaIT {
     void valorMaximo() throws Exception {
         Actor a = world.new Actor("bord3");
         String max = "999999999.99";
-        // conta com saldo grande para não esbarrar em saldo
         String big = GoalQa.account(a, "Grande", "CHECKING", "999999999.99", "2026-09-01");
         String lazer = a.category("Lazer", CategoryKind.EXPENSE);
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", QaWorld.expense(big, a.food, max, "2026-10-10", "Max 1"), DebtQa.key()));
@@ -199,7 +192,6 @@ class RedesignFase0BordersQaIT {
         assertThat(summary.get("savingsRate").asString()).matches("^-?\\d+\\.\\d{4}$");
         JsonNode balances = a.getOk("/v1/dashboard/summary").get("balances");
         System.out.println("QA-F0-BORDER inAccountsChange extremo: " + balances.get("inAccountsChange"));
-        // previous pequeno e amount enorme: percent gigante cabe no padrão do Ratio
         Actor t = world.new Actor("bord3b");
         String acc = GoalQa.account(t, "Pequena", "CHECKING", "0.01", "2026-09-01");
         CardQaWorld.ok(t.call(HttpMethod.POST, "/v1/transactions", QaWorld.income(acc, t.income, max, "2026-10-05"), DebtQa.key()));
@@ -262,13 +254,11 @@ class RedesignFase0BordersQaIT {
     void todasAsJanelas() throws Exception {
         Actor a = world.new Actor("bord6");
         LocalDate day = LocalDate.of(2027, 12, 20);
-        // um lançamento por dia de 2027-11-01 a 2028-04-30 (1 centavo no dia do mês), para cada janela ter conteúdo e o oráculo SQL conferir
         for (LocalDate d = LocalDate.of(2027, 11, 1); !d.isAfter(LocalDate.of(2028, 4, 30)); d = d.plusDays(1)) {
             jdbc.update("insert into transactions (id, user_id, type, status, amount_cents, currency, transaction_date, description, payment_method, account_id, "
                     + "category_id, source, created_at, updated_at, version) values (?, ?, 'EXPENSE', 'ACTIVE', ?, 'BRL', ?, 'x', 'PIX', ?, ?, 'MANUAL', now(), now(), 0)",
                     UUID.randomUUID(), a.id, 1L + d.getDayOfMonth(), java.sql.Date.valueOf(d), UUID.fromString(a.nubank), UUID.fromString(a.food));
         }
-        // postings correspondentes
         jdbc.update("insert into ledger_postings (id, user_id, source_type, source_id, transaction_id, book_type, book_id, competence, effective_date, amount_cents, "
                 + "currency, active, created_at, updated_at) select gen_random_uuid(), user_id, 'TRANSACTION', id, id, 'EXPENSE', category_id, to_char(transaction_date,'YYYY-MM'), "
                 + "transaction_date, amount_cents, 'BRL', true, now(), now() from transactions where user_id = ?", a.id);
@@ -330,17 +320,17 @@ class RedesignFase0BordersQaIT {
     void horarioDeVerao() throws Exception {
         Actor a = world.new Actor("bord7");
         String[][] instants = {
-                {"2018-11-04T02:59:59Z", "2018-11-03"}, // 23:59:59 -03 de 03/11
-                {"2018-11-04T03:00:00Z", "2018-11-04"}, // 01:00:00 -02 de 04/11 (00:00 não existiu)
-                {"2019-02-17T01:59:59Z", "2019-02-16"}, // 23:59:59 -02 de 16/02
-                {"2019-02-17T02:00:00Z", "2019-02-16"}, // 23:00:00 -03 de 16/02 (a hora repete)
+                {"2018-11-04T02:59:59Z", "2018-11-03"},
+                {"2018-11-04T03:00:00Z", "2018-11-04"},
+                {"2019-02-17T01:59:59Z", "2019-02-16"},
+                {"2019-02-17T02:00:00Z", "2019-02-16"},
                 {"2019-02-17T02:59:59Z", "2019-02-16"},
-                {"2019-02-17T03:00:00Z", "2019-02-17"}, // 00:00:00 -03 de 17/02
-                {"2028-02-29T02:59:59Z", "2028-02-28"}, // 23:59:59 -03 de 28/02 (bissexto)
+                {"2019-02-17T03:00:00Z", "2019-02-17"},
+                {"2028-02-29T02:59:59Z", "2028-02-28"},
                 {"2028-02-29T03:00:00Z", "2028-02-29"},
                 {"2028-03-01T02:59:59Z", "2028-02-29"},
                 {"2028-03-01T03:00:00Z", "2028-03-01"},
-                {"2026-12-31T23:59:59Z", "2026-12-31"}, // 20:59:59 -03
+                {"2026-12-31T23:59:59Z", "2026-12-31"},
                 {"2027-01-01T02:59:59Z", "2026-12-31"},
                 {"2027-01-01T03:00:00Z", "2027-01-01"}};
         for (String[] i : instants) {

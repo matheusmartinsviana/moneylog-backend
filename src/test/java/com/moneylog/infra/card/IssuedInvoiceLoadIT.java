@@ -11,10 +11,6 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.infra.debt.E4ItBase;
 
-/**
- * Carga de fatura já emitida (ADR-014): fatura fechada, ainda no prazo de vencimento e sem nenhum item recebe a compra do ciclo como lançamento
- * tardio; depois do vencimento volta a regra geral (fatura sem movimento é paga: a compra vai para a corrente). Cartão fecha dia 25, vence dia 5.
- */
 @DisplayName("Fatura emitida e sem itens recebe a compra do ciclo dentro do prazo (ADR-014)")
 class IssuedInvoiceLoadIT extends E4ItBase {
 
@@ -42,7 +38,6 @@ class IssuedInvoiceLoadIT extends E4ItBase {
         assertThat(closed.get("status").asString()).isEqualTo("CLOSED");
         assertThat(money(closed, "total")).isEqualTo("120.00");
         assertThat(count("transactions")).isEqualTo(1);
-        // segunda compra do mesmo ciclo: a fatura já tem item, segue o mesmo caminho
         purchase("2026-10-12", "30.00");
         assertThat(money(invoice("2026-10-25"), "total")).isEqualTo("150.00");
     }

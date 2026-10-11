@@ -7,10 +7,6 @@ import com.moneylog.core.debt.domain.DebtVoidRules;
 import com.moneylog.core.sk.ledger.VoidDecision;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidPolicyNotApplicableException;
 
-/**
- * Implementação da {@link TransactionVoidPolicy} para as movimentações de dívida (S-36): origem só sem quitações
- * ativas e sem encerramento; quitação só se a dívida não foi perdoada. As regras ficam em {@link DebtVoidRules}.
- */
 public final class DebtTransactionVoidPolicy implements TransactionVoidPolicy {
 
     private final Debt debt;

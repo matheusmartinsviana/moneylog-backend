@@ -23,23 +23,11 @@ import com.moneylog.core.sk.money.MoneyExceptions.CurrencyMismatchException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidTransactionOperationException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
 
-/**
- * Fábricas e operações das movimentações de cartão (D1 §2.4, §2.5): {@code CARD_PURCHASE}, {@code INVOICE_PAYMENT},
- * {@code REFUND} no cartão e cancelamento das parcelas restantes.
- */
 public final class CardTransactions {
 
     private CardTransactions() {
     }
 
-    /**
-     * Compra no cartão com alocação pelo status das faturas (S-14): item datado num ciclo de fatura fechada e não paga
-     * entra nela como lançamento tardio; se ela já foi paga, entra na corrente. As parcelas seguintes seguem a
-     * anterior. Para cada parcela k: {@code EXPENSE(cat) +p_k / CARD −p_k} na data efetiva da parcela, origem
-     * {@code TRANSACTION} com o id da parcela. Nenhum posting em {@code ACCOUNT}: caixa 0 (PR 01 caso 2).
-     *
-     * <p>É a única forma de criar uma compra no cartão (A2): não existe alocação só pelo calendário.
-     */
     public static Transaction purchase(TransactionHeader header, Money amount, CreditCard card, Category category, int installments,
                                        InvoiceChain chain, LocalDate today) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
@@ -50,15 +38,6 @@ public final class CardTransactions {
                 InvoiceAllocator.forInstallments(header.date(), installments, chain, today));
     }
 
-    /**
-     * Compra parcelada <b>em andamento</b> (ADR-013, P5/P7): o usuário informa o valor de cada parcela, o total de parcelas e quantas
-     * faltam pagar (a próxima a vencer inclusive: "parcela 3 de 10" = faltam 8). Grava só as parcelas restantes
-     * ({@code total−restantes+1..total}) na fatura da {@code firstInvoiceDate} e nas seguintes; <b>não cria consumo retroativo</b>:
-     * sem categoria, cada parcela é {@code CARD −p / EQUITY +p} (consumo 0, dívida +p, como a dívida reconhecida sem movimentação);
-     * com categoria, {@code EXPENSE(cat) +p / CARD −p} só na competência de cada parcela (que não pode ser anterior à de hoje).
-     * A fatura da próxima parcela não pode estar paga ({@code ONGOING_FIRST_INVOICE_NOT_PAYABLE}); não há lançamento tardio
-     * silencioso em fatura paga.
-     */
     public static Transaction ongoingPurchase(TransactionHeader header, Money installmentAmount, int totalInstallments,
                                               int remainingInstallments, CreditCard card, Category category, InvoiceChain chain,
                                               LocalDate today) {
@@ -88,7 +67,6 @@ public final class CardTransactions {
         List<TransactionInstallment> plan = InstallmentPlan.generateOngoing(header.id(), installmentAmount, totalInstallments,
                 remainingInstallments, header.date(), allocations);
         BookRef counterpart = category == null ? BookRef.equity() : category.book();
-        // sem categoria a contrapartida é EQUITY: o CARD fica negativo (dívida) e o EQUITY positivo, como no reconhecimento de dívida
         List<LedgerEntry> entries = new ArrayList<>();
         for (TransactionInstallment installment : plan) {
             entries.addAll(LedgerEntry.activeGroup(PostingSource.installment(header.id(), installment.id()), List.of(
@@ -99,12 +77,6 @@ public final class CardTransactions {
                 .card(card.id()).category(category == null ? null : category.id()).installments(plan).entries(entries).build();
     }
 
-    /**
-     * Item de <b>fatura histórica</b> (ADR-014): o banco já cobrou a fatura que fechou em {@code closingDate} e o usuário só tem o
-     * valor pago, não as compras. Grava {@code CARD −X / EQUITY +X} na fatura desse fechamento (mesmo vazia/"paga"), sem categoria, sem
-     * lançamento tardio e <b>sem consumo</b>; depois o pagamento real ({@code INVOICE_PAYMENT}) a quita. Resultado final: CARD 0,
-     * ACCOUNT −X, EQUITY +X. A fatura precisa ter fechado ({@code closingDate} anterior ou igual a hoje) e ser fechamento do calendário.
-     */
     public static Transaction historicalInvoiceItem(TransactionHeader header, Money amount, CreditCard card, LocalDate closingDate,
                                                     InvoiceChain chain, LocalDate today) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
@@ -126,10 +98,6 @@ public final class CardTransactions {
                 .card(card.id()).installments(plan).entries(entries).build();
     }
 
-    /**
-     * Edição da compra em andamento sem categoria (contrapartida EQUITY): só descrição e observação mudam; os lançamentos e as
-     * parcelas ficam como estão. Com categoria, a edição é a da compra comum ({@link #editPurchaseDetails}).
-     */
     public static Transaction editOngoingDetails(Transaction current, TransactionHeader newHeader) {
         java.util.Objects.requireNonNull(current, "current");
         AccountTransactions.requireHeaderAndAmount(newHeader, current.amount());
@@ -146,10 +114,6 @@ public final class CardTransactions {
         return TransactionEditing.replace(current, replacement, null);
     }
 
-    /**
-     * Pagamento de fatura: {@code CARD +X / ACCOUNT −X}, nenhum posting de {@code EXPENSE} (PR 01 caso 3). Valor livre
-     * &gt; 0 em fatura {@code OPEN}/{@code CLOSED}/{@code OVERDUE} (S-15, S-16); o excedente vira crédito transportado.
-     */
     public static Transaction invoicePayment(TransactionHeader header, Money amount, Account account, CreditCard card,
                                              LocalDate invoiceClosingDate, InvoiceChain chain, LocalDate today) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
@@ -167,10 +131,6 @@ public final class CardTransactions {
                 .build();
     }
 
-    /**
-     * Reembolso no cartão: {@code CARD +X / EXPENSE(cat) −X} na competência do reembolso (S-10), como crédito na fatura
-     * do período (com lançamento tardio, S-14). Pode deixar a fatura negativa: vira crédito transportado (S-18).
-     */
     public static Transaction refundToCard(TransactionHeader header, Money amount, CreditCard card, Category category,
                                            RefundOrigin refundOf, InvoiceChain chain, LocalDate today) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
@@ -188,16 +148,6 @@ public final class CardTransactions {
                 .build();
     }
 
-    /**
-     * Cancela as parcelas restantes (D1 §2.5.2): as de faturas {@code FUTURE}/{@code OPEN} viram {@code CANCELED} e só
-     * os postings delas ficam inativos; as de faturas fechadas não mudam (correção = reembolso no cartão).
-     *
-     * <p>S-218 (A1): recusa com {@code REFUND_EXCEEDS_ORIGINAL} quando a soma dos reembolsos ativos ligados à compra
-     * passaria do valor cobrado <b>depois</b> do cancelamento (o consumo da compra ficaria negativo). Nada é alterado
-     * quando a recusa acontece.
-     *
-     * @param activeRefunds Σ dos reembolsos ativos ligados à compra, lida sob a trava da movimentação; {@code null} = nenhum
-     */
     public static void cancelRemainingInstallments(Transaction purchase, InvoiceChain chain, LocalDate today, Instant now,
                                                    Money activeRefunds) {
         if (purchase.type() != TransactionType.CARD_PURCHASE || !purchase.isActive()) {
@@ -216,21 +166,10 @@ public final class CardTransactions {
         purchase.replaceInstallments(updated);
     }
 
-    /** Cancelamento de uma compra sem reembolso ativo (equivale a {@code activeRefunds = null}). */
     public static void cancelRemainingInstallments(Transaction purchase, InvoiceChain chain, LocalDate today, Instant now) {
         cancelRemainingInstallments(purchase, chain, today, now, null);
     }
 
-    /**
-     * Edição limitada da compra no cartão (S-121): só descrição, observação e categoria. Valor, data, número de parcelas e
-     * cartão não mudam (reescrever parcelas e faturas arriscaria dupla contagem e mexeria em fatura fechada). A substituta
-     * tem o mesmo id, as mesmas parcelas (faturas e cancelamentos intactos) e os lançamentos regravados na categoria nova:
-     * os das parcelas ativas ficam ativos e os das canceladas ficam inativos (histórico).
-     *
-     * @param newHeader     descrição e observação novas; id, dono, data e origem têm de ser os da compra
-     * @param activeRefunds Σ dos reembolsos ativos ligados à compra: com reembolso ativo a categoria não muda
-     *                      ({@code REFUND_CATEGORY_LOCKED}, o reembolso volta para a categoria da compra, S-9)
-     */
     public static Transaction editPurchaseDetails(Transaction current, TransactionHeader newHeader, Category category,
                                                   Money activeRefunds) {
         java.util.Objects.requireNonNull(current, "current");
@@ -275,7 +214,6 @@ public final class CardTransactions {
                 .build();
     }
 
-    /** A cadeia é obrigatória e precisa ser do cartão da movimentação (A3). */
     static void requireChain(CreditCard card, InvoiceChain chain, LocalDate today) {
         TransactionHeader.required(chain, "chain").ensureFor(card.id());
         TransactionHeader.required(today, "today");

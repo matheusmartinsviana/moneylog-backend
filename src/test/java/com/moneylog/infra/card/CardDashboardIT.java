@@ -15,11 +15,6 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T59: cartões e faturas no dashboard e nos compromissos, sem dupla contagem (compra → parcela → fatura → pagamento). Cenário:
- * Nubank 20.000,00 e as duas compras de 10/10 e 12/10 no Roxinho (1.200,00 em 6x e 1.083,00 à vista); relógio 10/10. Toda
- * requisição e resposta valida contra o contrato.
- */
 @DisplayName("Dashboard e compromissos com cartões, sem dupla contagem (T59)")
 class CardDashboardIT extends CardItBase {
 
@@ -35,7 +30,6 @@ class CardDashboardIT extends CardItBase {
         return okBody(get("/v1/entries?competence=" + competence + "&pageSize=50"));
     }
 
-    /** Σ outstanding das faturas não pagas e não futuras-vazias do cartão, pela API de faturas (não pela de compromissos). */
     private String sumOfUnpaidOutstanding() throws Exception {
         long cents = 0;
         for (JsonNode invoice : okBody(get("/v1/cards/" + card + "/invoices?pageSize=50")).get("items")) {
@@ -165,8 +159,8 @@ class CardDashboardIT extends CardItBase {
         String refund = created(cardRefund("50.00", "2026-10-10", "Estorno do banco")).get("id").asString();
         assertThat(refund).isNotBlank();
         advanceTo(Instant.parse("2026-10-20T15:00:00Z"));
-        paid(NOV_CLOSING, "200.00", "2026-10-20"); // antecipação na fatura OPEN
-        advanceTo(Instant.parse("2026-11-08T15:00:00Z")); // depois do vencimento de 05/11: a fatura de 25/10 está OVERDUE
+        paid(NOV_CLOSING, "200.00", "2026-10-20");
+        advanceTo(Instant.parse("2026-11-08T15:00:00Z"));
         List<String> competences = List.of("2026-10", "2026-11", "2026-12", "2027-01", "2027-02", "2027-03");
         List<String> consumptionBefore = competences.stream().map(c -> {
             try {
@@ -179,7 +173,7 @@ class CardDashboardIT extends CardItBase {
         assertThat(overdue.get("status").asString()).isEqualTo("OVERDUE");
         assertThat(money(overdue, "outstanding")).isEqualTo("1033.00");
 
-        paid(NOV_CLOSING, "500.00", "2026-11-08"); // pagamento parcial na vencida
+        paid(NOV_CLOSING, "500.00", "2026-11-08");
 
         assertThat(money(invoice(NOV_CLOSING), "outstanding")).isEqualTo("533.00");
         JsonNode upcoming = upcoming("?from=2026-11-08&to=2027-12-31");
@@ -188,7 +182,6 @@ class CardDashboardIT extends CardItBase {
                 .isEqualTo(sumOfUnpaidOutstanding());
         assertThat(upcoming.get("items").valueStream().map(i -> i.get("label").asString()).distinct().toList()).containsExactly("Roxinho");
         assertThat(upcoming.get("items").valueStream().filter(i -> "INSTALLMENT".equals(i.get("kind").asString())).count()).isZero();
-        // o consumo por competência é o das compras, antes e depois dos pagamentos; cada parcela aparece uma vez
         List<String> consumptionAfter = competences.stream().map(c -> {
             try {
                 return money(entries(c).get("totals"), "total");
@@ -199,7 +192,7 @@ class CardDashboardIT extends CardItBase {
         assertThat(consumptionAfter).isEqualTo(consumptionBefore);
         assertThat(consumptionAfter).containsExactly("1233.00", "200.00", "200.00", "200.00", "200.00", "200.00");
         assertThat(entries("2026-11").get("items")).hasSize(1);
-        assertThat(entries("2026-10").get("items")).hasSize(3); // parcela 1/6, compra à vista e o crédito (−50)
+        assertThat(entries("2026-10").get("items")).hasSize(3);
         assertThat(money(summary().get("committed"), "m12")).isEqualTo(upcoming("?from=2026-11-08&to=2027-12-31").get("totals").get("out").get("amount").asString());
     }
 

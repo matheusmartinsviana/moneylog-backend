@@ -32,7 +32,6 @@ class TrackedCommitmentTest {
         return new ScheduleItem(position, "Item " + position, type, due == null ? null : LocalDate.parse(due), brl(amount), paid, null);
     }
 
-    /** Cronograma genérico: sinal pago, 2 parcelas (1 paga), 1 extraordinária e um bloco de financiamento sem data. */
     private static List<ScheduleItem> sample() {
         return List.of(item(1, ScheduleItemType.DOWN_PAYMENT, null, "100.00", true), item(2, ScheduleItemType.INSTALLMENT, "2026-11-15", "200.00", true),
                 item(3, ScheduleItemType.INSTALLMENT, "2026-12-15", "200.00", false), item(4, ScheduleItemType.EXTRAORDINARY, "2026-12-20", "300.00", false),

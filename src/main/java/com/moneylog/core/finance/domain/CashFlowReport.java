@@ -16,34 +16,16 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Fluxo de caixa (D1 §2.8, §2.10): efeito líquido de cada <b>movimentação</b> nas contas {@code CASH}, pela data. Uma
- * transferência entre contas CASH tem efeito 0 e não entra; uma aplicação em investimento é saída; o saldo inicial
- * não é movimentação e não entra. É a mesma definição do {@code totals.cashFlow} da lista de registros.
- *
- * @param in    Σ efeitos positivos
- * @param out   Σ efeitos negativos, em valor positivo
- * @param net   in − out
- * @param count movimentações com efeito diferente de zero
- */
 public record CashFlowReport(LocalDate from, LocalDate to, Money in, Money out, Money net, int count) {
 
     public static CashFlowReport forCompetence(FinancialRecords records, Ledger ledger, Competence competence) {
         return between(records, ledger, competence.firstDay(), competence.lastDay());
     }
 
-    /** Todas as movimentações no período (o caminho do dashboard); é {@link #between(FinancialRecords, Ledger, LocalDate, LocalDate, Predicate)} sem filtro. */
     public static CashFlowReport between(FinancialRecords records, Ledger ledger, LocalDate from, LocalDate to) {
         return between(records, ledger, from, to, null);
     }
 
-    /**
-     * Efeito líquido de cada movimentação que passa em {@code filter} nas contas {@code CASH} (S-79: é a mesma função do
-     * dashboard e do {@code totals.cashFlow} da lista; os filtros {@code type}/{@code categoryId}/{@code method}/{@code q}/
-     * {@code status} viram o predicado). Estornada nunca entra (os lançamentos dela estão inativos).
-     *
-     * @param filter {@code null} = todas as movimentações
-     */
     public static CashFlowReport between(FinancialRecords records, Ledger ledger, LocalDate from, LocalDate to,
                                          Predicate<Transaction> filter) {
         List<UUID> cash = records.cashAccountIds();
@@ -51,13 +33,6 @@ public record CashFlowReport(LocalDate from, LocalDate to, Money in, Money out, 
                 e -> e.posting().bookType() == BookType.ACCOUNT && cash.contains(e.posting().book().id()));
     }
 
-    /**
-     * Efeito de cada movimentação que passa em {@code filter} <b>só no livro da conta informada</b> (S-63), seja ela
-     * {@code CASH} ou de investimento: a transferência aparece como saída na origem e como entrada no destino; a
-     * aplicação aparece como entrada na conta de investimento. O saldo inicial não é movimentação e não entra.
-     *
-     * @param filter {@code null} = todas as movimentações
-     */
     public static CashFlowReport forAccount(FinancialRecords records, Ledger ledger, UUID accountId, LocalDate from, LocalDate to,
                                             Predicate<Transaction> filter) {
         Objects.requireNonNull(accountId, "accountId");

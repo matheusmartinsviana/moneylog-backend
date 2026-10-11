@@ -19,12 +19,6 @@ import com.moneylog.core.ai.app.LlmClient.LlmRequest;
 import com.moneylog.core.ai.app.LlmClient.LlmResponse;
 import com.moneylog.core.ai.domain.GroundingValidator;
 
-/**
- * {@link AIService} real: monta o prompt, chama o {@link LlmClient} (1 retry em falha transitória), exige JSON no esquema
- * {@code {text, factRefs, caveat}} e só devolve texto aterrado nos fatos (S-184). Falha do provedor, saída fora do esquema ou número inventado
- * viram {@link AiUnavailable}, nunca exceção: o app mostra o determinístico. O conteúdo do usuário vai como dado JSON delimitado e a instrução de
- * sistema o declara não confiável (prompt injection).
- */
 public class AiServiceImpl implements AIService {
 
     static final int MAX_OUTPUT_TOKENS = 600;
@@ -145,7 +139,6 @@ public class AiServiceImpl implements AIService {
             factRefs.add(ref.asString());
         }
         String caveatText = caveat.isString() ? caveat.asString() : null;
-        // mês parcial: o esquema obriga o aviso de que o mês não terminou
         if ("true".equals(request.facts().values().get("partial")) && (caveatText == null || caveatText.isBlank())) {
             return new AiUnavailable(Reason.INVALID_RESPONSE, in, out);
         }

@@ -14,10 +14,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.text.PlainText;
 import com.moneylog.core.sk.time.FinancialDates;
 
-/**
- * Reserva lógica de uma meta sobre o saldo de uma conta (D1 §2.9, S-147): positiva reserva, negativa libera. Não é
- * movimentação e não gera lançamento: nenhum livro é tocado. Imutável e só se acrescenta (liberar é uma linha negativa).
- */
 public record GoalReservation(UUID id, UUID goalId, UUID accountId, Money amount, LocalDate date, String note, Instant createdAt) {
 
     public static final int NOTE_MAX_LENGTH = 200;

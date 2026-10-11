@@ -35,7 +35,6 @@ public class UpdateGoalUseCaseImpl implements UpdateGoalUseCase {
             throw new VersionConflictException(c.version(), current.version());
         }
         Goal goal = current.value();
-        // campos inaplicáveis não são exigidos: sem alvo, quitar dívidas e medida mantêm o atual; quitar dívidas sem nome mantém o nome
         String name = c.name() == null && goal.isDebtPayoff() ? goal.name() : c.name();
         goal.update(name, c.target() == null && goal.kind() != GoalKind.SAVINGS ? goal.target() : c.target(), c.deadline(),
                 c.priority() == null ? goal.priority() : c.priority(), c.description());

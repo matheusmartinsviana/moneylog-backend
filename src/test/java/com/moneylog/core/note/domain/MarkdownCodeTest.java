@@ -79,16 +79,11 @@ class MarkdownCodeTest {
         assertThat(covered("texto\n\n    [[A]] em código\n    outra linha\n\nfim")).isEqualTo("[    [[A]] em código\n    outra linha\n]");
         assertThat(covered("texto\n\n\t[[A]] com tab\nfim")).isEqualTo("[\t[[A]] com tab\n]");
         assertThat(covered("    [[A]] no começo do texto")).isEqualTo("[    [[A]] no começo do texto]");
-        // continuação de parágrafo (sem linha em branco antes) não é código
         assertThat(covered("texto\n    [[A]] continua o parágrafo")).isEmpty();
-        // item de lista aninhado e continuação de item não são código
         assertThat(covered("- item\n    - [[A]] aninhado\n\n    continuação [[B]]\n")).isEmpty();
         assertThat(covered("1. item\n\n       [[A]] dentro do item\n")).isEmpty();
-        // depois que a lista acaba, o recuo volta a ser código
         assertThat(covered("- item\n\nparágrafo\n\n    [[A]] código\n")).isEqualTo("[    [[A]] código\n]");
-        // linha em branco entre duas linhas indentadas continua o mesmo bloco; crase dentro do bloco não abre trecho
         assertThat(covered("x\n\n    `a\n\n    b`\n")).isEqualTo("[    `a\n\n    b`\n]");
-        // o bloco acaba na primeira linha sem recuo
         assertThat(covered("x\n\n    a\n\ny [[B]]\n")).isEqualTo("[    a\n]");
     }
 

@@ -20,16 +20,10 @@ import tools.jackson.databind.JsonNode;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T108 e T109 (Etapa 6): notas, lixeira, vínculos e backlinks pela API real, com o contrato validando toda requisição e resposta. Cenário do
- * {@link NotesItBase}: compra do notebook, meta, dívida, pessoa, cartão, fatura e conta.
- */
 @DisplayName("Notas: API, persistência, lixeira, vínculos e backlinks (T108, T109)")
 class NotesIT extends NotesItBase {
 
     private static final Timestamp NOW = Timestamp.from(Instant.parse("2026-10-10T12:00:00Z"));
-
-    // ---------------------------------------------------------------- T108
 
     @Test
     @DisplayName("T108 CA1: POST /v1/notes devolve 201 + Location, versão 0, título = nome do arquivo, tags e links do corpo (resolvidos e pendentes) com origem WIKILINK")
@@ -65,7 +59,6 @@ class NotesIT extends NotesItBase {
         JsonNode again = createNote("reviews/2026-10.md", "b");
         assertThat(again.get("path").asString()).isEqualTo("reviews/2026-10.md");
         assertThat(count("notes")).isEqualTo(2L);
-        // o índice parcial é a segunda barreira (a aplicação checa antes): duas ativas com a mesma chave são recusadas pelo banco
         assertThatThrownBy(() -> jdbc.update("INSERT INTO notes (id, user_id, path, path_key, title, body, created_at, updated_at, version) "
                 + "VALUES (?, ?, 'x.md', 'reviews/2026-10.md', 'x', '', ?, ?, 0)", UUID.randomUUID(), userId, NOW, NOW)).isInstanceOf(DataIntegrityViolationException.class);
     }
@@ -120,7 +113,6 @@ class NotesIT extends NotesItBase {
         assertThat(getNote(review).get("links").get(0).get("state").asString()).isEqualTo("RESOLVED");
         expectError(postNoBody("/v1/notes/" + macbook + "/restore"), 422, "NOTE_NOT_TRASHED");
 
-        // esvaziar: só as notas já na lixeira do usuário; nenhuma entidade financeira é tocada
         String bearerOther = otherUserBearer();
         mockMvc.perform(postAs(bearerOther, "/v1/notes", noteJson("alheia.md", "x"))).andExpect(status().isCreated());
         mockMvc.perform(MockMvcRequestBuildersDelete.as(bearerOther)).andExpect(status().isNoContent());
@@ -135,7 +127,6 @@ class NotesIT extends NotesItBase {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notes WHERE title = 'alheia'", Long.class)).isEqualTo(1L);
     }
 
-    /** DELETE /v1/notes/trash com o token de outro usuário. */
     private static final class MockMvcRequestBuildersDelete {
         static org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder as(String bearer) {
             return org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/notes/trash").header("Authorization", bearer);
@@ -179,7 +170,6 @@ class NotesIT extends NotesItBase {
         assertThat(count("notes")).isEqualTo(1L);
         mockMvc.perform(post("/v1/notes", noteJson("exata.md", "a".repeat(204_800)))).andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
         mockMvc.perform(post("/v1/notes", noteJson("tab.md", "linha\r\n\tcom tab e quebra"))).andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
-        // S-273: YAML que não é um mapa seguro não é frontmatter: o texto é corpo e volta como foi escrito
         mockMvc.perform(post("/v1/notes", noteJson("fm.md", "---\nx: !!java.lang.Object {}\n---\n"))).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.body").value("---\nx: !!java.lang.Object {}\n---\n")).andExpect(ContractValidation.conforms());
         expectError(post("/v1/notes", noteJson("fm3.md", "---\ntitle: \"a\\x00b\"\n---\n")), 422, "TEXT_INVALID_CHARACTERS");
@@ -247,8 +237,6 @@ class NotesIT extends NotesItBase {
         assertThat(ledgerTotal()).isZero();
     }
 
-    // ---------------------------------------------------------------- T109
-
     @Test
     @DisplayName("T109 CA1/CA2: vínculo à compra do notebook e ao resumo de outubro; GET /v1/links traz a nota; alvo de outro usuário ou inexistente é 422 NOTE_LINK_TARGET_NOT_FOUND; 2026-13 é 422")
     void deveVincularEntidadesELerOsVinculos() throws Exception {
@@ -272,7 +260,6 @@ class NotesIT extends NotesItBase {
         expectError(put("/v1/notes/" + id + "/links", "{\"links\":[" + monthLink("2026-13") + "],\"version\":0}"), 422, "NOTE_LINK_INVALID");
         expectError(put("/v1/notes/" + id + "/links", "{\"links\":[{\"type\":\"GOAL\"}],\"version\":0}"), 422, "NOTE_LINK_INVALID");
         expectError(post("/v1/notes", noteJson("b.md", "x", "[" + link("GOAL", foreign) + "]")), 422, "NOTE_LINK_TARGET_NOT_FOUND");
-        // o alvo é de OUTRO usuário
         String other = otherUserBearer();
         String othersGoal = body(mockMvc.perform(postAs(other, "/v1/goals", "{\"name\":\"Alheia\",\"target\":\"10.00\",\"priority\":\"LOW\"}")).andExpect(status().isCreated()).andReturn())
                 .get("id").asString();
@@ -302,7 +289,6 @@ class NotesIT extends NotesItBase {
         for (String[] pair : new String[][] {{"ACCOUNT", nubank}, {"CARD", card}, {"INVOICE", invoiceId}, {"PERSON", maria}, {"DEBT", debtId}, {"GOAL", goalId}, {"NOTE", other}}) {
             assertThat(paths(okBody(get("/v1/links?targetType=" + pair[0] + "&targetId=" + pair[1])))).as(pair[0]).contains("tudo.md");
         }
-        // as colunas tipadas têm FK composta: só uma referência por vínculo
         assertThat(jdbc.queryForObject("SELECT count(*) FROM note_links WHERE user_id = ? AND origin = 'EXPLICIT' AND num_nonnulls(target_note_id, target_transaction_id, target_account_id, "
                 + "target_card_id, target_invoice_id, target_person_id, target_debt_id, target_goal_id, target_key, target_text) = 1", Long.class, userId)).isEqualTo(9L);
     }
@@ -316,7 +302,6 @@ class NotesIT extends NotesItBase {
         assertThat(linkOf(note, "TRANSACTION").get("state").asString()).isEqualTo("RESOLVED");
         assertThat(linkOf(note, "TRANSACTION").get("target").get("status").asString()).isEqualTo("VOIDED");
         assertThat(paths(okBody(get("/v1/links?targetType=TRANSACTION&targetId=" + notebookId)))).containsExactly("reviews/2026-10.md");
-        // meta arquivada também continua alvo válido
         mockMvc.perform(post("/v1/goals/" + goalId + "/archive", "")).andExpect(status().isOk());
         JsonNode linked = setLinks(id, "[" + link("GOAL", goalId) + "]", 0);
         assertThat(linkOf(linked, "GOAL").get("target").get("status").asString()).isEqualTo("ARCHIVED");
@@ -370,8 +355,6 @@ class NotesIT extends NotesItBase {
         assertThat(b).isNotBlank();
     }
 
-    // ---------------------------------------------------------------- banco: a segunda barreira
-
     @Test
     @DisplayName("esquema: FK composta recusa vínculo para entidade de OUTRO usuário; CHECK exige exatamente uma referência e a coluna do tipo; wikilink não aponta para entidade; texto > 200 KB é recusado")
     void deveProtegerOEsquema() throws Exception {
@@ -397,7 +380,6 @@ class NotesIT extends NotesItBase {
         assertThatThrownBy(() -> jdbc.update("INSERT INTO note_links (id, user_id, note_id, position, origin, target_type, target_key, created_at, updated_at) "
                 + "VALUES (?, ?, ?, 0, 'EXPLICIT', 'MONTHLY_SUMMARY', '2026-13', ?, ?)", UUID.randomUUID(), userId, UUID.fromString(id), NOW, NOW))
                 .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_note_links_key_format");
-        // nota e tag de outro usuário: a FK composta (note_id, user_id) também vale
         assertThatThrownBy(() -> jdbc.update("INSERT INTO note_tags (id, user_id, note_id, tag, created_at, updated_at) VALUES (?, ?, ?, 'x', ?, ?)", UUID.randomUUID(), otherUser,
                 UUID.fromString(id), NOW, NOW)).isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("fk_note_tags_note_id_user");
         assertThatThrownBy(() -> jdbc.update("INSERT INTO notes (id, user_id, path, path_key, title, body, created_at, updated_at, version) VALUES (?, ?, 'g.md', 'g.md', 'g', ?, ?, ?, 0)",

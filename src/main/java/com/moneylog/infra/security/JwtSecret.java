@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-/** Valida o {@code JWT_SECRET} (mínimo de 32 bytes) e monta a chave HS256. O segredo nunca vai para o log. */
 public final class JwtSecret {
 
     public static final int MIN_BYTES = 32;

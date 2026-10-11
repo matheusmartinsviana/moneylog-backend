@@ -10,7 +10,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.moneylog.core.search.domain.SearchResults;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code SearchResults} do contrato (S-287). {@code truncated}: nomes dos grupos que estouraram o tempo, em minúsculas. */
 public record SearchResponse(String q, List<TransactionHit> transactions, List<AccountHit> accounts, List<CategoryHit> categories,
                              List<CardHit> cards, List<NoteHit> notes, List<String> truncated) {
 
@@ -33,7 +32,6 @@ public record SearchResponse(String q, List<TransactionHit> transactions, List<A
     public record NoteHit(UUID id, String title, String path, String snippet) {
     }
 
-    /** Sem o termo nem o texto dos resultados: o Spring imprime o corpo da resposta ({@code Writing [...]}) em DEBUG (S-287: {@code q} fora do log). */
     @Override
     public String toString() {
         return "SearchResponse[transactions=" + transactions.size() + ", accounts=" + accounts.size() + ", categories=" + categories.size()

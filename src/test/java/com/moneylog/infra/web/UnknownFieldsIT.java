@@ -30,10 +30,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * BUG-E2E-02: os corpos de entrada do contrato têm {@code additionalProperties: false}; campo desconhecido é
- * {@code 400 VALIDATION_FAILED} (erro {@code UNKNOWN_FIELD}) e os corpos legítimos continuam passando.
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Campos desconhecidos no corpo: 400 VALIDATION_FAILED (BUG-E2E-02)")

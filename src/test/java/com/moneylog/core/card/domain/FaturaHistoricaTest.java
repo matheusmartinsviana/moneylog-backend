@@ -33,7 +33,7 @@ import com.moneylog.core.transaction.domain.TransactionSource;
 class FaturaHistoricaTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 30);
-    private final CreditCard card = CreditCardTestFactory.umCartao(); // fecha 25, vence 5
+    private final CreditCard card = CreditCardTestFactory.umCartao();
     private final Account account = AccountTestFactory.umaContaCorrente();
 
     private static long sum(List<Transaction> txs, BookType type) {

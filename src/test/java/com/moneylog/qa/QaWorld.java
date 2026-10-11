@@ -21,7 +21,6 @@ import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/** T43 (QA): helpers compartilhados dos ITs de validação. Cria usuários, contas, categorias e movimentações pela API. */
 final class QaWorld {
 
     final MockMvc mvc;
@@ -38,7 +37,6 @@ final class QaWorld {
         this.tm = tm;
     }
 
-    /** Um usuário isolado com Nubank (20.000,00), XP, XP Invest e categorias de despesa/receita. */
     final class Actor {
         final UUID id = UUID.randomUUID();
         final String bearer;
@@ -136,13 +134,11 @@ final class QaWorld {
                 + account + "\",\"categoryId\":\"" + category + "\",\"refundOfTransactionId\":\"" + original + "\"}";
     }
 
-    /** Σ de amount_cents dos lançamentos ativos do usuário (a partida dobrada fecha em zero). */
     long ledgerSum(UUID userId) {
         Long sum = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active", Long.class, userId);
         return sum == null ? 0 : sum;
     }
 
-    /** Σ por grupo de origem (source_id) dos lançamentos ativos: cada grupo tem de fechar em zero por si. */
     long unbalancedActiveGroups(UUID userId) {
         Long n = jdbc.queryForObject("select count(*) from (select source_id from ledger_postings where user_id = ? and active "
                 + "group by source_id having sum(amount_cents) <> 0) t", Long.class, userId);

@@ -30,10 +30,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T97: exportação CSV de movimentações e backup completo (JSON). Cenário do plano (relógio 10/10/2026) com a compra de 1.200,00 em 6x, despesas com
- * descrições perigosas, uma estornada, dívida, recorrência e meta. Toda resposta é validada contra o contrato.
- */
 @DisplayName("Exportação CSV e backup: formato, injeção de fórmula, segredos, isolamento, coerência e volume (T97)")
 class ExportsIT extends E4ItBase {
 
@@ -221,8 +217,6 @@ class ExportsIT extends E4ItBase {
                 .isEqualTo("attachment; filename=\"moneylog-backup-2026-10-10.json\"");
     }
 
-    // ---------------------------------------------------------------- backup
-
     @Test
     @DisplayName("CA3: o backup tem schemaVersion, generatedAt e todas as seções (contas, categorias, cartões, movimentações com parcelas, dívidas, pessoas, recorrências, metas e reservas, razão)")
     void deveGerarOBackupCompleto() throws Exception {
@@ -347,9 +341,6 @@ class ExportsIT extends E4ItBase {
         assertThat(total).as("o razão do backup fecha em zero").isZero();
     }
 
-    // ---------------------------------------------------------------- volume
-
-    /** Insere 10.000 despesas (e os 2 lançamentos de cada) direto no banco, em lotes, para medir o streaming sem 10.000 chamadas à API. */
     private void seedBulk(int count) {
         UUID nubankId = UUID.fromString(nubank);
         UUID foodId = UUID.fromString(food);
@@ -393,7 +384,6 @@ class ExportsIT extends E4ItBase {
         long backupStart = System.nanoTime();
         MvcResult backupResult = mockMvc.perform(get("/v1/exports/backup")).andExpect(status().isOk()).andReturn();
         long backupMillis = (System.nanoTime() - backupStart) / 1_000_000;
-        // heap COM as respostas ainda vivas (arquivos de 1 MB e 11 MB): o coletor já recolheu o lixo dos DTOs e da árvore JSON
         long usedWithFiles = usedHeapAfterGc();
 
         String text = new String(csvBytes, 3, csvBytes.length - 3, StandardCharsets.UTF_8);
@@ -405,9 +395,6 @@ class ExportsIT extends E4ItBase {
                 csvBytes.length / 1024, backupMillis, backupResult.getResponse().getContentAsByteArray().length / 1024, usedBefore >> 20, usedWithFiles >> 20);
         assertThat(csvMillis).as("limite documentado: 15 s para o CSV de 10.000 movimentações").isLessThan(15_000);
         assertThat(backupMillis).as("limite documentado: 30 s para o backup de 10.000 movimentações").isLessThan(30_000);
-        // M1 da revisão: o assert antigo media o heap SEM coletar (ruído do coletor). Agora é o heap VIVO depois de System.gc(): o que as duas
-        // respostas retêm (arquivos + a árvore JSON do teste), sem vazamento do que o servidor montou. 10.000 movimentações medem ~35 MB.
-        // (O pico de memória das duas rotas, com 50.000 movimentações e heap de 2 GB, é medido em GoalVolumeQaIT.)
         assertThat(usedWithFiles - usedBefore).as("heap vivo depois do GC: só os arquivos, sem vazamento").isLessThan(150L << 20);
     }
 
@@ -416,7 +403,6 @@ class ExportsIT extends E4ItBase {
         return runtime.totalMemory() - runtime.freeMemory();
     }
 
-    /** Pede o GC até o heap usado parar de cair (System.gc() é uma dica; a repetição o torna estável). */
     private static long usedHeapAfterGc() throws InterruptedException {
         long last = Long.MAX_VALUE;
         for (int i = 0; i < 5; i++) {

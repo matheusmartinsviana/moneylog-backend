@@ -18,11 +18,9 @@ public interface ThirdPartyExpenseGateway {
 
     List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> findAllReceipts(UUID userId);
 
-    /** Remove um recebimento registrado (correção de vínculo); não há movimento a desfazer. @return {@code true} se existia */
     boolean deleteReceipt(UUID userId, UUID id);
 
     Optional<ThirdPartyExpense> findById(UUID userId, UUID id);
 
-    /** Remove só a marca (a marca não gera lançamento, então nada do razão muda). */
     void delete(UUID userId, UUID id);
 }

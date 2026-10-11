@@ -17,11 +17,6 @@ import com.moneylog.core.transaction.app.query.TransactionFilter;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 
-/**
- * Lista de registros (S-47, S-63, S-74, S-79, S-80). Os {@code totals} saem do mesmo {@link FinancialRecords} e das
- * mesmas calculadoras do dashboard: {@code CashFlowReport.between} com o filtro como predicado (sem conta) ou
- * {@code CashFlowReport.forAccount} (com conta). Nenhuma soma é feita em SQL nem aqui.
- */
 public class ListTransactionsUseCaseImpl implements ListTransactionsUseCase {
 
     private final TransactionGateway transactions;

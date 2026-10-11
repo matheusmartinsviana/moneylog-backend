@@ -52,12 +52,10 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
         this.ids = ids;
     }
 
-    /** Teto de caracteres de um nome ou mensagem no relatório (um nome de entrada pode ter até 64 KB). */
     static final int REPORT_TEXT_MAX = 200;
 
     @Override
     public ImportReport handle(ImportVaultCommand c) {
-        // o upload vira arquivo temporário (apagado no finally) e a 1ª passada valida o zip inteiro ANTES da trava e de gravar uma linha
         try (VaultZipReader.Archive archive = VaultZipReader.open(c.zip())) {
             Scan scan = archive.scan();
             notes.lockVault(c.userId());
@@ -73,7 +71,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
                     run.warn(ignored.name(), "NAME_ENCODING_GUESSED", ENCODING_MESSAGE);
                 }
             }
-            // 2ª passada: grava uma nota por vez
             archive.readNotes(run::importNote);
             run.resolveDeferredNoteLinks();
             VaultIndex.refreshWikilinks(notes, c.userId(), run.createdPaths, run.createdLinkKeys);
@@ -85,25 +82,21 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
 
     private static final String ENCODING_MESSAGE = "O zip não declara UTF-8: o nome do arquivo foi lido como CP437 e pode estar com acentos trocados.";
 
-    /** Nome ou mensagem do relatório, cortado por ponto de código. */
     private static String clip(String text) {
         return CodePoints.ellipsize(text, REPORT_TEXT_MAX);
     }
 
-    /** Estado de uma execução. */
     private final class Run {
         final ImportVaultCommand command;
         final Map<String, UUID> idByKey = new HashMap<>();
         final int existing;
         final List<UUID> createdIds = new ArrayList<>();
         final List<NotePath> createdPaths = new ArrayList<>();
-        /** Chaves de nome dos wikilinks das notas criadas: as notas entram sem resolver os links, que o recálculo resolve contra o vault todo. */
         final Set<String> createdLinkKeys = new java.util.HashSet<>();
         final List<String> ignoredFiles = new ArrayList<>();
         final List<String> skippedFiles = new ArrayList<>();
         final List<RenamedFile> renamed = new ArrayList<>();
         final List<ImportWarning> warnings = new ArrayList<>();
-        /** Vínculos NOTE (por caminho) que só se resolvem depois que todas as notas existem. */
         final Map<UUID, List<LinkRef>> deferredNoteLinks = new LinkedHashMap<>();
         final Map<UUID, List<NoteLink>> knownLinks = new HashMap<>();
 
@@ -157,7 +150,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
                 note.wikilinks().forEach(l -> createdLinkKeys.add(WikilinkResolver.nameKey(l.text())));
                 if (rename != null) {
                     renamed.add(rename);
-                    // M3: RENAME não é idempotente (reenviar o mesmo zip cria outra cópia): a resposta diz isso a cada nota renomeada
                     warn(entry.name(), "NOTE_RENAMED", "Já existia uma nota neste caminho: a importada ficou como '" + rename.to()
                             + "'. Importar o mesmo zip de novo com RENAME cria outra cópia; use SKIP para não duplicar.");
                 }
@@ -171,7 +163,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
             } catch (NoteLimitReachedException e) {
                 throw e;
             } catch (NoteWikilinkLimitReachedException e) {
-                // S-271: nota com mais de 500 wikilinks distintos é pulada e relatada; o resto do zip segue
                 ignoredFiles.add(clip(entry.name()));
                 warn(entry.name(), "NOTE_TOO_MANY_LINKS", "A nota tem mais de " + NoteLimits.MAX_WIKILINKS + " wikilinks distintos e foi ignorada.");
             } catch (BusinessRuleException e) {
@@ -180,10 +171,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
             }
         }
 
-        /**
-         * Remove a chave reservada e lê os vínculos. Só um bloco reconhecido como frontmatter (mapa YAML válido) é lido; qualquer outro
-         * início com {@code ---} é corpo e entra como está. O que o texto não consegue tirar da chave {@code moneylog} descarta o bloco, com aviso.
-         */
         private String prepareFrontmatter(String name, String text, List<NoteLink> explicit, List<LinkRef> deferred) {
             Frontmatter.Parsed parsed = Frontmatter.parse(text);
             if (!parsed.present() || !parsed.hasMoneylogKey()) {
@@ -272,7 +259,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
             return NoteLink.pending(type, ref.id());
         }
 
-        /** Resolve os vínculos NOTE por caminho agora que todas as notas do zip existem. */
         void resolveDeferredNoteLinks() {
             for (Map.Entry<UUID, List<LinkRef>> entry : deferredNoteLinks.entrySet()) {
                 List<NoteLink> links = new ArrayList<>(knownLinks.get(entry.getKey()));
@@ -309,7 +295,6 @@ public class ImportVaultUseCaseImpl implements ImportVaultUseCase {
             return null;
         }
 
-        /** UTF-8 estrito (sem BOM); {@code null} e aviso se o arquivo não é texto UTF-8. */
         private String decode(NoteEntry entry) {
             try {
                 String text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)

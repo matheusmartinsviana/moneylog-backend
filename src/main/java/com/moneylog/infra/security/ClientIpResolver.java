@@ -6,11 +6,6 @@ import java.util.List;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * IP do cliente para o rate limit (S-86). {@code X-Forwarded-For} só vale quando a conexão vem de um proxy confiável
- * ({@code moneylog.security.trusted-proxies}, CIDRs); caso contrário o header é ignorado (senão qualquer um forjaria o
- * IP e contornaria o limite). Percorre o header da direita para a esquerda, pulando os proxies confiáveis.
- */
 public class ClientIpResolver {
 
     private final List<Cidr> trusted;
@@ -60,7 +55,7 @@ public class ClientIpResolver {
 
         boolean contains(String ip) {
             if (!ip.matches("[0-9a-fA-F:.]+")) {
-                return false; // não é IP literal: nunca resolve nome (evita DNS por header forjado)
+                return false;
             }
             byte[] candidate;
             try {

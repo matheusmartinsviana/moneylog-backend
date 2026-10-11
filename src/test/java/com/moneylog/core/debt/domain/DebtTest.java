@@ -338,22 +338,18 @@ class DebtTest {
         boolean encerrada = status == DebtStatus.CANCELED || status == DebtStatus.VOIDED;
         boolean comQuitacao = status == DebtStatus.PARTIALLY_SETTLED || status == DebtStatus.SETTLED;
 
-        // quitação
         Debt d1 = umaDividaNoStatus(status);
         if (encerrada || status == DebtStatus.SETTLED) {
             assertThatThrownBy(() -> d1.registerSettlement(SECOND_TX, Money.of("0.01"))).isInstanceOf(DomainException.class);
         } else {
             d1.registerSettlement(SECOND_TX, Money.of("0.01"));
         }
-        // perdão
         Debt d2 = umaDividaNoStatus(status);
         expect(status == DebtStatus.OPEN || status == DebtStatus.PARTIALLY_SETTLED, d -> d.cancel("x", HOJE), d2,
                 encerrada ? "DEBT_CLOSED" : "DEBT_ALREADY_SETTLED");
         assertThat(d2.status()).isEqualTo(status == DebtStatus.OPEN || status == DebtStatus.PARTIALLY_SETTLED ? DebtStatus.CANCELED : status);
-        // estorno do registro
         Debt d3 = umaDividaNoStatus(status);
         expect(status == DebtStatus.OPEN, d -> d.voidRecord("x", HOJE), d3, encerrada ? "DEBT_CLOSED" : "DEBT_HAS_SETTLEMENTS");
-        // estorno de quitação
         Debt d4 = umaDividaNoStatus(status);
         if (comQuitacao) {
             d4.voidSettlement(SETTLEMENT_TX_ID);

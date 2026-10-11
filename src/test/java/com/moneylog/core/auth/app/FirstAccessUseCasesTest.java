@@ -51,7 +51,6 @@ import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.ClockTimeProvider;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Primeiro acesso do dono (ADR-015): política de senha, código de uso único, setup, status, reset e ordem do login. */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Primeiro acesso do dono (ADR-015)")
 class FirstAccessUseCasesTest {

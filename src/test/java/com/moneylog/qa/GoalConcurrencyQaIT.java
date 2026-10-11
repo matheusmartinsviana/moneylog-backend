@@ -34,12 +34,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T98 (QA), critério 4: concorrência de metas e reservas. Reservas e liberações simultâneas na mesma meta e conta (nunca saldo
- * negativo por data, meta e conta), reserva x arquivamento de conta, reserva x arquivamento da meta, reserva x estorno de movimentação,
- * {@code version}/409, criação de meta com a mesma {@code Idempotency-Key} em paralelo e uma tempestade que mistura tudo. Toda falha de
- * trava tem de ser {@code 409 CONFLICT} (ou o erro de domínio certo), nunca 500.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: concorrência de metas e reservas")
@@ -101,7 +95,6 @@ class GoalConcurrencyQaIT {
         assertThat(results.stream().filter(r -> r.status() >= 500).map(Res::toString).toList()).as(label).isEmpty();
     }
 
-    /** Estado final de qualquer corrida: razão fecha, nada de movimentação criada por reserva, nenhuma meta/conta com saldo de reserva negativo em alguma data. */
     private void assertHealthy(long transactionsBefore) throws Exception {
         assertThat(a.ledgerSum()).as("razão").isZero();
         assertThat(a.unbalancedGroups()).as("grupos desbalanceados").isZero();
@@ -217,7 +210,6 @@ class GoalConcurrencyQaIT {
             assertThat(results.stream().map(r -> r.node().get("id").asString()).distinct().toList()).hasSize(1);
             assertThat(jdbc.queryForObject("select count(*) from goals where user_id = ? and name = ?", Long.class, a.id, "Mesma chave " + round)).isEqualTo(1L);
         }
-        // corpo diferente com a mesma chave em paralelo: nunca duas metas e nunca 500
         String key = GoalQa.key();
         List<Callable<Res>> tasks = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -300,7 +292,6 @@ class GoalConcurrencyQaIT {
             }
             String status = a.getOk("/v1/accounts/" + second).get("status").asString();
             long net = GoalQa.net(jdbc, a, goal, second);
-            // depois de arquivada: reservar é recusado, liberar é aceito
             if ("ARCHIVED".equals(status)) {
                 Res again = GoalQa.reserve(a, goal, second, "1.00", today);
                 assertThat(again.status()).as(again.toString()).isEqualTo(422);
@@ -335,7 +326,6 @@ class GoalConcurrencyQaIT {
             }
             assertThat(results.get(1).status()).isEqualTo(200);
             assertHealthy(tx);
-            // com o saldo de volta a 20.000 a reserva não fica descoberta; coerência final
             JsonNode g = GoalQa.getGoal(a, goal);
             assertThat(g.get("current").get("amount").asString()).isEqualTo(CardQaWorld.money(GoalQa.net(jdbc, a, goal, a.nubank)));
         }
@@ -407,15 +397,12 @@ class GoalConcurrencyQaIT {
         }
         System.out.println("QA-E5-STORM " + histogram(all));
         assertNoServerError("tempestade", all);
-        // 404 INVOICE_NOT_FOUND só no pagamento de fatura: o id da fatura vem da data de fechamento, e a "mudança de dias" de outra thread entre a listagem
-        // e o pagamento faz o id listado deixar de existir (corrida do próprio teste, não defeito); qualquer outro 404 continua sendo falha
         assertThat(all.stream().filter(r -> r.status() != 200 && r.status() != 201 && r.status() != 409 && r.status() != 422
                 && !(r.status() == 404 && "INVOICE_NOT_FOUND".equals(r.code()))).map(Res::toString).toList()).isEmpty();
         assertThat(a.ledgerSum()).isZero();
         assertThat(a.unbalancedGroups()).isZero();
         assertThat(CardInvariants.check(a, a.card)).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from goal_reservations where user_id = ?", Long.class, a.id)).isPositive();
-        // nenhuma meta/conta com saldo de reserva negativo em alguma data
         List<Map<String, Object>> rows = jdbc.queryForList("select goal_id::text g, account_id::text a, reserved_on d, sum(amount_cents) c from goal_reservations "
                 + "where user_id = ? group by 1,2,3 order by 1,2,3", a.id);
         Map<String, Long> running = new java.util.HashMap<>();

@@ -32,19 +32,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Lente de compromissos futuros (D1 §2.8): faturas fechadas e previstas (com as parcelas aninhadas), dívidas com
- * previsão, ocorrências de recorrência não realizadas e movimentações ativas com data futura ({@code SCHEDULED_TRANSACTION},
- * S-258). O status da fatura e o {@code bucket} usam a mesma função de
- * status de {@code CreditCardInvoice} (S-37), com "hoje" do relógio.
- *
- * <ul>
- *   <li>{@code committed(H)} = Σ itens de saída com vencimento ≤ hoje + H; os vencidos entram em todos os horizontes.</li>
- *   <li>Dívida sem {@code expectedDate} vai para {@link #undated()} e fica fora dos horizontes.</li>
- *   <li>Recorrências: ocorrências previstas desde o início da agenda até hoje + 12 meses (as vencidas e não
- *       realizadas continuam como pendentes, S-20).</li>
- * </ul>
- */
 public final class CommitmentSchedule {
 
     private final LocalDate today;
@@ -96,14 +83,6 @@ public final class CommitmentSchedule {
         return new CommitmentSchedule(today, dated, undated);
     }
 
-    /**
-     * Movimentações ativas com data futura (S-258, BUG-QA-28): o caixa só soma lançamentos {@code ≤ hoje}, então o efeito no
-     * caixa dos lançamentos de conta {@code CASH} com data {@code > hoje} entra aqui, uma vez por movimentação e data, até a data
-     * chegar (a partir dela o lançamento é caixa e deixa de ser compromisso: as duas lentes particionam o tempo no "hoje").
-     * Só conta o que muda o total em contas: transferência entre contas {@code CASH} (soma zero) e movimentação de cartão
-     * (lançamento no livro do cartão, a fatura é o compromisso) não geram item. Quitação de dívida e pagamento de fatura
-     * futuros já reduzem o saldo da dívida e da fatura, então o caixa deles entra aqui sem dupla contagem.
-     */
     private static void scheduledTransactions(FinancialRecords records, LocalDate today, List<Commitment> dated) {
         Set<UUID> cashAccounts = new HashSet<>(records.cashAccountIds());
         for (Transaction tx : records.transactions()) {
@@ -142,37 +121,30 @@ public final class CommitmentSchedule {
         return nested;
     }
 
-    /** Itens datados de primeiro nível (sem parcelas soltas), por vencimento. */
     public List<Commitment> items() {
         return items;
     }
 
-    /** Itens sem data (dívida sem previsão): fora dos horizontes. */
     public List<Commitment> undated() {
         return undated;
     }
 
-    /** Itens com vencimento em {@code [from, to]}. */
     public List<Commitment> between(LocalDate from, LocalDate to) {
         return items.stream().filter(c -> !c.dueDate().isBefore(from) && !c.dueDate().isAfter(to)).toList();
     }
 
-    /** Comprometido no horizonte: Σ saídas com vencimento ≤ hoje + H (os vencidos entram em todos). */
     public Money committed(Horizon horizon) {
         return sum(FlowDirection.OUT, horizon.endFrom(today));
     }
 
-    /** Entradas previstas no horizonte. */
     public Money incoming(Horizon horizon) {
         return sum(FlowDirection.IN, horizon.endFrom(today));
     }
 
-    /** Σ de todas as saídas datadas. */
     public Money totalOut() {
         return sum(FlowDirection.OUT, LocalDate.MAX);
     }
 
-    /** Σ de todas as entradas datadas. */
     public Money totalIn() {
         return sum(FlowDirection.IN, LocalDate.MAX);
     }

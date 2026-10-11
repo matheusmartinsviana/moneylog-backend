@@ -3,10 +3,6 @@ package com.moneylog.infra.ai.config;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Configuração de IA vinda do ambiente (S-185). A chave nunca sai desta classe: {@link #toString()} a mascara, e nenhuma mensagem de erro de
- * validação a inclui (nem parte dela). {@code none}/{@code noop} (padrão) desliga a IA; {@code fake} só existe fora de produção.
- */
 public final class AiProperties {
 
     public static final String NONE = "none";
@@ -52,7 +48,6 @@ public final class AiProperties {
         return provider;
     }
 
-    /** Uso exclusivo do adaptador do provedor (cabeçalho de autenticação). */
     public String apiKey() {
         return apiKey;
     }

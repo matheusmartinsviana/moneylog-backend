@@ -26,7 +26,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Faturas (D2 §4.3): consulta, prévia de pagamento e pagamento. Todo número vem da cadeia de faturas do backend. */
 @RestController
 @RequestMapping("/v1/invoices")
 @Validated
@@ -47,7 +46,6 @@ public class InvoiceController {
         return InvoiceDetailResponse.of(get.handle(new GetInvoiceQuery(userId, id)));
     }
 
-    /** Prévia do pagamento (S-136): {@code FULL}, {@code PARTIAL}, {@code OVERPAY} ou {@code PREPAY}, sem gravar. */
     @GetMapping("/{id}/payment-preview")
     public PaymentPreviewResponse previewPayment(@CurrentUser UUID userId, @PathVariable UUID id,
                                                  @RequestParam @NotNull @Pattern(regexp = InvoicePaymentInput.AMOUNT_PATTERN) String amount) {
@@ -55,7 +53,6 @@ public class InvoiceController {
                 Money.of(amount, CurrencyCode.BRL))));
     }
 
-    /** Paga a fatura (inclusive parcial, antecipado e a maior) e devolve a fatura atualizada; {@code Idempotency-Key} obrigatório. */
     @PostMapping("/{id}/payments")
     public InvoiceDetailResponse pay(@CurrentUser UUID userId, @PathVariable UUID id,
                                      @RequestHeader("Idempotency-Key") UUID idempotencyKey, @Valid @RequestBody InvoicePaymentInput body) {

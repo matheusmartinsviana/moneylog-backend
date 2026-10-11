@@ -7,9 +7,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/**
- * Exceções da importação de extrato.
- */
 public final class ImportingExceptions {
 
     private ImportingExceptions() {
@@ -21,14 +18,12 @@ public final class ImportingExceptions {
         }
     }
 
-    /** Ação não permitida no status atual da linha em revisão. */
     public static class InvalidImportLineTransitionException extends BusinessRuleException {
         public InvalidImportLineTransitionException(ImportLineStatus from, String action) {
             super("IMPORT_LINE_INVALID_TRANSITION", "Não é possível '" + action + "' uma linha " + from + ".");
         }
     }
 
-    /** Arquivo acima de 5 MB ou 5.000 linhas (S-171). */
     public static class ImportTooLargeException extends BusinessRuleException {
         public ImportTooLargeException(String reason) {
             super("IMPORT_TOO_LARGE", "Arquivo grande demais: " + reason);
@@ -41,7 +36,6 @@ public final class ImportingExceptions {
         }
     }
 
-    /** O arquivo não pôde ser lido; {@code line} aponta a linha do arquivo (0 = arquivo inteiro). */
     public static class ImportParseFailedException extends BusinessRuleException {
         private final int line;
 
@@ -97,7 +91,6 @@ public final class ImportingExceptions {
         }
     }
 
-    /** Fonte (conta ou cartão) do lote: exatamente uma. */
     public static class ImportSourceRequiredException extends BusinessRuleException {
         public ImportSourceRequiredException() {
             super("IMPORT_SOURCE_INVALID", "Informe a conta ou o cartão do extrato (apenas um).");
@@ -122,7 +115,6 @@ public final class ImportingExceptions {
         }
     }
 
-    /** Uma linha não pôde virar movimentação; nada do lote foi gravado (rollback total) e ele segue em revisão. */
     public static class ImportApplyFailedException extends BusinessRuleException {
         private final int position;
         private final String causeCode;
@@ -148,7 +140,6 @@ public final class ImportingExceptions {
         }
     }
 
-    /** A perna oposta da transferência já é movimentação ativa: transferir de novo contaria o valor duas vezes (PR 01). */
     public static class ImportTransferLegAlreadyRecordedException extends BusinessRuleException {
         public ImportTransferLegAlreadyRecordedException() {
             super("IMPORT_TRANSFER_LEG_ALREADY_RECORDED", "A outra ponta desta transferência já está registrada como entrada ou saída em outra conta. "
@@ -156,7 +147,6 @@ public final class ImportingExceptions {
         }
     }
 
-    /** Já existe movimentação ativa com a mesma chave (o mesmo extrato aplicado em outro lote). */
     public static class ImportLineAlreadyRecordedException extends ConflictException {
         public ImportLineAlreadyRecordedException() {
             super("IMPORT_LINE_ALREADY_RECORDED", "Esta linha já foi importada em outro lote. Rejeite-a ou descarte o lote.");

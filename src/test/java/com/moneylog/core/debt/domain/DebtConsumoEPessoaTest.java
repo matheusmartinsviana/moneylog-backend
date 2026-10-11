@@ -118,7 +118,6 @@ class DebtConsumoEPessoaTest {
             assertThatThrownBy(() -> Debt.restore(wrongDirection, List.of(), debt.entries())).isInstanceOf(DebtStateInconsistentException.class);
             List<LedgerEntry> equityEntries = dinner(null).entries();
             assertThatThrownBy(() -> Debt.restore(debt.state(), List.of(), equityEntries)).isInstanceOf(DebtStateInconsistentException.class);
-            // o construtor antigo de DebtState (sem categoria) segue valendo
             DebtState old = new DebtState(DEBT_ID, USER_ID, PersonTestFactory.PEDRO_ID, DebtDirection.PAYABLE, DebtOrigin.WITHOUT_MOVEMENT,
                     Money.of("80.00"), "x", DATE, null, null, null, null, null);
             assertThat(old.categoryId()).isNull();

@@ -24,10 +24,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.util.Ids;
 
-/**
- * Geradores sobre o cenário do plano (T128): fatura do Roxinho de 1.283,00 vence 05/11; o João deve 300,00 (previsão 05/11); eu devo 200,00 ao Pedro
- * (05/11); Internet de 119,00 todo dia 10. Mesmos {@code CommitmentSchedule} do dashboard.
- */
 @DisplayName("Geradores de notificação (T128, T129)")
 class NotificationGeneratorsTest {
 
@@ -126,7 +122,6 @@ class NotificationGeneratorsTest {
             assertThat(of(NotificationGenerators.generate(context(quiet)), NotificationKind.RECURRENCE_PENDING)).as(quiet.toString()).isEmpty();
         }
         assertThat(of(NotificationGenerators.generate(context(LocalDate.of(2026, 10, 17))), NotificationKind.RECURRENCE_PENDING)).hasSize(1);
-        // chegou o dia da ocorrência seguinte: avisa "hoje" mesmo havendo a anterior pendente
         assertThat(of(NotificationGenerators.generate(context(LocalDate.of(2026, 11, 10))), NotificationKind.RECURRENCE_PENDING)).singleElement()
                 .satisfies(d -> assertThat(d.titleKey()).isEqualTo("notification.recurrence.today"));
     }
@@ -186,7 +181,6 @@ class NotificationGeneratorsTest {
         done.done(now);
         NotificationSettings settings = NotificationSettings.defaults(USER);
         LocalDate day = LocalDate.of(2026, 11, 5);
-        // 08:30, antes das 09:00: ainda não
         assertThat(of(NotificationGenerators.generate(context(day, settings, List.of(), List.of(cobrar, done))), NotificationKind.REMINDER)).isEmpty();
         CommitmentSchedule schedule = CommitmentSchedule.of(scenario.records(), List.of(), day);
         GenerationContext nineFifteen = new GenerationContext(USER, day, LocalTime.of(9, 15), settings, schedule, List.of(), List.of(cobrar, done),
@@ -223,7 +217,6 @@ class NotificationGeneratorsTest {
     void resumoFrequencias() {
         NotificationSettings onlyDue = NotificationSettings.defaults(USER);
         onlyDue.update(true, LocalTime.of(8, 0), SummaryFrequency.ONLY_DUE, Map.of(), QuietHours.DEFAULT, false, null);
-        // 01/10: a Internet só vence em 10/10 (fora dos 7 dias) e não há fatura nem dívida
         assertThat(of(NotificationGenerators.generate(context(LocalDate.of(2026, 10, 1), onlyDue, List.of(), List.of())), NotificationKind.DAILY_SUMMARY))
                 .isEmpty();
         invoiceAndDebts();

@@ -12,12 +12,6 @@ import java.util.UUID;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Insights determinísticos do mês, sem IA (S-188), sobre os mesmos números do resumo mensal (PR 01, regra 10: nenhuma conta própria sobre o razão;
- * recebe o consumo por categoria já calculado por {@code EntryReport}). Limites como constantes documentadas:
- * variação por categoria só com {@value #MIN_DELTA_PERCENT}% ou mais <b>e</b> R$ 50,00 ou mais (nos limites exatos, entra).
- * Consumo é despesa de verdade: transferência, investimento e empréstimo já ficam fora do {@code EntryReport} de consumo (PR 01).
- */
 public final class InsightEngine {
 
     public static final int MIN_DELTA_PERCENT = 10;

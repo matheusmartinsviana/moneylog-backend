@@ -19,12 +19,6 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T82 (QA), critério 5: V4.00 a V4.02 sobre uma base da Etapa 3 com dados (inclusive dívidas e pessoas escritas direto no banco, o
- * único jeito de existirem antes da Etapa 4). Os dados não mudam, os índices existem, são válidos, parciais como documentado e o
- * planejador os usa; V4.01 troca o índice único da origem por um comum (uma despesa, várias dívidas) e V4.02 cria o esquema das
- * recorrências com as restrições do domínio.
- */
 @Tag("i")
 @DisplayName("QA T82: migrações V4.00 a V4.02 sobre dados da Etapa 3")
 class DebtMigrationQaIT {
@@ -64,7 +58,6 @@ class DebtMigrationQaIT {
                 jdbc.update("insert into ledger_postings (id,user_id,source_type,source_id,transaction_id,book_type,book_id,competence,effective_date,amount_cents,currency,active,created_at,updated_at) "
                         + "values (?,?,'TRANSACTION',?,?,'ACCOUNT',?,'2026-10','2026-10-02',-500,'BRL',true,?,?)", UUID.randomUUID(), user, t, t, acc, NOW, NOW);
             }
-            // dívidas legadas escritas direto: uma sem movimentação e uma com origem
             UUID person = UUID.randomUUID();
             jdbc.update("insert into persons (id,user_id,name,archived,created_at,updated_at) values (?,?,'João',false,?,?)", person, user, NOW, NOW);
             UUID plain = UUID.randomUUID();
@@ -75,7 +68,6 @@ class DebtMigrationQaIT {
             tx(jdbc, origin, user, "LOAN_GIVEN", 30000, acc, null, null, "MANUAL", null, null);
             jdbc.update("insert into debts (id,user_id,person_id,direction,origin,principal_cents,currency,description,debt_date,origin_transaction_id,created_at,updated_at) "
                     + "values (?,?,?,'RECEIVABLE','WITH_MOVEMENT',30000,'BRL','legado','2026-10-02',?,?,?)", withOrigin, user, person, origin, NOW, NOW);
-            // antes da V4.01, duas dívidas com a mesma origem são recusadas pelo índice único
             UUID twin = UUID.randomUUID();
             assertThatThrownBy(() -> jdbc.update("insert into debts (id,user_id,person_id,direction,origin,principal_cents,currency,description,debt_date,origin_transaction_id,created_at,updated_at) "
                     + "values (?,?,?,'RECEIVABLE','WITH_MOVEMENT',100,'BRL','x','2026-10-02',?,?,?)", twin, user, person, origin, NOW, NOW)).hasMessageContaining("uq_debts_origin_transaction");
@@ -87,7 +79,7 @@ class DebtMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(29); // V8.17 (dispensas de insights, ADR-019) + V8.16 (fotos das metas e destaque, ADR-018) + V8.15 (competência de renda, ADR-017) + V8.14 (metas de medida e plano, ADR-016) + V8.13 (fatura histórica) + V8.12 (limite opcional do cartão) +  V8.11 (recebimentos de terceiros) + V8.10 (senha do dono, ADR-015) + V8.09 (fechamento confirmado do cartão) + V8.0x (ADR-015) + V8.05 a V8.08 (ADR-014) + V8.02 a V8.04 + V4.00 a V4.02, V5.00 e V6.00, V6.01, V6.02, V7.00 a V7.03 e V8.00 e V8.01 (Etapas 7 e 8)
+            assertThat(result.migrationsExecuted).isEqualTo(29);
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 
@@ -96,7 +88,6 @@ class DebtMigrationQaIT {
             assertThat(jdbc.queryForObject("select count(*) from debts", Long.class)).isEqualTo(debtsBefore);
             assertThat(jdbc.queryForObject("select category_id from debts where id = ?", UUID.class, plain)).isNull();
 
-            // índices
             List<String> idx = jdbc.queryForList("select indexname || ' :: ' || indexdef from pg_indexes where indexname in ('ix_debts_user_person','ix_transactions_debt',"
                     + "'ix_debts_origin_transaction','ix_recurring_transactions_user','ix_recurrence_skips_user','uq_debts_origin_transaction')", String.class);
             assertThat(idx.stream().anyMatch(s -> s.startsWith("uq_debts_origin_transaction"))).as("o índice único antigo saiu").isFalse();
@@ -125,7 +116,6 @@ class DebtMigrationQaIT {
             assertThat(plans.get(3)).contains("ix_recurring_transactions_user");
             assertThat(plans.get(4)).contains("ix_recurrence_skips_user");
 
-            // V4.01: várias dívidas na mesma origem; categoria só em PAYABLE sem movimentação, do mesmo usuário
             jdbc.update("insert into debts (id,user_id,person_id,direction,origin,principal_cents,currency,description,debt_date,origin_transaction_id,created_at,updated_at) "
                     + "values (?,?,?,'RECEIVABLE','WITH_MOVEMENT',100,'BRL','x','2026-10-02',?,?,?)", twin, user, person, origin, NOW, NOW);
             jdbc.update("insert into debts (id,user_id,person_id,direction,origin,principal_cents,currency,description,debt_date,category_id,created_at,updated_at) "
@@ -135,7 +125,6 @@ class DebtMigrationQaIT {
             assertThatThrownBy(() -> jdbc.update("insert into debts (id,user_id,person_id,direction,origin,principal_cents,currency,description,debt_date,category_id,created_at,updated_at) "
                     + "values (?,?,?,'PAYABLE','WITHOUT_MOVEMENT',100,'BRL','x','2026-10-02',?,?,?)", UUID.randomUUID(), user, person, otherCat, NOW, NOW)).hasMessageContaining("fk_debts_category_id_user");
 
-            // V4.02: recorrência válida e as restrições do esquema
             UUID rec = UUID.randomUUID();
             insertRecurrence(jdbc, rec, user, "EXPENSE", 11900, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, null);
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 0, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("amount_positive");
@@ -145,19 +134,16 @@ class DebtMigrationQaIT {
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, 0)).hasMessageContaining("ck_recurring_transactions_max");
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, null, null, "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("ck_recurring_transactions_target");
             assertThatThrownBy(() -> insertRecurrence(jdbc, UUID.randomUUID(), other, "EXPENSE", 100, acc, null, "PIX", "MONTHLY", 1, null, "2026-10-10", null, null)).hasMessageContaining("fk_recurring_transactions_account");
-            // pulada: única por (recorrência, data); de outro usuário não vale
             jdbc.update("insert into recurrence_skips (id,user_id,recurrence_id,occurrence_date,created_at,updated_at) values (?,?,?,'2026-11-10',?,?)", UUID.randomUUID(), user, rec, NOW, NOW);
             assertThatThrownBy(() -> jdbc.update("insert into recurrence_skips (id,user_id,recurrence_id,occurrence_date,created_at,updated_at) values (?,?,?,'2026-11-10',?,?)", UUID.randomUUID(), user, rec, NOW, NOW))
                     .hasMessageContaining("uq_recurrence_skips_recurrence_date");
             assertThatThrownBy(() -> jdbc.update("insert into recurrence_skips (id,user_id,recurrence_id,occurrence_date,created_at,updated_at) values (?,?,?,'2026-12-10',?,?)", UUID.randomUUID(), other, rec, NOW, NOW))
                     .hasMessageContaining("fk_recurrence_skips_recurrence_id_user");
-            // movimentação realizada: duas ativas para a mesma (recorrência, data) são recusadas; a estornada não conta
             UUID t1 = UUID.randomUUID();
             tx(jdbc, t1, user, "EXPENSE", 11900, acc, cat, null, "RECURRENCE", rec, "2026-10-10");
             assertThatThrownBy(() -> tx(jdbc, UUID.randomUUID(), user, "EXPENSE", 11900, acc, cat, null, "RECURRENCE", rec, "2026-10-10")).hasMessageContaining("uq_transactions_recurrence_occurrence");
             jdbc.update("update transactions set status='VOIDED', voided_at=?, void_reason='x' where id = ?", NOW, t1);
             tx(jdbc, UUID.randomUUID(), user, "EXPENSE", 11900, acc, cat, null, "RECURRENCE", rec, "2026-10-10");
-            // a FK de transactions.recurrence_id: recorrência inexistente é recusada
             assertThatThrownBy(() -> tx(jdbc, UUID.randomUUID(), user, "EXPENSE", 100, acc, cat, null, "RECURRENCE", UUID.randomUUID(), "2026-10-11")).hasMessageContaining("fk_transactions_recurrence_id_user");
         }
     }

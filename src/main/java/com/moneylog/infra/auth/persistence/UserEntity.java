@@ -86,7 +86,6 @@ public class UserEntity {
         return setupCodeExpiresAt;
     }
 
-    /** Redefinição pedida: sem senha, setup pendente, sem código. */
     public void resetPassword(Instant now) {
         this.passwordHash = null;
         this.passwordSetAt = null;

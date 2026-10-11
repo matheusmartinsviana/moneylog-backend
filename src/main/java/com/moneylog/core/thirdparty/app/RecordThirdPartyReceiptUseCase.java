@@ -8,11 +8,6 @@ import com.moneylog.core.thirdparty.domain.ThirdPartyReceipt;
 
 public interface RecordThirdPartyReceiptUseCase {
 
-    /**
-     * Registra um recebimento de terceiro que JÁ está refletido no saldo observado, SEM movimento de conta (nada é lançado no razão). Com
-     * {@code transactionId} liga-se a uma despesa marcada como de terceiro (reduz o pendente dela); sem, fica sem vínculo ("origem a
-     * confirmar"). Nunca é renda. Mesma chave + mesmo corpo devolve o mesmo registro.
-     */
     ThirdPartyReceipt handle(RecordThirdPartyReceiptCommand command);
 
     record RecordThirdPartyReceiptCommand(UUID userId, UUID personId, UUID transactionId, Money amount, LocalDate receivedOn, String note,

@@ -1,15 +1,5 @@
 package com.moneylog.core.goal.photo;
 
-/**
- * Limites das fotos das metas (configuráveis em {@code moneylog.goals.photos}; ADR-018).
- *
- * @param maxPerGoal       fotos por meta
- * @param maxPerUser       fotos por usuário
- * @param maxBytesPerUser  bytes guardados por usuário (exibição + miniatura)
- * @param maxUploadBytes   tamanho do arquivo enviado
- * @param maxPixels        megapixels aceitos (largura x altura), conferidos no cabeçalho antes de decodificar
- * @param maxSide          maior lado aceito, em pixels
- */
 public record PhotoLimits(int maxPerGoal, int maxPerUser, long maxBytesPerUser, long maxUploadBytes, long maxPixels, int maxSide) {
 
     public static final int MAX_PER_GOAL = 8;

@@ -21,7 +21,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/** Linha de {@code goals}. Toda gravação (inclusive uma reserva nova) sobe {@code updatedAt} e, com ele, a versão. */
 @Entity
 @Table(name = "goals")
 public class GoalEntity {
@@ -32,7 +31,6 @@ public class GoalEntity {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    /** Opcional só na meta {@code METRIC} (V8.14). */
     @Column(length = 100)
     private String name;
 
@@ -56,33 +54,27 @@ public class GoalEntity {
     @Column(nullable = false)
     private boolean archived;
 
-    /** V8.03: tipo da meta; {@code SAVINGS} nas existentes. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 16, updatable = false)
     private GoalKind kind = GoalKind.SAVINGS;
 
-    /** V8.03: total de dívidas fixado em "cadastrei tudo" (só {@code DEBT_PAYOFF}). */
     @Column(name = "baseline_cents")
     private Long baselineCents;
 
     @Column(name = "baseline_at")
     private Instant baselineAt;
 
-    /** V8.14: medida acompanhada (só {@code METRIC}). */
     @Enumerated(EnumType.STRING)
     @Column(length = 24, updatable = false)
     private GoalMetric metric;
 
-    /** V8.14: sentido derivado de alvo × baseline (só {@code METRIC}); muda se o alvo ou a baseline mudam. */
     @Enumerated(EnumType.STRING)
     @Column(length = 8)
     private GoalDirection direction;
 
-    /** V8.14: texto do plano declarado. */
     @Column(name = "plan_note", length = 500)
     private String planNote;
 
-    /** V8.16: meta em destaque da Home (no máximo uma por usuário; índice único parcial). */
     @Column(nullable = false)
     private boolean featured;
 
@@ -122,7 +114,6 @@ public class GoalEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o estado do domínio. {@code updatedAt} sempre avança, então a versão sobe a cada gravação (também ao reservar). */
     @SuppressWarnings("java:S107")
     public void apply(String newName, long newTargetCents, LocalDate newDeadline, GoalPriority newPriority, String newDescription,
                       boolean newArchived, Long newBaselineCents, Instant newBaselineAt, GoalDirection newDirection, String newPlanNote,

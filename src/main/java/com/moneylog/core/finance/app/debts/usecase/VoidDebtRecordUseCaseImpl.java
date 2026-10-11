@@ -14,7 +14,6 @@ import com.moneylog.core.sk.time.TimeProvider;
 
 public class VoidDebtRecordUseCaseImpl implements VoidDebtRecordUseCase {
 
-    /** Motivo gravado ao desativar os lançamentos do reconhecimento. */
     public static final String VOID_REASON = "VOID";
 
     private final PersonGateway people;

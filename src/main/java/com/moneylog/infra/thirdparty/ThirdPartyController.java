@@ -30,7 +30,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Despesas de terceiro e "Dinheiro a receber de terceiros": só do usuário do token; tudo calculado no backend. */
 @RestController
 public class ThirdPartyController {
 
@@ -78,7 +77,6 @@ public class ThirdPartyController {
                                    MonthResponse month) {
     }
 
-    /** Marca a compra/despesa como de uma pessoa (responsável real). Não muda lançamentos nem o consumo. */
     @PostMapping("/v1/third-party-expenses")
     public ResponseEntity<MarkResponse> mark(@CurrentUser UUID userId,
                                              @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
@@ -89,7 +87,6 @@ public class ThirdPartyController {
                 .body(new MarkResponse(created.id(), created.transactionId(), created.personId(), created.note(), created.amount()));
     }
 
-    /** Recebimento já refletido no saldo, sem movimento de conta (nunca renda). */
     @PostMapping("/v1/third-party-receipts")
     public ResponseEntity<ReceiptResponse> receipt(@CurrentUser UUID userId,
                                                    @RequestHeader(value = "Idempotency-Key", required = false) UUID idempotencyKey,
@@ -101,14 +98,12 @@ public class ThirdPartyController {
                 .body(new ReceiptResponse(created.id(), created.personId(), created.transactionId(), created.amount(), created.receivedOn(), created.note()));
     }
 
-    /** Remove um recebimento registrado sem movimento (correção de vínculo). */
     @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-receipts/{id}")
     public ResponseEntity<Void> deleteReceipt(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {
         unmark.deleteReceipt(new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.UnmarkThirdPartyExpenseCommand(userId, id));
         return ResponseEntity.noContent().build();
     }
 
-    /** Desfaz a marca (correção de responsável); a despesa e o consumo não mudam. */
     @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-expenses/{id}")
     public ResponseEntity<Void> unmark(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {
         unmark.handle(new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.UnmarkThirdPartyExpenseCommand(userId, id));

@@ -55,12 +55,10 @@ class NotificationPlannerTest {
         List<NotificationDraft> all = drafts(3);
         Set<String> existing = all.stream().map(NotificationDraft::identity).collect(Collectors.toSet());
         assertThat(NotificationPlanner.plan(USER, TODAY, all, existing, 3)).isEmpty();
-        // duas novas com 3 já criadas: cabem exatamente (3 + 2 = 5)
         List<NotificationDraft> more = new ArrayList<>(all);
         more.add(draft(NotificationKind.INVOICE_DUE, 10));
         more.add(draft(NotificationKind.INVOICE_DUE, 11));
         assertThat(NotificationPlanner.plan(USER, TODAY, more, existing, 3)).hasSize(2);
-        // teto atingido: nada
         assertThat(NotificationPlanner.plan(USER, TODAY, more, existing, 5)).isEmpty();
     }
 

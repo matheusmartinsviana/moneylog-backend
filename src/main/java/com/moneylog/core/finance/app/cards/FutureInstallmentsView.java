@@ -7,10 +7,6 @@ import java.util.UUID;
 
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Parcelas futuras de um cartão por fatura (D2 §4.3): as parcelas não canceladas das faturas {@code FUTURE}. {@code total}
- * é a soma do backend e é o {@code Card.committedFuture}.
- */
 public record FutureInstallmentsView(Money total, List<ByInvoice> byInvoice) {
 
     public FutureInstallmentsView {

@@ -14,7 +14,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Desfazer o lote (S-180). Sem transação própria de propósito: cada estorno é uma transação do caso de uso de estorno. */
 public class UndoImportBatchUseCaseImpl implements UndoImportBatchUseCase {
 
     private final ImportBatchGateway batches;

@@ -10,9 +10,6 @@ import com.moneylog.core.account.domain.AccountStatus;
 import com.moneylog.core.account.domain.AccountType;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Contas do cenário base de D1 §3 (Nubank, XP, XP Invest), com ids e datas fixos.
- */
 public final class AccountTestFactory {
 
     public static final UUID NUBANK_ID = UUID.fromString("00000000-0000-0000-0000-00000000a001");
@@ -24,17 +21,14 @@ public final class AccountTestFactory {
     private AccountTestFactory() {
     }
 
-    /** Nubank, corrente, saldo inicial 20.000,00 em 01/10/2026. */
     public static Account umaContaCorrente() {
         return Account.open(NUBANK_ID, USER_ID, "Nubank", AccountType.CHECKING, "Nubank", NUBANK_OPENING_BALANCE, OPENING_DATE);
     }
 
-    /** XP, corrente, saldo inicial zero. */
     public static Account umaContaSemSaldo() {
         return Account.open(XP_ID, USER_ID, "XP", AccountType.CHECKING, "XP", Money.of("0.00"), OPENING_DATE);
     }
 
-    /** XP Invest, investimento, saldo inicial zero. */
     public static Account umaContaDeInvestimento() {
         return Account.open(XP_INVEST_ID, USER_ID, "XP Invest", AccountType.INVESTMENT, "XP", Money.of("0.00"), OPENING_DATE);
     }

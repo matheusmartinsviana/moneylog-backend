@@ -79,7 +79,6 @@ public class AccountEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o estado editável do domínio; só toca {@code updatedAt} se algo mudou (o lock otimista só avança com mudança). */
     public void apply(String newName, AccountType newType, String newInstitution, long newOpeningBalanceCents,
                       LocalDate newOpeningDate, AccountStatus newStatus, Instant now) {
         boolean changed = !name.equals(newName) || type != newType || !java.util.Objects.equals(institution, newInstitution)

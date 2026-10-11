@@ -16,10 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import com.moneylog.util.ContractValidation;
 
-/**
- * T49 CA3: cada {@code code} de domínio (404, 409 e 422) da tabela de erros do contrato existe como constante no código
- * de produção, e cada {@code code} de cartão/fatura que o código declara aparece na tabela do contrato.
- */
 @DisplayName("Contrato: tabela de códigos de erro × constantes do código")
 class ContractErrorCodesTest {
 
@@ -27,10 +23,8 @@ class ContractErrorCodesTest {
     private static final Pattern ROW = Pattern.compile("^\\| (404|409|422) \\|(.*)\\|$", Pattern.MULTILINE);
     private static final Pattern CODE = Pattern.compile("`([A-Z][A-Z0-9_]+)`");
 
-    /** Códigos de cartão/fatura que o domínio lança como invariante interna (500): ficam fora da tabela de 4xx. */
     private static final Set<String> INTERNAL = Set.of("INVOICE_CHAIN_INCONSISTENT", "CARD_INVALID_INSTALLMENT");
 
-    /** Literais de cartão que são nomes de tipo ({@code TransactionType}, tipo de insight {@code CARD_COMMITTED}), não códigos de erro. */
     private static final Set<String> NOT_CODES = Set.of("CARD_PURCHASE", "CARD_COMMITTED", "CARD_LIMIT_USAGE", "CARD_CLOSING_SOON");
 
     @Test

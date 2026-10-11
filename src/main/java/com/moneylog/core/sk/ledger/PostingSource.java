@@ -4,10 +4,6 @@ import java.util.UUID;
 
 import com.moneylog.core.sk.ledger.LedgerExceptions.InvalidPostingException;
 
-/**
- * Origem de um grupo de postings (D1 §1.1, S-45): tipo + id da entidade que gerou + parcela (só em
- * {@code TRANSACTION}). É a chave usada para desativar o grupo (estorno, cancelamento de parcela, correção).
- */
 public record PostingSource(PostingSourceType type, UUID sourceId, UUID installmentId) {
 
     public PostingSource {
@@ -45,7 +41,6 @@ public record PostingSource(PostingSourceType type, UUID sourceId, UUID installm
         return new PostingSource(PostingSourceType.DEBT_CANCELLATION, debtId, null);
     }
 
-    /** Id da movimentação quando a origem é {@code TRANSACTION}; {@code null} nas demais. */
     public UUID transactionId() {
         return type == PostingSourceType.TRANSACTION ? sourceId : null;
     }

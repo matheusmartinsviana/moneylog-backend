@@ -14,14 +14,6 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import com.moneylog.core.note.exception.NoteExceptions.NoteFrontmatterInvalidException;
 
-/**
- * Frontmatter YAML de uma nota (S-166). <b>Só é frontmatter</b> um bloco {@code ---...---} fechado cujo conteúdo é um mapeamento YAML
- * válido e seguro (ou está vazio); qualquer outra coisa (régua horizontal com texto no meio, YAML quebrado, escalar ou lista, alias,
- * {@code !!tag}, aninhamento ou tamanho acima do limite) é <b>corpo</b> e fica como foi escrito, byte a byte (S-273). A leitura é <b>segura</b>: {@code SafeConstructor} (nenhum tipo arbitrário, {@code !!java...}
- * falha), sem âncoras nem aliases (nem recursivos), no máximo 64 KB e 8 níveis de aninhamento. As demais chaves do frontmatter ficam no
- * <b>texto</b> da nota e por isso são preservadas na exportação sem reserialização. A chave {@code moneylog.links} traz os vínculos
- * tipados (D1 §5) e só é tocada por {@link #stripMoneylog} e {@link #withMoneylogLinks}, que trabalham sobre o texto.
- */
 public final class Frontmatter {
 
     public static final int MAX_BYTES = 64 * 1024;
@@ -30,29 +22,21 @@ public final class Frontmatter {
     private Frontmatter() {
     }
 
-    /** Posição do bloco {@code ---...---} no início do texto. {@code end} é exclusivo e inclui a quebra de linha depois do fechamento. */
     public record Block(int yamlStart, int yamlEnd, int closeStart, int end, String newline) {
     }
 
-    /**
-     * Um vínculo declarado em {@code moneylog.links}, como escrito: {@code type} e {@code id} (entidades), {@code key} (resumo mensal,
-     * {@code AAAA-MM}) ou {@code path} (nota, pelo caminho, porque o id muda ao importar). {@code state} é informativo e só a exportação o
-     * escreve ({@code trashed}: a nota-alvo está na lixeira, S-275); a importação o ignora.
-     */
     public record LinkRef(String type, String id, String key, String path, String state) {
         public LinkRef(String type, String id, String key, String path) {
             this(type, id, key, path, null);
         }
     }
 
-    /** Frontmatter lido: o bloco (ou {@code null} se a nota não tem) e os dados. */
     public record Parsed(Block block, Map<String, Object> data) {
 
         public boolean present() {
             return block != null;
         }
 
-        /** Posição onde começa o corpo depois do frontmatter. */
         public int bodyStart() {
             return block == null ? 0 : block.end();
         }
@@ -65,7 +49,6 @@ public final class Frontmatter {
             return Optional.empty();
         }
 
-        /** Tags como escritas (lista, texto separado por vírgula ou espaço); a normalização é do {@link NoteTags}. */
         public List<String> rawTags() {
             Object tags = data.get("tags");
             if (tags == null) {
@@ -92,7 +75,6 @@ public final class Frontmatter {
             return data.containsKey(MONEYLOG_KEY);
         }
 
-        /** Vínculos de {@code moneylog.links}; estrutura inválida lança {@link NoteFrontmatterInvalidException}. */
         public List<LinkRef> moneylogLinks() {
             Object moneylog = data.get(MONEYLOG_KEY);
             if (moneylog == null) {
@@ -130,19 +112,10 @@ public final class Frontmatter {
         }
     }
 
-    // ------------------------------------------------------------------ localizar e ler
-
-    /**
-     * Acha o bloco no início do texto: primeira linha {@code ---} e fechamento {@code ---} ou {@code ...} em linha própria. Sem fechamento,
-     * não é frontmatter (como no Obsidian).
-     *
-     * @throws NoteFrontmatterInvalidException o conteúdo do bloco passa de 64 KB
-     */
     public static Optional<Block> locate(String text) {
         return locate(text, true);
     }
 
-    /** Remove o bloco de frontmatter do início do texto, seja ele válido ou não (sem checar o tamanho). Usado na importação. */
     public static String dropBlock(String text) {
         return locate(text, false).map(block -> text.substring(block.end())).orElse(text);
     }
@@ -178,10 +151,6 @@ public final class Frontmatter {
         return Optional.empty();
     }
 
-    /**
-     * Localiza e lê o frontmatter. Sem bloco <b>reconhecido</b>, devolve dados vazios e o texto inteiro é corpo: bloco sem fechamento,
-     * conteúdo que não é um mapa YAML válido e seguro (régua horizontal com texto, lista, escalar, alias, {@code !!tag}) ou acima de 64 KB.
-     */
     public static Parsed parse(String text) {
         Optional<Block> block;
         try {
@@ -230,12 +199,6 @@ public final class Frontmatter {
         return Collections.unmodifiableMap(out);
     }
 
-    // ------------------------------------------------------------------ edição sobre o texto
-
-    /**
-     * Remove do texto o bloco da chave {@code moneylog} do frontmatter (linhas indentadas que a seguem). Se o frontmatter fica sem
-     * conteúdo (só linhas em branco), o bloco inteiro some: um frontmatter vazio pré-existente também some, sem perda de dado. Nada mais é reescrito.
-     */
     public static String stripMoneylog(String text) {
         Parsed parsed = parse(text);
         if (!parsed.present()) {
@@ -277,24 +240,17 @@ public final class Frontmatter {
         return text.substring(0, b.yamlStart()) + remaining + text.substring(b.closeStart());
     }
 
-    /** A chave no começo da linha, pura ou entre aspas ({@code "moneylog":}), com espaço antes dos dois-pontos. */
     private static final Pattern MONEYLOG_KEY_LINE = Pattern.compile("^(?:moneylog|\"moneylog\"|'moneylog')[ \\t]*:(?:[ \\t].*)?$");
 
     private static boolean isMoneylogKeyLine(String line) {
         return MONEYLOG_KEY_LINE.matcher(line.stripTrailing()).matches();
     }
 
-    /**
-     * Acrescenta {@code moneylog.links} ao frontmatter (cria o bloco se a nota não tem frontmatter reconhecido ou se o dela está vazio; um
-     * texto que começa com {@code ---} sem ser frontmatter ganha o bloco na frente). O resto do texto não muda. Pressupõe que o texto
-     * ainda não tem a chave {@code moneylog} (as notas gravadas nunca a têm).
-     */
     public static String withMoneylogLinks(String text, List<LinkRef> links) {
         if (links.isEmpty()) {
             return text;
         }
         Parsed parsed = parse(text);
-        // um bloco vazio ou em branco recebe um bloco NOVO na frente (o original volta intacto quando a importação tira o nosso)
         Optional<Block> located = parsed.present() && !text.substring(parsed.block().yamlStart(), parsed.block().yamlEnd()).isBlank()
                 ? Optional.of(parsed.block()) : Optional.empty();
         String newline = parsed.present() ? parsed.block().newline() : "\n";
@@ -324,7 +280,6 @@ public final class Frontmatter {
         return before + lead + yaml + text.substring(b.closeStart());
     }
 
-    /** Escalar YAML seguro: puro se for só {@code [A-Za-z0-9_-]}, senão entre aspas duplas com escapes. */
     static String scalar(String value) {
         if (!value.isEmpty() && value.matches("[A-Za-z0-9_-]+") && !value.matches("-?[0-9_]+") && !value.matches("(?i)true|false|null|yes|no|on|off|y|n")) {
             return value;

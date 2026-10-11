@@ -41,7 +41,6 @@ import com.moneylog.infra.security.MoneylogAuthProperties;
 import com.moneylog.infra.security.MoneylogOwnerProperties;
 import com.moneylog.infra.security.OwnerBootstrap;
 
-/** Ligação da feature auth: gateways, casos de uso com a fronteira transacional e o boot do dono. */
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
 public class AuthConfig {
@@ -73,7 +72,6 @@ public class AuthConfig {
     @SuppressWarnings("unchecked")
     RefreshSessionUseCase refreshSessionUseCase(RefreshTokenGateway refreshTokens, SessionOpener sessions, TimeProvider time,
                                                 MoneylogAuthProperties auth, PlatformTransactionManager transactionManager) {
-        // O reuso fora da janela revoga a família e responde 401: a revogação precisa ser confirmada (commit).
         return TransactionalProxies.requiredCommittingOn(RefreshSessionUseCase.class,
                 new RefreshSessionUseCaseImpl(refreshTokens, sessions, time, auth.reuseGrace()), transactionManager,
                 RefreshInvalidException.class);

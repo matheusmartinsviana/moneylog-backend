@@ -21,10 +21,6 @@ import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.insights.gateways.InsightDismissalGatewayImpl;
 
-/**
- * Ligação dos insights calculados (ADR-019). Sem nenhuma dependência de IA: {@code AI_PROVIDER=none} não muda nada aqui. As leituras são
- * transacionais com um instantâneo só ({@code REPEATABLE_READ}, somente leitura); dispensar e restaurar gravam em uma transação curta.
- */
 @Configuration(proxyBeanMethods = false)
 public class InsightsConfig {
 

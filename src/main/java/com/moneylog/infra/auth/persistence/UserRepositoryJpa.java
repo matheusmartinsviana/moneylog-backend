@@ -19,7 +19,6 @@ public interface UserRepositoryJpa extends JpaRepository<UserEntity, UUID> {
     @Query("select u from UserEntity u order by u.createdAt asc, u.id asc")
     List<UserEntity> findOldest(Pageable pageable);
 
-    /** Definição de senha atômica e de uso único: só se não há senha e o código gravado é o esperado. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update UserEntity u set u.passwordHash = :hash, u.passwordSetAt = :now, u.passwordSetupPending = false,

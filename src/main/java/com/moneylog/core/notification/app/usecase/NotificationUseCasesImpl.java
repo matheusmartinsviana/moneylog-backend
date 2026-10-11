@@ -61,19 +61,14 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Implementações dos casos de uso de notificações (T127 a T130). */
 public final class NotificationUseCasesImpl {
 
-    /** Lidas há mais de 90 dias saem da central (S-179). */
     public static final int RETENTION_DAYS = 90;
     public static final int MAX_PUSH_SUBSCRIPTIONS = 10;
-    /** Valores financeiros que não vão no payload do push sem {@code push.includeAmounts=true}. */
     static final Set<String> AMOUNT_PARAMS = Set.of("amount", "total", "available", "committed7d");
 
     private NotificationUseCasesImpl() {
     }
-
-    // ------------------------------------------------------------------ central
 
     public static final class ListNotifications implements ListNotificationsUseCase {
         private final NotificationGateway notifications;
@@ -132,8 +127,6 @@ public final class NotificationUseCasesImpl {
             return notifications.markAllRead(userId, time.now());
         }
     }
-
-    // ------------------------------------------------------------------ lembretes
 
     public static final class CreateReminder implements CreateReminderUseCase {
         private final ReminderGateway reminders;
@@ -213,8 +206,6 @@ public final class NotificationUseCasesImpl {
         }
     }
 
-    // ------------------------------------------------------------------ configurações
-
     public static final class GetSettings implements GetNotificationSettingsUseCase {
         private final NotificationSettingsGateway settings;
 
@@ -246,8 +237,6 @@ public final class NotificationUseCasesImpl {
         }
     }
 
-    // ------------------------------------------------------------------ geração, retenção, push, mensagem diária
-
     public static final class GenerateNotifications implements GenerateNotificationsUseCase {
         private final GenerationContextLoader loader;
         private final NotificationGateway notifications;
@@ -267,7 +256,6 @@ public final class NotificationUseCasesImpl {
             List<NotificationDraft> drafts = NotificationGenerators.generate(ctx);
             List<NotificationDraft> planned = NotificationPlanner.plan(userId, ctx.today(), drafts,
                     notifications.identitiesOn(userId, ctx.today()), notifications.countOn(userId, ctx.today()));
-            // fora da janela de silêncio e com push ligado: elegível a push; senão só a central (S-175)
             boolean push = ctx.settings().pushEnabled() && !ctx.settings().quietHours().contains(ctx.localTime());
             int created = 0;
             for (NotificationDraft draft : planned) {
@@ -330,7 +318,6 @@ public final class NotificationUseCasesImpl {
                     }
                 }
                 if (delivered || !retry) {
-                    // entregue, ou sem destino/falha definitiva: sai da fila (a central já tem a notificação)
                     n.pushSent(time.now());
                     notifications.save(n);
                 }
@@ -366,8 +353,6 @@ public final class NotificationUseCasesImpl {
             return new DailyMessageView(message, DailyMessageView.STATIC, time.now());
         }
     }
-
-    // ------------------------------------------------------------------ push
 
     public static final class SubscribePush implements SubscribePushUseCase {
         private final PushSubscriptionGateway subscriptions;
@@ -434,7 +419,6 @@ public final class NotificationUseCasesImpl {
         }
     }
 
-    /** Instante usado nos testes para o corte de retenção. */
     static Instant cutoff(Instant now) {
         return now.minus(Duration.ofDays(RETENTION_DAYS));
     }

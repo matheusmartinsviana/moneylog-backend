@@ -15,11 +15,9 @@ import com.moneylog.core.finance.domain.NetWorth;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 
-/** {@code DashboardSummary} do contrato: tudo calculado pelo backend (D2 §4.4), com {@code hasAccounts} (S-61). */
 public record DashboardResponse(LocalDate asOf, @JsonProperty("isProjection") boolean isProjection, boolean hasAccounts,
                                 Balances balances, Committed committed, Projected projected, Month month, NetWorthResponse netWorth) {
 
-    /** {@code inAccountsChange} só existe fora de projeção e com ao menos uma conta (redesign R4); ausente, não {@code null}. */
     public record Balances(Money inAccounts, Money investments, Money available, Money reserved, Money committed30d,
                            @JsonInclude(JsonInclude.Include.NON_NULL) InAccountsChange inAccountsChange) {
     }

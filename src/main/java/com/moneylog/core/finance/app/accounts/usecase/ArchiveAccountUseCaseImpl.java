@@ -39,7 +39,6 @@ public class ArchiveAccountUseCaseImpl implements ArchiveAccountUseCase {
         List<Posting> postings = loaded.ledger().entries().stream().map(LedgerEntry::posting)
                 .filter(posting -> account.book().equals(posting.book())).toList();
         account.archive(postings, time.today());
-        // S-259: reserva ativa positiva (em qualquer data, inclusive futura) impede arquivar; a meta arquivada não reserva nada
         List<String> goalsWithReservation = loaded.goals().stream()
                 .filter(goal -> goal.reservedOn(account.id(), LocalDate.MAX).isPositive()).map(Goal::name).toList();
         if (!goalsWithReservation.isEmpty()) {

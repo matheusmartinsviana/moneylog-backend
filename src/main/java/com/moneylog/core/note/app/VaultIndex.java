@@ -13,26 +13,15 @@ import com.moneylog.core.note.domain.NotePath;
 import com.moneylog.core.note.domain.WikilinkResolver;
 import com.moneylog.core.note.exception.NoteExceptions.NotePathTakenException;
 
-/** Operações sobre o índice do vault que os casos de uso de escrita compartilham. */
 public final class VaultIndex {
 
     private VaultIndex() {
     }
 
-    /**
-     * Resolve de novo os wikilinks <b>afetados</b> e grava só o que mudou. Chamado depois de criar, mover, mandar para a lixeira, restaurar e
-     * importar: um link pendente passa a resolver quando a nota aparece, e um resolvido volta a pendente quando ela sai. A resolução só
-     * depende das notas de mesmo nome, então basta olhar os links cuja chave de nome coincide com a das notas que entraram, saíram ou
-     * mudaram de nome ({@code affectedPaths}): o custo não cresce com o tamanho do vault (S-278).
-     */
     public static void refreshWikilinks(NoteGateway notes, UUID userId, Collection<NotePath> affectedPaths) {
         refreshWikilinks(notes, userId, affectedPaths, Set.of());
     }
 
-    /**
-     * Como {@link #refreshWikilinks(NoteGateway, UUID, Collection)}, mais as chaves de nome dos wikilinks de notas recém-criadas sem índice
-     * (a importação cria as notas sem resolver os links; os que apontam para notas que já existiam têm de ser resolvidos agora).
-     */
     public static void refreshWikilinks(NoteGateway notes, UUID userId, Collection<NotePath> affectedPaths, Collection<String> extraNameKeys) {
         Set<String> keys = new HashSet<>(extraNameKeys);
         for (NotePath path : affectedPaths) {
@@ -55,7 +44,6 @@ public final class VaultIndex {
         }
     }
 
-    /** {@code NOTE_PATH_TAKEN} se outra nota ativa (diferente de {@code exceptId}) usa o caminho, sem diferenciar maiúsculas. */
     public static void requireFree(List<WikilinkResolver.Entry> index, NotePath path, UUID exceptId) {
         String key = path.key();
         for (WikilinkResolver.Entry entry : index) {

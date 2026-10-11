@@ -10,14 +10,8 @@ import com.moneylog.core.sk.ledger.VoidDecision;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidPolicyNotApplicableException;
 
-/**
- * Implementação da {@link TransactionVoidPolicy} para as movimentações de cartão (S-36): {@code CARD_PURCHASE},
- * {@code REFUND} no cartão e {@code INVOICE_PAYMENT}. As regras ficam em {@link CardVoidRules}. A cadeia precisa ser do
- * mesmo cartão (A3). O estorno em si passa por {@link TransactionVoiding}; a policy só decide.
- */
 public final class CardTransactionVoidPolicy implements TransactionVoidPolicy {
 
-    /** Recusa de estorno da compra com reembolso ativo (S-89), o mesmo {@code code} da despesa em conta. */
     public static final String HAS_ACTIVE_REFUNDS = TransactionVoidPolicy.HAS_ACTIVE_REFUNDS;
 
     private final CreditCard card;
@@ -29,10 +23,6 @@ public final class CardTransactionVoidPolicy implements TransactionVoidPolicy {
         this(card, chain, today, null);
     }
 
-    /**
-     * @param activeRefunds Σ dos reembolsos ativos ligados à compra ({@code null} = nenhum): compra com reembolso ativo não é
-     *                      estornada, para o consumo da categoria nunca ficar negativo (S-9, S-89)
-     */
     public CardTransactionVoidPolicy(CreditCard card, InvoiceChain chain, LocalDate today, Money activeRefunds) {
         this.card = Objects.requireNonNull(card, "card");
         this.chain = Objects.requireNonNull(chain, "chain");
@@ -54,7 +44,6 @@ public final class CardTransactionVoidPolicy implements TransactionVoidPolicy {
         };
     }
 
-    /** A guarda de fatura fechada primeiro (a correção é cancelar as parcelas restantes); depois, os reembolsos ativos. */
     private VoidDecision purchase(Transaction transaction) {
         VoidDecision decision = CardVoidRules.forPurchase(transaction.installments(), chain, today);
         if (decision.allowed() && activeRefunds != null && activeRefunds.isPositive()) {

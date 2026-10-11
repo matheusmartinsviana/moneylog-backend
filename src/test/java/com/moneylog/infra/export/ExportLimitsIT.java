@@ -15,10 +15,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/**
- * M1 da revisão da Etapa 5 (S-260): teto de volume (422 {@code EXPORT_TOO_LARGE}) e limite de taxa (429 {@code TOO_MANY_ATTEMPTS}) das rotas de exportação.
- * Os limites reais são 200.000 movimentações e 6 pedidos por minuto por usuário; aqui são reduzidos por propriedade para o teste ser rápido.
- */
 @TestPropertySource(properties = {"moneylog.export.max-transactions=5", "moneylog.export.rate-limit.max-requests=4", "moneylog.export.rate-limit.window=PT1M"})
 @DisplayName("Exportação: teto de volume e limite de taxa (M1, S-260)")
 class ExportLimitsIT extends E4ItBase {
@@ -36,7 +32,7 @@ class ExportLimitsIT extends E4ItBase {
         expenses(5);
         mockMvc.perform(get("/v1/exports/backup")).andExpect(status().isOk()).andExpect(ContractValidation.conforms());
         mockMvc.perform(get("/v1/exports/transactions.csv")).andExpect(status().isOk()).andExpect(ContractValidation.conforms());
-        advanceTo(Instant.parse("2026-10-10T15:00:00Z").plusSeconds(120)); // nova janela de taxa
+        advanceTo(Instant.parse("2026-10-10T15:00:00Z").plusSeconds(120));
         created("{\"type\":\"EXPENSE\",\"amount\":\"10.00\",\"date\":\"2026-10-11\",\"description\":\"A sexta\",\"accountId\":\"" + nubank
                 + "\",\"categoryId\":\"" + food + "\",\"method\":\"PIX\"}");
 

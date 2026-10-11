@@ -66,10 +66,6 @@ public class TransactionGatewayImpl implements TransactionGateway {
         this.entityManager = entityManager;
     }
 
-    /**
-     * As linhas de fatura de uma movimentação de cartão: cada fechamento vira a linha (criada na primeira vez, ADR-006) e
-     * o resultado fica guardado para a mesma gravação não repetir a consulta.
-     */
     private final class InvoiceBinding {
         private final UUID userId;
         private final UUID cardId;
@@ -104,7 +100,6 @@ public class TransactionGatewayImpl implements TransactionGateway {
         Instant now = time.now();
         InvoiceBinding binding = new InvoiceBinding(s.userId(), s.cardId());
         UUID invoiceId = s.invoiceClosingDate() == null ? null : binding.idFor(s.invoiceClosingDate());
-        // a linha de fatura precisa existir antes da movimentação e das parcelas que a referenciam (FKs compostas)
         List<InstallmentEntity> rows = new ArrayList<>();
         for (TransactionInstallment i : s.installments()) {
             rows.add(new InstallmentEntity(i.id(), s.userId(), s.id(), i.number(), i.total(), i.amount().cents(),
@@ -146,7 +141,6 @@ public class TransactionGatewayImpl implements TransactionGateway {
                 saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
-    /** Alinha as parcelas gravadas ao estado do agregado: cancelamento e fatura (realocação da mudança de dias). */
     private List<InstallmentEntity> syncInstallments(TransactionState s, InvoiceBinding binding, Instant now) {
         if (s.installments().isEmpty()) {
             return List.of();
@@ -231,7 +225,6 @@ public class TransactionGatewayImpl implements TransactionGateway {
                 .toList();
     }
 
-    /** A mesma regra de {@link TransactionFilter#matches}, em SQL. */
     private static List<Predicate> predicates(CriteriaBuilder cb, Root<TransactionEntity> root, UUID userId, TransactionFilter f) {
         List<Predicate> where = new ArrayList<>();
         where.add(cb.equal(root.get("userId"), userId));

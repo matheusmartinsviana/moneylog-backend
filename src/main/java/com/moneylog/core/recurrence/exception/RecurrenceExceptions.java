@@ -7,15 +7,11 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/**
- * Exceções da feature recorrência.
- */
 public final class RecurrenceExceptions {
 
     private RecurrenceExceptions() {
     }
 
-    /** Recorrência inexistente ou de outro usuário (não revela existência). */
     public static class RecurrenceNotFoundException extends NotFoundException {
         public RecurrenceNotFoundException(UUID id) {
             super("RECURRENCE_NOT_FOUND", "Recorrência não encontrada: " + id + ".");
@@ -28,7 +24,6 @@ public final class RecurrenceExceptions {
         }
     }
 
-    /** A mesma ocorrência não é realizada duas vezes ({@code recurrenceId + occurrenceDate} é único). */
     public static class AccountRequiredException extends BusinessRuleException {
         public AccountRequiredException() {
             super("RECURRENCE_ACCOUNT_REQUIRED",
@@ -54,14 +49,12 @@ public final class RecurrenceExceptions {
         }
     }
 
-    /** Realizar ou pular ocorrência de recorrência desativada (S-234). */
     public static class RecurrenceInactiveException extends BusinessRuleException {
         public RecurrenceInactiveException() {
             super("RECURRENCE_INACTIVE", "A recorrência está desativada: não é possível realizar nem pular ocorrências.");
         }
     }
 
-    /** Editar sem {@code endDate} uma recorrência encerrada a reabriria em silêncio (S-236). */
     public static class RecurrenceEndedException extends BusinessRuleException {
         public RecurrenceEndedException() {
             super("RECURRENCE_ENDED", "A recorrência já está encerrada: informe um novo endDate para reabri-la, ou crie outra.");
@@ -74,7 +67,6 @@ public final class RecurrenceExceptions {
         }
     }
 
-    /** Estado gravado de uma recorrência inconsistente ao reidratar ({@code RecurringTransaction.restore}): vira 500. */
     public static class RecurrenceStateInconsistentException extends DomainException {
         public RecurrenceStateInconsistentException(String reason) {
             super("RECURRENCE_STATE_INCONSISTENT", "Estado gravado da recorrência inconsistente: " + reason);

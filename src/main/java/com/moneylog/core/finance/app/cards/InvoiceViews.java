@@ -16,16 +16,11 @@ import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Monta {@link InvoiceDetails} de uma fatura da cadeia, com a descrição e o número da parcela vindos das movimentações do
- * mesmo carregamento (S-79). Só itens e pagamentos ativos.
- */
 public final class InvoiceViews {
 
     private InvoiceViews() {
     }
 
-    /** Índice das movimentações carregadas por id (uma vez por caso de uso). */
     public static Map<UUID, Transaction> index(FinancialRecords records) {
         return records.transactions().stream().collect(Collectors.toMap(Transaction::id, Function.identity()));
     }
@@ -35,7 +30,6 @@ public final class InvoiceViews {
                 payments(invoice.payments(), transactions));
     }
 
-    /** Itens ativos ordenados por data, número da parcela (créditos depois), descrição e movimentação (ordem estável); só parcelas se {@code onlyInstallments}. */
     public static List<InvoiceDetails.Item> items(List<InvoiceItem> items, Map<UUID, Transaction> transactions,
                                                   boolean onlyInstallments) {
         return items.stream().filter(InvoiceItem::active)

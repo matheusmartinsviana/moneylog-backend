@@ -32,7 +32,6 @@ public class UpdateCardDetailsUseCaseImpl implements UpdateCardDetailsUseCase {
 
     @Override
     public CardDetails handle(UpdateCardDetailsCommand command) {
-        // a leitura sem trava só decide o caminho: mudar os dias exige travar as movimentações antes do cartão (outra ordem)
         CardGateway.BillingDays current = cards.currentBillingDays(command.userId(), command.cardId())
                 .orElseThrow(() -> new CardNotFoundException(command.cardId()));
         if (current.closingDay() != command.closingDay() || current.dueDay() != command.dueDay()) {
@@ -46,7 +45,6 @@ public class UpdateCardDetailsUseCaseImpl implements UpdateCardDetailsUseCase {
         if (card.version() != command.version()) {
             throw new VersionConflictException(command.version(), card.version());
         }
-        // só valida a conta se ela mudou: editar o nome não pode falhar porque a conta antiga foi arquivada depois
         if (!Objects.equals(card.defaultPaymentAccountId(), command.defaultPaymentAccountId())) {
             CardAccounts.requireUsablePaymentAccount(accounts, command.userId(), command.defaultPaymentAccountId());
         }

@@ -12,20 +12,8 @@ import com.moneylog.core.sk.money.MoneyExceptions.InvalidMoneyAllocationExceptio
 import com.moneylog.core.sk.money.MoneyExceptions.InvalidMoneyAmountException;
 import com.moneylog.core.sk.money.MoneyExceptions.MoneyOverflowException;
 
-/**
- * Dinheiro em <b>centavos {@code long}</b> + moeda (D1 §2.1, ADR-002). Imutável.
- *
- * <ul>
- *   <li>Nunca usa {@code double}/{@code float} (verificado pelo {@code ArchitectureTest}).</li>
- *   <li>Rejeita valor com mais de 2 casas: não existe arredondamento silencioso.</li>
- *   <li>Soma, subtração e multiplicação usam {@code Math.*Exact}: overflow lança {@link MoneyOverflowException}.</li>
- *   <li>Operar moedas diferentes lança {@link CurrencyMismatchException}.</li>
- *   <li>Pode ser negativo (ex.: saldo inicial de cheque especial, lado crédito de um posting).</li>
- * </ul>
- */
 public final class Money implements Comparable<Money> {
 
-    /** Casas decimais: o valor é guardado em centavos. */
     public static final int SCALE = 2;
 
     private static final Pattern DECIMAL = Pattern.compile("-?\\d+(\\.\\d{1,2})?");
@@ -38,7 +26,6 @@ public final class Money implements Comparable<Money> {
         this.currency = Objects.requireNonNull(currency, "currency");
     }
 
-    /** Valor em BRL a partir de string decimal com até 2 casas (ex.: {@code "1200.00"}, {@code "-0.5"}). */
     public static Money of(String amount) {
         return of(amount, CurrencyCode.BRL);
     }
@@ -62,7 +49,6 @@ public final class Money implements Comparable<Money> {
         return new Money(0L, currency);
     }
 
-    /** Soma uma lista de valores na moeda dada (lista vazia = zero). */
     public static Money sum(Iterable<Money> values, CurrencyCode currency) {
         Money total = zero(currency);
         for (Money value : values) {
@@ -101,13 +87,6 @@ public final class Money implements Comparable<Money> {
         return exact(() -> Math.multiplyExact(cents, factor));
     }
 
-    /**
-     * Divide o valor em {@code parts} partes cuja soma é <b>exatamente</b> o total. O resto (centavos que não dividem)
-     * vai para a <b>primeira</b> parte (S-3): {@code 1000.00 / 3 = [333.34, 333.33, 333.33]}.
-     *
-     * @throws InvalidMoneyAllocationException se {@code parts < 1}, se o valor não for positivo ou se alguma parte
-     *                                         ficaria menor que 1 centavo (ex.: {@code 0.05} em 6)
-     */
     public List<Money> allocate(int parts) {
         if (parts < 1) {
             throw new InvalidMoneyAllocationException("o número de partes precisa ser ao menos 1 (recebido " + parts + ").");
@@ -149,14 +128,12 @@ public final class Money implements Comparable<Money> {
         return compareTo(other) < 0;
     }
 
-    /** Compara valores da mesma moeda. Moedas diferentes lançam {@link CurrencyMismatchException}. */
     @Override
     public int compareTo(Money other) {
         requireSameCurrency(other);
         return Long.compare(cents, other.cents);
     }
 
-    /** Representação decimal com 2 casas, usada na API (ex.: {@code "1200.00"}, {@code "-0.50"}). */
     public String toPlainString() {
         return BigDecimal.valueOf(cents, SCALE).toPlainString();
     }

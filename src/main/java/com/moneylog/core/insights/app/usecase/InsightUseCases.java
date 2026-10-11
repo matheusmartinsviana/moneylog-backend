@@ -9,13 +9,11 @@ import com.moneylog.core.insights.domain.InsightItem;
 import com.moneylog.core.insights.domain.InsufficientData;
 import com.moneylog.core.sk.time.Competence;
 
-/** Casos de uso dos insights calculados (ADR-019). Um por ação, {@code handle(...)}. */
 public final class InsightUseCases {
 
     private InsightUseCases() {
     }
 
-    /** Lista ordenada e paginada, mais o que não saiu por falta de dado. */
     public record InsightsView(List<InsightItem> items, boolean hasNext, List<InsufficientData> insufficient) {
 
         public InsightsView {
@@ -32,11 +30,9 @@ public final class InsightUseCases {
         }
     }
 
-    /** @param month {@code null} = mês corrente */
     public record MonthlyQuery(UUID userId, Competence month, boolean includeDismissed, int offset, int limit) {
     }
 
-    /** @param date {@code null} = hoje no fuso do usuário; depois de hoje é recusada */
     public record DailyQuery(UUID userId, LocalDate date, boolean includeDismissed, int offset, int limit) {
     }
 
@@ -61,12 +57,10 @@ public final class InsightUseCases {
         List<HistoryMonth> handle(HistoryQuery query);
     }
 
-    /** Devolve o insight atualizado ({@code dismissed = true}). */
     public interface DismissInsightUseCase {
         InsightItem handle(DismissCommand command);
     }
 
-    /** Revoga a dispensa (grava {@code revoked_at}, nunca apaga) e devolve o insight atualizado. */
     public interface RestoreInsightUseCase {
         InsightItem handle(RestoreCommand command);
     }

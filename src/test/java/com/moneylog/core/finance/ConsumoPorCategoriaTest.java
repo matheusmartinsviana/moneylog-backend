@@ -103,7 +103,6 @@ class ConsumoPorCategoriaTest {
 
         SpendingByCategory result = spending(5, OCTOBER);
 
-        // C em outubro: +0,01 − 20,00 − 30,00 = −49,99 (reembolsos de compras de setembro)
         assertThat(result.items()).extracting(SpendingByCategory.Item::categoryId).containsExactly(a.id(), b.id());
         assertThat(result.other()).isNull();
         assertThat(result.total()).as("o total líquido já considera a categoria negativa").isEqualTo(Money.of("100.01"));
@@ -145,7 +144,6 @@ class ConsumoPorCategoriaTest {
         assertThat(result.other().amount()).isEqualTo(Money.of("10.00"));
         assertThat(result.other().categories()).isEqualTo(1);
 
-        // 1 de 20.000 centavos = 0,00005 → HALF_UP → 0.0001
         FinanceScenarioFactory big = umCenarioBase();
         Category x = category("X");
         Category y = category("Y");

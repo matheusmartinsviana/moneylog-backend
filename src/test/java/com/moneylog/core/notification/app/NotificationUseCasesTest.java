@@ -65,10 +65,9 @@ import com.moneylog.core.util.Ids;
 class NotificationUseCasesTest {
 
     private static final UUID USER = Ids.USER_ID;
-    private static final Instant NOW = Instant.parse("2026-11-02T11:30:00Z"); // 08:30 em São Paulo
+    private static final Instant NOW = Instant.parse("2026-11-02T11:30:00Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 11, 2);
 
-    /** Central em memória com a mesma regra do índice único {@code (user, kind, ref, dia)}. */
     static final class MemoryNotifications implements NotificationGateway {
         final Map<String, Notification> byIdentity = new HashMap<>();
 
@@ -286,8 +285,6 @@ class NotificationUseCasesTest {
         assertThat(open.remindOn()).isEqualTo(TODAY.plusDays(3));
         assertThat(open.remindAt()).isEqualTo(LocalTime.of(9, 0));
     }
-
-    // ------------------------------------------------------------------ push
 
     private static final class FakeSender implements PushSender {
         final boolean enabled;

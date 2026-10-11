@@ -11,11 +11,6 @@ import com.moneylog.core.finance.domain.CommitmentKind;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * {@code Upcoming} do contrato (D2 §4.4, S-64). O {@code bucket} do item sem data é {@code null} (a dívida sem previsão
- * não tem faixa de vencimento), e {@code refId} também pode ser {@code null}. {@code overdueTruncated} (S-240): havia mais ocorrências
- * de recorrência vencidas e pendentes que o limite por chamada; os totais continuam completos.
- */
 public record UpcomingResponse(List<Item> items, List<Item> undated, Totals totals, boolean overdueTruncated) {
 
     public record Installment(int number, int total) {

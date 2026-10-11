@@ -67,7 +67,6 @@ import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IdempotencyKeyReusedException;
 
-/** T80: realizar (conta e cartão) e pular ocorrências, com idempotência e a ordem de travas: recorrência → cartão → contas. */
 @DisplayName("Realizar e pular ocorrências: casos de uso (T80)")
 class RealizarEPularOcorrenciaUseCasesTest {
 
@@ -141,7 +140,6 @@ class RealizarEPularOcorrenciaUseCasesTest {
         ArgumentCaptor<List<LedgerEntry>> entries = ArgumentCaptor.forClass(List.class);
         order.verify(ledger).append(eq(USER_ID), entries.capture());
         assertThat(entries.getValue()).hasSize(2);
-        // com o valor real, a movimentação tem o valor real; a ocorrência passa a realizada e não pode ser realizada de novo
         TransactionDetails actual = realize.handle(command("2026-11-10", "124.90", null));
         assertThat(actual.transaction().amount()).isEqualTo(Money.of("124.90"));
         assertThatThrownBy(() -> realize.handle(command("2026-10-10", null, null))).isInstanceOf(OccurrenceAlreadyRealizedException.class);
@@ -179,7 +177,6 @@ class RealizarEPularOcorrenciaUseCasesTest {
         assertThat(captor.getValue().actualAmount()).isEqualTo(Money.of("52.00"));
         assertThat(captor.getValue().transactionId()).isNotNull();
         verify(accounts, never()).lockForUpdate(any(), any());
-        // o comando de 4 argumentos continua valendo (id gerado pelo caso de uso)
         assertThat(new RealizeCardRecurrenceCommand(USER_ID, CARD_RECURRENCE_ID, LocalDate.of(2026, 10, 15), null).transactionId()).isNull();
     }
 
@@ -194,16 +191,13 @@ class RealizarEPularOcorrenciaUseCasesTest {
         verify(idempotency).claim(eq(USER_ID), any(), eq(key), hash.capture(), resource.capture(), any(), any());
         assertThat(resource.getValue()).isEqualTo(first.transaction().id());
 
-        // segunda chamada: a chave existe (claim recusado) com o mesmo hash → devolve o mesmo recurso, sem criar outro
         when(idempotency.claim(eq(USER_ID), any(), eq(key), any(), any(), any(), any())).thenReturn(false);
         when(idempotency.find(USER_ID, "POST /v1/recurrences/{id}/occurrences/{date}/realize", key))
                 .thenReturn(Optional.of(new Claim(hash.getValue(), first.transaction().id(), NOW)));
         TransactionDetails replay = realize.handle(command("2026-10-10", null, key));
         assertThat(replay.transaction().id()).isEqualTo(first.transaction().id());
         assertThat(stored).hasSize(1);
-        // outro comando com a mesma chave
         assertThatThrownBy(() -> realize.handle(command("2026-10-10", "130.00", key))).isInstanceOf(IdempotencyKeyReusedException.class);
-        // a chave sumiu entre o claim recusado e o find (rollback da transação que a segurava): tenta de novo e, sem achar, falha
         when(idempotency.find(any(), any(), any())).thenReturn(Optional.empty());
         assertThatThrownBy(() -> realize.handle(command("2026-10-10", null, key))).isInstanceOf(IllegalStateException.class);
         verify(ledger, org.mockito.Mockito.times(1)).append(any(), any());

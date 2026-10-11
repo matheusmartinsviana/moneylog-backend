@@ -18,7 +18,6 @@ import com.moneylog.infra.security.TooManyAttemptsException;
 @DisplayName("ExportRateLimiter: limite de taxa em memória das exportações (S-260)")
 class ExportRateLimiterTest {
 
-    /** Relógio que avança sob controle do teste. */
     private static final class TestClock extends Clock {
         private Instant now = Instant.parse("2026-10-10T15:00:00Z");
 
@@ -57,7 +56,7 @@ class ExportRateLimiterTest {
                 e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(50)));
         clock.advance(Duration.ofSeconds(49));
         assertThatThrownBy(() -> limiter.acquire(user)).isInstanceOf(TooManyAttemptsException.class);
-        clock.advance(Duration.ofSeconds(1)); // o 1º pedido (t=0) saiu da janela
+        clock.advance(Duration.ofSeconds(1));
         limiter.acquire(user);
     }
 

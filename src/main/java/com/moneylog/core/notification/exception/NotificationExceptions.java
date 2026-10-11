@@ -6,7 +6,6 @@ import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.NotFoundException;
 
-/** Exceções de notificações, lembretes, configurações e push. */
 public final class NotificationExceptions {
 
     private NotificationExceptions() {
@@ -66,7 +65,6 @@ public final class NotificationExceptions {
         }
     }
 
-    /** Push ainda desligado neste servidor ({@code moneylog.push.enabled=false}): a central continua funcionando. */
     public static class PushNotEnabledException extends BusinessRuleException {
         public PushNotEnabledException() {
             super("PUSH_NOT_ENABLED", "As notificações no dispositivo ainda não estão ativadas neste servidor.");

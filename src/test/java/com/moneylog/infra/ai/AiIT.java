@@ -15,7 +15,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/** Etapa 8 com {@code AI_PROVIDER=none} (padrão): o app funciona sem chave, a prévia é transparente e nada é enviado. Relógio 10/10/2026. */
 @DisplayName("IA sem chave: status, prévia, negação, AI_DISABLED, insights e preferências (Etapa 8)")
 class AiIT extends E4ItBase {
 

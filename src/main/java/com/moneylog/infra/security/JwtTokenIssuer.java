@@ -14,7 +14,6 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** JWT HS256 de curta duração (claim {@code sub} = userId) e refresh opaco de 256 bits. */
 public class JwtTokenIssuer implements TokenIssuer {
 
     private final JwtEncoder encoder;

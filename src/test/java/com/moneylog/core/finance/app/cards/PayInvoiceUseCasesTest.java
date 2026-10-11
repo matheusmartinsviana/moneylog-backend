@@ -60,11 +60,6 @@ import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AccountNotCashException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IdempotencyKeyReusedException;
 
-/**
- * T55: pagamento de fatura e a prévia, sobre o cenário (fatura 2026-11 de 1.283,00: parcela 1/6 de 200,00 + 1.083,00 à
- * vista). Verifica as travas (cartão antes da conta, antes de ler a cadeia), o que é gravado e que nada é gravado quando o
- * domínio recusa.
- */
 @DisplayName("Pagamento de fatura e prévia (T55)")
 class PayInvoiceUseCasesTest {
 
@@ -151,7 +146,7 @@ class PayInvoiceUseCasesTest {
             InOrder order = inOrder(cards, accounts, transactions);
             order.verify(cards).lockForUpdate(USER_ID, cardId);
             order.verify(accounts).lockForUpdate(USER_ID, scenario.nubank.id());
-            order.verify(cards).discardReadState(); // B1: nada lido antes da trava é reaproveitado
+            order.verify(cards).discardReadState();
             order.verify(cards).findById(USER_ID, cardId);
             order.verify(transactions).findAllOfCard(USER_ID, cardId);
             order.verify(transactions).insert(any());

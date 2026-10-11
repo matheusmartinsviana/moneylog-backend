@@ -26,11 +26,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * S-207: o Jackson não aceita mais número com parte fracionária em campo inteiro ({@code ACCEPT_FLOAT_AS_INT} desligado).
- * {@code installments: 2.5} virava 2 em silêncio: em dinheiro isso é perigoso. Agora é {@code 400 VALIDATION_FAILED} com
- * {@code INVALID_FORMAT} no campo, no corpo (installments, closingDay, dueDay, version) e na query (page, pageSize).
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Campo inteiro com parte fracionária: 400 INVALID_FORMAT (S-207)")

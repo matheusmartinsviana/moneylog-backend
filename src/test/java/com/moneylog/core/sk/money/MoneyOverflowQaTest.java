@@ -32,10 +32,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/**
- * T12 (QA): overflow de {@link Money} nos limites de {@code long} e na agregação das lentes. Nunca pode haver
- * transbordo silencioso (D1 §2.1).
- */
 @DisplayName("Money: overflow nos limites (T12, QA)")
 class MoneyOverflowQaTest {
 
@@ -87,11 +83,6 @@ class MoneyOverflowQaTest {
                 .extracting(e -> ((AmountAboveLimitException) e).code()).isEqualTo("AMOUNT_ABOVE_LIMIT");
     }
 
-    /**
-     * BUG-QA-03 (corrigido, S-78): antes não havia teto, e dois gastos individualmente válidos cuja soma passava de
-     * {@code Long.MAX_VALUE} centavos travavam toda leitura do razão. Agora o valor gigante é barrado na entrada
-     * ({@code AMOUNT_ABOVE_LIMIT}, 422), e mesmo milhares de lançamentos no teto somam sem transbordar.
-     */
     @Test
     @DisplayName("BUG-QA-03: valor acima do teto é recusado na entrada; lançamentos no teto não travam a leitura do razão")
     void deveDocumentarOverflowNaAgregacao() {

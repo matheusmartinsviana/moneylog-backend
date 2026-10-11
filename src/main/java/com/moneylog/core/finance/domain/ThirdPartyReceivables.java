@@ -22,18 +22,6 @@ import com.moneylog.core.thirdparty.domain.ThirdPartyExpense;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * "Dinheiro a receber de terceiros" (irmã, mãe, amigos). Lê o <b>estado</b>, nunca soma movimentos, e fica fora de patrimônio, renda e
- * consumo. Duas fontes, sem sobreposição:
- * <ul>
- *   <li><b>Dívidas a receber</b> ({@code RECEIVABLE}: empréstimo concedido): a receber = principal, recebido = Σ quitações ativas;</li>
- *   <li><b>Despesas de terceiro</b> (compra/despesa marcada com o responsável): a receber = valor cobrado da compra, recebido = Σ
- *       {@code REFUND} ativos ligados a ela ({@code refundOf}); o reembolso reduz o consumo na categoria original, nunca é receita.</li>
- * </ul>
- * Regra do gasto (decisão do dono): a despesa de terceiro <b>continua consumo bruto do usuário até o reembolso</b>; o recebimento a
- * neutraliza. O gasto pessoal líquido do mês é o consumo do livro (já abatido dos reembolsos); {@link MonthView#thirdPartyPending()} é o
- * que ainda está bruto e é de terceiro.
- */
 public final class ThirdPartyReceivables {
 
     private ThirdPartyReceivables() {
@@ -50,14 +38,6 @@ public final class ThirdPartyReceivables {
     public record PersonLine(UUID personId, String name, Money owed, Money received, Money pending, List<Item> items) {
     }
 
-    /**
-     * @param grossConsumption     consumo bruto da competência: despesas pagas + cartão + dívidas de consumo (antes dos reembolsos)
-     * @param refunds              todos os reembolsos da competência
-     * @param personalNet          gasto pessoal líquido = consumo do livro = bruto − reembolsos
-     * @param thirdPartyConsumption consumo bruto da competência que é de terceiro (despesas marcadas)
-     * @param thirdPartyReimbursed reembolsos da competência ligados a despesas de terceiro
-     * @param thirdPartyPending    {@code thirdPartyConsumption − thirdPartyReimbursed}: de terceiro e ainda não reembolsado (dentro do bruto)
-     */
     public record MonthView(Competence competence, Money grossConsumption, Money refunds, Money personalNet,
                             Money thirdPartyConsumption, Money thirdPartyReimbursed, Money thirdPartyPending) {
     }
@@ -70,16 +50,11 @@ public final class ThirdPartyReceivables {
         return of(records, marks, List.of(), personNames, today, competence);
     }
 
-    /**
-     * @param receipts recebimentos já refletidos nos saldos, sem movimento de conta: os ligados a uma despesa marcada reduzem o pendente dela;
-     *                 os sem vínculo viram um item {@code RECEIPT} já recebido (a receber = recebido, pendente 0), "origem a confirmar"
-     */
     public static Overview of(FinancialRecords records, List<ThirdPartyExpense> marks, List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts,
                               Map<UUID, String> personNames, LocalDate today, Competence competence) {
         Money zero = Money.zero(CurrencyCode.BRL);
         Map<UUID, Transaction> txs = records.transactionsById();
         Map<UUID, List<Item>> byPerson = new LinkedHashMap<>();
-        // dívidas a receber
         for (Debt d : records.debts()) {
             if (d.direction() != DebtDirection.RECEIVABLE || d.personId() == null
                     || d.status() == DebtStatus.CANCELED || d.status() == DebtStatus.VOIDED) {
@@ -88,7 +63,6 @@ public final class ThirdPartyReceivables {
             byPerson.computeIfAbsent(d.personId(), k -> new ArrayList<>()).add(new Item(Source.DEBT, d.id(), d.description(), d.date(),
                     d.expectedDate(), d.principal(), d.settled(), d.outstanding(), d.status().name()));
         }
-        // despesas de terceiro
         Set<UUID> markedIds = marks.stream().map(ThirdPartyExpense::transactionId).collect(Collectors.toSet());
         for (ThirdPartyExpense mark : marks) {
             Transaction tx = txs.get(mark.transactionId());

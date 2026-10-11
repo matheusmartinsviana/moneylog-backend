@@ -24,10 +24,6 @@ import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Não calcula nada por conta própria: junta o {@link DebtOverviewCalculator} (saldo devedor), o {@link MonthlyEstimate} (custo fixo e renda
- * recorrente) e o {@link DashboardSummary} (em contas e disponível), as mesmas calculadoras das outras telas (PR 01, regra 10).
- */
 public class GetDebtOverviewUseCaseImpl implements GetDebtOverviewUseCase {
 
     private final FinancialRecordsGateway records;
@@ -63,7 +59,6 @@ public class GetDebtOverviewUseCaseImpl implements GetDebtOverviewUseCase {
         persons.forEach((id, person) -> names.put(id, person.name()));
         DebtOverview overview = DebtOverviewCalculator.overview(loaded, names, MonthlyEstimate.of(recurrences, today), lastFullMonth,
                 dashboard.balances().inAccounts(), dashboard.balances().available(), today, query.months());
-        // compromissos acompanhados (empréstimo de terceiro, projeto de longo prazo): vão à parte, NUNCA entram no total (sem dupla contagem)
         return new DebtOverviewView(overview, payoffGoal(loaded, overview),
                 commitments == null ? java.util.List.of() : commitments.findAll(query.userId()));
     }

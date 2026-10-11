@@ -6,7 +6,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.moneylog.core.importing.app.gateways.ImportSourceGateway;
 
-/** Posse de conta e cartão por consulta direta (id de outro usuário não existe). */
 public class ImportSourceGatewayImpl implements ImportSourceGateway {
 
     private final JdbcTemplate jdbc;

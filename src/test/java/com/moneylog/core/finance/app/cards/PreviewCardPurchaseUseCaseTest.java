@@ -38,7 +38,6 @@ import com.moneylog.core.transaction.domain.CardTransactions;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/** Prévia da compra no cartão (T53 CA4, S-124): os mesmos números da criação, sem gravar. */
 @DisplayName("Prévia de compra no cartão (T53 CA4)")
 class PreviewCardPurchaseUseCaseTest {
 

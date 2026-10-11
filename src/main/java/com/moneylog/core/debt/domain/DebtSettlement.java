@@ -5,7 +5,6 @@ import java.util.UUID;
 
 import com.moneylog.core.sk.money.Money;
 
-/** Quitação de uma dívida: a movimentação real ({@code MONEY_RECEIVED}/{@code DEBT_PAYMENT}), o valor e se está ativa. */
 public record DebtSettlement(UUID transactionId, Money amount, boolean active) {
 
     public DebtSettlement {

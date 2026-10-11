@@ -37,10 +37,6 @@ import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * ADR-017 e PR 01 (regras 2, 9 e 10): a renda pode pertencer a outro mês; o caixa, o saldo e o consumo não mudam; nenhum centavo some ou
- * duplica ao mover de mês; dashboard, lista e resumo do mesmo mês coincidem. Só dados sintéticos.
- */
 @DisplayName("Renda de outro mês: competência da renda × caixa (ADR-017)")
 class RendaDeOutroMesTest {
 
@@ -56,7 +52,6 @@ class RendaDeOutroMesTest {
         return Money.of(value);
     }
 
-    /** O salário dividido: adiantamento em 16/09 que é renda de outubro + folha em 02/10. */
     private static FinanceScenarioFactory salarioDividido(boolean comCompetencia) {
         FinanceScenarioFactory s = umCenarioBase();
         s.transactions.add(AccountTransactions.income(s.header(d("2026-09-16"), "Adiantamento"), m("1500.00"), s.nubank, s.salario,
@@ -91,7 +86,6 @@ class RendaDeOutroMesTest {
         assertThat(resumo.comparison().income().amount()).isEqualTo(m("4000.00"));
         assertThat(resumo.savingsRate()).isEqualByComparingTo("0.9700");
         assertThat(EntryReport.of(records, ledger, EntryLens.INCOME, SET).lines()).isEmpty();
-        // as linhas guardam a data real e a competência
         assertThat(lista.lines()).extracting(EntryReport.Line::date).containsExactlyInAnyOrder(d("2026-09-16"), d("2026-10-02"));
         assertThat(lista.lines()).extracting(EntryReport.Line::competence).containsOnly(OUT);
     }
@@ -106,14 +100,12 @@ class RendaDeOutroMesTest {
             assertThat(CashPosition.at(com, com.ledger(), d(dia))).isEqualTo(CashPosition.at(sem, sem.ledger(), d(dia)));
             assertThat(NetWorth.at(com.ledger(), d(dia))).isEqualTo(NetWorth.at(sem.ledger(), d(dia)));
         }
-        // 16/09: o dinheiro já entrou na conta (caixa de setembro), mesmo sendo renda de outubro
         assertThat(CashFlowReport.between(com, com.ledger(), d("2026-09-01"), d("2026-09-30")).in()).isEqualTo(m("1500.00"));
         assertThat(CashFlowReport.between(com, com.ledger(), d("2026-10-01"), d("2026-10-31")).in()).isEqualTo(m("2500.00"));
         for (Competence mes : List.of(SET, OUT)) {
             assertThat(ConsumptionReport.of(com, com.ledger(), mes).consumption()).isEqualTo(ConsumptionReport.of(sem, sem.ledger(), mes).consumption());
             assertThat(CashFlowReport.forCompetence(com, com.ledger(), mes)).isEqualTo(CashFlowReport.forCompetence(sem, sem.ledger(), mes));
         }
-        // sem o campo, a renda de setembro é 1.500 e a de outubro 2.500 (comportamento de sempre)
         assertThat(ConsumptionReport.of(sem, sem.ledger(), SET).income()).isEqualTo(m("1500.00"));
         assertThat(ConsumptionReport.of(sem, sem.ledger(), OUT).income()).isEqualTo(m("2500.00"));
     }
@@ -138,7 +130,6 @@ class RendaDeOutroMesTest {
                 .satisfies(p -> assertThat(p.income()).isEqualTo(m("1500.00")));
         assertThat(dias.points()).filteredOn(p -> p.periodStart().equals(d("2026-10-02"))).singleElement()
                 .satisfies(p -> assertThat(p.income()).isEqualTo(m("2500.00")));
-        // a renda de setembro/outubro somada é a mesma nas duas bases (nada some, nada duplica)
         assertThat(dias.totals().income()).isEqualTo(m("4000.00"));
         assertThat(meses.totals().income()).isEqualTo(m("4000.00"));
     }
@@ -155,8 +146,6 @@ class RendaDeOutroMesTest {
         assertThat(ConsumptionReport.of(records, records.ledger(), Competence.of(2027, 1)).income()).isEqualTo(m("900.00"));
         assertThat(EntryReport.of(records, records.ledger(), EntryLens.INCOME, Competence.of(2027, 1)).total()).isEqualTo(m("900.00"));
     }
-
-    // ------------------------------------------------------------------ propriedade
 
     static LongStream seeds() {
         return LongStream.rangeClosed(1, 40);
@@ -203,7 +192,6 @@ class RendaDeOutroMesTest {
         Ledger lb = before.ledger();
         Ledger la = after.ledger();
 
-        // o delta esperado por mês: + valor no mês novo, − valor no mês antigo
         Map<Competence, Long> delta = new TreeMap<>();
         long totalCents = 0;
         for (IncomeSpec i : incomes) {
@@ -223,10 +211,8 @@ class RendaDeOutroMesTest {
             assertThat(ra.income().cents()).as("semente %d, renda de %s", seed, month).isEqualTo(expected);
             sumBefore += rb.income().cents();
             sumAfter += ra.income().cents();
-            // consumo e caixa do mês: intactos
             assertThat(ra.consumption()).isEqualTo(rb.consumption());
             assertThat(CashFlowReport.forCompetence(after, la, month)).isEqualTo(CashFlowReport.forCompetence(before, lb, month));
-            // dashboard = lista = resumo do MESMO mês
             MonthlySummary resumo = MonthlySummary.of(after, la, month, hoje);
             EntryReport lista = EntryReport.of(after, la, EntryLens.INCOME, month);
             LocalDate asOf = month.lastDay().isAfter(hoje) ? hoje : month.lastDay();
@@ -237,17 +223,14 @@ class RendaDeOutroMesTest {
             assertThat(lista.total()).isEqualTo(ra.income());
             assertThat(resumo.net()).isEqualTo(ra.income().subtract(ra.consumption()));
         }
-        // soma de todos os meses = soma de todas as entradas (nenhum centavo some ou duplica)
         assertThat(sumBefore).isEqualTo(totalCents);
         assertThat(sumAfter).isEqualTo(totalCents);
 
-        // caixa e saldo por data: intactos em todo dia relevante
         for (LocalDate day = LocalDate.of(2025, 12, 31); !day.isAfter(LocalDate.of(2027, 1, 5)); day = day.plusDays(9)) {
             assertThat(CashPosition.at(after, la, day)).isEqualTo(CashPosition.at(before, lb, day));
             assertThat(NetWorth.at(la, day)).isEqualTo(NetWorth.at(lb, day));
         }
 
-        // séries: MONTH = resumo; DAY/WEEK = caixa (iguais às de antes, que só dependem da data real)
         IncomeExpenseSeries meses = IncomeExpenseSeries.of(la, ReportPeriod.M12, hoje);
         for (IncomeExpenseSeries.Point p : meses.points()) {
             assertThat(p.income()).as("série MONTH %s", p.periodStart()).isEqualTo(ConsumptionReport.of(after, la, Competence.from(p.periodStart())).income());

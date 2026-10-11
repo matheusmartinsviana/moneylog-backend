@@ -19,7 +19,6 @@ import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 
-/** T25 CA1: conta e lançamento do saldo inicial na mesma transação (falha no lançamento → nenhuma conta gravada). */
 @IntegrationTest
 @DisplayName("Criação de conta é atômica (T25 CA1)")
 class AccountCreationAtomicityIT {

@@ -14,10 +14,6 @@ import com.moneylog.core.insights.domain.Insight;
 import com.moneylog.core.ai.domain.Redactor;
 import com.moneylog.core.finance.domain.MonthlySummary;
 
-/**
- * Monta os fatos enviados à IA a partir do resumo mensal e dos insights (mesma fonte do dashboard, PR 01 regra 10). Só agregados: nenhum id,
- * descrição de movimentação, nome de conta ou pessoa, e-mail, nota ou o nome do usuário (S-182). Nomes de categoria passam pelo {@link Redactor}.
- */
 public final class AiFactsAssembler {
 
     public record Assembled(AiFacts facts, Set<String> redactions) {

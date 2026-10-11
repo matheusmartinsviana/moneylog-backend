@@ -23,10 +23,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * Insights calculados (ADR-019) de ponta a ponta: contrato, dispensa auditada, isolamento entre usuários, alias do contrato antigo e sem IA.
- * Relógio 10/10/2026 em {@code America/Sao_Paulo}. Dados 100% sintéticos: renda de 4.000,00 em 02/10 e um gasto de 300,00 em 05/10.
- */
 @DisplayName("Insights calculados: daily, monthly, history, dispensa auditada e isolamento (T293, T294)")
 class InsightsIT extends E4ItBase {
 
@@ -53,8 +49,6 @@ class InsightsIT extends E4ItBase {
     private JsonNode dailyBudget() throws Exception {
         return find(okBody(get("/v1/insights/daily?includeDismissed=true")), "DAILY_BUDGET");
     }
-
-    // ---------------------------------------------------------------- contrato
 
     @Test
     @DisplayName("daily: orçamento do dia = (4.000 − 300) / 22 dias = 168,18, com o contrato novo completo (id, severity, priority, period, source, basis)")
@@ -146,8 +140,6 @@ class InsightsIT extends E4ItBase {
         }
     }
 
-    // ---------------------------------------------------------------- alias do contrato antigo
-
     @Test
     @DisplayName("alias GET /v1/insights?month=: um cliente antigo, que só lê type, key, params e factRefs, continua parseando")
     void deveManterOContratoAntigo() throws Exception {
@@ -176,8 +168,6 @@ class InsightsIT extends E4ItBase {
         mockMvc.perform(get("/v1/insights?month=2026-13")).andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INSIGHTS_MONTH_INVALID"));
         assertThat(okBody(get("/v1/insights?month=2026-10&page=1&pageSize=1")).get("items")).hasSize(1);
     }
-
-    // ---------------------------------------------------------------- dispensa auditada
 
     @Test
     @DisplayName("dispensar HOJE: 201 + Location, o insight some do dia (volta com includeDismissed), a linha é gravada e no dia seguinte o do novo dia aparece")
@@ -261,8 +251,6 @@ class InsightsIT extends E4ItBase {
         assertThat(count("insight_dismissals")).isEqualTo(1);
     }
 
-    // ---------------------------------------------------------------- isolamento
-
     @Test
     @DisplayName("outro usuário: 404 ao dispensar ou restaurar o id alheio, nada gravado, e a própria lista não vê os dados do primeiro")
     void deveIsolarOsUsuarios() throws Exception {
@@ -285,8 +273,6 @@ class InsightsIT extends E4ItBase {
         assertThat(theirMonthly.get("items")).isEmpty();
         mockMvc.perform(post("/v1/insights/ins_" + "0".repeat(32) + "/dismissals", "{\"scope\":\"TODAY\"}")).andExpect(status().isNotFound());
     }
-
-    // ---------------------------------------------------------------- sem IA
 
     @Test
     @DisplayName("sem provedor de IA (padrão): daily e monthly respondem 200 com insights, e /v1/ai/status segue como antes")

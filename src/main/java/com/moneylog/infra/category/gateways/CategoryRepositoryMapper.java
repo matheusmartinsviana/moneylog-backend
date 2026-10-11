@@ -3,7 +3,6 @@ package com.moneylog.infra.category.gateways;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.infra.category.persistence.CategoryEntity;
 
-/** {@code Category} ⇄ {@code CategoryEntity}. */
 public final class CategoryRepositoryMapper {
 
     private CategoryRepositoryMapper() {

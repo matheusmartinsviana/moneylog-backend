@@ -16,16 +16,11 @@ import org.springframework.context.ConfigurableApplicationContext;
 import com.moneylog.MoneylogApplication;
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T22b CA9 e CA10: a aplicação <b>não sobe</b> com segredo curto ou com o cookie sem {@code Secure} fora do plano B,
- * e o log diz por quê sem imprimir o segredo.
- */
 @Tag("i")
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("Guardas de boot da segurança")
 class StartupGuardsIT {
 
-    /** As propriedades vão como argumentos de linha de comando, que vencem o {@code application-it.yaml}. */
     private static ConfigurableApplicationContext start(String... arguments) {
         return start(new String[] {"it"}, arguments);
     }

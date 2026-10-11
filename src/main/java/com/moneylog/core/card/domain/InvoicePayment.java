@@ -6,7 +6,6 @@ import java.util.UUID;
 
 import com.moneylog.core.sk.money.Money;
 
-/** Pagamento de fatura ({@code INVOICE_PAYMENT}): valor livre &gt; 0 (S-15, S-16). */
 public record InvoicePayment(UUID transactionId, LocalDate invoiceClosingDate, Money amount, LocalDate date, boolean active) {
 
     public InvoicePayment {

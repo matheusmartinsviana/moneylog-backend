@@ -44,11 +44,9 @@ import com.moneylog.core.importing.parser.ParsedStatement;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Upload do extrato (T124): parse, normalização, deduplicação, marcas e sugestões; nada vira movimentação aqui. */
 public class CreateImportBatchUseCaseImpl implements CreateImportBatchUseCase {
 
     public static final Duration IDEMPOTENCY_VALIDITY = Duration.ofHours(24);
-    /** Linhas de histórico lidas para as sugestões. */
     static final int HISTORY_LIMIT = 5000;
     private static final int MAX_SKIPPED_LISTED = 200;
 

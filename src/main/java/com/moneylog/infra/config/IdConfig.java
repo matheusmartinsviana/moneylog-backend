@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration;
 
 import com.moneylog.core.sk.id.IdGenerator;
 
-/** Ids gerados pela aplicação (nunca pelo banco). */
 @Configuration(proxyBeanMethods = false)
 public class IdConfig {
 

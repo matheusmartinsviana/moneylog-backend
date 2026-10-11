@@ -18,9 +18,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/**
- * Movimentações de conta do cenário base de D1 §3, com ids e datas fixos.
- */
 public final class TransactionTestFactory {
 
     public static final UUID EXPENSE_ID = UUID.fromString("00000000-0000-0000-0000-0000000e0001");
@@ -40,16 +37,11 @@ public final class TransactionTestFactory {
         return umHeader(TX_ID, DATE);
     }
 
-    /**
-     * Compra no cartão registrada no próprio dia da compra, sem faturas anteriores: as parcelas caem nas faturas do
-     * calendário, sem lançamento tardio. Passa pela alocação com a cadeia (A2: não existe outra forma de comprar).
-     */
     public static Transaction compraNoCalendario(TransactionHeader header, Money amount, CreditCard card, Category category,
                                                  int installments) {
         return CardTransactions.purchase(header, amount, card, category, installments, InvoiceChain.empty(card), header.date());
     }
 
-    /** Caso 1 do PR 01: 100,00 via PIX em Alimentação, Nubank, 10/10/2026. */
     public static Transaction umaDespesaPix() {
         return AccountTransactions.expense(umHeader(EXPENSE_ID, DATE), Money.of("100.00"),
                 AccountTestFactory.umaContaCorrente(), CategoryTestFactory.umaCategoriaDeDespesa(), PaymentMethod.PIX);

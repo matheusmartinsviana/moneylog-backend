@@ -20,11 +20,6 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T98 (QA), critério 6: V5.00 sobre uma base da Etapa 4 com dados (despesas, razão, dívidas, recorrência). Os dados não mudam, as tabelas
- * novas nascem vazias, os índices existem, são válidos e o planejador os usa, as restrições do esquema valem (valor, moeda, prioridade,
- * alvo, FKs compostas entre usuários) e a reexecução não faz nada.
- */
 @Tag("i")
 @DisplayName("QA T98: migração V5.00 sobre dados da Etapa 4")
 class GoalMigrationQaIT {
@@ -79,7 +74,7 @@ class GoalMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(26); // V8.17 (dispensas de insights, ADR-019) + V8.16 (fotos das metas e destaque, ADR-018) + V8.15 (competência de renda, ADR-017) + V8.14 (metas de medida e plano, ADR-016) + V8.13 (fatura histórica) + V8.12 (limite opcional do cartão) +  V8.11 (recebimentos de terceiros) + V8.10 (senha do dono, ADR-015) + V8.09 (fechamento confirmado do cartão) + V8.0x (ADR-015) + V8.05 a V8.08 (ADR-014) + V8.02 a V8.04 + V7.00 a V7.03, V8.00 e V8.01 (Etapas 7 e 8) + V5.00 (metas) e V6.00, V6.01, V6.02 (notas, Etapa 6)
+            assertThat(result.migrationsExecuted).isEqualTo(26);
             assertThat(all.info().applied()).extracting(i -> i.getVersion().getVersion()).contains("5.00");
             assertThat(all.info().current().getVersion().getVersion()).isEqualTo("8.17");
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
@@ -91,13 +86,11 @@ class GoalMigrationQaIT {
             assertThat(jdbc.queryForObject("select count(*) from goals", Long.class)).isZero();
             assertThat(jdbc.queryForObject("select count(*) from goal_reservations", Long.class)).isZero();
 
-            // índices
             List<String> idx = jdbc.queryForList("select indexname || ' :: ' || indexdef from pg_indexes where indexname in ('ix_goals_user','ix_goal_reservations_user',"
                     + "'ix_goal_reservations_goal','ix_goal_reservations_account')", String.class);
             assertThat(idx).hasSize(4);
             assertThat(jdbc.queryForObject("select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid where c.relname like 'ix_goal%' and not i.indisvalid", Long.class)).isZero();
 
-            // restrições
             UUID g = UUID.randomUUID();
             goal(jdbc, g, user, "Meta", 100_000, "BRL", "HIGH");
             assertThatThrownBy(() -> goal(jdbc, UUID.randomUUID(), user, "  ", 100, "BRL", "HIGH")).hasMessageContaining("ck_goals_name_not_blank");
@@ -115,14 +108,11 @@ class GoalMigrationQaIT {
             assertThatThrownBy(() -> reservation(jdbc, UUID.randomUUID(), other, g, otherAcc, 100, "BRL")).hasMessageContaining("fk_goal_reservations_goal_id_user");
             assertThatThrownBy(() -> reservation(jdbc, UUID.randomUUID(), user, g, otherAcc, 100, "BRL")).hasMessageContaining("fk_goal_reservations_account_id_user");
             assertThatThrownBy(() -> reservation(jdbc, UUID.randomUUID(), user, UUID.randomUUID(), acc, 100, "BRL")).hasMessageContaining("fk_goal_reservations_goal_id_user");
-            // não dá para apagar a meta nem a conta com reservas (sem cascata silenciosa)
             assertThatThrownBy(() -> jdbc.update("delete from goals where id = ?", g)).hasMessageContaining("fk_goal_reservations_goal_id_user");
             assertThatThrownBy(() -> jdbc.update("delete from accounts where id = ?", acc)).isInstanceOf(Exception.class);
-            // reserva não é lançamento: o razão não mudou
             assertThat(jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class)).isEqualTo(sumBefore);
             assertThat(jdbc.queryForObject("select count(*) from transactions", Long.class)).isEqualTo(txBefore);
 
-            // planejador usa os índices
             jdbc.execute("analyze");
             List<String> plans = new ArrayList<>();
             jdbc.execute((java.sql.Connection c) -> {

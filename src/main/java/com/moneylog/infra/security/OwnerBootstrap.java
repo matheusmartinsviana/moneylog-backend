@@ -20,14 +20,6 @@ import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase;
 import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase.FirstAccessPrepared;
 import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase.PrepareFirstAccessCommand;
 
-/**
- * No boot garante o dono único (S-82) e prepara o primeiro acesso (ADR-015). Cada caso de uso roda (e confirma) a própria
- * transação; só depois, se o dono foi criado, {@link OwnerCreated} é publicado (efeito colateral depois do commit: seed
- * de categorias).
- *
- * <p>O código do primeiro acesso, quando gerado, é impresso <b>uma vez</b> e <b>só no perfil dev</b>. Em produção ele vem
- * de {@code MONEYLOG_OWNER_SETUP_CODE}/{@code _FILE} (secrets) e nunca é logado.
- */
 public class OwnerBootstrap implements ApplicationRunner, Ordered {
 
     private static final Logger log = LoggerFactory.getLogger(OwnerBootstrap.class);
@@ -76,7 +68,6 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
             if (devProfile) {
                 log.info("PRIMEIRO ACESSO: código de uso único (válido por {}): {}", owner.setupCodeTtl(), prepared.generatedCode());
             } else {
-                // Fora do dev o código gerado não é impresso (log estruturado/centralizado): sem o secret, não há como usar.
                 log.warn("Primeiro acesso pendente, mas nenhum MONEYLOG_OWNER_SETUP_CODE informado: defina o código por secret e reinicie.");
             }
         } else {
@@ -85,7 +76,6 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
         }
     }
 
-    /** O arquivo, se informado, vale mais que o valor direto (mesma regra do hash). */
     private String providedSetupCode() {
         String file = owner.setupCodeFile();
         if (file != null && !file.isBlank()) {
@@ -103,7 +93,6 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 
-    /** {@code dono@moneylog.test} → {@code d***@moneylog.test}. */
     static String mask(String email) {
         int at = email.indexOf('@');
         if (at <= 0) {

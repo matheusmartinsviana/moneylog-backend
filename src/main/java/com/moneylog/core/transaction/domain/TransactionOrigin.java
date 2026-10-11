@@ -6,13 +6,6 @@ import java.util.UUID;
 import com.moneylog.core.importing.domain.DedupKey;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidTransactionOriginException;
 
-/**
- * Como a movimentação nasceu (D1 §2.4): manual, importação (lote + chaves) ou realização de recorrência.
- *
- * @param dedupKey         chave efetiva, que participa da unicidade entre ativas; na duplicata forçada é a chave derivada do lote (S-75)
- * @param originalDedupKey chave original da linha importada (sempre presente na importação), para a reimportação
- *                         continuar detectando a duplicata mesmo depois de forçada
- */
 public record TransactionOrigin(TransactionSource source, UUID importBatchId, DedupKey dedupKey, DedupKey originalDedupKey,
                                 UUID recurrenceId, LocalDate occurrenceDate) {
 
@@ -36,7 +29,6 @@ public record TransactionOrigin(TransactionSource source, UUID importBatchId, De
         return MANUAL;
     }
 
-    /** Linha importada. {@code effectiveKey} é a chave derivada do lote quando a duplicata foi forçada (S-75). */
     public static TransactionOrigin imported(UUID importBatchId, DedupKey effectiveKey, DedupKey originalKey) {
         return new TransactionOrigin(TransactionSource.IMPORT, importBatchId, effectiveKey, originalKey, null, null);
     }

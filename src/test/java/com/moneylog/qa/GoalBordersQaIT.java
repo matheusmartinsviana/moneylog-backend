@@ -30,11 +30,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T98 (QA): bordas da Etapa 5. Prazo no mês corrente, vencido e meta atingida ({@code monthlyNeeded}, {@code progress} sem teto), reserva
- * igual ao saldo, reserva futura, conta e meta arquivadas, virada de ano, fevereiro bissexto e dia 31 no resumo e na projeção, fuso
- * America/Sao_Paulo, mês inexistente, horizonte inválido, tendência com menos de 3 meses, base zero em {@code percent} e o teto S-78.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T98: bordas de metas, resumo mensal e projeções")
@@ -84,8 +79,6 @@ class GoalBordersQaIT {
         return g.get(field).isNull() ? null : g.get(field).get("amount").asString();
     }
 
-    // ------------------------------------------------------------------------------------------------ metas
-
     @Test
     @DisplayName("monthlyNeeded: prazo no mês corrente (1 mês), hoje (1 mês), ontem (null), arredondamento para cima, atingida (0,00), prazo longínquo e meta de 1 centavo")
     void monthlyNeeded() throws Exception {
@@ -105,12 +98,10 @@ class GoalBordersQaIT {
         assertThat(money(over, "remaining")).isEqualTo("0.00");
         assertThat(money(over, "monthlyNeeded")).isEqualTo("0.00");
         assertThat(over.get("status").asString()).isEqualTo("ACHIEVED");
-        // liberar desfaz o atingimento (o estado é derivado)
         CardQaWorld.ok(GoalQa.reserve(a, over.get("id").asString(), a.nubank, "-200.00", today));
         JsonNode back = GoalQa.getGoal(a, over.get("id").asString());
         assertThat(back.get("status").asString()).isEqualTo("ACTIVE");
         assertThat(back.get("progress").asString()).isEqualTo("0.5000");
-        // arredondamento HALF_UP do progress
         assertThat(goalWith("3.00", null, "1.00").get("progress").asString()).isEqualTo("0.3333");
         assertThat(goalWith("0.03", null, "0.02").get("progress").asString()).isEqualTo("0.6667");
         assertThat(goalWith("2000.00", null, "0.01").get("progress").asString()).isEqualTo(ratio(1, 200_000));
@@ -133,7 +124,6 @@ class GoalBordersQaIT {
         JsonNode g = GoalQa.getGoal(a, id);
         assertThat(g.get("current").get("amount").asString()).isEqualTo("1999999999.98");
         assertThat(GoalQa.reserve(a, id, a.nubank, "1000000000.00", today).code()).isEqualTo("AMOUNT_ABOVE_LIMIT");
-        // meta de 1 centavo com reserva no teto: progress gigante, mas no formato
         String tiny = GoalQa.goal(a, "Mínima", "0.01", null);
         CardQaWorld.ok(GoalQa.reserve(a, tiny, a.nubank, "999999999.99", today));
         assertThat(GoalQa.getGoal(a, tiny).get("progress").asString()).isEqualTo("99999999999.0000");
@@ -159,7 +149,6 @@ class GoalBordersQaIT {
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/transactions", "{\"type\":\"EXPENSE\",\"amount\":\"1.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"accountId\":\""
                 + a.nubank + "\",\"categoryId\":\"" + a.food + "\",\"method\":\"PIX\"}", GoalQa.key()));
         assertThat(a.getOk("/v1/accounts/" + a.nubank).get("uncovered").asBoolean()).as("despesa depois da reserva").isTrue();
-        // reserva futura: aparece em reservations[], não conta hoje
         String future = GoalQa.goal(a, "Futuro", "1000.00", null);
         CardQaWorld.ok(GoalQa.reserve(a, future, a.nubank, "300.00", today.plusDays(5)));
         JsonNode g = GoalQa.getGoal(a, future);
@@ -167,13 +156,11 @@ class GoalBordersQaIT {
         assertThat(money(g, "current")).isEqualTo("0.00");
         assertThat(g.get("progress").asString()).isEqualTo("0.0000");
         JsonNode asOf = a.getOk("/v1/dashboard/summary?asOf=" + today.plusDays(5));
-        assertThat(asOf.get("balances").get("reserved").get("amount").asString()).isEqualTo("20300.00"); // 20.000,00 + 300,00 que passam a contar em asOf
-        // liberar com data anterior à da reserva é recusado (o saldo por data ficaria negativo)
+        assertThat(asOf.get("balances").get("reserved").get("amount").asString()).isEqualTo("20300.00");
         Res early = GoalQa.reserve(a, future, a.nubank, "-100.00", today);
         assertThat(early.status()).isEqualTo(422);
         assertThat(early.code()).isEqualTo("GOAL_RELEASE_EXCEEDS_RESERVED");
         assertThat(GoalQa.reserve(a, future, a.nubank, "-100.00", today.plusDays(5)).status()).isEqualTo(200);
-        // com o relógio no dia 15 a reserva passa a contar
         a.at(Instant.parse("2026-10-15T15:00:00Z"));
         assertThat(money(GoalQa.getGoal(a, future), "current")).isEqualTo("200.00");
         noContractViolations();
@@ -187,8 +174,6 @@ class GoalBordersQaIT {
         CardQaWorld.ok(GoalQa.reserve(a, goal, second, "100.00", today));
         CardQaWorld.ok(GoalQa.reserve(a, goal, a.nubank, "400.00", today));
         assertThat(a.getOk("/v1/dashboard/summary").get("balances").get("reserved").get("amount").asString()).isEqualTo("500.00");
-        // S-259 (A1 da revisão): conta com reserva ativa positiva não arquiva; o caminho que sobra é arquivar a meta (que não reserva nada), arquivar a
-        // conta e desarquivar a meta: a reserva volta numa conta arquivada, que é o estado que o resto do teste examina
         Res refused = a.call(HttpMethod.POST, "/v1/accounts/" + second + "/archive", null, null);
         assertThat(refused.status()).as(refused.toString()).isEqualTo(422);
         assertThat(refused.code()).isEqualTo("ACCOUNT_HAS_RESERVATIONS");
@@ -199,7 +184,6 @@ class GoalBordersQaIT {
         Res nova = GoalQa.reserve(a, goal, second, "1.00", today);
         assertThat(nova.status()).isEqualTo(422);
         assertThat(nova.code()).isEqualTo("ACCOUNT_ARCHIVED");
-        // BUG-QA?: o reservado da conta arquivada continua valendo?
         JsonNode account = a.getOk("/v1/accounts/" + second);
         JsonNode dash = a.getOk("/v1/dashboard/summary");
         System.out.println("QA-E5-ARCH conta arquivada reservedAmount=" + account.get("reservedAmount").get("amount").asString() + " uncovered=" + account.get("uncovered").asBoolean()
@@ -209,7 +193,6 @@ class GoalBordersQaIT {
         assertThat(account.get("reservedAmount").get("amount").asString()).isEqualTo("100.00");
         assertThat(GoalQa.reserve(a, goal, second, "-100.00", today).status()).as("liberar em conta arquivada").isEqualTo(200);
         assertThat(a.getOk("/v1/dashboard/summary").get("balances").get("reserved").get("amount").asString()).isEqualTo("400.00");
-        // meta arquivada
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/goals/" + goal + "/archive", null, null));
         assertThat(a.getOk("/v1/dashboard/summary").get("balances").get("reserved").get("amount").asString()).isEqualTo("0.00");
         assertThat(a.getOk("/v1/accounts/" + a.nubank).get("reservedAmount").get("amount").asString()).isEqualTo("0.00");
@@ -242,8 +225,6 @@ class GoalBordersQaIT {
         assertThat(money(GoalQa.getGoal(a, goal), "current")).isEqualTo("35.00");
         noContractViolations();
     }
-
-    // ------------------------------------------------------------------------------------------------ fuso e virada de ano
 
     @Test
     @DisplayName("fuso America/Sao_Paulo: às 23:30 de 31/12 em SP ainda é 2026 (prazo 31/12 vale 1 mês); 00:30 de 1/1 já é 2027 (prazo vencido) e a reserva datada 1/1 passa a contar")
@@ -292,12 +273,10 @@ class GoalBordersQaIT {
         assertThat(a.getOk("/v1/summaries/2028-02").get("expenses").get("amount").asString()).isEqualTo("50.00");
         assertThat(a.getOk("/v1/summaries/2028-03").get("expenses").get("amount").asString()).isEqualTo("60.00");
         assertThat(a.getOk("/v1/summaries/2028-03").get("comparison").get("previousMonth").get("expenses").get("amount").asString()).isEqualTo("50.00");
-        // base zero: percent null, delta absoluto vale
         JsonNode feb27 = a.getOk("/v1/summaries/2027-02");
         assertThat(feb27.get("comparison").get("incomeDelta").get("percent").isNull()).isTrue();
         assertThat(feb27.get("comparison").get("investmentsDelta").get("percent").isNull()).isTrue();
         assertThat(feb27.get("comparison").get("incomeDelta").get("amount").get("amount").asString()).isEqualTo("0.00");
-        // extremos da janela
         JsonNode first = a.getOk("/v1/summaries/2000-01");
         assertThat(first.get("comparison").get("previousMonth").get("competence").asString()).isEqualTo("1999-12");
         JsonNode last = a.getOk("/v1/summaries/2100-12");
@@ -316,8 +295,6 @@ class GoalBordersQaIT {
             assertThat(r.status()).as(month + " -> " + r).isEqualTo(400);
             assertThat(r.code()).as(month).isEqualTo("SUMMARY_MONTH_INVALID");
         }
-        // BUG-QA-32 (corrigido, S-261): dígitos não ASCII, %00 e %2F no caminho são recusados pelo firewall antes do controlador, e a resposta é 400
-        // problem+json com code SUMMARY_MONTH_INVALID e traceId, como o mês inválido "normal"
         for (String raw : List.of("%D9%A2%D9%A0%D9%A2%D9%A6-%D9%A1%D9%A0", "2026-10%00", "2026%2F10")) {
             var rejected = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v1/summaries/" + raw)
                     .header(org.springframework.http.HttpHeaders.AUTHORIZATION, a.bearer)).andReturn().getResponse();
@@ -337,7 +314,6 @@ class GoalBordersQaIT {
         for (String h : List.of("D7", "d30", "", "M18", "D30;D90", "%00", "30", "M6%20", "NULL", "M6,M12")) {
             Res r = a.raw(HttpMethod.GET, "/v1/projections?horizon=" + h, null, null);
             System.out.println("QA-E5-HORIZON '" + h + "' -> " + r.status() + " " + r.code());
-            // horizon= vazio vira o padrão (M6), como se não viesse; qualquer outro valor fora do enum é 400
             assertThat(r.status()).as("horizonte '" + h + "' -> " + r).isBetween(h.isEmpty() ? 200 : 400, h.isEmpty() ? 200 : 499);
         }
         for (String t : List.of("yes", "1", "on", "TRUE", "True", "no", "0", "off", "sim", "")) {
@@ -345,15 +321,11 @@ class GoalBordersQaIT {
             System.out.println("QA-E5-TREND includeTrend='" + t + "' -> " + r.status() + " " + r.code());
             assertThat(r.status()).as("includeTrend=" + t).isLessThan(500);
         }
-        // horizonte repetido e parâmetro desconhecido
         assertThat(a.raw(HttpMethod.GET, "/v1/projections?horizon=M6&horizon=M12", null, null).status()).isLessThan(500);
         assertThat(a.raw(HttpMethod.GET, "/v1/projections?horizon=M6&foo=bar", null, null).status()).isLessThan(500);
         noContractViolations();
     }
 
-    // ------------------------------------------------------------------------------------------------ projeção em datas difíceis
-
-    /** A série mensal é coerente com o dashboard e com os itens de /upcoming no "hoje" atual do relógio. */
     private void assertProjectionConsistent(LocalDate now, String tag) throws Exception {
         JsonNode summary = a.getOk("/v1/dashboard/summary");
         assertThat(summary.get("asOf").asString()).as(tag).isEqualTo(now.toString());
@@ -379,7 +351,7 @@ class GoalBordersQaIT {
             assertThat(series.get(series.size() - 1).get("balance").get("amount").asString()).as(tag + " " + h + " = projected").isEqualTo(
                     summary.get("projected").get(h.toLowerCase()).get("amount").asString());
             if (end.isAfter(LocalDate.of(2100, 12, 31))) {
-                continue; // /upcoming só aceita datas até 2100-12-31
+                continue;
             }
             JsonNode up = a.getOk("/v1/dashboard/upcoming?from=" + now + "&to=" + end);
             assertThat(inAccounts + CardQaWorld.cents(up.get("totals").get("in")) - CardQaWorld.cents(up.get("totals").get("out")))
@@ -402,20 +374,15 @@ class GoalBordersQaIT {
             LocalDate now = Instant.parse(iso).atZone(java.time.ZoneId.of("America/Sao_Paulo")).toLocalDate();
             assertProjectionConsistent(now, iso);
         }
-        // fim de mês: a recorrência de dia 31 tem exatamente uma ocorrência por mês na série de M12 a partir de 2026-10-10
         a.at(Instant.parse("2026-10-10T15:00:00Z"));
         JsonNode p = a.getOk("/v1/projections?horizon=M12");
         long outTotal = 0;
         for (JsonNode pt : p.get("series")) {
             outTotal += CardQaWorld.cents(pt.get("outflows"));
         }
-        // 13 pontos (out/26 a out/27): ocorrências de dia 31 em 31/10, 30/11, 31/12, 31/01, 28/02, 31/03, 30/04, 31/05, 30/06, 31/07, 31/08, 30/09 = 12 x 100,00; a de 31/10/27 passa do fim (10/10/27)
-        // + faturas da compra 6x (6 parcelas de 200,00 = 1.200,00)
         assertThat(outTotal).as("Σ saídas = 12 ocorrências de 100,00 + 6 parcelas de 200,00").isEqualTo(12 * 10_000 + 120_000);
         noContractViolations();
     }
-
-    // ------------------------------------------------------------------------------------------------ tendência histórica
 
     private long trendOracle(Actor who, String... months) {
         String in = String.join("','", months);
@@ -429,12 +396,10 @@ class GoalBordersQaIT {
     @Test
     @DisplayName("tendência: sem histórico e com menos de 3 meses completos = INSUFFICIENT_HISTORY (sem inventar média); com 3 meses = média de consumo novo (sem parcelas 2..N, recorrência nem reembolso); série base idêntica")
     void tendencia() throws Exception {
-        // sem nenhuma movimentação
         JsonNode empty = a.getOk("/v1/projections?horizon=M6&includeTrend=true");
         assertThat(empty.get("trend").get("available").asBoolean()).isFalse();
         assertThat(empty.get("trend").get("reason").asString()).isEqualTo("INSUFFICIENT_HISTORY");
         assertThat(empty.get("trend").get("estimate").asBoolean()).isTrue();
-        // primeira movimentação em 2026-07-02: o mês de julho é parcial
         Actor late = world.new Actor("e5late");
         String hist = GoalQa.account(late, "Hist", "CHECKING", "5000.00", "2026-06-01");
         expenseOn(late, hist, "100.00", "2026-07-02", "Julho");
@@ -442,7 +407,6 @@ class GoalBordersQaIT {
         expenseOn(late, hist, "100.00", "2026-09-02", "Setembro");
         JsonNode partial = late.getOk("/v1/projections?horizon=M6&includeTrend=true");
         assertThat(partial.get("trend").get("available").asBoolean()).as("1ª movimentação em 02/07 (jul parcial)").isFalse();
-        // primeira movimentação em 2026-07-01: 3 meses completos
         Actor full = world.new Actor("e5full");
         String hist2 = GoalQa.account(full, "Hist", "CHECKING", "5000.00", "2026-06-01");
         expenseOn(full, hist2, "300.00", "2026-07-01", "Julho");
@@ -451,7 +415,6 @@ class GoalBordersQaIT {
         expenseOn(full, hist2, "7777.00", "2026-10-02", "Mês corrente fora da média");
         CardQaWorld.ok(full.call(HttpMethod.POST, "/v1/recurrences", DebtQa.recurrenceBody("EXPENSE", "500.00", "Fixa", full.food, "\"accountId\":\"" + hist2 + "\",\"method\":\"PIX\"",
                 "MONTHLY", "2026-08-20", null), null));
-        // realiza a recorrência de 20/08 e 20/09 (vão para o razão com origem RECURRENCE: fora da tendência)
         String recId = DebtQa.all(full, "/v1/recurrences").get(0).get("id").asString();
         CardQaWorld.ok(DebtQa.realize(full, recId, "2026-09-20", null));
         CardQaWorld.ok(full.purchase("150.00", 1, "2026-08-10", "À vista"));
@@ -470,7 +433,6 @@ class GoalBordersQaIT {
         assertThat(trend.get("basedOn").get(0).asString()).isEqualTo("2026-07");
         assertThat(trend.get("series")).hasSize(base.get("series").size());
         assertThat(trend.get("series").get(0).get("estimatedSpending").get("amount").asString()).as("o mês corrente conta 0").isEqualTo("0.00");
-        // a conta recalculada: Σ >= 1.800,00 (3 despesas) e < Σ de tudo (7.777,00, a recorrência e as parcelas 2..N ficaram de fora)
         assertThat(expected).isGreaterThanOrEqualTo(180_000);
         noContractViolations();
     }
@@ -479,8 +441,6 @@ class GoalBordersQaIT {
         CardQaWorld.ok(who.call(HttpMethod.POST, "/v1/transactions", "{\"type\":\"EXPENSE\",\"amount\":\"" + amount + "\",\"date\":\"" + date + "\",\"description\":\"" + description
                 + "\",\"accountId\":\"" + account + "\",\"categoryId\":\"" + who.food + "\",\"method\":\"PIX\"}", GoalQa.key()));
     }
-
-    // ------------------------------------------------------------------------------------------------ projeção e fatos futuros
 
     @Test
     @DisplayName("BUG-QA-28: uma saída já lançada para daqui a 5 dias tem de aparecer em projected.d30 (hoje não aparece nem no caixa nem nos compromissos)")

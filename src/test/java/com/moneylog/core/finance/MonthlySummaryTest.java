@@ -39,10 +39,6 @@ class MonthlySummaryTest {
 
     private final Category tecnologia = Category.create(TECNOLOGIA_ID, USER_ID, "Tecnologia", CategoryKind.EXPENSE);
 
-    /**
-     * Outubro de 2026: Salário 3.000,00; Pix 100,00 (Alimentação); compra de 1.200,00 em 6x no cartão (Tecnologia); aplicação de
-     * 10.000,00; reembolso de 50,00 (Alimentação) em 12/10. Setembro: consumo de 150,00 e receita de 3.000,00.
-     */
     private FinanceScenarioFactory cenario(boolean compraDeTecnologia) {
         FinanceScenarioFactory s = umCenarioBase();
         Category categoriaDaCompra = compraDeTecnologia ? tecnologia : s.alimentacao;

@@ -20,7 +20,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.RefundCateg
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException;
 
-/** T27: regras da edição (S-68, S-81) e do estorno com contas arquivadas e reembolsos (S-73, S-88, S-89). */
 @DisplayName("Edição e estorno de movimentação em conta (T27)")
 class TransactionEditingTest {
 
@@ -108,7 +107,6 @@ class TransactionEditingTest {
     @Test
     @DisplayName("S-81 (b): reembolso ligado é revalidado excluindo a si mesmo; categoria diferente da original é REFUND_INVALID_ORIGINAL")
     void deveRevalidarOReembolsoSemContarASiMesmo() {
-        // despesa de 100,00 com dois reembolsos ativos: R1 de 30,00 e R2 de 20,00; ao editar R1 o teto é 100 − 20 = 80
         Money otherRefunds = Money.of("20.00");
         RefundOrigin origin = new RefundOrigin(s.pix, otherRefunds);
 
@@ -119,8 +117,6 @@ class TransactionEditingTest {
         assertThatThrownBy(() -> AccountTransactions.refundToAccount(headerOf(s.reembolso), Money.of("10.00"), s.nubank, s.transporte, origin))
                 .hasFieldOrPropertyWithValue("code", "REFUND_INVALID_ORIGINAL");
     }
-
-    // ---------------------------------------------------------------- estorno
 
     private static Account archived(Account account) {
         return Account.restore(account.id(), account.userId(), account.name(), AccountType.CHECKING, null, account.openingBalance(),

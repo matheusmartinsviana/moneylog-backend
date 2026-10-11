@@ -52,7 +52,6 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
                     time.now());
             if (existing != null) {
                 IdempotentClaim.requireSameCommand(existing, hashOf(c));
-                // o replay devolve o estado ATUAL (S-87)
                 return views.one(c.userId(), recurrences.findVersioned(c.userId(), existing.resourceId())
                         .orElseThrow(() -> new RecurrenceNotFoundException(existing.resourceId())), time.today());
             }
@@ -63,12 +62,10 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
         FinancialDates.requireInWindow(c.startDate(), "startDate");
         FinancialDates.requireInWindow(c.endDate(), "endDate");
         if (c.frequency() == Frequency.CUSTOM && c.interval() == null) {
-            // `interval` nulo em CUSTOM não assume 1 em silêncio (S-242): o contrato o exige
             throw new InvalidRecurrenceException("a frequência personalizada exige intervalo ≥ 1 e unidade.");
         }
         Schedule schedule = new Schedule(c.frequency(), c.interval() == null ? 1 : c.interval(), c.unit(), c.startDate(), c.endDate(),
                 c.maxOccurrences());
-        // categoria e meio de pagamento ausentes se resolvem aqui, no servidor (padrão: Outros/Outras receitas e OTHER)
         Category category = references.category(c.userId(), c.categoryId(), c.type());
         UUID categoryId = category.id();
         RecurringTransaction recurrence;
@@ -98,7 +95,6 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
         return views.one(c.userId(), saved, time.today());
     }
 
-    /** Hash do comando canônico (o dono não entra: a chave é por usuário). */
     private static String hashOf(CreateRecurrenceCommand c) {
         return IdempotentClaim.hash("type=" + c.type() + ";amount=" + c.amount().toPlainString() + ";description=" + nz(c.description()).strip()
                 + ";categoryId=" + nz(c.categoryId()) + ";accountId=" + nz(c.accountId()) + ";method=" + nz(c.method()) + ";cardId=" + nz(c.cardId())

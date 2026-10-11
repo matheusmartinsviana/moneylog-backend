@@ -16,10 +16,6 @@ import com.moneylog.core.transaction.app.gateways.TransactionRevisionGateway;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionState;
 
-/**
- * {@code transaction_revisions} por SQL direto, na transação do caso de uso. O snapshot é um JSON com os campos da
- * movimentação (valores em texto: o dinheiro como {@code "100.00"}, datas ISO), sem depender do formato das classes.
- */
 public class TransactionRevisionGatewayImpl implements TransactionRevisionGateway {
 
     private final JdbcTemplate jdbc;
@@ -40,7 +36,6 @@ public class TransactionRevisionGatewayImpl implements TransactionRevisionGatewa
         try {
             insert(userId, previous, revision, at, change, reason);
         } catch (DuplicateKeyException e) {
-            // outra edição da mesma versão gravou esta revisão primeiro
             throw new VersionConflictException();
         }
     }
@@ -73,7 +68,6 @@ public class TransactionRevisionGatewayImpl implements TransactionRevisionGatewa
         fields.put("adjustmentKind", s.adjustmentKind() == null ? null : s.adjustmentKind().name());
         fields.put("reason", s.reason());
         if (s.incomeCompetence() != null) {
-            // só aparece quando declarada (ADR-017): o snapshot das demais movimentações segue com a forma de antes
             fields.put("incomeCompetence", s.incomeCompetence().toString());
         }
         fields.put("version", s.version());

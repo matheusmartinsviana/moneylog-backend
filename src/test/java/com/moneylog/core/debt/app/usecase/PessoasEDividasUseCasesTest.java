@@ -46,7 +46,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Casos de uso de pessoas (T74) e de leitura de dívidas (T75) com adaptadores em memória das portas. */
 @DisplayName("Pessoas e leitura de dívidas: casos de uso (T74, T75)")
 class PessoasEDividasUseCasesTest {
 
@@ -219,7 +218,6 @@ class PessoasEDividasUseCasesTest {
         assertThat(payables.items()).hasSize(1);
         assertThat(listDebts.handle(new ListDebtsQuery(USER_ID, DebtFilter.all(), new PageQuery(1, 1))).hasNext()).isTrue();
 
-        // cancelada, a dívida não tem mais o que cancelar e o estorno do registro também é recusado (DEBT_CLOSED)
         late.cancel("perdão", TODAY);
         DebtView closed = getDebt.handle(new GetDebtQuery(USER_ID, late.id()));
         assertThat(closed.cancelable()).isFalse();

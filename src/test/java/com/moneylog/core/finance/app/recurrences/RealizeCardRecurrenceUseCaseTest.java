@@ -57,10 +57,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * T60: o lado do cartão da recorrência. Assinatura mensal de 49,90 no Roxinho (categoria do cenário), início em 15/09, relógio
- * 10/10 (fatura de 25/10 aberta). A porta {@code RecurrenceGateway} é o adaptador em memória de teste (a JPA é da T79).
- */
 @DisplayName("Realizar ocorrência de recorrência no cartão (T60)")
 class RealizeCardRecurrenceUseCaseTest {
 
@@ -139,13 +135,11 @@ class RealizeCardRecurrenceUseCaseTest {
         assertThat(purchase.date()).isEqualTo(OCT_15);
         assertThat(purchase.description()).isEqualTo("Streaming");
         assertThat(details.impact().cash()).isEqualTo(Money.of("0.00"));
-        // sem dupla contagem: o item RECURRENCE de 15/10 deixou de existir e o mesmo valor está na fatura
         CommitmentSchedule schedule = CommitmentSchedule.of(scenario.records(), List.of(recurrences.findById(USER_ID, RECURRENCE_ID).orElseThrow()), TODAY);
         assertThat(schedule.items().stream().filter(c -> c.kind() == CommitmentKind.RECURRENCE).map(c -> c.dueDate()))
                 .doesNotContain(OCT_15).contains(LocalDate.of(2026, 11, 15));
         assertThat(schedule.items().stream().filter(c -> c.kind() == CommitmentKind.INVOICE_FORECAST).findFirst().orElseThrow().amount())
                 .isEqualTo(Money.of("49.90"));
-        // 12 meses de ocorrências (15/09..15/10 vencidas ou realizada saem; sobram 15/09 vencida + 15/11..15/09 a pagar): o total só trocou 49,90 de lugar
         assertThat(commitmentsOut()).isEqualTo(before);
     }
 
@@ -162,12 +156,10 @@ class RealizeCardRecurrenceUseCaseTest {
     @Test
     @DisplayName("CA3: ocorrência de 15/09 com a fatura de 25/09 (vence 05/10) PAID vai para a corrente com lançamento tardio; com a fatura fechada e não paga entra nela como lançamento tardio; nunca em fatura PAID")
     void deveAlocarPeloStatusDaFatura() {
-        // fatura de 25/09 vazia em 10/10 = PAID (sem saldo): a compra vai para a corrente (25/10)
         TransactionDetails toCurrent = realize(SEP_15, null);
         assertThat(toCurrent.transaction().installments().getFirst().lateEntry()).isTrue();
         assertThat(toCurrent.transaction().installments().getFirst().invoiceClosingDate()).isEqualTo(LocalDate.of(2026, 10, 25));
 
-        // com uma compra de 100,00 em 01/09 a fatura de 25/09 (vence 05/10) existe com saldo e está OVERDUE em 10/10
         scenario.transactions.clear();
         scenario.transactions.add(com.moneylog.core.transaction.util.factory.TransactionTestFactory.compraNoCalendario(
                 scenario.header(LocalDate.of(2026, 9, 1), "Antiga"), Money.of("100.00"), scenario.roxinho, scenario.alimentacao, 1));
@@ -177,7 +169,6 @@ class RealizeCardRecurrenceUseCaseTest {
 
         assertThat(late.transaction().installments().getFirst().invoiceClosingDate()).isEqualTo(LocalDate.of(2026, 9, 25));
         assertThat(late.transaction().installments().getFirst().lateEntry()).isTrue();
-        // paga a fatura de 25/09: a próxima realização atrasada (outra ocorrência) nunca cai nela
         scenario.pagarFatura("149.90", LocalDate.of(2026, 9, 25), TODAY);
         recurrences.save(RecurringTransaction.ofCard(UUID.fromString("00000000-0000-0000-0000-0000000ec002"), USER_ID, Money.of("10.00"), "Outra",
                 scenario.alimentacao.id(), scenario.roxinho.id(), Schedule.of(Frequency.MONTHLY, SEP_15)));
@@ -210,7 +201,6 @@ class RealizeCardRecurrenceUseCaseTest {
                 Schedule.of(Frequency.MONTHLY, SEP_15)));
         assertThatThrownBy(() -> useCase.handle(new RealizeCardRecurrenceCommand(USER_ID, accountModel, OCT_15, null)))
                 .isInstanceOf(RecurrenceReferenceMismatchException.class).hasFieldOrPropertyWithValue("code", "RECURRENCE_REFERENCE_MISMATCH");
-        // categoria do modelo que não é a carregada (a categoria foi trocada no cadastro)
         UUID otherCategory = scenario.salario.id();
         recurrences.save(RecurringTransaction.ofCard(UUID.fromString("00000000-0000-0000-0000-0000000ec004"), USER_ID, Money.of("10.00"), "X",
                 otherCategory, scenario.roxinho.id(), Schedule.of(Frequency.MONTHLY, SEP_15)));

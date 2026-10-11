@@ -28,7 +28,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/** T61 (QA), critério 4: isolamento entre usuários, autenticação, entradas hostis e idempotência nas rotas da Etapa 3. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T61: segurança das rotas de cartão")
@@ -116,7 +115,6 @@ class CardSecurityQaIT {
                 failures.add(c[0] + " " + c[1] + " -> " + r.status() + " " + r.code() + " (esperado 404 " + c[3] + ")");
             }
         }
-        // listas de B não vazam os cartões de A
         JsonNode list = b.getOk("/v1/cards?pageSize=50");
         list.get("items").forEach(i -> {
             if (i.get("id").asString().equals(aCard)) {
@@ -206,7 +204,6 @@ class CardSecurityQaIT {
         List<String> keys = new ArrayList<>();
         card.propertyNames().forEach(keys::add);
         assertThat(keys.stream().filter(c -> c.matches("(?i).*(number|cvv|cvc|brand|digits|holder|expir).*")).toList()).isEmpty();
-        // um nome que parece número de cartão é só texto: não vira outro campo (a regra é do produto; aqui só não pode quebrar)
         CardQaWorld.Res r = a.raw(HttpMethod.POST, "/v1/cards", "{\"name\":\"4111 1111 1111 1111\",\"limit\":{\"amount\":\"100.00\",\"currency\":\"BRL\"},\"closingDay\":10,\"dueDay\":15}", null);
         assertThat(r.status()).as(r.toString()).isLessThan(500);
     }
@@ -307,10 +304,8 @@ class CardSecurityQaIT {
         CardQaWorld.Res other = a.raw(HttpMethod.POST, "/v1/invoices/" + aInvoice + "/payments", body.replace("100.00", "101.00"), key);
         assertThat(other.status()).as(other.toString()).isEqualTo(409);
         assertThat(other.code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
-        // a mesma chave com a fatura de outro dia/outro cartão do mesmo usuário também é "outro corpo"
         CardQaWorld.Res otherInvoice = a.raw(HttpMethod.POST, "/v1/invoices/" + a.invoiceId(LocalDate.of(2026, 11, 25)) + "/payments", body, key);
         assertThat(otherInvoice.status()).as(otherInvoice.toString()).isEqualTo(409);
-        // B usa a MESMA chave na fatura dele: independente
         String bBody = "{\"accountId\":\"" + b.nubank + "\",\"amount\":\"100.00\",\"date\":\"2026-10-30\"}";
         CardQaWorld.Res bRes = b.call(HttpMethod.POST, "/v1/invoices/" + b.invoiceId(LocalDate.of(2026, 10, 25)) + "/payments", bBody, key);
         assertThat(bRes.status()).as(bRes.toString()).isEqualTo(200);

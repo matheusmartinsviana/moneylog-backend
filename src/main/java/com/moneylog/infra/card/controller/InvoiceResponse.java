@@ -7,7 +7,6 @@ import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.finance.app.cards.InvoiceView;
 import com.moneylog.core.sk.money.Money;
 
-/** Saída de fatura resumida (contrato: {@code InvoiceSummary}). */
 public record InvoiceResponse(UUID id, UUID cardId, String referenceMonth, LocalDate periodStart, LocalDate closingDate,
                               LocalDate dueDate, InvoiceStatus status, Money total, Money carryIn, Money paid, Money outstanding,
                               Money creditCarry, boolean hasLateEntries) {

@@ -6,7 +6,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 
 import com.moneylog.core.ai.app.usecase.AiUseCases.PurgeExpiredAiDataUseCase;
 
-/** Retenção (S-183): uma vez por dia apaga o payload enviado com mais de N dias (padrão 90) e as prévias vencidas; o registro permanece. */
 public class PayloadRetentionJob {
 
     private static final Logger log = LoggerFactory.getLogger(PayloadRetentionJob.class);

@@ -43,21 +43,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T190 (QA independente, fase 0 do redesign). Propriedade com semente fixa misturando as operações das Etapas 1 a 6 pela API (despesa, receita,
- * parcelada, estorno, reembolso, transferência, aplicação, ajuste, empréstimo, dívida, despesa dividida, recorrência, meta, fatura, mudança de
- * dias, movimentação futura), em épocas escolhidas a dedo (início e fim do horário de verão de 2018/2019, 29/02/2028, virada de ano) e com o relógio
- * parando em 23:59:59 e 00:00:00 de America/Sao_Paulo. O oráculo é <b>SQL puro sobre {@code ledger_postings}</b> (nada do {@code Ledger} Java), e
- * o teste confere:
- * <ul>
- *   <li>cada ponto de D7, D30, M3 e M12 (e as janelas {@code from/to}, os baldes, {@code partial}, {@code net}, {@code totals});</li>
- *   <li>cada ponto de M12 = dashboard.month = entries = resumo mensal;</li>
- *   <li>{@code spending-by-category} = oráculo por categoria (itens, other, base, share) e = {@code entries.totals};</li>
- *   <li>{@code inAccountsChange} = {@code inAccounts} em {@code since} (SQL) e a taxa de poupança/delta do resumo;</li>
- *   <li>só tipos de movimentação esperados chegam aos livros INCOME/EXPENSE (nunca fatura paga, transferência, aplicação, empréstimo);</li>
- *   <li>os relatórios não alteram o razão.</li>
- * </ul>
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T190 (fase 0): propriedade da série, do consumo por categoria e das variações contra oráculo SQL")
@@ -95,8 +80,6 @@ class RedesignFase0PropertyQaIT {
             new Era("bissexto-2028", 20280229L, Instant.parse("2028-02-18T15:00:00Z")),
             new Era("virada-de-ano", 20261231L, Instant.parse("2026-12-10T15:00:00Z")),
             new Era("normal-2026", 20261010L, Instant.parse("2026-10-10T15:00:00Z")));
-
-    // ------------------------------------------------------------------------------------------------ estado da época
 
     private Actor a;
     private Random rnd;
@@ -163,8 +146,6 @@ class RedesignFase0PropertyQaIT {
         assertThat(violations).as("violações").isEmpty();
     }
 
-    // ------------------------------------------------------------------------------------------------ operações
-
     private String dateBack(int max) {
         return today().minusDays(rnd.nextInt(max)).toString();
     }
@@ -190,7 +171,6 @@ class RedesignFase0PropertyQaIT {
         }
     }
 
-    /** Move o relógio: às vezes para 23:59:59 ou 00:00:00 locais, às vezes horas, às vezes dias. */
     private void passTime() {
         ZonedDateTime now = clock.instant().atZone(SP);
         ZonedDateTime next;
@@ -357,8 +337,6 @@ class RedesignFase0PropertyQaIT {
         return out;
     }
 
-    // ------------------------------------------------------------------------------------------------ oráculo SQL
-
     private long book(String book, LocalDate from, LocalDate to) {
         Long v = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active and book_type = ? "
                 + "and effective_date between ? and ?", Long.class, a.id, book, java.sql.Date.valueOf(from), java.sql.Date.valueOf(to));
@@ -384,12 +362,9 @@ class RedesignFase0PropertyQaIT {
         return BigDecimal.valueOf(numerator).divide(BigDecimal.valueOf(Math.abs(denominator)), 4, RoundingMode.HALF_UP).toPlainString();
     }
 
-    // ------------------------------------------------------------------------------------------------ verificação
-
     private void verify(String label) throws Exception {
         LocalDate today = today();
         long postingsBefore = fingerprint();
-        // invariante do razão usada como premissa do oráculo: competência = mês da data efetiva nos dois livros
         Long wrongCompetence = jdbc.queryForObject("select count(*) from ledger_postings where user_id = ? and active and book_type in ('INCOME','EXPENSE') "
                 + "and competence <> to_char(effective_date, 'YYYY-MM')", Long.class, a.id);
         if (wrongCompetence != null && wrongCompetence > 0) {
@@ -454,7 +429,6 @@ class RedesignFase0PropertyQaIT {
             violations.add(ctx + ": janela " + s.get("from").asString() + ".." + s.get("to").asString() + " esperada " + from + ".." + to);
             return;
         }
-        // baldes esperados, escritos de novo aqui (sem usar o código de produção)
         List<LocalDate[]> buckets = new ArrayList<>();
         switch (period) {
             case "D7", "D30" -> {
@@ -499,7 +473,6 @@ class RedesignFase0PropertyQaIT {
                 violations.add(ctx + ": balde " + i + " " + p.get("periodStart").asString() + ".." + p.get("periodEnd").asString() + " esperado " + b[0] + ".." + b[1]);
                 continue;
             }
-            // DAY/WEEK nunca passam de hoje (o balde já termina em hoje); MONTH é a competência inteira
             long income = incomeSql(b[0], b[1]);
             long expenses = expensesSql(b[0], b[1]);
             totalIncome += income;
@@ -549,18 +522,16 @@ class RedesignFase0PropertyQaIT {
             if (expenses != CardQaWorld.cents(sum.get("expenses")) || income != CardQaWorld.cents(sum.get("income"))) {
                 violations.add(ctx + ": série != resumo mensal " + sum.get("income") + "/" + sum.get("expenses"));
             }
-            // taxa de poupança do resumo: (income - expenses) / income, 4 casas, null sem receita
             long net = income - expenses;
             String expectedRate = income == 0 ? null : ratio(net, income);
             JsonNode rate = sum.get("savingsRate");
             String actualRate = rate == null || rate.isNull() ? null : rate.asString();
             if (income < 0) {
-                expectedRate = actualRate; // fora do contrato (receita negativa não é gerada)
+                expectedRate = actualRate;
             }
             if (expectedRate == null ? actualRate != null : !expectedRate.equals(actualRate)) {
                 violations.add(ctx + ": savingsRate " + actualRate + " esperado " + expectedRate);
             }
-            // delta contra o mês anterior (sobre as taxas já arredondadas)
             YearMonth prev = ym.minusMonths(1);
             long pIncome = incomeSql(prev.atDay(1), prev.atEndOfMonth());
             long pExpenses = expensesSql(prev.atDay(1), prev.atEndOfMonth());
@@ -584,7 +555,6 @@ class RedesignFase0PropertyQaIT {
     private void checkSpending(String label, YearMonth ym) throws Exception {
         String month = ym.toString();
         String ctx = label + " spending " + month;
-        // oráculo por categoria: Σ postings EXPENSE ativos da competência
         Map<UUID, Long> byCategory = new HashMap<>();
         for (Map<String, Object> row : jdbc.queryForList("select book_id, sum(amount_cents) as c from ledger_postings where user_id = ? and active "
                 + "and book_type = 'EXPENSE' and competence = ? group by book_id", a.id, month)) {
@@ -707,14 +677,12 @@ class RedesignFase0PropertyQaIT {
         if (CardQaWorld.cents(atSince.get("inAccounts")) != previous) {
             violations.add(ctx + ": dashboard(asOf=since).inAccounts " + CardQaWorld.cents(atSince.get("inAccounts")) + " != previous " + previous);
         }
-        // projeção: campo ausente
         JsonNode future = a.getOk("/v1/dashboard/summary?asOf=" + today.plusDays(3)).get("balances");
         if (future.has("inAccountsChange")) {
             violations.add(ctx + ": presente em projeção (asOf futuro): " + future.get("inAccountsChange"));
         }
     }
 
-    /** Quais tipos de movimentação chegam aos livros da série (nada de fatura paga, transferência, aplicação, empréstimo, ajuste). */
     private void typesContributing(String era) {
         List<Map<String, Object>> rows = jdbc.queryForList("select p.book_type, p.source_type, t.type as ttype, count(*) as n from ledger_postings p "
                 + "left join transactions t on t.id = p.transaction_id where p.user_id = ? and p.active and p.book_type in ('INCOME','EXPENSE') "

@@ -6,16 +6,6 @@ import java.util.UUID;
 import com.moneylog.core.importing.exception.ImportingExceptions.InvalidImportLineException;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Linha de extrato já interpretada pelo parser (CSV/OFX, etapa de importação), antes da revisão.
- *
- * @param sourceId    conta ou cartão de onde o extrato veio
- * @param date        data da linha
- * @param amount      valor sempre positivo; o sinal vem de {@code direction}
- * @param direction   entrada ou saída
- * @param description descrição original (pode ser vazia)
- * @param fitId       identificador da transação no OFX ({@code FITID}), ou {@code null}
- */
 public record ImportLine(UUID sourceId, LocalDate date, Money amount, ImportDirection direction, String description,
                          String fitId) {
 
@@ -43,7 +33,6 @@ public record ImportLine(UUID sourceId, LocalDate date, Money amount, ImportDire
         return DescriptionNormalizer.normalize(description);
     }
 
-    /** Valor com sinal: positivo para entrada, negativo para saída. */
     public Money signedAmount() {
         return direction == ImportDirection.IN ? amount : amount.negate();
     }

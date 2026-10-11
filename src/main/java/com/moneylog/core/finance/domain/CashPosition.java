@@ -10,11 +10,6 @@ import com.moneylog.core.account.domain.LiquidityClass;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Lente de caixa (D1 §1): saldo de cada conta = Σ postings ativos do livro {@code ACCOUNT} com data ≤ a data
- * consultada. "Em contas" soma as contas {@code CASH}; "investimentos", as {@code INVESTMENT}. Movimentação com data
- * futura ainda não entra.
- */
 public record CashPosition(LocalDate asOf, Map<UUID, Money> byAccount, Money inAccounts, Money investments) {
 
     public static CashPosition at(FinancialRecords records, Ledger ledger, LocalDate asOf) {

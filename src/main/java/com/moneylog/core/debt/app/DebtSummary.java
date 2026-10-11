@@ -9,7 +9,6 @@ import com.moneylog.core.debt.domain.DebtStatus;
 import com.moneylog.core.debt.domain.Person;
 import com.moneylog.core.sk.money.Money;
 
-/** Dívida resumida (dentro da movimentação e da pessoa): o que a API calcula, com o status derivado e o "atrasada" de hoje. */
 public record DebtSummary(UUID id, UUID personId, String personName, DebtDirection direction, DebtStatus status, Money principal,
                           Money settled, Money outstanding, LocalDate date, LocalDate expectedDate, boolean overdue,
                           String description) {

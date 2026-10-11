@@ -24,9 +24,6 @@ import com.moneylog.core.transaction.domain.InvestmentDirection;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * D1 §2.10 (S-47) e PR 01 regra 10: lista e dashboard leem a mesma fonte, com totais calculados no backend.
- */
 @DisplayName("Lista × dashboard: visões de leitura consistentes (T8a CA7)")
 class ListaDashboardConsistenciaTest {
 
@@ -74,13 +71,11 @@ class ListaDashboardConsistenciaTest {
         assertThat(month.net()).isEqualTo(Money.of("4650.00"));
         assertThat(month.investedNet()).isEqualTo(Money.of("2000.00"));
 
-        // fluxo de caixa: entradas 5.000 (salário) + 30 (reembolso em conta); saídas 100 + 40 + 60 + 2.000 (aplicação)
         assertThat(caixa.in()).isEqualTo(Money.of("5030.00"));
         assertThat(caixa.out()).isEqualTo(Money.of("2200.00"));
         assertThat(caixa.net()).isEqualTo(Money.of("2830.00"));
         assertThat(caixa.count()).isEqualTo(6);
 
-        // visão de lançamentos: a compra é uma linha de 200 (1/6) e os reembolsos são negativos
         assertThat(consumo.lines()).filteredOn(l -> compra.id().equals(l.transactionId())).singleElement().satisfies(l -> {
             assertThat(l.amount()).isEqualTo(Money.of("200.00"));
             assertThat(l.installmentNumber()).isEqualTo(1);

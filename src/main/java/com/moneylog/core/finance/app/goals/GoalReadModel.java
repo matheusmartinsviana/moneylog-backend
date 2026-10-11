@@ -25,11 +25,6 @@ import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Prepara a leitura das metas (ADR-016): calcula <b>uma vez por requisição</b> as medidas que as metas pedem (N metas {@code METRIC} não
- * disparam N leituras; a mesma medida em duas metas é calculada uma vez), a posição das reservas e carrega os instantâneos de todas as
- * metas numa consulta só. Meta arquivada não pede medida. As fontes são as mesmas das telas (ver {@link GoalMetricValues}).
- */
 public class GoalReadModel {
 
     private final CommitmentSourcesGateway sources;
@@ -42,15 +37,10 @@ public class GoalReadModel {
         this.time = time;
     }
 
-    /** Uma meta (escrita ou detalhe), sem gravar instantâneo. */
     public GoalDetails view(UUID userId, Versioned<Goal> goal, FinancialRecords records) {
         return GoalViews.of(goal, context(userId, List.of(goal), records, false));
     }
 
-    /**
-     * @param touch grava o instantâneo do mês corrente quando ainda não existe (primeira leitura do mês, em transação própria). Só para
-     *              leituras: nas escritas a linha da meta pode estar travada ou ainda não confirmada.
-     */
     public GoalViews.Context context(UUID userId, Collection<Versioned<Goal>> goals, FinancialRecords records, boolean touch) {
         LocalDate today = time.today();
         Set<GoalMetric> needed = EnumSet.noneOf(GoalMetric.class);
@@ -90,23 +80,19 @@ public class GoalReadModel {
         return new GoalViews.Context(GoalViews.accountNames(records), reserves, metrics, byGoal, today, time.zone());
     }
 
-    /** Valor atual de uma medida (para a baseline na criação e na re-ancoragem); mesma fonte das leituras. */
     public Money metricValue(UUID userId, GoalMetric metric, FinancialRecords records) {
         return GoalMetricValues.compute(EnumSet.of(metric), records, () -> sources.recurrences(userId), time.today())
                 .getOrDefault(metric, Money.zero(CurrencyCode.BRL));
     }
 
-    /** Grava (ou atualiza) o instantâneo do mês corrente da meta; participa da transação do chamador. */
     public void recordSnapshot(UUID userId, Goal goal, Money value) {
         snapshots.upsert(userId, goal.id(), Competence.from(time.today()), value, time.now());
     }
 
-    /** Metas com histórico de medida: {@code METRIC} e {@code DEBT_PAYOFF} (com baseline), não arquivadas. */
     public static boolean isTracked(Goal goal) {
         return !goal.isArchived() && (goal.kind() == GoalKind.METRIC || goal.kind() == GoalKind.DEBT_PAYOFF && goal.isBaselineSet());
     }
 
-    /** Valor atual da meta rastreada, dentre as medidas já calculadas. */
     public static Money valueOf(Goal goal, Map<GoalMetric, Money> metrics) {
         GoalMetric metric = goal.kind() == GoalKind.METRIC ? goal.metric() : GoalMetric.TOTAL_DEBT;
         return metrics.getOrDefault(metric, Money.zero(CurrencyCode.BRL));

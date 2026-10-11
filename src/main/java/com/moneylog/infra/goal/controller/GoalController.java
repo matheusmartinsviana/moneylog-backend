@@ -59,10 +59,6 @@ import com.moneylog.infra.exception.RequestValidationException.FieldIssue;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * Metas e reservas (D1 §2.9, S-147): reserva <b>lógica</b>, sem movimentação nem lançamento. Reservar e liberar devolvem a meta
- * atualizada ({@code 200}).
- */
 @RestController
 @RequestMapping("/v1/goals")
 public class GoalController {
@@ -146,7 +142,6 @@ public class GoalController {
                 body.deadline(), body.priority(), body.description(), body.version(), body.planNote())));
     }
 
-    /** Reserva (positivo) ou libera (negativo) dinheiro de uma conta; não cria movimentação nem lançamento. */
     @PostMapping("/{id}/reservations")
     public GoalResponse reserve(@CurrentUser UUID userId, @PathVariable UUID id, @RequestHeader("Idempotency-Key") UUID idempotencyKey,
                                 @Valid @RequestBody GoalReservationInput body) {
@@ -154,13 +149,11 @@ public class GoalController {
                 Money.of(body.amount(), CurrencyCode.BRL), body.date(), body.note(), idempotencyKey)));
     }
 
-    /** "Cadastrei tudo" (ADR-013): fixa a baseline da meta de quitar dívidas com o total de hoje; repetir re-ancora. */
     @PostMapping("/{id}/baseline")
     public GoalResponse baseline(@CurrentUser UUID userId, @PathVariable UUID id) {
         return GoalResponse.of(baseline.handle(new AnchorDebtPayoffBaselineCommand(userId, id)));
     }
 
-    /** Acrescenta uma ação ao plano declarado (ADR-016); devolve a meta atualizada. */
     @PostMapping("/{id}/actions")
     public ResponseEntity<GoalResponse> addAction(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody GoalActionInput body) {
         GoalDetails details = addAction.handle(new AddGoalActionCommand(userId, id, body.title(), body.frequency()));
@@ -178,7 +171,6 @@ public class GoalController {
         return GoalResponse.of(deleteAction.handle(new DeleteGoalActionCommand(userId, id, actionId)));
     }
 
-    /** Marca (ou desmarca com {@code done=false}) o período da ação; idempotente. */
     @PostMapping("/{id}/actions/{actionId}/check-in")
     public GoalResponse checkIn(@CurrentUser UUID userId, @PathVariable UUID id, @PathVariable UUID actionId,
                                 @Valid @RequestBody GoalCheckInInput body) {

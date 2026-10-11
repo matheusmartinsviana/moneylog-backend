@@ -11,7 +11,6 @@ import com.moneylog.infra.ledger.gateways.LedgerReadGatewayImpl;
 import com.moneylog.infra.ledger.gateways.LedgerWriteGatewayImpl;
 import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
 
-/** Ligação da persistência do razão (T24). */
 @Configuration(proxyBeanMethods = false)
 public class LedgerConfig {
 

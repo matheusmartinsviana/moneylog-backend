@@ -171,7 +171,6 @@ class ReviewImportLinesTest {
                 .isInstanceOf(ImportTransferLegAlreadyRecordedException.class);
 
         verify(batches, never()).updateLine(any(), any());
-        // a linha não foi gravada como aceita: o usuário ainda escolhe entre aceitar como está ou rejeitar
         assertThat(review.handle(command(in.id(), Action.REJECT, null, null, false)).status()).isEqualTo(ImportLineStatus.REJECTED);
     }
 

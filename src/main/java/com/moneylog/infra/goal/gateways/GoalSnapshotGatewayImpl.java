@@ -24,7 +24,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/** {@link GoalSnapshotGateway} sobre JDBC: um registro por meta e mês ({@code UNIQUE (goal_id, reference_month)}), então repetir é idempotente. */
 public class GoalSnapshotGatewayImpl implements GoalSnapshotGateway {
 
     private static final Logger log = LoggerFactory.getLogger(GoalSnapshotGatewayImpl.class);
@@ -74,7 +73,6 @@ public class GoalSnapshotGatewayImpl implements GoalSnapshotGateway {
         try {
             ownTransaction.executeWithoutResult(status -> write(INSERT_IF_ABSENT, userId, goalId, month, value, capturedAt));
         } catch (RuntimeException e) {
-            // ler a meta nunca falha por causa do instantâneo (o job diário cobre); sem dados no log
             log.warn("Instantâneo da meta não gravado na leitura (erro={})", e.getClass().getSimpleName());
         }
     }

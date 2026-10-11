@@ -22,12 +22,6 @@ import com.moneylog.core.goal.domain.GoalStage;
 import com.moneylog.core.goal.domain.GoalStatus;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * {@code Goal} do contrato: tudo calculado pelo backend (D2 §4.7). {@code current}, {@code progress} (razão com 4 casas),
- * {@code remaining}, {@code status} derivado, {@code monthlyNeeded} (estimativa) e {@code uncovered} (S-148). Reserva lógica: nada aqui
- * é movimentação nem lançamento. Meta {@code METRIC} (ADR-016): {@code metric}, {@code direction}, {@code reached}, {@code metricAsOf} e
- * {@code name} pode ser {@code null}. Estágio e plano (ADR-016): {@code stage}, plano automático, plano declarado e consistência.
- */
 public record GoalResponse(UUID id, GoalKind kind, String name, Money target, Money current, String progress, Money remaining, GoalStatus status,
                            LocalDate deadline, GoalPriority priority, String description, Money monthlyNeeded, boolean uncovered,
                            List<ReservationResponse> reservations, boolean baselineSet, Money baseline, Instant baselineAt, boolean grewSinceBaseline,
@@ -37,23 +31,19 @@ public record GoalResponse(UUID id, GoalKind kind, String name, Money target, Mo
                            String consistencyRate, boolean featured, UUID coverPhotoId, List<PhotoResponse> photos, long version,
                            Instant createdAt, Instant updatedAt) {
 
-    /** {@code GoalPhoto} do contrato: só metadados, na ordem de exibição; os bytes vêm de {@code .../photos/{photoId}/content}. */
     public record PhotoResponse(UUID id, int position, int width, int height, Instant createdAt) {
     }
 
 
-    /** {@code GoalReservation} do contrato. */
     public record ReservationResponse(UUID id, AccountRef account, Money amount, LocalDate date, String note, Instant createdAt) {
     }
 
     public record AccountRef(UUID id, String name) {
     }
 
-    /** {@code doneIn}: períodos com check-in (MONTHLY {@code YYYY-MM}, WEEKLY {@code YYYY-Www}, ONE_TIME {@code ONCE}). */
     public record ActionResponse(UUID id, String title, GoalActionFrequency frequency, List<String> doneIn, Instant createdAt) {
     }
 
-    /** {@code met} e {@code actual} nulos = sem dado (nunca "cumprido"). */
     public record ConsistencyMonth(String month, Money expected, Money actual, Boolean met, boolean closed) {
     }
 

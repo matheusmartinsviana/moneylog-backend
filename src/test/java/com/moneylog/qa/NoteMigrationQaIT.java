@@ -19,11 +19,6 @@ import org.testcontainers.utility.DockerImageName;
 
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T113 (QA), critério 5: V6.00 e V6.01 sobre uma base da Etapa 5 COM dados (contas, transações, razão, metas, cartão, faturas, pessoas, dívidas).
- * Os dados não mudam; {@code unaccent} funciona; as FKs compostas recusam alvo de outro usuário em todas as colunas; o índice único parcial da
- * lixeira permite reutilizar o caminho; ON DELETE CASCADE só na fatura vazia e na nota dona; as restrições do esquema valem; a reexecução não faz nada.
- */
 @Tag("i")
 @DisplayName("QA T113: migrações V6.00 e V6.01 sobre dados da Etapa 5")
 class NoteMigrationQaIT {
@@ -110,7 +105,7 @@ class NoteMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(25); // V8.17 (dispensas de insights, ADR-019) + V8.16 (fotos das metas e destaque, ADR-018) + V8.15 (competência de renda, ADR-017) + V8.14 (metas de medida e plano, ADR-016) + V8.13 (fatura histórica) + V8.12 (limite opcional do cartão) +  V8.11 (recebimentos de terceiros) + V8.10 (senha do dono, ADR-015) + V8.09 (fechamento confirmado do cartão) + V8.0x (ADR-015) + V8.05 a V8.08 (ADR-014) + V8.02 a V8.04 + V6.00 a V6.02 + V7.00 a V7.03, V8.00 e V8.01
+            assertThat(result.migrationsExecuted).isEqualTo(25);
             assertThat(all.info().current().getVersion().getVersion()).isEqualTo("8.17");
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
@@ -121,12 +116,10 @@ class NoteMigrationQaIT {
             assertThat(jdbc.queryForObject("select count(*) from note_links", Long.class)).isZero();
             assertThat(jdbc.queryForObject("select count(*) from note_tags", Long.class)).isZero();
 
-            // unaccent disponível (V6.01) e se comporta como a busca espera
             assertThat(jdbc.queryForObject("select unaccent('Ação e coração ÜNICODE')", String.class)).isEqualTo("Acao e coracao UNICODE");
             assertThat(jdbc.queryForObject("select 'Coração' ILIKE ('%' || unaccent('coracao') || '%') or unaccent('Coração') ILIKE unaccent('%coracao%')", Boolean.class)).isTrue();
             assertThat(jdbc.queryForObject("select count(*) from pg_extension where extname = 'unaccent'", Long.class)).isEqualTo(1L);
 
-            // índice único parcial da lixeira: o caminho (sem caixa) é único entre ativas, e a lixeira libera
             UUID n1 = UUID.randomUUID();
             UUID n2 = UUID.randomUUID();
             UUID n3 = UUID.randomUUID();
@@ -138,7 +131,6 @@ class NoteMigrationQaIT {
             note(jdbc, UUID.randomUUID(), u1, "Revisão.md", "outra na lixeira também", NOW);
             assertThatThrownBy(() -> jdbc.update("update notes set deleted_at = null where id = ?", n1)).hasMessageContaining("uq_notes_user_path_active");
 
-            // restrições da nota
             assertThatThrownBy(() -> note(jdbc, UUID.randomUUID(), u1, "   ", "x", null)).hasMessageContaining("ck_notes_path_not_blank");
             assertThatThrownBy(() -> jdbc.update("insert into notes (id,user_id,path,path_key,title,body,created_at,updated_at) values (?,?,'a.md','a.md','  ','x',?,?)", UUID.randomUUID(), u1, NOW, NOW))
                     .hasMessageContaining("ck_notes_title_not_blank");
@@ -148,7 +140,6 @@ class NoteMigrationQaIT {
             assertThatThrownBy(() -> jdbc.update("insert into notes (id,user_id,path,path_key,title,body,created_at,updated_at) values (?,?,?,?, 't', ?, ?, ?)", UUID.randomUUID(), u1, "z".repeat(256), "z".repeat(256), "x", NOW, NOW))
                     .isInstanceOf(Exception.class);
 
-            // FKs compostas por coluna: o alvo de outro usuário é recusado em CADA tipo
             UUID mine = n3;
             explicit(jdbc, u1, mine, "TRANSACTION", "target_transaction_id", tx1);
             explicit(jdbc, u1, mine, "ACCOUNT", "target_account_id", acc1);
@@ -163,14 +154,12 @@ class NoteMigrationQaIT {
             for (Object[] f : foreign) {
                 assertThatThrownBy(() -> explicit(jdbc, u1, mine, (String) f[0], (String) f[1], f[2])).as("%s de outro usuário", f[0]).hasMessageContaining("fk_note_links_" + f[1] + "_user");
             }
-            // a nota (dona) e a tag também são do mesmo usuário
             assertThatThrownBy(() -> explicit(jdbc, u2, mine, "GOAL", "target_goal_id", goal2)).hasMessageContaining("fk_note_links_note_id_user");
             assertThatThrownBy(() -> jdbc.update("insert into note_tags (id,user_id,note_id,tag,created_at,updated_at) values (?,?,?,'x',?,?)", UUID.randomUUID(), u2, mine, NOW, NOW))
                     .hasMessageContaining("fk_note_tags_note_id_user");
             assertThatThrownBy(() -> wikilink(jdbc, u1, mine, n2, "Revisão")).as("wikilink para nota de outro usuário (a FK é deferida: confere no commit)").isInstanceOf(Exception.class);
             jdbc.update("delete from note_links where note_id = ?", mine);
 
-            // CHECKs dos vínculos
             assertThatThrownBy(() -> explicit(jdbc, u1, mine, "GOAL", "target_key", "2026-10")).hasMessageContaining("ck_note_links");
             assertThatThrownBy(() -> explicit(jdbc, u1, mine, "MONTHLY_SUMMARY", "target_key", "2026-13")).hasMessageContaining("ck_note_links_key_format");
             assertThatThrownBy(() -> explicit(jdbc, u1, mine, "MONTHLY_SUMMARY", "target_key", "1999-12")).hasMessageContaining("ck_note_links_key_format");
@@ -187,7 +176,6 @@ class NoteMigrationQaIT {
             assertThatThrownBy(() -> jdbc.update("insert into note_links (id,user_id,note_id,position,origin,target_type,target_text,created_at,updated_at) values (?,?,?,0,'OUTRA','NOTE','x',?,?)", UUID.randomUUID(), u1, mine, NOW, NOW))
                     .hasMessageContaining("ck_note_links_origin");
 
-            // CASCADE: a fatura vazia some e leva o vínculo; as demais entidades NÃO podem ser apagadas com vínculo; a nota dona leva tags e vínculos
             explicit(jdbc, u1, mine, "INVOICE", "target_invoice_id", inv1);
             explicit(jdbc, u1, mine, "GOAL", "target_goal_id", goal1);
             jdbc.update("insert into note_tags (id,user_id,note_id,tag,created_at,updated_at) values (?,?,?,'x',?,?)", UUID.randomUUID(), u1, mine, NOW, NOW);
@@ -201,7 +189,6 @@ class NoteMigrationQaIT {
             jdbc.update("delete from notes where id = ?", mine);
             assertThat(jdbc.queryForObject("select count(*) from note_links where note_id = ?", Long.class, mine)).isZero();
             assertThat(jdbc.queryForObject("select count(*) from note_tags where note_id = ?", Long.class, mine)).isZero();
-            // apagar uma nota que outra nota cita (wikilink resolvido) é recusado no commit: o esvaziar da lixeira apaga os vínculos antes
             UUID citing = UUID.randomUUID();
             UUID cited = UUID.randomUUID();
             note(jdbc, citing, u1, "cita.md", "[[alvo]]", null);
@@ -209,7 +196,6 @@ class NoteMigrationQaIT {
             wikilink(jdbc, u1, citing, cited, "alvo");
             assertThatThrownBy(() -> jdbc.update("delete from notes where id = ?", cited)).hasMessageContaining("fk_note_links_target_note_id_user");
 
-            // índices existem, são válidos e o planejador os usa
             List<String> idx = jdbc.queryForList("select indexname from pg_indexes where tablename in ('notes','note_tags','note_links') and indexname like 'ix_%' order by 1", String.class);
             assertThat(idx).contains("ix_notes_user_updated", "ix_notes_user_deleted", "ix_note_tags_user_tag", "ix_note_links_note", "ix_note_links_user_target_note", "ix_note_links_user_target_key");
             assertThat(jdbc.queryForObject("select count(*) from pg_index i join pg_class c on c.oid = i.indexrelid where (c.relname like 'ix_note%' or c.relname like 'uq_note%') and not i.indisvalid", Long.class)).isZero();
@@ -229,7 +215,6 @@ class NoteMigrationQaIT {
             assertThat(plans.get(1)).containsAnyOf("ix_notes_user_updated", "uq_notes_user_path_active");
             assertThat(plans.get(2)).contains("uq_notes_user_path_active");
             assertThat(plans.get(3)).contains("ix_note_tags_user_tag");
-            // as lentes financeiras seguem intactas depois de tudo
             assertThat(jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class)).isEqualTo(ledgerBefore);
             assertThat(jdbc.queryForObject("select count(*) from transactions", Long.class)).isEqualTo(txBefore);
         }
@@ -247,7 +232,6 @@ class NoteMigrationQaIT {
             assertThat(jdbc.queryForObject("select count(*) from information_schema.tables where table_name in ('notes','note_tags','note_links')", Long.class)).isEqualTo(3L);
             jdbc.execute("CREATE EXTENSION IF NOT EXISTS unaccent");
             assertThat(jdbc.queryForObject("select unaccent('é')", String.class)).isEqualTo("e");
-            // V6.02 (S-278): chave de nome do wikilink e o índice parcial que o recálculo usa
             assertThat(jdbc.queryForObject("select count(*) from information_schema.columns where table_name = 'note_links' and column_name = 'target_name_key'", Long.class)).isEqualTo(1L);
             assertThat(jdbc.queryForObject("select indexdef from pg_indexes where indexname = 'ix_note_links_user_wikilink_name'", String.class))
                     .contains("(user_id, target_name_key)").contains("WIKILINK");

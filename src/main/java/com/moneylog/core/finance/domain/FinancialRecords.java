@@ -17,12 +17,6 @@ import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Os registros de um usuário que as lentes leem (D1 §1): contas, cartões, movimentações e dívidas. Na Etapa 1 as
- * calculadoras rodam em memória; na Etapa 2 o gateway entrega as mesmas entradas a partir de {@code ledger_postings}
- * (só postings ativos) e das tabelas de cadastro. As metas (Etapa 5) trazem as reservas lógicas: não são lançamentos e
- * não entram em {@link #entries()}; só o {@link GoalReserves} as lê (S-147).
- */
 public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, List<Transaction> transactions, List<Debt> debts,
                                List<Goal> goals) {
 
@@ -34,15 +28,10 @@ public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, L
         goals = List.copyOf(goals);
     }
 
-    /** Sem metas (comportamento das Etapas 2 a 4). */
     public FinancialRecords(List<Account> accounts, List<CreditCard> cards, List<Transaction> transactions, List<Debt> debts) {
         this(accounts, cards, transactions, debts, List.of());
     }
 
-    /**
-     * Todos os lançamentos, de todas as origens (S-45): saldo inicial ({@code ACCOUNT_OPENING}), movimentações
-     * ({@code TRANSACTION}) e dívidas ({@code DEBT_RECOGNITION}, {@code DEBT_CANCELLATION}).
-     */
     public List<LedgerEntry> entries() {
         List<LedgerEntry> entries = new ArrayList<>();
         for (Account account : accounts) {
@@ -67,7 +56,6 @@ public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, L
         return transactions.stream().collect(Collectors.toMap(Transaction::id, Function.identity()));
     }
 
-    /** Ids das contas líquidas (CASH). */
     List<UUID> cashAccountIds() {
         return accounts.stream().filter(a -> a.liquidity() == LiquidityClass.CASH).map(Account::id).toList();
     }

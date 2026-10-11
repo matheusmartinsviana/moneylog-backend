@@ -11,7 +11,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Linha de {@code credit_card_billing_rules}: a regra de fechamento/vencimento que vale a partir de um mês (S-42). */
 @Entity
 @Table(name = "credit_card_billing_rules")
 public class BillingRuleEntity {
@@ -55,7 +54,6 @@ public class BillingRuleEntity {
         this.updatedAt = now;
     }
 
-    /** Só toca {@code updatedAt} se um dos dias mudou. */
     public void apply(int newClosingDay, int newDueDay, Instant now) {
         if (closingDay != newClosingDay || dueDay != newDueDay) {
             this.closingDay = (short) newClosingDay;

@@ -43,22 +43,6 @@ import com.moneylog.core.transaction.domain.RefundOrigin;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * T190 (propriedades, regra 10 do PR 01): para sequências aleatórias de operações válidas (as da {@link PropriedadesRazaoAleatorioTest} mais
- * receita, despesa agendada, reembolso de conta e empréstimo), em várias datas de avaliação:
- * <ol>
- *   <li>cada ponto da série {@code M12} é igual ao {@code ConsumptionReport}, ao total do {@code EntryReport}, ao {@code MonthlySummary} e ao
- *       {@code DashboardSummary.month} da mesma competência (mesmas calculadoras do core, sem dupla contagem);</li>
- *   <li>cada ponto de {@code D7}, {@code D30} e {@code M3} é igual à soma dos postings dos livros {@code INCOME}/{@code EXPENSE} no intervalo
- *       (oráculo independente), nada passa de hoje e {@code totals} é a soma dos pontos;</li>
- *   <li>a soma dos 30 dias de um mês de 30 dias fechado é o ponto mensal e o {@code month.consumption} do dashboard;</li>
- *   <li>fatura paga, transferência, aplicação, empréstimo e quitação nunca tocam os livros da série;</li>
- *   <li>o consumo por categoria fecha com {@code entries.totals.total}, {@code base} = Σ positivas e o {@code share} respeita a tolerância de
- *       arredondamento;</li>
- *   <li>{@code inAccountsChange.previous} é o {@code inAccounts} de um dashboard pedido no último dia do mês anterior e o delta da taxa de
- *       poupança é a diferença das taxas já arredondadas.</li>
- * </ol>
- */
 @DisplayName("Propriedades do redesign: série, consumo por categoria e variações × as calculadoras do core (T190, PR 01 regra 10)")
 class RedesignPropriedadesTest {
 
@@ -99,8 +83,6 @@ class RedesignPropriedadesTest {
         checkOutOfBooks(s, ledger, seed);
     }
 
-    // ------------------------------------------------------------------ geração extra
-
     private static void extras(FinanceScenarioFactory s, Random r, LocalDate today, Set<UUID> refunded) {
         int kind = r.nextInt(100);
         try {
@@ -127,15 +109,12 @@ class RedesignPropriedadesTest {
                 s.caso7Devolucao();
             }
         } catch (RuntimeException e) {
-            // operação recusada pelo domínio (data, limite...): a sequência segue
         }
     }
 
     private static Money cents(Random r, long min, long max) {
         return Money.ofCents(min + r.nextLong(max - min), CurrencyCode.BRL);
     }
-
-    // ------------------------------------------------------------------ série
 
     private static void checkSeries(FinancialRecords records, Ledger ledger, LocalDate today, String ctx) {
         Money zero = Money.zero(CurrencyCode.BRL);
@@ -195,7 +174,6 @@ class RedesignPropriedadesTest {
         return a.isBefore(b) ? a : b;
     }
 
-    /** D30 em 30/11 cobre exatamente novembro: a soma dos dias é o ponto mensal e o consumo do dashboard daquele mês. */
     private static void checkClosedMonthByDays(FinancialRecords records, Ledger ledger, long seed) {
         LocalDate lastDay = LocalDate.of(2026, 11, 30);
         IncomeExpenseSeries days = IncomeExpenseSeries.of(ledger, ReportPeriod.D30, lastDay);
@@ -210,7 +188,6 @@ class RedesignPropriedadesTest {
         assertThat(days.totals().income()).isEqualTo(dashboard.month().income());
     }
 
-    /** Nada que não seja receita ou consumo toca os livros da série (zero dupla contagem). */
     private static void checkOutOfBooks(FinanceScenarioFactory s, Ledger ledger, long seed) {
         Set<TransactionType> outside = Set.of(TransactionType.INVOICE_PAYMENT, TransactionType.TRANSFER, TransactionType.INVESTMENT,
                 TransactionType.LOAN_GIVEN, TransactionType.MONEY_RECEIVED, TransactionType.DEBT_PAYMENT, TransactionType.ADJUSTMENT);
@@ -224,8 +201,6 @@ class RedesignPropriedadesTest {
             }
         }
     }
-
-    // ------------------------------------------------------------------ consumo por categoria
 
     private static void checkSpending(FinancialRecords records, Ledger ledger, LocalDate today, Random random, String ctx) {
         for (Competence month = Competence.from(today).minusMonths(11); !month.isAfter(Competence.from(today)); month = month.plusMonths(1)) {
@@ -267,8 +242,6 @@ class RedesignPropriedadesTest {
             }
         }
     }
-
-    // ------------------------------------------------------------------ variações
 
     private static void checkChanges(FinancialRecords records, Ledger ledger, LocalDate today, String ctx) {
         DashboardSummary dashboard = DashboardSummary.of(records, List.of(), today, today);

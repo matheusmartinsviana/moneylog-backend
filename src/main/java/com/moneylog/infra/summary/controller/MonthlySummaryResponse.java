@@ -10,7 +10,6 @@ import com.moneylog.core.finance.app.summary.MonthlySummaryView;
 import com.moneylog.core.finance.domain.MonthlySummary;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code MonthlySummary} do contrato (S-151): tudo calculado pelo backend ({@code core.finance}); o front só exibe. */
 public record MonthlySummaryResponse(String competence, boolean partial, @JsonProperty("isProjection") boolean isProjection, Money income,
                                      Money expenses, Money investments, Money net, String savingsRate, LargestCategory largestCategory,
                                      LargestExpense largestExpense, CardSummary card, Money futureInstallments, Comparison comparison) {

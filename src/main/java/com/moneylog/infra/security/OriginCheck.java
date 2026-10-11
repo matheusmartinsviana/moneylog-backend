@@ -5,11 +5,6 @@ import java.util.Locale;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * Proteção CSRF de {@code /v1/auth/refresh} e {@code /v1/auth/logout} (ADR-003): o refresh viaja em cookie, então o
- * header {@code Origin} precisa estar em {@code MONEYLOG_ALLOWED_ORIGINS}. Sem {@code Origin} também é recusado
- * (navegadores sempre o enviam em POST).
- */
 public class OriginCheck {
 
     private final List<String> allowed;

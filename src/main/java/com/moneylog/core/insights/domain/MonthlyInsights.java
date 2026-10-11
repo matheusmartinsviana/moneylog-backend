@@ -16,12 +16,6 @@ import com.moneylog.core.insights.domain.Insight.Severity;
 import com.moneylog.core.insights.domain.InsufficientData.Reason;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Insights mensais (ADR-019): funções puras {@code (MonthFacts) -> insights}, sem leitura de razão, gateway nem relógio. Cada calculador exige
- * histórico, observações e materialidade mínimos; sem eles registra {@link InsufficientData} e <b>nunca inventa um número</b>. Dinheiro em
- * {@link Money} (centavos); razões em {@link BigDecimal}. Insights que dependem do estado de hoje (projeção, dinheiro livre, cobertura da
- * reserva, metas, limite do cartão) só saem no mês corrente.
- */
 public final class MonthlyInsights {
 
     public static final String SAVINGS_RATE = "SAVINGS_RATE";
@@ -46,7 +40,6 @@ public final class MonthlyInsights {
     private MonthlyInsights() {
     }
 
-    /** Resultado da projeção de fechamento: valor esperado e intervalo de 80%. */
     public record Projection(Money closing, Money lower, Money upper, int spendDays, int daysElapsed, BigDecimal dailyAverage) {
     }
 
@@ -72,13 +65,6 @@ public final class MonthlyInsights {
         recurringDetected(f, sink);
     }
 
-    // ------------------------------------------------------------------ projeção
-
-    /**
-     * {@code fechamento = consumo do mês (inclui o que já tem data futura) + ocorrências de recorrência ainda previstas + média diária variável × dias
-     * restantes}; intervalo de 80%: {@code ± 1,28 × desvio do gasto diário variável × √(dias restantes)}. Sem dupla contagem: parcela, recorrência e
-     * dívida entram uma vez (no consumo ou nas ocorrências previstas) e só o gasto variável é extrapolado.
-     */
     static Projection projection(MonthFacts f, InsightSink sink) {
         if (!f.currentMonth() || f.budget() == null) {
             return null;
@@ -127,8 +113,6 @@ public final class MonthlyInsights {
         sink.emit(month(f, MONTH_PROJECTION, key, params, List.of("summary." + f.month()), severity, 90, Basis.PROJECTION,
                 new Confidence(p.spendDays(), p.daysElapsed(), null), null, p.closing().subtract(received).abs().cents()));
     }
-
-    // ------------------------------------------------------------------ taxa de poupança
 
     static void savingsRate(MonthFacts f, Projection projection, InsightSink sink) {
         Money income = f.current().income();
@@ -181,8 +165,6 @@ public final class MonthlyInsights {
                 null, income.subtract(consumption).abs().cents()));
     }
 
-    // ------------------------------------------------------------------ gasto contra a mediana
-
     static void spendVsBaseline(MonthFacts f, Projection projection, InsightSink sink) {
         if (f.history().size() < Thresholds.MIN_HISTORY_MONTHS) {
             sink.insufficient(SPEND_VS_BASELINE, Reason.HISTORY, Thresholds.MIN_HISTORY_MONTHS - f.history().size());
@@ -234,13 +216,6 @@ public final class MonthlyInsights {
                 new Confidence(series.size(), Thresholds.HISTORY_MONTHS, Fmt.number(z, 2)), null, delta.abs().longValue()));
     }
 
-    // ------------------------------------------------------------------ variação por categoria
-
-    /**
-     * {@code Δ = atual − mediana(até 3 fechados da categoria)}; emite com {@code |Δ%| >= 20} e {@code |Δ| >= R$ 50} (inclusivo). Com 1 ou 2 meses
-     * fechados usa o mês anterior com os limiares originais (10% e R$ 50). Categoria líquida negativa (reembolso) conta como zero. No mês
-     * corrente só a alta é dita: o mês ainda não terminou, então "gastou menos" seria apenas o mês incompleto.
-     */
     static void categoryDelta(MonthFacts f, InsightSink sink) {
         if (f.history().isEmpty()) {
             sink.insufficient(CATEGORY_DELTA, Reason.HISTORY, 1);
@@ -297,8 +272,6 @@ public final class MonthlyInsights {
         }
     }
 
-    // ------------------------------------------------------------------ dinheiro livre
-
     static void freeMoney(MonthFacts f, InsightSink sink) {
         MonthFacts.Budget budget = f.budget();
         if (!f.currentMonth() || budget == null) {
@@ -329,8 +302,6 @@ public final class MonthlyInsights {
         params.put("free", free.toPlainString());
         sink.emit(month(f, FREE_MONEY, key, params, List.of("summary." + f.month()), severity, 75, null, null, null, free.abs().cents()));
     }
-
-    // ------------------------------------------------------------------ comprometimento e dívida
 
     static void commitmentIndex(MonthFacts f, InsightSink sink) {
         Money income = f.current().income();
@@ -388,8 +359,6 @@ public final class MonthlyInsights {
                 null, null, null, service.cents()));
     }
 
-    // ------------------------------------------------------------------ carga de parcelas
-
     static void installmentLoad(MonthFacts f, InsightSink sink) {
         List<Money> load = f.installmentLoad();
         if (load.isEmpty() || load.stream().noneMatch(Money::isPositive)) {
@@ -431,8 +400,6 @@ public final class MonthlyInsights {
             }
         }
     }
-
-    // ------------------------------------------------------------------ cobertura da reserva
 
     static void emergencyCoverage(MonthFacts f, InsightSink sink) {
         if (!f.currentMonth()) {
@@ -480,8 +447,6 @@ public final class MonthlyInsights {
                 new Confidence(Thresholds.MIN_HISTORY_MONTHS, Thresholds.MIN_HISTORY_MONTHS, null), null, f.cashBalance().abs().cents()));
     }
 
-    // ------------------------------------------------------------------ estabilidade de renda
-
     static void incomeStability(MonthFacts f, InsightSink sink) {
         List<MonthSnapshot> withIncome = f.history().stream().filter(m -> m.income().isPositive()).toList();
         if (withIncome.size() < Thresholds.MIN_INCOME_STABILITY_MONTHS) {
@@ -501,9 +466,6 @@ public final class MonthlyInsights {
                 new Confidence(incomes.size(), Thresholds.HISTORY_MONTHS, null), null, 0));
     }
 
-    // ------------------------------------------------------------------ metas
-
-    /** Repete o ritmo que a API de metas já calcula (ADR-016); nada é recalculado aqui. */
     static void goalPace(MonthFacts f, InsightSink sink) {
         if (!f.currentMonth() || f.goals().isEmpty()) {
             return;
@@ -533,9 +495,6 @@ public final class MonthlyInsights {
         }
     }
 
-    // ------------------------------------------------------------------ concentração
-
-    /** Parcela das 3 maiores categorias sobre o consumo positivo por categoria (reembolso líquido fica fora do denominador). */
     static void concentration(MonthFacts f, InsightSink sink) {
         List<Money> positives = f.current().byCategory().values().stream().filter(Money::isPositive)
                 .sorted(Comparator.<Money>naturalOrder().reversed()).toList();
@@ -559,8 +518,6 @@ public final class MonthlyInsights {
                 null, top3.cents()));
     }
 
-    // ------------------------------------------------------------------ cartão
-
     static void cardCommitted(MonthFacts f, InsightSink sink) {
         if (f.cardOutstanding() == null || !f.cardOutstanding().isPositive()) {
             return;
@@ -571,7 +528,6 @@ public final class MonthlyInsights {
                 f.cardOutstanding().cents()));
     }
 
-    /** {@code (limite − disponível) / limite}; cartão sem limite cadastrado não emite (ADR-014). */
     static void cardLimitUsage(MonthFacts f, InsightSink sink) {
         if (!f.currentMonth() || f.cards().isEmpty()) {
             return;
@@ -604,8 +560,6 @@ public final class MonthlyInsights {
         }
     }
 
-    // ------------------------------------------------------------------ assinaturas
-
     static void recurringDetected(MonthFacts f, InsightSink sink) {
         if (f.subscriptionLines().isEmpty()) {
             return;
@@ -622,8 +576,6 @@ public final class MonthlyInsights {
                     new Confidence(d.occurrences(), Thresholds.HISTORY_MONTHS, null), d.key(), d.annualCost().cents()));
         }
     }
-
-    // ------------------------------------------------------------------ montagem
 
     private static Insight month(MonthFacts f, String type, String key, Map<String, String> params, List<String> refs, Severity severity,
                                  int priority, Basis basis, Confidence confidence, String subjectId, long magnitude) {

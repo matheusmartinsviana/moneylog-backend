@@ -9,11 +9,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 
-/**
- * {@code idempotency_keys} por SQL direto (JDBC), na transação do caso de uso. O {@code claim} é uma única instrução
- * {@code INSERT ... ON CONFLICT DO UPDATE ... WHERE <vencida>}: o Postgres serializa duas reivindicações da mesma
- * chave no índice único (a segunda espera o commit ou o rollback da primeira) e só sobrescreve a chave vencida.
- */
 public class IdempotencyGatewayImpl implements IdempotencyGateway {
 
     private final JdbcTemplate jdbc;

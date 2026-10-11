@@ -13,11 +13,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.exception.RequestValidationException.FieldIssue;
 
-/**
- * Lê {@code page} (1-indexado, padrão 1) e {@code pageSize} (padrão 10, máximo 50) da query e entrega um
- * {@link PageQuery}. Fora do limite ou não numérico → {@code 400 VALIDATION_FAILED} (não {@code 422}: é erro de
- * entrada, não de regra de negócio).
- */
 public class PageQueryResolver implements HandlerMethodArgumentResolver {
 
     @Override

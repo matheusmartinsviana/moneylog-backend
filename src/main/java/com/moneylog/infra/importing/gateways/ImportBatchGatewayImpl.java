@@ -32,7 +32,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/** Lotes e linhas de importação em JDBC; toda consulta filtra por {@code user_id}. O arquivo bruto não existe aqui. */
 public class ImportBatchGatewayImpl implements ImportBatchGateway {
 
     private static final String BATCH_COLUMNS = "id, user_id, account_id, card_id, format, file_sha256, status, warnings, skipped_info, "
@@ -48,8 +47,6 @@ public class ImportBatchGatewayImpl implements ImportBatchGateway {
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(tm);
     }
-
-    // ------------------------------------------------------------------ lote
 
     @Override
     public void insert(ImportBatch b, List<ImportBatchLine> lines) {
@@ -111,7 +108,6 @@ public class ImportBatchGatewayImpl implements ImportBatchGateway {
 
     @Override
     public void update(ImportBatch b) {
-        // REQUIRED: junta-se à transação do aplicar; no desfazer (que não tem transação própria) abre a sua, senão o commit nunca acontece
         tx.executeWithoutResult(status -> jdbc.update("UPDATE import_batches SET status = ?, applied_at = ?, undone_at = ?, undo_reason = ?, updated_at = now() "
                         + "WHERE user_id = ? AND id = ?", b.status().name(), ts(b.appliedAt()), ts(b.undoneAt()), b.undoReason(), b.userId(), b.id()));
     }
@@ -155,8 +151,6 @@ public class ImportBatchGatewayImpl implements ImportBatchGateway {
                 .stream().findFirst();
     }
 
-    // ------------------------------------------------------------------ linhas
-
     @Override
     public Optional<ImportBatchLine> findLine(UUID userId, UUID batchId, UUID lineId) {
         return jdbc.query("SELECT " + LINE_COLUMNS + " FROM import_lines WHERE user_id = ? AND batch_id = ? AND id = ?", (rs, n) -> line(rs),
@@ -195,8 +189,6 @@ public class ImportBatchGatewayImpl implements ImportBatchGateway {
         return jdbc.query("SELECT id FROM transactions WHERE user_id = ? AND import_batch_id = ? AND status = 'ACTIVE' ORDER BY created_at, id",
                 (rs, n) -> rs.getObject("id", UUID.class), userId, batchId);
     }
-
-    // ------------------------------------------------------------------ mapeamento
 
     private static ImportBatch batch(ResultSet rs) throws SQLException {
         return ImportBatch.restore(rs.getObject("id", UUID.class), rs.getObject("user_id", UUID.class), rs.getObject("account_id", UUID.class),

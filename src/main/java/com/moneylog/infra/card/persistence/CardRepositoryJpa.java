@@ -18,7 +18,6 @@ public interface CardRepositoryJpa extends JpaRepository<CardEntity, UUID> {
 
     Optional<CardEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** {@code SELECT ... FOR UPDATE} da linha do cartão: a trava da cadeia de faturas (ADR-006 §5). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from CardEntity c where c.id = :id and c.userId = :userId")
     Optional<CardEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);

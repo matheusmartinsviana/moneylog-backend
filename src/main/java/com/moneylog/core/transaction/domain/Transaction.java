@@ -30,20 +30,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.Transaction
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.VoidReasonRequiredException;
 
-/**
- * Movimentação (D1 §2.4): agregado único com um {@link TransactionType}. Cada tipo nasce por uma fábrica que valida
- * os campos dele ({@link AccountTransactions}, {@code CardTransactions}, {@code DebtTransactions}); os campos que não
- * fazem sentido para o tipo ficam {@code null}.
- *
- * <ul>
- *   <li>O valor é sempre &gt; 0 e no máximo o teto de S-78; a direção vem do tipo.</li>
- *   <li>Os efeitos financeiros são {@link LedgerEntry} com origem {@code TRANSACTION} (S-45); os ativos de cada grupo
- *       (a movimentação, ou cada parcela) somam zero.</li>
- *   <li>Estorno com guarda (S-36): só por {@link TransactionVoiding}, o ponto único que escolhe a
- *       {@link TransactionVoidPolicy} pelo tipo e aplica o efeito na dívida (M1). Se aceito, a movimentação vira
- *       {@code VOIDED} e todos os postings ficam inativos. Nada é apagado.</li>
- * </ul>
- */
 public final class Transaction {
 
     public static final int VOID_REASON_MAX_LENGTH = 500;
@@ -125,15 +111,6 @@ public final class Transaction {
         return new Builder(header, type, amount);
     }
 
-    /**
-     * Reidrata uma movimentação já persistida (usado pelo mapper da infra). Não gera id, não consulta relógio e não
-     * passa pela {@link TransactionVoidPolicy}: devolve o agregado como foi gravado. Mas <b>não aceita estado corrompido
-     * em silêncio</b>: lançamentos de outra origem, grupo que não fecha em zero, estado e estorno incoerentes ou
-     * parcelas que não batem com os lançamentos lançam {@link TransactionStateInconsistentException}.
-     *
-     * @param state   estado persistido ({@link #state()})
-     * @param entries todos os lançamentos, ativos e inativos ({@link #entries()})
-     */
     public static Transaction restore(TransactionState state, List<LedgerEntry> entries) {
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(entries, "entries");
@@ -160,7 +137,6 @@ public final class Transaction {
         return transaction;
     }
 
-    /** Estado persistido (o inverso de {@link #restore}); os lançamentos saem por {@link #entries()}. */
     public TransactionState state() {
         return new TransactionState(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId,
                 counterpartAccountId, cardId, categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection,
@@ -235,15 +211,6 @@ public final class Transaction {
         return new TransactionStateInconsistentException(reason);
     }
 
-    // ------------------------------------------------------------------ comportamento
-
-    /**
-     * Valida o estorno sem mudar nada (D1 §2.4, regra 1): estado, motivo, instante e a guarda do tipo.
-     *
-     * @return o motivo normalizado, para {@link #applyVoid}
-     * @throws TransactionAlreadyVoidedException se já estiver estornada
-     * @throws TransactionVoidRefusedException   se a policy recusar, com o {@code code} dela
-     */
     String prepareVoid(String reason, Instant now, TransactionVoidPolicy policy) {
         if (status == TransactionStatus.VOIDED) {
             throw new TransactionAlreadyVoidedException();
@@ -260,7 +227,6 @@ public final class Transaction {
         return validReason;
     }
 
-    /** Aplica um estorno já validado por {@link #prepareVoid}: {@code VOIDED}, postings inativos, parcelas canceladas. */
     void applyVoid(String validReason, Instant now) {
         this.status = TransactionStatus.VOIDED;
         this.voidReason = validReason;
@@ -269,18 +235,10 @@ public final class Transaction {
         installments.replaceAll(installment -> installment.isCanceled() ? installment : installment.cancel(now));
     }
 
-    /**
-     * Estorna com a guarda informada. Package-private (M1): fora do pacote o estorno passa por
-     * {@link TransactionVoiding}, que escolhe a policy pelo tipo e aplica o efeito na dívida.
-     */
     void voidTransaction(String reason, Instant now, TransactionVoidPolicy policy) {
         applyVoid(prepareVoid(reason, now, policy), now);
     }
 
-    /**
-     * Valor efetivamente cobrado: na compra no cartão, Σ das parcelas não canceladas; nos demais tipos, o valor. É o
-     * teto do reembolso com {@code refundOf} (S-9, A1).
-     */
     public Money chargedAmount() {
         if (type != TransactionType.CARD_PURCHASE) {
             return amount;
@@ -289,14 +247,12 @@ public final class Transaction {
                 amount.currency());
     }
 
-    /** Referência de outro usuário é tratada como inexistente. */
     public void ensureBelongsTo(UUID requesterId) {
         if (!userId.equals(requesterId)) {
             throw new TransactionNotFoundException(id);
         }
     }
 
-    /** Desativa os postings das parcelas indicadas e troca as parcelas (uso do cancelamento das parcelas restantes). */
     void replaceInstallments(List<TransactionInstallment> updated) {
         List<UUID> canceled = updated.stream().filter(TransactionInstallment::isCanceled)
                 .map(TransactionInstallment::id).toList();
@@ -307,10 +263,6 @@ public final class Transaction {
                 .toList();
     }
 
-    /**
-     * Troca as faturas das parcelas pela realocação da mudança de dia (S-42). Valor, data, cancelamento e postings não
-     * mudam; só a data de fechamento de cada parcela.
-     */
     void reallocateInstallments(List<TransactionInstallment> reallocated) {
         if (reallocated.size() != installments.size()) {
             throw new InvoiceChainInconsistentException("realocação com " + reallocated.size() + " parcelas para " + installments.size() + ".");
@@ -327,24 +279,18 @@ public final class Transaction {
         installments.addAll(reallocated);
     }
 
-    /** A movimentação que substitui a atual (edição, {@link TransactionEditing}) segue na mesma linha: herda a versão. */
     void inheritVersion(Transaction current) {
         this.version = current.version;
     }
 
-    /** Troca a fatura do reembolso no cartão pela realocação da mudança de dia (S-42). */
     void reallocateInvoice(LocalDate newInvoiceClosingDate) {
         this.invoiceClosingDate = required(newInvoiceClosingDate, "invoiceClosingDate");
     }
 
-    // ------------------------------------------------------------------ leitura
-
-    /** Todos os lançamentos, ativos e inativos (o que o gateway persiste). */
     public List<LedgerEntry> entries() {
         return entries;
     }
 
-    /** Lançamentos que valem nas lentes (só os ativos). */
     public List<Posting> postings() {
         return postingsOf(entries.stream().filter(LedgerEntry::active).toList());
     }
@@ -385,17 +331,14 @@ public final class Transaction {
         return origin;
     }
 
-    /** Meio de pagamento ({@code EXPENSE}/{@code INCOME}); {@code null} nos demais tipos. */
     public PaymentMethod paymentMethod() {
         return paymentMethod;
     }
 
-    /** Conta principal (origem da transferência, conta CASH do investimento...); {@code null} se o tipo não usa conta. */
     public UUID accountId() {
         return accountId;
     }
 
-    /** Destino da transferência ou conta de investimento do {@code INVESTMENT}. */
     public UUID counterpartAccountId() {
         return counterpartAccountId;
     }
@@ -428,35 +371,26 @@ public final class Transaction {
         return adjustmentKind;
     }
 
-    /** Motivo do ajuste manual. */
     public String reason() {
         return reason;
     }
 
-    /** Fatura (data de fechamento, S-13) do pagamento de fatura e do reembolso no cartão. */
     public LocalDate invoiceClosingDate() {
         return invoiceClosingDate;
     }
 
-    /** Reembolso no cartão alocado como lançamento tardio (S-14). */
     public boolean lateEntry() {
         return lateEntry;
     }
 
-    /**
-     * Mês a que a renda pertence quando difere do mês da data (ADR-017); {@code null} = o mês da data. Só a {@code INCOME}
-     * tem. O caixa e o saldo continuam na {@link #date()}: só a competência da receita muda.
-     */
     public Competence incomeCompetence() {
         return incomeCompetence;
     }
 
-    /** Competência efetiva da receita: a declarada ou o mês da data. {@code null} fora da {@code INCOME}. */
     public Competence effectiveIncomeCompetence() {
         return type != TransactionType.INCOME ? null : incomeCompetence == null ? Competence.from(date) : incomeCompetence;
     }
 
-    /** Parcelas da {@code CARD_PURCHASE} (vazio nos demais tipos). */
     public List<TransactionInstallment> installments() {
         return List.copyOf(installments);
     }
@@ -473,7 +407,6 @@ public final class Transaction {
         return voidedAt;
     }
 
-    /** Versão do lock otimista gravada (0 numa movimentação nova); quem incrementa é a persistência. */
     public long version() {
         return version;
     }
@@ -508,7 +441,6 @@ public final class Transaction {
         return "Transaction[" + id + ", " + type + ", " + amount + ", " + date + ", " + status + "]";
     }
 
-    /** Montagem interna usada pelas fábricas do pacote (não há setters públicos no agregado). */
     static final class Builder {
         private final TransactionHeader header;
         private final TransactionType type;

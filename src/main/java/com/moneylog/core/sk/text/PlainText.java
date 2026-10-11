@@ -2,16 +2,11 @@ package com.moneylog.core.sk.text;
 
 import com.moneylog.core.sk.exception.BusinessRuleException;
 
-/**
- * Texto livre sem caracteres de controle (B4). {@code \u0000} o Postgres recusa e os demais controles (ESC, BEL...) só
- * servem para estragar relatórios e logs. Só as notas aceitam quebra de linha e tabulação.
- */
 public final class PlainText {
 
     private PlainText() {
     }
 
-    /** {@code true} se há caractere de controle (ISO) que o campo não aceita. */
     public static boolean hasControlCharacters(String value, boolean allowLineBreaks) {
         if (value == null) {
             return false;
@@ -25,10 +20,6 @@ public final class PlainText {
         return false;
     }
 
-    /**
-     * {@code true} se o texto serve para uma linha exibida pela UI (título, id, caminho): sem controle (nem quebra de linha ou tabulação),
-     * sem caractere de formatação invisível ({@code bidi}, largura zero), sem separador de linha ou parágrafo e sem surrogate solto.
-     */
     public static boolean isSafeSingleLine(String value) {
         if (value == null) {
             return true;
@@ -49,7 +40,6 @@ public final class PlainText {
         return true;
     }
 
-    /** Devolve o próprio texto ou lança {@link TextInvalidCharactersException}. */
     public static String requireClean(String value, String field, boolean allowLineBreaks) {
         if (hasControlCharacters(value, allowLineBreaks)) {
             throw new TextInvalidCharactersException(field);

@@ -24,7 +24,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/** T43 (QA): bordas de auth que os ITs da T22b não cobrem. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: auth, bordas adicionais")

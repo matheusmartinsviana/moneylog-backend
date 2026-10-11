@@ -35,14 +35,10 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Movimentação ativa com data futura é compromisso até a data chegar (S-258, BUG-QA-28): entra em {@code committed},
- * {@code projected}, {@code available} e na projeção, e nunca duas vezes (caixa = lançamentos {@code ≤ hoje}, compromisso = {@code > hoje}).
- */
 @DisplayName("Movimentações com data futura como compromisso (S-258)")
 class MovimentacoesFuturasTest {
 
-    private static final LocalDate TODAY = BASE_DATE; // 10/10/2026
+    private static final LocalDate TODAY = BASE_DATE;
     private static final LocalDate OCT_15 = LocalDate.of(2026, 10, 15);
 
     private static DashboardSummary dashboard(FinanceScenarioFactory s, LocalDate today) {
@@ -102,7 +98,7 @@ class MovimentacoesFuturasTest {
             assertThat(c.direction()).isEqualTo(FlowDirection.IN);
             assertThat(c.amount()).isEqualTo(Money.of("3000.00"));
         });
-        assertThat(schedule.totalOut().subtract(outBefore)).isEqualTo(Money.of("600.00")); // só a previsão de fatura
+        assertThat(schedule.totalOut().subtract(outBefore)).isEqualTo(Money.of("600.00"));
         assertThat(schedule.items().stream().filter(c -> c.kind() == CommitmentKind.INVOICE_FORECAST)).hasSize(1);
     }
 
@@ -134,7 +130,7 @@ class MovimentacoesFuturasTest {
     @DisplayName("pagamento de fatura e quitação de dívida com data futura: o saldo da fatura/dívida cai e o caixa entra como compromisso, o total de saídas não muda")
     void pagamentosFuturosNaoDobram() {
         FinanceScenarioFactory s = umCenarioBase();
-        s.compraNoCartao("900.00", 1); // fatura ref. nov (fecha 25/10), vence 05/11
+        s.compraNoCartao("900.00", 1);
         Money before = total(s, TODAY);
         CommitmentSchedule scheduleBefore = CommitmentSchedule.of(s.records(), List.of(), TODAY);
         s.pagarFatura("400.00", LocalDate.of(2026, 10, 25), LocalDate.of(2026, 11, 5));
@@ -184,7 +180,6 @@ class MovimentacoesFuturasTest {
                             random.nextBoolean() ? InvestmentDirection.CONTRIBUTION : InvestmentDirection.REDEMPTION, s.nubank, s.xpInvest));
                     case 5 -> s.compraNoCartao(amount.toPlainString(), 1 + random.nextInt(6));
                     case 6 -> {
-                        // pagamento parcial de fatura, com data passada, de hoje ou futura
                         var invoices = s.chain().invoices().stream().filter(inv -> inv.outstanding().isPositive()).toList();
                         if (!invoices.isEmpty()) {
                             var invoice = invoices.get(random.nextInt(invoices.size()));
@@ -193,12 +188,10 @@ class MovimentacoesFuturasTest {
                                 s.pagarFatura(Money.ofCents(part, CurrencyCode.BRL).toPlainString(), invoice.closingDate(), date);
                                 partialPayments++;
                             } catch (RuntimeException refused) {
-                                // fatura que o domínio não deixa pagar assim: segue sem pagamento
                             }
                         }
                     }
                     case 7 -> {
-                        // ocorrência realizada (adiantada ou não): vira movimentação e sai das pendentes
                         RecurringTransaction recurrence = RecurringTransaction.ofAccount(UUID.randomUUID(), com.moneylog.core.util.Ids.USER_ID, TransactionType.EXPENSE, amount,
                                 "rec" + i, s.alimentacao.id(), s.nubank.id(), PaymentMethod.PIX, Schedule.of(Frequency.MONTHLY, date));
                         s.transactions.add(recurrence.realize(date, UUID.randomUUID(), null, s.nubank, s.alimentacao));
@@ -211,7 +204,6 @@ class MovimentacoesFuturasTest {
                                 s.estornar(tx, "engano", TODAY);
                                 voids++;
                             } catch (RuntimeException refused) {
-                                // estorno recusado pelo domínio
                             }
                         }
                     }
@@ -220,7 +212,7 @@ class MovimentacoesFuturasTest {
                             amount, date, date.plusDays(random.nextInt(300)), "p" + i));
                 }
             }
-            Money reference = total(s, TODAY.minusDays(9)); // 01/10: a conta já foi aberta (saldo inicial não é movimentação)
+            Money reference = total(s, TODAY.minusDays(9));
             for (int d = -9; d <= 75; d += 3) {
                 LocalDate today = TODAY.plusDays(d);
                 assertThat(total(s, today)).as("seed %d, hoje %s", seed, today).isEqualTo(reference);
@@ -228,10 +220,8 @@ class MovimentacoesFuturasTest {
                 assertThat(schedule.items()).as("seed %d, hoje %s: movimentação com data passada não é compromisso", seed, today)
                         .filteredOn(c -> c.kind() == CommitmentKind.SCHEDULED_TRANSACTION).allMatch(c -> c.dueDate().isAfter(today));
                 futureItems += (int) schedule.items().stream().filter(c -> c.kind() == CommitmentKind.SCHEDULED_TRANSACTION).count();
-                // cada movimentação ativa aparece no máximo uma vez por data como compromisso (nunca duas vezes)
                 assertThat(schedule.items().stream().filter(c -> c.kind() == CommitmentKind.SCHEDULED_TRANSACTION).map(c -> c.refId() + "|" + c.dueDate()))
                         .doesNotHaveDuplicates();
-                // as lentes concordam: o último ponto da projeção de cada horizonte é o projected do dashboard
                 DashboardSummary dashboard = dashboard(s, today);
                 for (Horizon horizon : Projection.HORIZONS) {
                     assertThat(Projection.of(s.records(), List.of(), horizon, today, false).series().getLast().balance())

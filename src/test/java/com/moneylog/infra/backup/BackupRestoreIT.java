@@ -31,10 +31,6 @@ import com.moneylog.core.backup.app.BackupService;
 import com.moneylog.core.backup.app.DatabaseDumper;
 import com.moneylog.util.PostgresTestcontainer;
 
-/**
- * T176 CA1/CA4: backup de uma base migrada e com dados, restauração numa base VAZIA e comparação por consultas (saldos, razão soma zero,
- * metas, notas e um hash de todas as linhas de todas as tabelas). pg_dump/pg_restore rodam dentro dos containers (mesma imagem do compose).
- */
 @Tag("i")
 @DisplayName("Backup e restauração do banco (Testcontainers)")
 class BackupRestoreIT {
@@ -44,7 +40,6 @@ class BackupRestoreIT {
     @TempDir
     Path dir;
 
-    /** pg_dump no container de origem; pg_restore no container de destino. */
     private record ContainerDumper(PostgreSQLContainer source, PostgreSQLContainer target) implements DatabaseDumper {
         @Override
         public void dump(Path file) {
@@ -100,7 +95,6 @@ class BackupRestoreIT {
         j.update("""
                 INSERT INTO goals (id, user_id, name, target_cents, currency, priority, featured, created_at, updated_at, version)
                 VALUES (?, ?, 'Reserva', 500000, 'BRL', 'HIGH', TRUE, now(), now(), 0)""", goal, user);
-        // fotos sintéticas (ADR-018): geradas por código, nunca arquivos do repositório
         for (int position = 0; position < 2; position++) {
             UUID photo = UUID.randomUUID();
             byte[] display = com.moneylog.util.SyntheticImages.jpeg(640, 400, "Foto " + position);
@@ -116,7 +110,6 @@ class BackupRestoreIT {
                 UUID.randomUUID(), user);
     }
 
-    /** Resumo comparável: saldo por conta, soma do razão, e um hash por tabela (todas as linhas, ordenadas). */
     private static List<String> snapshot(JdbcTemplate j) {
         List<String> out = new ArrayList<>();
         out.add("saldos=" + j.queryForList("""
@@ -160,7 +153,6 @@ class BackupRestoreIT {
             List<String> before = snapshot(src);
             assertThat(before).contains("saldos=[Conta Teste:123456]", "razao=0");
             assertThat(snapshot(dst)).isEqualTo(before);
-            // as fotos (ADR-018) voltam com o mesmo conteúdo: hash dos bytes de exibição e de miniatura, e a meta segue em destaque
             String photoHash = "SELECT string_agg(md5(display) || md5(thumbnail), ',' ORDER BY photo_id) FROM goal_photo_blobs";
             assertThat(src.queryForObject(photoHash, String.class)).isNotBlank().isEqualTo(dst.queryForObject(photoHash, String.class));
             assertThat(dst.queryForObject("SELECT count(*) FROM goal_photo_blobs", Long.class)).isEqualTo(2L);

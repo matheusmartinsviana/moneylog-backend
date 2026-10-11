@@ -12,10 +12,6 @@ import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Resultado da busca global (redesign, S-287): só campos de exibição e de rota, nenhum total ou saldo agregado. {@code truncated} lista os
- * grupos cuja leitura estourou o limite de tempo (vêm vazios).
- */
 public record SearchResults(String q, List<TransactionHit> transactions, List<AccountHit> accounts, List<CategoryHit> categories,
                             List<CardHit> cards, List<NoteHit> notes, Set<SearchGroup> truncated) {
 
@@ -28,7 +24,6 @@ public record SearchResults(String q, List<TransactionHit> transactions, List<Ac
         truncated = Set.copyOf(truncated);
     }
 
-    /** Sem o termo nem o texto dos resultados (S-287: {@code q} fora do log). */
     @Override
     public String toString() {
         return "SearchResults[transactions=" + transactions.size() + ", accounts=" + accounts.size() + ", categories=" + categories.size()
@@ -41,7 +36,6 @@ public record SearchResults(String q, List<TransactionHit> transactions, List<Ac
     public record TransactionHit(UUID id, String description, LocalDate date, Money amount, TransactionType type, Ref category, Ref account,
                                  String incomeCompetence) {
 
-        /** Sem competência de renda (todos os tipos, menos a receita de outro mês, ADR-017). */
         public TransactionHit(UUID id, String description, LocalDate date, Money amount, TransactionType type, Ref category, Ref account) {
             this(id, description, date, amount, type, category, account, null);
         }
@@ -56,7 +50,6 @@ public record SearchResults(String q, List<TransactionHit> transactions, List<Ac
     public record CardHit(UUID id, String name, String institution, CardStatus status) {
     }
 
-    /** {@code snippet}: texto puro (nunca Markdown nem HTML). */
     public record NoteHit(UUID id, String title, String path, String snippet) {
     }
 }

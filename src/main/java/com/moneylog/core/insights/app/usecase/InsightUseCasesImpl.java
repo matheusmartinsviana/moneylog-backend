@@ -32,13 +32,8 @@ import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Casos de uso dos insights calculados. Cada requisição monta <b>um</b> {@link InsightContext} (uma leitura do razão) e roda calculadores puros;
- * quem ordena, deduplica e marca as dispensas é o {@link InsightAggregator}. Nenhum caso de uso aqui fala com a IA (ADR-019).
- */
 public final class InsightUseCasesImpl {
 
-    /** Meses que {@code dismiss}/{@code restore} varrem para achar o insight pelo id (o id é um hash, não carrega o período). */
     static final int RESOLVE_MONTHS = 12;
 
     private InsightUseCasesImpl() {
@@ -49,8 +44,6 @@ public final class InsightUseCasesImpl {
         int to = (int) Math.min(all.size(), (long) from + limit);
         return new InsightsView(all.subList(from, to), to < all.size(), sink.insufficient());
     }
-
-    // ------------------------------------------------------------------ mensal
 
     public static class GetMonthlyInsights implements GetMonthlyInsightsUseCase {
         private final InsightContextFactory contexts;
@@ -75,8 +68,6 @@ public final class InsightUseCasesImpl {
             return page(all, q.offset(), q.limit(), sink);
         }
     }
-
-    // ------------------------------------------------------------------ do dia
 
     public static class GetDailyInsights implements GetDailyInsightsUseCase {
         private final InsightContextFactory contexts;
@@ -104,8 +95,6 @@ public final class InsightUseCasesImpl {
             return page(all, q.offset(), q.limit(), sink);
         }
     }
-
-    // ------------------------------------------------------------------ histórico
 
     public static class GetInsightHistory implements GetInsightHistoryUseCase {
         private final InsightContextFactory contexts;
@@ -138,9 +127,6 @@ public final class InsightUseCasesImpl {
         }
     }
 
-    // ------------------------------------------------------------------ dispensar e restaurar
-
-    /** Acha o insight pelo id entre os do dia de hoje e os dos últimos 12 meses (um contexto, uma leitura do razão). */
     private static InsightItem resolve(InsightContextFactory contexts, UUID userId, String insightId, LocalDate today, List<Dismissal> active) {
         String fingerprint = InsightIds.fingerprintOf(insightId);
         if (fingerprint == null) {

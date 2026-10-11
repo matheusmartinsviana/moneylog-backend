@@ -11,10 +11,6 @@ import com.moneylog.core.card.domain.InvoiceItemKind;
 import com.moneylog.core.card.domain.InvoicePayment;
 import com.moneylog.core.card.domain.TransactionInstallment;
 
-/**
- * Monta a cadeia de faturas de um cartão a partir das movimentações dele (parcelas, créditos e pagamentos). Fica no
- * pacote de movimentação para o cartão não depender dele.
- */
 public final class CardInvoices {
 
     private CardInvoices() {

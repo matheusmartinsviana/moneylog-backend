@@ -4,10 +4,6 @@ import java.util.Objects;
 
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Movimentação original de um reembolso ({@code refundOf}, S-9) e quanto dela já foi reembolsado (Σ dos reembolsos
- * ativos anteriores, calculado pelo gateway).
- */
 public record RefundOrigin(Transaction original, Money alreadyRefunded) {
 
     public RefundOrigin {

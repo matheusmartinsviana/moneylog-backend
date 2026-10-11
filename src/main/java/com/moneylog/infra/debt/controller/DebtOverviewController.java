@@ -13,7 +13,6 @@ import com.moneylog.core.finance.domain.DebtOverviewCalculator;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Visão total de dívidas (ADR-013): tudo calculado no backend, só do usuário do token. */
 @RestController
 @RequestMapping("/v1/debts/overview")
 public class DebtOverviewController {

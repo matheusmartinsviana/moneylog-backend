@@ -55,7 +55,6 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
         if (command.creditorName() != null || command.personId() == null) {
             return createWithFreeCreditor(command, debtId);
         }
-        // arquivar a pessoa e criar dívida para ela se serializam
         people.lockForUpdate(command.userId(), command.personId());
         Person person = people.findById(command.userId(), command.personId()).map(Versioned::value)
                 .orElseThrow(() -> new PersonNotFoundException(command.personId()));
@@ -68,7 +67,6 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
         return DebtViews.one(people, debts, categories, command.userId(), saved, time.today());
     }
 
-    /** "Outra dívida" (P1): credor livre, sem pessoa e sem categoria; contra EQUITY como a dívida sem movimentação. */
     private DebtView createWithFreeCreditor(CreateDebtCommand command, UUID debtId) {
         if (command.personId() != null) {
             throw new com.moneylog.core.debt.exception.DebtExceptions.DebtCreditorInvalidException("informe a pessoa ou o nome do credor, não os dois.");
@@ -96,13 +94,11 @@ public class CreateDebtUseCaseImpl implements CreateDebtUseCase {
 
     private DebtView replay(CreateDebtCommand command, Claim existing) {
         IdempotentClaim.requireSameCommand(existing, hashOf(command));
-        // o replay devolve o estado ATUAL da dívida (S-87), não uma cópia da primeira resposta
         Versioned<Debt> debt = debts.findById(command.userId(), existing.resourceId())
                 .orElseThrow(() -> new DebtNotFoundException(existing.resourceId()));
         return DebtViews.one(people, debts, categories, command.userId(), debt, time.today());
     }
 
-    /** Hash do comando canônico (o dono não entra: a chave é por usuário). */
     private static String hashOf(CreateDebtCommand c) {
         return IdempotentClaim.hash("personId=" + c.personId() + ";creditor=" + (c.creditorName() == null ? "-" : c.creditorName().strip()) + ";direction=" + c.direction() + ";principal=" + c.principal().toPlainString()
                 + ";date=" + c.date() + ";expectedDate=" + (c.expectedDate() == null ? "-" : c.expectedDate())

@@ -10,20 +10,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Filtro da lista de movimentações (D2 §4.2, S-71, S-79, S-80): a <b>única</b> definição de "a movimentação casa com o
- * filtro". Ela vira (a) o predicado das calculadoras do {@code core.finance} (totais) e (b) a contagem; a consulta da
- * página (SQL) repete a mesma regra campo a campo e um IT compara página e totais.
- *
- * <ul>
- *   <li>{@code accountId}: a conta aparece como origem <b>ou</b> como contrapartida (transferência e aplicação);</li>
- *   <li>{@code q}: contém, sem diferenciar maiúsculas, na descrição; acentos não são normalizados (S-71);</li>
- *   <li>{@code status}: padrão {@code ACTIVE}.</li>
- * </ul>
- *
- * @param from primeira data (inclusive); {@code null} = sem limite
- * @param to   última data (inclusive); {@code null} = sem limite
- */
 public record TransactionFilter(LocalDate from, LocalDate to, TransactionType type, UUID accountId, UUID categoryId,
                                 PaymentMethod method, TransactionStatus status, String q) {
 
@@ -37,15 +23,10 @@ public record TransactionFilter(LocalDate from, LocalDate to, TransactionType ty
         q = q == null || q.isBlank() ? null : q.strip();
     }
 
-    /** O filtro casa com a movimentação inteira (data, atributos e status). */
     public boolean matches(Transaction transaction) {
         return inPeriod(transaction.date()) && attributes().test(transaction);
     }
 
-    /**
-     * Tudo menos o período: tipo, conta, categoria, método, texto e status. É o predicado das calculadoras, que já
-     * recebem {@code from}/{@code to} à parte.
-     */
     public Predicate<Transaction> attributes() {
         String needle = q == null ? null : q.toLowerCase(Locale.ROOT);
         return t -> t.status() == status

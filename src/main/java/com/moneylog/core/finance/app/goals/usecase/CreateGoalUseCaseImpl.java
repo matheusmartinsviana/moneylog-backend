@@ -51,7 +51,6 @@ public class CreateGoalUseCaseImpl implements CreateGoalUseCase {
             Claim existing = IdempotentClaim.claimOrFind(idempotency, c.userId(), IDEMPOTENCY_SCOPE, c.idempotencyKey(), hash, goalId, time.now());
             if (existing != null) {
                 IdempotentClaim.requireSameCommand(existing, hash);
-                // o replay devolve o estado ATUAL (S-87)
                 Versioned<Goal> current = goals.findById(c.userId(), existing.resourceId())
                         .orElseThrow(() -> new GoalNotFoundException(existing.resourceId()));
                 return model.view(c.userId(), current, records.load(c.userId()));
@@ -80,7 +79,6 @@ public class CreateGoalUseCaseImpl implements CreateGoalUseCase {
             if (duplicate) {
                 throw new GoalMetricDuplicateException();
             }
-            // o ponto de partida é o valor atual da medida, na mesma fonte das leituras (sem o passo "montando")
             loaded = records.load(c.userId());
             baseline = model.metricValue(c.userId(), c.metric(), loaded);
             goal = Goal.createMetric(goalId, c.userId(), c.name(), c.metric(), c.target(), baseline, time.now(), c.deadline(), priority,
@@ -90,7 +88,7 @@ public class CreateGoalUseCaseImpl implements CreateGoalUseCase {
         }
         Versioned<Goal> saved = goals.save(goal);
         if (baseline != null) {
-            model.recordSnapshot(c.userId(), goal, baseline); // histórico começa na criação
+            model.recordSnapshot(c.userId(), goal, baseline);
         }
         return model.view(c.userId(), saved, loaded == null ? records.load(c.userId()) : loaded);
     }

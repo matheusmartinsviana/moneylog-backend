@@ -33,14 +33,8 @@ import com.moneylog.core.transaction.app.IdempotentClaim;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 
-/**
- * Envio, ordem, capa e remoção das fotos da meta (ADR-018), no mesmo tipo (todas travam a meta, mudam o agregado e gravam). Ordem de
- * travas: meta, depois a cota do usuário. Os bytes só são gravados depois dos metadados, na mesma transação (a tabela de bytes referencia a
- * de metadados); falhou, tudo desfaz. O conteúdo da foto nunca vai para log.
- */
 public class GoalPhotoUseCasesImpl implements UploadGoalPhotoUseCase, ReorderGoalPhotosUseCase, SetGoalPhotoCoverUseCase, RemoveGoalPhotoUseCase {
 
-    /** Escopo da {@code Idempotency-Key} do envio. */
     public static final String IDEMPOTENCY_SCOPE = "POST /v1/goals/{id}/photos";
 
     private final GoalGateway goals;

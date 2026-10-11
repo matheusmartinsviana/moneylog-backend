@@ -45,7 +45,6 @@ import com.moneylog.infra.transaction.gateways.TransactionHydrator;
 import com.moneylog.infra.transaction.persistence.InstallmentRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/** Ligação da feature movimentação (T26a): gateway, montagem de detalhes e casos de uso transacionais. */
 @Configuration(proxyBeanMethods = false)
 public class TransactionConfig {
 

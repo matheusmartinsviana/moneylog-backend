@@ -47,7 +47,7 @@ class PhotoImagePipelineTest {
         assertThat(isJpeg(out.display())).isTrue();
         assertThat(isJpeg(out.thumbnail())).isTrue();
         assertThat(display.getWidth()).isEqualTo(1280);
-        assertThat(display.getHeight()).isEqualTo(853); // 2000 * 1280 / 3000
+        assertThat(display.getHeight()).isEqualTo(853);
         assertThat(thumb.getWidth()).isEqualTo(320);
         assertThat(thumb.getHeight()).isEqualTo(213);
         assertThat(out.width()).isEqualTo(1280);
@@ -66,7 +66,7 @@ class PhotoImagePipelineTest {
         ProcessedPhoto alpha = pipeline.process(SyntheticImages.pngWithAlpha(100, 100));
         BufferedImage image = read(alpha.display());
         int transparentSide = image.getRGB(90, 50) & 0xFFFFFF;
-        assertThat(transparentSide).isGreaterThan(0xF0F0F0); // branco, não preto
+        assertThat(transparentSide).isGreaterThan(0xF0F0F0);
     }
 
     @Test
@@ -83,7 +83,6 @@ class PhotoImagePipelineTest {
         BufferedImage display = read(out.display());
         assertThat(display.getWidth()).isEqualTo(200);
         assertThat(display.getHeight()).isEqualTo(400);
-        // girar 90 graus horário: o canto inferior esquerdo da origem (azul) vai para o topo esquerdo; o superior esquerdo (vermelho) para o topo direito
         assertThat(dominant(display.getRGB(20, 20))).isEqualTo("blue");
         assertThat(dominant(display.getRGB(180, 20))).isEqualTo("red");
         assertThat(dominant(display.getRGB(20, 380))).isEqualTo("yellow");
@@ -95,7 +94,7 @@ class PhotoImagePipelineTest {
     void deveAplicarOutrasOrientacoes() throws IOException {
         BufferedImage rotated = read(pipeline.process(SyntheticImages.withExif(SyntheticImages.quadrantsJpeg(200, 100), 3)).display());
         assertThat(rotated.getWidth()).isEqualTo(200);
-        assertThat(dominant(rotated.getRGB(10, 10))).isEqualTo("yellow"); // o inferior direito foi para o topo esquerdo
+        assertThat(dominant(rotated.getRGB(10, 10))).isEqualTo("yellow");
 
         BufferedImage same = read(pipeline.process(SyntheticImages.withExif(SyntheticImages.quadrantsJpeg(200, 100), 1)).display());
         assertThat(dominant(same.getRGB(10, 10))).isEqualTo("red");
@@ -109,8 +108,8 @@ class PhotoImagePipelineTest {
                 SyntheticImages.text("<html><script>alert(1)</script></html>"),
                 SyntheticImages.text("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>"),
                 {0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x00, 0x00, 0x08, 0x00},
-                {(byte) 0xFF, (byte) 0xD8}, // só dois bytes do JPEG
-                {(byte) 0x89, 'P', 'N', 'G'}, // assinatura incompleta
+                {(byte) 0xFF, (byte) 0xD8},
+                {(byte) 0x89, 'P', 'N', 'G'},
         };
         for (byte[] fake : fakes) {
             assertThatThrownBy(() -> pipeline.process(fake)).isInstanceOf(GoalPhotoUnsupportedTypeException.class);
@@ -126,7 +125,6 @@ class PhotoImagePipelineTest {
         long before = runtime.totalMemory() - runtime.freeMemory();
 
         assertThatThrownBy(() -> pipeline.process(bomb)).isInstanceOf(GoalPhotoDimensionsExceededException.class);
-        // sem alocar o bitmap de 3,6 bilhões de pixels (nem os 24 MP): o heap quase não se mexe
         assertThat(runtime.totalMemory() - runtime.freeMemory() - before).isLessThan(64L * 1024 * 1024);
     }
 
@@ -175,7 +173,6 @@ class PhotoImagePipelineTest {
     @Test
     @DisplayName("o nome do arquivo não existe para o pipeline: só os bytes entram")
     void soBytesEntram() {
-        // a assinatura aceita apenas byte[]; qualquer nome, extensão ou MIME do cliente fica de fora por construção
         assertThat(pipeline.process(SyntheticImages.jpeg(100, 100, "x")).display()).isNotEmpty();
     }
 

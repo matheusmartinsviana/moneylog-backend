@@ -17,7 +17,6 @@ import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Um só tipo para as quatro ações do plano: todas travam a meta, mudam o agregado, gravam e devolvem a meta atualizada. */
 public class GoalActionUseCasesImpl implements AddGoalActionUseCase, UpdateGoalActionUseCase, DeleteGoalActionUseCase, CheckInGoalActionUseCase {
 
     private final GoalGateway goals;

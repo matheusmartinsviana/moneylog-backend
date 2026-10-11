@@ -35,15 +35,8 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IdempotencyKeyReusedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 
-/**
- * Pagamento de fatura (T55). A fatura pode nem ter linha (S-119) e a cadeia é um agregado do cartão ({@code carryIn}
- * atravessa as faturas), então a trava é a da linha do cartão, depois a da conta (ordem global: movimentações → cartão →
- * contas, ADR-006 §5), e a cadeia só é lida <b>depois</b> das travas (e de descartar o que a resolução da fatura leu antes delas, B1): um
- * pagamento, estorno ou compra concorrente já confirmado aparece nela e a validação vale sobre o estado pós-trava. Uma transação só: movimentação, lançamentos e chave de idempotência.
- */
 public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
 
-    /** Validade da chave (S-72): depois disso ela é sobrescrita pelo próximo pagamento. */
     public static final Duration IDEMPOTENCY_VALIDITY = Duration.ofHours(24);
 
     private final InvoiceLookupGateway lookup;
@@ -83,11 +76,8 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
         UserDay day = new UserDay(command.userId(), time.today());
         InvoiceResolver.Resolved resolved = InvoiceResolver.resolve(command.userId(), command.invoiceId(), lookup,
                 records.load(command.userId()), day.today());
-        // ordem global de travas: movimentações (nenhuma) → cartão → conta
         cards.lockForUpdate(command.userId(), resolved.card().id());
         accounts.lockForUpdate(command.userId(), command.accountId());
-        // B1: a leitura acima só serviu para achar o cartão da fatura; o que outro pedido confirmou enquanto esperávamos a
-        // trava (estorno do pagamento anterior, cancelamento, mudança de dias) só aparece se descartarmos o estado já lido
         cards.discardReadState();
         CreditCard card = cards.findById(command.userId(), resolved.card().id()).map(Persisted::value)
                 .orElseThrow(() -> new CardNotFoundException(resolved.card().id()));
@@ -101,24 +91,17 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
         return detailsOf(command.userId(), card.id(), resolved.closingDate(), day.today());
     }
 
-    /**
-     * O pagamento que a conta, o cartão, a cadeia e o "hoje" determinam. É o <b>único</b> ponto onde um pagamento é
-     * montado: a criação e a prévia ({@code PreviewInvoicePaymentUseCaseImpl}) passam por aqui, então os números da prévia
-     * são os do pagamento real (S-136).
-     */
     static Transaction plan(TransactionHeader header, Money amount, Account account, CreditCard card, LocalDate closingDate,
                             InvoiceChain chain, LocalDate today) {
         return CardTransactions.invoicePayment(header, amount, account, card, closingDate, chain, today);
     }
 
-    /** Descrição da movimentação gerada: a fatura que ela paga, para a lista ficar legível. */
     static TransactionHeader header(UUID id, UUID userId, LocalDate date, CreditCard card, InvoiceChain chain, LocalDate closingDate) {
         String description = "Fatura " + card.name() + " " + chain.calendar().periodClosingIn(java.time.YearMonth.from(closingDate))
                 .referenceMonth();
         return TransactionHeader.of(id, userId, date, description);
     }
 
-    /** {@code null} = a chave é nossa (primeira vez ou vencida); senão, o que ela guardou. */
     private Claim claimOrFind(PayInvoiceCommand command, UUID key, UUID resourceId) {
         String hash = CanonicalCommandHash.ofInvoicePayment(command.invoiceId(), command.accountId(), command.amount(), command.date());
         Instant now = time.now();
@@ -139,7 +122,6 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
         if (!existing.requestHash().equals(hash)) {
             throw new IdempotencyKeyReusedException();
         }
-        // o replay devolve o estado ATUAL da fatura (S-87), não uma cópia da primeira resposta
         Transaction payment = transactions.findById(command.userId(), existing.resourceId()).map(Persisted::value)
                 .orElseThrow(() -> new TransactionNotFoundException(existing.resourceId()));
         return detailsOf(command.userId(), payment.cardId(), payment.invoiceClosingDate(), time.today());

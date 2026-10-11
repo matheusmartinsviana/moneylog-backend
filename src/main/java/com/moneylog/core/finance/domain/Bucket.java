@@ -2,7 +2,6 @@ package com.moneylog.core.finance.domain;
 
 import java.time.LocalDate;
 
-/** Faixa de vencimento calculada no backend, no fuso do usuário (D2 §4.4). */
 public enum Bucket {
     OVERDUE,
     TODAY,

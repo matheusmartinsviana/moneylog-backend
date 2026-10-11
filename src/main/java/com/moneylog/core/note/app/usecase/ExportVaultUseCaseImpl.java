@@ -62,7 +62,6 @@ public class ExportVaultUseCaseImpl implements ExportVaultUseCase {
         }
     }
 
-    /** Monta o zip em lotes, parando assim que passa de um limite da importação. */
     private void build(UUID userId, Path file, Map<UUID, String> pathById, Map<UUID, String> trashed) throws IOException {
         try (CountingOutputStream counted = new CountingOutputStream(Files.newOutputStream(file)); ZipOutputStream zip = new ZipOutputStream(counted)) {
             long uncompressed = 0;

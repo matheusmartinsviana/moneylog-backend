@@ -41,10 +41,6 @@ import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryMonths;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * IA (Etapa 8): status, prévia → aprovação → análise, histórico e preferências. Os insights calculados saíram daqui (ADR-019: {@code InsightsController}). Todo endpoint filtra pelo usuário do
- * token e nenhuma resposta é cacheada. Sem provedor configurado, tudo responde (status {@code enabled: false}, envio {@code 422 AI_DISABLED}).
- */
 @RestController
 public class AiController {
 

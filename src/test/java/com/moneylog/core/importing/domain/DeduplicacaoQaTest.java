@@ -18,10 +18,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import com.moneylog.core.sk.money.Money;
 
-/**
- * T12 (QA): lacunas da deduplicação (PR 01 regra 9, D1 §6): extrato estendido, borda da janela de ±1 dia, data
- * bissexta e a duplicata forçada (S-43).
- */
 @DisplayName("Importação: deduplicação (T12, QA)")
 class DeduplicacaoQaTest {
 
@@ -97,12 +93,6 @@ class DeduplicacaoQaTest {
         assertThat(DedupKey.of(umaLinha(NUBANK_ID, LocalDate.of(2026, 10, 10), "1.00", ImportDirection.OUT, " *** - "), 1)).isEqualTo(nula);
     }
 
-    /**
-     * BUG-QA-04 (corrigido, S-75 revisada): a duplicata forçada é gravada com a chave derivada do lote em
-     * {@code dedup_key} ({@link ImportLineReview#effectiveKey()}) e a chave original em {@code original_dedup_key}
-     * ({@link ImportLineReview#key()}). O classificador compara a linha com as duas colunas: depois de estornar a
-     * movimentação original, a reimportação do mesmo arquivo reconhece a linha forçada e não cria uma terceira cópia.
-     */
     @Test
     @DisplayName("BUG-QA-04: depois de forçar uma duplicata e estornar a original, reimportar não pode criar outra cópia")
     void naoDeveDuplicarDepoisDeForcarEEstornar() {
@@ -122,10 +112,6 @@ class DeduplicacaoQaTest {
         assertThat(reimportacao.matches()).containsExactly(TX_B);
     }
 
-    /**
-     * T47 CA2: a forçada estornada (chave derivada em {@code dedup_key}, original em {@code original_dedup_key}) não
-     * conta em nenhuma das duas colunas; a original ativa continua contando.
-     */
     @Test
     @DisplayName("T47 CA2: movimentação forçada estornada não é duplicata pela chave efetiva nem pela original")
     void naoDeveContarForcadaEstornada() {
@@ -143,11 +129,6 @@ class DeduplicacaoQaTest {
         assertThat(DuplicateClassifier.classify(cafe, derivada, List.of(forcadaAtiva)).status()).isEqualTo(ImportLineStatus.DUPLICATE);
     }
 
-    /**
-     * T47 CA3: aplicar de novo a mesma linha forçada no mesmo lote (retry) produz a mesma chave derivada, que já existe
-     * como {@code dedup_key} de uma movimentação ativa; é isso que o índice único
-     * {@code uq_transactions_user_dedup_active} barra na Etapa 7. Em outro lote a chave é outra.
-     */
     @Test
     @DisplayName("T47 CA3: a mesma linha forçada duas vezes no mesmo lote gera a mesma chave derivada (barrada); em outro lote, não")
     void deveBarrarAMesmaLinhaForcadaNoMesmoLote() {

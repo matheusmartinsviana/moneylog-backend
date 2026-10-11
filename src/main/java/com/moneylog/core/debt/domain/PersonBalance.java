@@ -6,14 +6,6 @@ import java.util.Collection;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Saldo com uma pessoa (S-142): {@code net} = Σ saldo devedor das dívidas {@code RECEIVABLE} em aberto − Σ das {@code PAYABLE}
- * em aberto, com sinal (positivo = "me devem"). Só entram as dívidas {@code OPEN}/{@code PARTIALLY_SETTLED}: as
- * {@code SETTLED}, {@code CANCELED} e {@code VOIDED} ficam no histórico e fora do saldo.
- *
- * @param openDebts   dívidas em aberto
- * @param nextDueDate menor previsão entre as dívidas em aberto que têm previsão; {@code null} se nenhuma tem
- */
 public record PersonBalance(Money net, int openDebts, LocalDate nextDueDate) {
 
     public static PersonBalance of(Collection<Debt> debts) {
@@ -33,7 +25,6 @@ public record PersonBalance(Money net, int openDebts, LocalDate nextDueDate) {
         return new PersonBalance(net, open, next);
     }
 
-    /** Texto da tela: {@code RECEIVABLE} = "ele deve", {@code PAYABLE} = "você deve", {@code NONE} = quite. */
     public Direction direction() {
         return net.isPositive() ? Direction.RECEIVABLE : net.isNegative() ? Direction.PAYABLE : Direction.NONE;
     }

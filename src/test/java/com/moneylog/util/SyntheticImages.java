@@ -15,19 +15,13 @@ import java.util.zip.CRC32;
 
 import javax.imageio.ImageIO;
 
-/**
- * Imagens SINTÉTICAS dos testes de fotos (ADR-018), geradas por código: nenhum arquivo binário no repositório e nenhuma foto real. Também
- * monta os arquivos hostis (EXIF com GPS, cabeçalho de PNG gigante, polyglot, texto com extensão de imagem).
- */
 public final class SyntheticImages {
 
-    /** Marcador que o teste procura na saída para provar que o EXIF/GPS não sobreviveu. */
     public static final String GPS_SENTINEL = "SENTINEL-GPS-LAT-00.0000";
 
     private SyntheticImages() {
     }
 
-    /** Gradiente com o texto, JPEG. */
     public static byte[] jpeg(int width, int height, String label) {
         return encode(gradient(width, height, label, BufferedImage.TYPE_INT_RGB), "jpg");
     }
@@ -36,7 +30,6 @@ public final class SyntheticImages {
         return encode(gradient(width, height, label, BufferedImage.TYPE_INT_RGB), "png");
     }
 
-    /** PNG com transparência (metade esquerda opaca, metade direita transparente). */
     public static byte[] pngWithAlpha(int width, int height) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < height; y++) {
@@ -47,7 +40,6 @@ public final class SyntheticImages {
         return encode(image, "png");
     }
 
-    /** Quatro quadrantes chapados: topo-esquerdo vermelho, topo-direito verde, base-esquerda azul, base-direita amarelo. */
     public static byte[] quadrantsJpeg(int width, int height) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < height; y++) {
@@ -60,15 +52,12 @@ public final class SyntheticImages {
         return encode(image, "jpg");
     }
 
-    /** Insere um APP1 EXIF logo depois do SOI, com orientação e um texto sentinela (simula o GPS). */
     public static byte[] withExif(byte[] jpeg, int orientation) {
         byte[] sentinel = (GPS_SENTINEL + "\0").getBytes(StandardCharsets.US_ASCII);
-        ByteBuffer tiff = ByteBuffer.allocate(8 + 2 + 2 * 12 + 4 + sentinel.length); // big-endian
+        ByteBuffer tiff = ByteBuffer.allocate(8 + 2 + 2 * 12 + 4 + sentinel.length);
         tiff.put((byte) 'M').put((byte) 'M').putShort((short) 42).putInt(8);
         tiff.putShort((short) 2);
-        // orientação: tag 0x0112, SHORT, 1 valor
         tiff.putShort((short) 0x0112).putShort((short) 3).putInt(1).putShort((short) orientation).putShort((short) 0);
-        // descrição: tag 0x010E, ASCII, aponta para o texto logo depois do IFD
         int textOffset = 8 + 2 + 2 * 12 + 4;
         tiff.putShort((short) 0x010E).putShort((short) 2).putInt(sentinel.length).putInt(textOffset);
         tiff.putInt(0);
@@ -79,7 +68,6 @@ public final class SyntheticImages {
         return concat(new byte[] {(byte) 0xFF, (byte) 0xD8}, app1, slice(jpeg, 2));
     }
 
-    /** Cabeçalho de PNG que declara {@code width x height} com poucos bytes (decompression bomb): assinatura, IHDR e IEND. */
     public static byte[] pngBombHeader(int width, int height) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.writeBytes(new byte[] {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A});
@@ -90,7 +78,6 @@ public final class SyntheticImages {
         return out.toByteArray();
     }
 
-    /** Anexa bytes depois do fim do arquivo (JPEG com ZIP/script depois do EOI: polyglot). */
     public static byte[] withTrailing(byte[] image, byte[] payload) {
         return concat(image, payload);
     }

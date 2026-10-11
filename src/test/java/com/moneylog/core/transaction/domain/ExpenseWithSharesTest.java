@@ -38,10 +38,6 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.SharePerson
 import com.moneylog.core.transaction.exception.TransactionExceptions.SharesExceedAmountException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
 
-/**
- * Divisão de despesa (D1 §2.6.1, S-40, S-137, T78): paguei 200,00 por Pix e o João me deve 100,00. O caixa é −200 (a linha do extrato),
- * o consumo é só a parte do usuário (100) e o patrimônio cai 100 (a parte do João é um recebível). A quitação do João não é receita.
- */
 @DisplayName("Divisão de despesa: EXPENSE com shares (D1 §2.6.1)")
 class ExpenseWithSharesTest {
 
@@ -124,7 +120,6 @@ class ExpenseWithSharesTest {
         assertThat(month.income()).isEqualTo(Money.of("0.00"));
         assertThat(month.received()).isEqualTo(Money.of("100.00"));
         assertThat(CashFlowReport.forCompetence(records, ledger, october).in()).isEqualTo(Money.of("100.00"));
-        // o patrimônio continua 100 abaixo do inicial: o consumo (a parte do usuário) não volta; só o recebível virou caixa
         assertThat(NetWorth.at(ledger, LocalDate.of(2026, 10, 12)).total()).isEqualTo(Money.of("19900.00"));
         assertThat(NetWorth.at(ledger, LocalDate.of(2026, 10, 12)).receivables()).isEqualTo(Money.of("0.00"));
         assertThat(debt.status()).isEqualTo(DebtStatus.SETTLED);
@@ -183,7 +178,6 @@ class ExpenseWithSharesTest {
         assertThatThrownBy(() -> TransactionVoiding.voidTransaction(settled.transaction(), VoidContext.of("x", NOW, DATE)
                 .withAccounts(List.of(nubank)).withActiveRefunds(Money.of("0.00")).withShareDebts(settled.debts())))
                 .isInstanceOf(DebtOperationRefusedException.class).extracting("code").isEqualTo("DEBT_HAS_SETTLEMENTS");
-        // nada mudou: a despesa e as duas dívidas continuam como estavam
         assertThat(settled.transaction().status()).isEqualTo(TransactionStatus.ACTIVE);
         assertThat(settled.debts().get(1).status()).isEqualTo(DebtStatus.OPEN);
         assertThat(settled.debts().get(1).closure()).isNull();
@@ -222,7 +216,6 @@ class ExpenseWithSharesTest {
                 PaymentMethod.PIX, op.debts())).isInstanceOf(SharesExceedAmountException.class);
         assertThatThrownBy(() -> AccountTransactions.expenseKeepingShares(header(EXPENSE_ID), Money.of("200.00"), nubank, food,
                 PaymentMethod.PIX, List.of())).isInstanceOf(SharesExceedAmountException.class);
-        // dívida de outra origem não pode ser reaproveitada
         assertThatThrownBy(() -> AccountTransactions.expenseKeepingShares(header(UUID.randomUUID()), Money.of("200.00"), nubank, food,
                 PaymentMethod.PIX, op.debts())).isInstanceOf(SharesExceedAmountException.class);
     }

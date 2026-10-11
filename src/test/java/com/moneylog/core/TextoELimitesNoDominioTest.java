@@ -26,16 +26,6 @@ import com.moneylog.core.recurrence.exception.RecurrenceExceptions.InvalidRecurr
 import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * BUG-QA-05: os limites de texto do domínio são os das colunas VARCHAR (revisão de todas as colunas): nunca um erro de
- * banco, sempre uma exceção de domínio específica (422).
- *
- * <p>Colunas revisadas: users.email 254 (fora do domínio da Etapa 1); categories.name 60 = Category; accounts.name 100 =
- * Account; accounts.institution 100 (agora validado); credit_cards.name 100 = CreditCard; credit_cards.institution 100
- * (agora validado); persons.name 100 = Person; debts.description 200 (agora validado); debts.closure_reason 500 =
- * Debt.TEXT_MAX_LENGTH; transactions.description 200 = TransactionHeader; reason/void_reason 500 = domínio;
- * ledger_postings.deactivation_reason 500 (preenchida pelo gateway com o motivo já validado).
- */
 @DisplayName("Limites de texto do domínio = colunas (BUG-QA-05)")
 class TextoELimitesNoDominioTest {
 

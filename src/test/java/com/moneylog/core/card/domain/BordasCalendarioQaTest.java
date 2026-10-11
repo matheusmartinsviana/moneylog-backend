@@ -31,10 +31,6 @@ import com.moneylog.core.transaction.domain.CardTransactions;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/**
- * T12 (QA): bordas de data do calendário da fatura (D1 §2.5.1) — fechamento nos dias 29/30/31, fevereiro de ano
- * bissexto, virada de ano, fuso America/Sao_Paulo — e uma propriedade sobre todas as combinações de dias.
- */
 @DisplayName("Bordas de data do cartão (T12, QA)")
 class BordasCalendarioQaTest {
 
@@ -51,7 +47,6 @@ class BordasCalendarioQaTest {
 
     @ParameterizedTest(name = "fecha {0}, vence {1}: compra {2} → fecha {3}, vence {4}, ref {5}")
     @CsvSource({
-            // fechamento 31: clamp em fevereiro (não bissexto e bissexto), abril (30) e virada de ano
             "31, 10, 2027-02-27, 2027-02-28, 2027-03-10, 2027-03",
             "31, 10, 2027-02-28, 2027-03-31, 2027-04-10, 2027-04",
             "31, 10, 2028-02-28, 2028-02-29, 2028-03-10, 2028-03",
@@ -59,16 +54,13 @@ class BordasCalendarioQaTest {
             "31, 10, 2027-04-30, 2027-05-31, 2027-06-10, 2027-06",
             "31, 10, 2026-12-30, 2026-12-31, 2027-01-10, 2027-01",
             "31, 10, 2026-12-31, 2027-01-31, 2027-02-10, 2027-02",
-            // fechamento 29 e 30 em fevereiro
             "29, 8, 2027-02-28, 2027-03-29, 2027-04-08, 2027-04",
             "29, 8, 2028-02-28, 2028-02-29, 2028-03-08, 2028-03",
             "30, 8, 2027-02-27, 2027-02-28, 2027-03-08, 2027-03",
             "30, 8, 2027-01-30, 2027-02-28, 2027-03-08, 2027-03",
-            // virada de ano com vencimento no mês seguinte e no mesmo mês
             "25, 5, 2026-12-25, 2027-01-25, 2027-02-05, 2027-02",
             "25, 5, 2026-12-24, 2026-12-25, 2027-01-05, 2027-01",
             "5, 15, 2026-12-31, 2027-01-05, 2027-01-15, 2027-01",
-            // vencimento no dia 31 com clamp em mês curto
             "20, 31, 2027-02-10, 2027-02-20, 2027-02-28, 2027-02",
             "10, 31, 2027-04-01, 2027-04-10, 2027-04-30, 2027-04",
     })
@@ -90,7 +82,6 @@ class BordasCalendarioQaTest {
         List<TransactionInstallment> i = t.installments();
         assertThat(i).extracting(TransactionInstallment::effectiveDate)
                 .containsExactly(d("2027-01-31"), d("2027-02-28"), d("2027-03-31"), d("2027-04-30"));
-        // compra em 31/01 é no dia do fechamento → fatura que fecha em 28/02; as seguintes, 31/03, 30/04, 31/05
         assertThat(i).extracting(TransactionInstallment::invoiceClosingDate)
                 .containsExactly(d("2027-02-28"), d("2027-03-31"), d("2027-04-30"), d("2027-05-31"));
         assertThat(i).extracting(TransactionInstallment::amount)
@@ -120,11 +111,6 @@ class BordasCalendarioQaTest {
         assertThat(calendario(25, 5).periodFor(hojeSp).closingDate()).isEqualTo(d("2026-10-25"));
     }
 
-    /**
-     * Propriedade: para todo par (fechamento, vencimento) e 3 anos de datas (inclui 2028 bissexto), o calendário é
-     * contíguo (cada fatura começa no fechamento da anterior), a data pertence ao período, o fechamento é estritamente
-     * posterior à compra e no máximo no mês seguinte, e a referência é o mês do vencimento.
-     */
     @Test
     @DisplayName("propriedade: calendário contíguo e coerente para todos os dias 1..31 × 1..31, 2027–2029")
     void deveSerContiguoParaTodosOsDias() {
@@ -141,18 +127,12 @@ class BordasCalendarioQaTest {
                     assertThat(YearMonth.from(p.closingDate())).as(ctx).isBetween(YearMonth.from(date), YearMonth.from(date).plusMonths(1));
                     assertThat(cal.next(p).periodStart()).as(ctx).isEqualTo(p.closingDate());
                     assertThat(p.referenceMonth()).as(ctx).isEqualTo(YearMonth.from(p.dueDate()));
-                    assertThat(p.dueDate()).as(ctx).isAfter(p.closingDate()); // S-77: estritamente depois
+                    assertThat(p.dueDate()).as(ctx).isAfter(p.closingDate());
                 }
             }
         }
     }
 
-    /**
-     * BUG-QA-01 (corrigido, S-77): com {@code dueDay > closingDay} e os dois no fim do mês (ex.: fecha 30, vence 31), em
-     * fevereiro o clamp levava o vencimento para o mesmo dia do fechamento (28/02/2027), e
-     * {@code ck_credit_card_invoices_due_after_closing} recusava a fatura. Agora o vencimento vai para o dia de
-     * vencimento do mês seguinte (com clamp). Ver {@code SchemaDominioLimitesQaIT}.
-     */
     @ParameterizedTest(name = "fecha {0}, vence {1} em {2}")
     @CsvSource({"30, 31, 2027-02", "29, 30, 2027-02", "29, 31, 2028-02", "28, 29, 2027-02", "30, 31, 2027-04"})
     @DisplayName("BUG-QA-01: o vencimento deveria ser estritamente posterior ao fechamento")
@@ -161,11 +141,6 @@ class BordasCalendarioQaTest {
         assertThat(p.dueDate()).isAfter(p.closingDate());
     }
 
-    /**
-     * BUG-QA-02 (corrigido, A2): a realização de recorrência no cartão usava a alocação só pelo calendário. Realizar
-     * com atraso uma ocorrência cujo ciclo já foi pago colocava a parcela numa fatura {@code PAID}, contra S-14. Agora
-     * {@code realizeOnCard} recebe a cadeia e "hoje" e usa a alocação com lançamento tardio (S-14/S-50).
-     */
     @Test
     @DisplayName("BUG-QA-02: ocorrência de cartão realizada depois de a fatura do ciclo ser paga deve ir para a fatura corrente")
     void naoDeveRealizarRecorrenciaEmFaturaPaga() {

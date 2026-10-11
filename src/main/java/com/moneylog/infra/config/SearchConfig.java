@@ -15,10 +15,6 @@ import com.moneylog.core.search.app.gateways.SearchGateway;
 import com.moneylog.infra.search.controller.SearchRateLimiter;
 import com.moneylog.infra.search.gateways.SearchGatewayImpl;
 
-/**
- * Ligação da busca global (T186): leitura pura num instantâneo só ({@code REPEATABLE_READ} somente leitura, ADR-008: as cinco consultas veem o
- * mesmo estado do banco), com limite de taxa próprio de 120 pedidos por minuto por usuário (S-287) e limite de tempo por grupo.
- */
 @Configuration(proxyBeanMethods = false)
 public class SearchConfig {
 
@@ -32,7 +28,6 @@ public class SearchConfig {
         return TransactionalProxies.snapshotReadOnly(SearchUseCase.class, new SearchUseCaseImpl(gateway), tm);
     }
 
-    /** S-287: 120 pedidos de busca por usuário por minuto (em memória, como o login e a exportação). */
     @Bean
     SearchRateLimiter searchRateLimiter(Clock clock, @Value("${moneylog.search.rate-limit.max-requests:120}") int maxRequests,
                                         @Value("${moneylog.search.rate-limit.window:PT1M}") Duration window) {

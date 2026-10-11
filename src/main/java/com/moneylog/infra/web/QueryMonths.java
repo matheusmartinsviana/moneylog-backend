@@ -5,13 +5,11 @@ import com.moneylog.core.sk.time.FinancialDates;
 import com.moneylog.core.sk.time.TimeExceptions.InvalidCompetenceException;
 import com.moneylog.infra.exception.InvalidPathValueException;
 
-/** Competência {@code AAAA-MM} recebida na fronteira web, dentro da janela financeira (2000-01 a 2100-12), com o {@code code} de erro da rota. */
 public final class QueryMonths {
 
     private QueryMonths() {
     }
 
-    /** O mês, ou {@code 400} com {@code code} (campo {@code field}) se fora do formato ou da janela. */
     public static Competence parse(String month, String code, String field) {
         if (month == null || !month.matches("\\d{4}-\\d{2}")) {
             throw new InvalidPathValueException(code, field, "Mês inválido: use o formato AAAA-MM.");

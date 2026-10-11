@@ -15,10 +15,6 @@ import com.moneylog.core.sk.ledger.PostingSourceType;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Monta {@link AccountDetails} a partir dos {@link FinancialRecords} carregados uma vez (S-79): o saldo sai de
- * {@code records.ledger()}, o mesmo cálculo do dashboard.
- */
 public final class AccountViews {
 
     private AccountViews() {
@@ -29,7 +25,6 @@ public final class AccountViews {
         return of(persisted, records, today, ledger, GoalReserves.at(records, CashPosition.at(records, ledger, today)));
     }
 
-    /** Mesma visão com o razão e as reservas já calculados (uma vez para a página inteira). */
     public static AccountDetails of(Persisted<Account> persisted, FinancialRecords records, LocalDate today, Ledger ledger,
                                     GoalReserves reserves) {
         Account account = persisted.value();
@@ -40,10 +35,6 @@ public final class AccountViews {
                 account.canBeArchived(accountPostings, today), reserves.reservedOn(account.id()), reserves.isUncovered(account.id()));
     }
 
-    /**
-     * A conta tem movimentação ativa? Sim se alguma movimentação ativa a usa (origem ou contrapartida) ou se existe
-     * lançamento ativo no livro dela que não seja o saldo inicial (ex.: dívida sem movimentação).
-     */
     public static boolean hasActiveMovements(FinancialRecords records, UUID accountId) {
         for (Transaction transaction : records.transactions()) {
             if (transaction.isActive()

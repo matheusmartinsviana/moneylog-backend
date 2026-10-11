@@ -32,23 +32,8 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Recorrência (D1 §2.7): modelo de uma {@code EXPENSE}, {@code INCOME} ou {@code CARD_PURCHASE} à vista, com agenda.
- *
- * <ul>
- *   <li>As ocorrências previstas ({@link #occurrences}) não são movimentações: não geram posting (S-20).</li>
- *   <li>Nada é realizado automaticamente: {@link #realize} é chamado com a confirmação do usuário e cria a
- *       movimentação com {@code recurrenceId + occurrenceDate}; a mesma ocorrência não é realizada duas vezes.</li>
- *   <li>Uma ocorrência pode ser pulada ({@link #skip}) e deixa de aparecer como prevista.</li>
- *   <li>No cartão ({@link #realizeOnCard}), a compra passa pela alocação com lançamento tardio (S-14, S-50): uma
- *       ocorrência confirmada depois de a fatura do ciclo ter sido paga vai para a fatura corrente (A2).</li>
- *   <li>Valor até o teto de S-78; descrição com no máximo {@value TransactionHeader#DESCRIPTION_MAX_LENGTH}
- *       caracteres, o mesmo da movimentação que ela gera.</li>
- * </ul>
- */
 public final class RecurringTransaction {
 
-    /** Deslocamento máximo da competência da renda (ADR-017): 0 = mês da data; 1 = mês seguinte (salário dividido). */
     public static final int MAX_INCOME_COMPETENCE_OFFSET = 1;
 
     private static final Set<TransactionType> TYPES = Set.of(TransactionType.EXPENSE, TransactionType.INCOME, TransactionType.CARD_PURCHASE);
@@ -88,7 +73,6 @@ public final class RecurringTransaction {
         this.schedule = schedule;
     }
 
-    /** As regras do modelo, as mesmas na criação e na edição ({@link #updateDetails}). */
     private static void validateModel(TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
                                       UUID cardId, PaymentMethod paymentMethod, int incomeCompetenceOffsetMonths) {
         if (incomeCompetenceOffsetMonths < 0 || incomeCompetenceOffsetMonths > MAX_INCOME_COMPETENCE_OFFSET) {
@@ -111,8 +95,6 @@ public final class RecurringTransaction {
             throw new InvalidRecurrenceException("a descrição pode ter no máximo " + TransactionHeader.DESCRIPTION_MAX_LENGTH + " caracteres.");
         }
         boolean card = type == TransactionType.CARD_PURCHASE;
-        // despesa/receita: conta e meio de pagamento juntos, ou nenhum dos dois ("conta a definir": a previsão existe e a conta/meio
-        // são informados ao confirmar cada ocorrência, RECURRENCE_ACCOUNT_REQUIRED)
         if (card ? cardId == null || accountId != null || paymentMethod != null
                 : (accountId == null) != (paymentMethod == null) || cardId != null) {
             throw new InvalidRecurrenceException(card ? "compra no cartão exige só o cartão."
@@ -125,7 +107,6 @@ public final class RecurringTransaction {
         return ofAccount(id, userId, type, amount, description, categoryId, accountId, method, schedule, 0);
     }
 
-    /** Receita/despesa em conta; {@code incomeCompetenceOffsetMonths} (0 ou 1) só vale para a receita (ADR-017). */
     public static RecurringTransaction ofAccount(UUID id, UUID userId, TransactionType type, Money amount, String description,
                                                  UUID categoryId, UUID accountId, PaymentMethod method, Schedule schedule,
                                                  int incomeCompetenceOffsetMonths) {
@@ -138,11 +119,6 @@ public final class RecurringTransaction {
         return new RecurringTransaction(id, userId, TransactionType.CARD_PURCHASE, amount, description, categoryId, null, cardId, null, schedule, 0);
     }
 
-    /**
-     * Reidrata uma recorrência já persistida (usado pelo mapper da infra), com as ocorrências já realizadas e puladas.
-     * Não consulta relógio nem cria movimentação. Estado corrompido (campos que não batem com o tipo, data que não é
-     * ocorrência da agenda, data ao mesmo tempo realizada e pulada) lança {@link RecurrenceStateInconsistentException}.
-     */
     public static RecurringTransaction restore(UUID id, UUID userId, TransactionType type, Money amount, String description,
                                                UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
                                                Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
@@ -182,17 +158,14 @@ public final class RecurringTransaction {
         target.add(date);
     }
 
-    /** Ocorrências já realizadas, em ordem de data (o que o gateway grava junto da recorrência). */
     public List<LocalDate> realizedDates() {
         return realized.stream().sorted().toList();
     }
 
-    /** Ocorrências puladas, em ordem de data. */
     public List<LocalDate> skippedDates() {
         return skipped.stream().sorted().toList();
     }
 
-    /** Ocorrências previstas em {@code [from, to]}: agendadas, nem realizadas nem puladas. */
     public List<Occurrence> occurrences(LocalDate from, LocalDate to) {
         if (!active) {
             return List.of();
@@ -203,18 +176,10 @@ public final class RecurringTransaction {
                 .toList();
     }
 
-    /**
-     * Realiza uma ocorrência de despesa ou receita com a confirmação do usuário (S-20), criando a movimentação com a
-     * origem {@code RECURRENCE}. O valor pode ser o real (ex.: conta de luz); {@code null} usa o do modelo.
-     */
     public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category) {
         return realize(occurrenceDate, transactionId, actualAmount, account, category, null);
     }
 
-    /**
-     * Como {@link #realize(LocalDate, UUID, Money, Account, Category)}; numa recorrência de "conta a definir" (sem conta no modelo) a
-     * conta e o meio de pagamento vêm da confirmação ({@code RECURRENCE_ACCOUNT_REQUIRED} se faltarem).
-     */
     public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category,
                                PaymentMethod method) {
         ensureActive();
@@ -242,14 +207,6 @@ public final class RecurringTransaction {
         return transaction;
     }
 
-    /**
-     * Realiza uma ocorrência de compra no cartão (à vista). A fatura é escolhida pelo status das faturas em
-     * {@code today} (S-14, S-50): ciclo fechado e não pago recebe a compra como lançamento tardio; ciclo já pago manda a
-     * compra para a fatura corrente. Nunca entra em fatura {@code PAID} (A2).
-     *
-     * @param chain cadeia de faturas do cartão
-     * @param today "hoje" no fuso do usuário
-     */
     public Transaction realizeOnCard(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, CreditCard card,
                                      InvoiceChain chain, LocalDate today, Category category) {
         ensureActive();
@@ -265,10 +222,6 @@ public final class RecurringTransaction {
         return transaction;
     }
 
-    /**
-     * Competência herdada pela ocorrência de receita realizada: mês da data da ocorrência + deslocamento (ADR-017). Sem
-     * deslocamento, {@code null} (o mês da data, como sempre). Ocorrências já realizadas não mudam se o modelo mudar depois.
-     */
     private Competence incomeCompetenceOf(LocalDate occurrenceDate) {
         return incomeCompetenceOffsetMonths == 0 ? null : Competence.from(occurrenceDate).plusMonths(incomeCompetenceOffsetMonths);
     }
@@ -281,14 +234,12 @@ public final class RecurringTransaction {
                 TransactionOrigin.recurrence(id, occurrenceDate));
     }
 
-    /** Pula uma ocorrência prevista: ela deixa de ser compromisso. */
     public void skip(LocalDate occurrenceDate) {
         ensureActive();
         ensurePending(occurrenceDate);
         skipped.add(occurrenceDate);
     }
 
-    /** Marca uma ocorrência como já realizada (reidratação a partir das movimentações gravadas). */
     public void markRealized(LocalDate occurrenceDate) {
         ensurePending(occurrenceDate);
         realized.add(occurrenceDate);
@@ -298,18 +249,11 @@ public final class RecurringTransaction {
         active = false;
     }
 
-    /**
-     * Edita os dados do modelo, que valem para as ocorrências <b>ainda não realizadas</b> (S-139): valor, descrição, categoria e
-     * conta/meio de pagamento (ou cartão). O tipo, a frequência e o início não mudam (a agenda é calculada da âncora, D1 §2.7);
-     * para mudar, encerra e cria outra. As ocorrências já realizadas continuam como estão (são movimentações). O modelo editado
-     * segue as mesmas regras da criação ({@code RECURRENCE_INVALID}).
-     */
     public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
                               UUID newCardId) {
         updateDetails(newAmount, newDescription, newCategoryId, newAccountId, newMethod, newCardId, incomeCompetenceOffsetMonths);
     }
 
-    /** Como {@link #updateDetails(Money, String, UUID, UUID, PaymentMethod, UUID)}, trocando também o deslocamento da competência da renda. */
     public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
                               UUID newCardId, int newIncomeCompetenceOffsetMonths) {
         validateModel(type, newAmount, newDescription, newCategoryId, newAccountId, newCardId, newMethod, newIncomeCompetenceOffsetMonths);
@@ -322,10 +266,6 @@ public final class RecurringTransaction {
         this.paymentMethod = newMethod;
     }
 
-    /**
-     * Encerra a recorrência na data (nada é apagado): as ocorrências depois dela deixam de existir. A data não pode ser anterior
-     * ao início nem a uma ocorrência já realizada ou pulada ({@code RECURRENCE_INVALID}).
-     */
     public void endOn(LocalDate end) {
         if (end == null) {
             throw new InvalidRecurrenceException("a data de encerramento é obrigatória.");
@@ -333,7 +273,6 @@ public final class RecurringTransaction {
         changeEnd(end);
     }
 
-    /** Define (ou, com {@code null}, remove) o fim da agenda, com as mesmas guardas de {@link #endOn}. */
     public void changeEnd(LocalDate end) {
         if (end != null) {
             for (LocalDate date : realized) {
@@ -357,22 +296,16 @@ public final class RecurringTransaction {
         return type == TransactionType.INCOME ? FlowDirection.IN : FlowDirection.OUT;
     }
 
-    /** Recorrência desativada não aceita realizar nem pular (S-234): a desativação é definitiva, não há reativação. */
     private void ensureActive() {
         if (!active) {
             throw new RecurrenceInactiveException();
         }
     }
 
-    /**
-     * Encerrada (S-235): a agenda não tem ocorrência em {@code today} nem depois (fim anterior a hoje ou quantidade máxima esgotada).
-     * É derivado, não gravado; não depende de {@code active}. As ocorrências vencidas e não realizadas continuam pendentes (S-20).
-     */
     public boolean isEnded(LocalDate today) {
         return !schedule.hasOccurrenceOnOrAfter(today);
     }
 
-    /** Recusa remover o fim (S-236) quando isso reabriria uma recorrência encerrada: está encerrada por {@code endDate} e a agenda sem o fim teria futuro. */
     public void ensureEndRemovalDoesNotReopen(LocalDate today) {
         if (isEnded(today) && schedule.endDate() != null && schedule.until(null).hasOccurrenceOnOrAfter(today)) {
             throw new RecurrenceEndedException();
@@ -437,7 +370,6 @@ public final class RecurringTransaction {
         return cardId;
     }
 
-    /** Deslocamento da competência da renda das ocorrências (0 = mesmo mês, 1 = mês seguinte); 0 fora da receita. */
     public int incomeCompetenceOffsetMonths() {
         return incomeCompetenceOffsetMonths;
     }

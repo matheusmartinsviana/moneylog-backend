@@ -16,7 +16,6 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.security.CurrentUser;
 
-/** Prévia de compra no cartão (S-124): o que a criação gravaria, sem gravar. */
 @RestController
 @RequestMapping("/v1/cards/{id}/purchase-preview")
 public class CardPurchaseController {

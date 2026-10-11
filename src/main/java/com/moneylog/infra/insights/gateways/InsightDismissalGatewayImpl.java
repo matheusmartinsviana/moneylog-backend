@@ -11,7 +11,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import com.moneylog.core.insights.app.gateways.InsightDismissalGateway;
 import com.moneylog.core.insights.domain.Dismissal;
 
-/** Auditoria das dispensas: só {@code INSERT} e o {@code UPDATE} que grava {@code revoked_at} (o banco recusa qualquer outra mudança). */
 public class InsightDismissalGatewayImpl implements InsightDismissalGateway {
 
     private final JdbcTemplate jdbc;

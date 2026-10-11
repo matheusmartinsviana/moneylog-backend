@@ -13,7 +13,6 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
-/** B8 / BUG-QA-01: leituras com mais de uma consulta abrem a transação em REPEATABLE_READ, somente leitura. */
 @DisplayName("Isolamento dos proxies transacionais (B8)")
 class TransactionalProxiesIsolationTest {
 

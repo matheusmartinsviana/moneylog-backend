@@ -24,10 +24,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T76: emprestar, receber e pagar por {@code POST /v1/transactions}, com a dívida criada/alterada na mesma transação, e o estorno
- * com as guardas (S-141). Casos 6 e 7 do PR 01 (emprestar 300, receber 300). Cenário padrão: relógio 10/10/2026, Nubank 20.000,00.
- */
 @DisplayName("Movimentações de dívida: emprestar, receber, pagar (T76)")
 class DebtTransactionsIT extends E4ItBase {
 
@@ -50,7 +46,6 @@ class DebtTransactionsIT extends E4ItBase {
         assertThat(result.getResponse().getHeader("Location")).isEqualTo("/v1/transactions/" + tx.get("id").asString());
         String debtId = tx.get("debt").get("id").asString();
 
-        // a dívida lida pela rota própria: origem = a movimentação, status derivado, sem quitação
         JsonNode debt = debt(debtId);
         assertThat(debt.get("origin").asString()).isEqualTo("WITH_MOVEMENT");
         assertThat(debt.get("originTransactionId").asString()).isEqualTo(tx.get("id").asString());
@@ -58,7 +53,6 @@ class DebtTransactionsIT extends E4ItBase {
         assertThat(debt.get("voidable").asBoolean()).isFalse();
         assertThat(debt.get("voidBlockedBy").asString()).isEqualTo("HAS_ORIGIN_TRANSACTION");
 
-        // PR 01 caso 6: caixa −300, nenhuma despesa, patrimônio igual (recebível +300 compensa o caixa) e compromisso a receber
         assertThat(accountBalance()).isEqualTo("19700.00");
         JsonNode summary = summary();
         assertThat(money(summary.get("month"), "consumption")).isEqualTo("0.00");
@@ -93,14 +87,12 @@ class DebtTransactionsIT extends E4ItBase {
 
         createTx(received("300.00", "2026-10-10", debtId)).andExpect(status().isUnprocessableEntity())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING"));
-        // a recusa não gravou nada: o saldo devedor continua 100,00
         assertThat(money(debt(debtId), "outstanding")).isEqualTo("100.00");
 
         JsonNode last = created(received("100.00", "2026-10-10", debtId));
         assertThat(last.get("debt").get("status").asString()).isEqualTo("SETTLED");
         assertThat(money(last.get("debt"), "outstanding")).isEqualTo("0.00");
 
-        // nada disso é renda: caixa de volta, receita 0, "recebido" só como informação, e o compromisso saiu do /upcoming
         assertThat(accountBalance()).isEqualTo("20000.00");
         JsonNode month = summary().get("month");
         assertThat(money(month, "income")).isEqualTo("0.00");
@@ -129,7 +121,6 @@ class DebtTransactionsIT extends E4ItBase {
         assertThat(accountBalance()).isEqualTo("20500.00");
         assertThat(money(summary().get("month"), "income")).isEqualTo("0.00");
         assertThat(book("PAYABLE")).isEqualTo(-50_000L);
-        // a captação é um compromisso de saída na previsão (DEBT_PAYABLE)
         JsonNode upcoming = upcoming("from=2026-10-10&to=2026-12-31");
         assertThat(upcoming.get("items").get(0).get("kind").asString()).isEqualTo("DEBT_PAYABLE");
         assertThat(upcoming.get("items").get(0).get("direction").asString()).isEqualTo("OUT");
@@ -151,10 +142,8 @@ class DebtTransactionsIT extends E4ItBase {
         String receivable = loan("100.00", "2026-10-10", joao, null).get("debt").get("id").asString();
         createTx(payment("10.00", "2026-10-10", receivable)).andExpect(status().isUnprocessableEntity())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("DEBT_DIRECTION_MISMATCH"));
-        // receber de uma PAYABLE também é direção errada
         createTx(received("10.00", "2026-10-10", payable)).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("DEBT_DIRECTION_MISMATCH"));
-        // pagamento sem debtId não passa do contrato
         createTx("{\"type\":\"DEBT_PAYMENT\",\"amount\":\"10.00\",\"date\":\"2026-10-10\",\"description\":\"x\",\"accountId\":\"" + nubank + "\"}")
                 .andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
     }
@@ -167,7 +156,6 @@ class DebtTransactionsIT extends E4ItBase {
         createTx("{\"type\":\"LOAN_GIVEN\",\"amount\":\"50.00\",\"date\":\"2026-10-10\",\"description\":\"De novo\",\"accountId\":\"" + nubank
                 + "\",\"debtId\":\"" + debtId + "\"}").andExpect(status().isUnprocessableEntity()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.code").value("DEBT_ALREADY_HAS_ORIGIN"));
-        // newDebt e debtId juntos não passam do contrato
         createTx("{\"type\":\"LOAN_GIVEN\",\"amount\":\"50.00\",\"date\":\"2026-10-10\",\"description\":\"Os dois\",\"accountId\":\"" + nubank
                 + "\",\"debtId\":\"" + debtId + "\",\"newDebt\":{\"personId\":\"" + joao + "\"}}").andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
@@ -192,7 +180,6 @@ class DebtTransactionsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));
         createTx(received("1.00", "2026-10-10", UUID.randomUUID().toString())).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("DEBT_NOT_FOUND"));
-        // nada foi gravado pelas recusas: continua uma dívida só
         assertThat(count("debts")).isEqualTo(1);
         assertThat(ledgerTotal()).isZero();
     }
@@ -206,7 +193,6 @@ class DebtTransactionsIT extends E4ItBase {
         JsonNode settlement = created(received("100.00", "2026-10-10", debtId));
         String settlementId = settlement.get("id").asString();
 
-        // a origem tem quitação ativa: a guarda recusa, e a flag antecipa a recusa
         mockMvc.perform(post("/v1/transactions/" + originId + "/void", voidBody("engano"))).andExpect(status().isUnprocessableEntity())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("DEBT_HAS_SETTLEMENTS"));
         mockMvc.perform(get("/v1/transactions/" + originId)).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
@@ -214,7 +200,6 @@ class DebtTransactionsIT extends E4ItBase {
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
         assertThat(accountBalance()).isEqualTo("19800.00");
 
-        // estornar a quitação: o status volta sozinho (derivado) e o caixa também
         mockMvc.perform(post("/v1/transactions/" + settlementId + "/void", voidBody("duplicado"))).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.status").value("VOIDED"))
                 .andExpect(jsonPath("$.debt.status").value("OPEN")).andExpect(jsonPath("$.debt.outstanding.amount").value("300.00"));
@@ -223,7 +208,6 @@ class DebtTransactionsIT extends E4ItBase {
         assertThat(reopened.get("status").asString()).isEqualTo("OPEN");
         assertThat(reopened.get("settlements").get(0).get("active").asBoolean()).isFalse();
 
-        // sem quitações ativas, a origem se estorna: despesa/dívida somem das lentes e a dívida vira VOIDED
         mockMvc.perform(post("/v1/transactions/" + originId + "/void", voidBody("não emprestei"))).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.status").value("VOIDED"))
                 .andExpect(jsonPath("$.voidable").value(false)).andExpect(jsonPath("$.debt.status").value("VOIDED"));
@@ -232,7 +216,6 @@ class DebtTransactionsIT extends E4ItBase {
         assertThat(book("RECEIVABLE")).isZero();
         assertThat(upcoming("from=2026-10-10&to=2026-11-10").get("items")).isEmpty();
         assertThat(ledgerTotal()).isZero();
-        // a quitação não pode mais ser recriada nem a dívida estornada de novo
         createTx(received("10.00", "2026-10-10", debtId)).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("DEBT_CLOSED"));
         mockMvc.perform(post("/v1/transactions/" + originId + "/void", voidBody("de novo"))).andExpect(status().isUnprocessableEntity())

@@ -43,7 +43,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionAlreadyVoidedException;
 
-/** Estorno do pagamento de fatura (T55 CA6, S-122): sempre permitido; o status da fatura volta a ser derivado. */
 @DisplayName("Estorno de pagamento de fatura (T55 CA6)")
 class VoidInvoicePaymentUseCaseTest {
 

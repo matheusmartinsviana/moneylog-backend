@@ -27,10 +27,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T61 (QA): ciclo completo (D1 §2.5.4), bordas de data (fechamento 29/30/31, bissexto, virada de ano, fuso), fatura vazia e
- * passada, e os achados do revisor sobre cancelamento depois de reembolso (A1) e ids da lista (B4).
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T61: ciclo, bordas de data e regressões do cartão")
@@ -64,8 +60,6 @@ class CardBordersQaIT {
         return v == null ? 0 : v;
     }
 
-    // ------------------------------------------------------------------ critério 1: ciclo completo
-
     @Test
     @DisplayName("T61 CA1: 1.200,00 em 6x e as 6 faturas pagas: Σ consumo = 1.200,00, Σ caixa = −1.200,00, livro CARD = 0, nenhum mês com mais de 200,00")
     void cicloCompleto() throws Exception {
@@ -91,8 +85,6 @@ class CardBordersQaIT {
         assertThat(world.contractViolations).isEmpty();
     }
 
-    // ------------------------------------------------------------------ revisor A1 (reembolso -> cancelamento)
-
     @Test
     @DisplayName("A1: compra 1.200 em 6x, parcela 1 em fatura fechada, reembolso de 1.000 aceito; cancelar as parcelas 2..6 NÃO pode deixar o consumo da compra negativo")
     void reembolsoDepoisCancelamentoNaoDeixaConsumoNegativo() throws Exception {
@@ -117,8 +109,6 @@ class CardBordersQaIT {
         assertThat(CardInvariants.check(a, a.card)).isEmpty();
     }
 
-    // ------------------------------------------------------------------ revisor B4
-
     @Test
     @DisplayName("B4: todo id devolvido pela lista de faturas resolve em GET /v1/invoices/{id} (cartão usado em 01/2024 e retomado em 10/2026)")
     void idsDaListaResolvem() throws Exception {
@@ -138,13 +128,10 @@ class CardBordersQaIT {
         assertThat(failures).as("faturas listadas (" + list.size() + ") cujo id dá 404 no detalhe").isEmpty();
     }
 
-    // ------------------------------------------------------------------ bordas de data: oráculo independente
-
     private static int dayOf(int day, YearMonth m) {
         return Math.min(day, m.lengthOfMonth());
     }
 
-    /** Fechamento, vencimento e referência da fatura que fecha em {@code m}, calculados fora do domínio (D1 §2.5.1). */
     private static LocalDate[] oracle(int closingDay, int dueDay, YearMonth m) {
         LocalDate closing = m.atDay(dayOf(closingDay, m));
         YearMonth dueMonth = dueDay > closingDay ? m : m.plusMonths(1);

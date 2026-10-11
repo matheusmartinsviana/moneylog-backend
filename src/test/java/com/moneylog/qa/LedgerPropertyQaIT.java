@@ -34,12 +34,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T43 (QA): propriedade com semente fixa. Sequências aleatórias de criar, editar e estornar pela API (casos de uso reais,
- * Postgres real) contra um modelo independente em BigDecimal. Invariantes: o razão fecha em zero (total e por grupo de
- * origem), saldo das contas = modelo, lista = entries = dashboard, consumo por categoria nunca negativo, estornada sem
- * lançamento ativo, sem dupla contagem.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T43: propriedade do razão com semente fixa")
@@ -64,7 +58,6 @@ class LedgerPropertyQaIT {
         return Stream.of(20261005L, 7L, 42L, 1234567L, 987654321L);
     }
 
-    /** Estado esperado de uma movimentação no modelo. */
     private static final class M {
         String id;
         String type;
@@ -72,10 +65,10 @@ class LedgerPropertyQaIT {
         BigDecimal amount;
         String date;
         String description;
-        String account;        // conta principal (EXPENSE/INCOME/ADJUSTMENT/REFUND) ou origem/caixa
-        String account2;       // destino (TRANSFER) ou investimento
+        String account;
+        String account2;
         String category;
-        String direction;      // CONTRIBUTION/REDEMPTION | INCREASE/DECREASE
+        String direction;
         String refundOf;
         long version;
     }
@@ -97,7 +90,6 @@ class LedgerPropertyQaIT {
         clock.set(Instant.parse("2026-10-31T15:00:00Z"));
         world = new QaWorld(mvc, om, jdbc, auth, tm);
         u = world.new Actor("prop");
-        // token emitido com o relógio de hoje
         u = reissue(u);
         cashAccounts = List.of(u.nubank, u.xp, u.account("Carteira", "WALLET", "150.00"));
         investAccounts = List.of(u.xpInvest, u.account("Poupança Invest", "INVESTMENT", "300.00"));
@@ -126,11 +118,8 @@ class LedgerPropertyQaIT {
     }
 
     private QaWorld.Actor reissue(QaWorld.Actor actor) throws Exception {
-        // o Actor fixou o bearer com o relógio anterior; como o token vale 15 min a partir de iat, basta recriar o usuário com o relógio atual
         return world.new Actor("prop");
     }
-
-    // ---------------------------------------------------------------- operações
 
     private static BigDecimal bd(String s) {
         return new BigDecimal(s);
@@ -145,7 +134,6 @@ class LedgerPropertyQaIT {
         return r.nextInt(10) == 0 ? "2026-11-" + String.format("%02d", 1 + r.nextInt(20)) : "2026-10-" + String.format("%02d", day);
     }
 
-    /** Data no mesmo mês de {@code ref} (reembolso e despesa na mesma competência: o consumo por categoria nunca fica negativo). */
     private String sameMonth(Random r, String ref) {
         return ref.substring(0, 8) + String.format("%02d", 1 + r.nextInt(28));
     }
@@ -347,7 +335,7 @@ class LedgerPropertyQaIT {
             case "EXPENSE" -> {
                 BigDecimal refunds = refunded(t.id, null);
                 if (refunds.signum() > 0) {
-                    newAmount = refunds.add(bd(money(r, 5000)));  // não pode baixar de Σ reembolsos; categoria travada
+                    newAmount = refunds.add(bd(money(r, 5000)));
                 } else {
                     newCategory = pick(r, expCategories);
                 }
@@ -401,7 +389,6 @@ class LedgerPropertyQaIT {
         return "edit " + t.type + " -> " + newAmount;
     }
 
-    /** Operações que o domínio precisa recusar sem mudar nada (o estado é conferido nos checks). */
     private String invalidAttempt(Random r) throws Exception {
         List<M> exp = active("EXPENSE");
         int k = r.nextInt(5);
@@ -437,8 +424,6 @@ class LedgerPropertyQaIT {
         }
         return "invalid#" + k;
     }
-
-    // ---------------------------------------------------------------- invariantes
 
     private BigDecimal balanceOf(String account, Map<String, BigDecimal> opening) {
         BigDecimal b = opening.get(account);
@@ -509,7 +494,6 @@ class LedgerPropertyQaIT {
         }
     }
 
-    /** Soma os itens de todas as páginas (paginação sem repetição nem perda). */
     private long pagedItems(String url, long seed, int step, List<String> log) throws Exception {
         long total = 0;
         java.util.Set<String> ids = new java.util.HashSet<>();
@@ -530,11 +514,10 @@ class LedgerPropertyQaIT {
 
     private void check(Map<String, BigDecimal> opening, long seed, int step, List<String> log) throws Exception {
         if (!failures.isEmpty()) {
-            return; // o primeiro desvio já invalida a sequência; evita ruído em cascata
+            return;
         }
         expect("Σ razão ativo", 0L, world.ledgerSum(u.id), seed, step, log);
         expect("grupos de origem desbalanceados", 0L, world.unbalancedActiveGroups(u.id), seed, step, log);
-        // estornadas não têm lançamento ativo; ativas têm
         for (M t : txs.values()) {
             if ("UNEXPECTED".equals(t.type)) {
                 continue;
@@ -544,7 +527,6 @@ class LedgerPropertyQaIT {
                 failures.add("seed " + seed + " passo " + step + ": tx " + t.type + " active=" + t.active + " com " + activePostings + " lançamentos ativos");
             }
         }
-        // saldo das contas
         BigDecimal cash = BigDecimal.ZERO;
         BigDecimal investments = BigDecimal.ZERO;
         JsonNode accounts = u.get("/v1/accounts?pageSize=50");
@@ -582,7 +564,6 @@ class LedgerPropertyQaIT {
             JsonNode incomeEntries = u.get("/v1/entries?competence=" + month + "&lens=INCOME&pageSize=50");
             expect("entries receita " + month, income, amount(incomeEntries.get("totals").get("total")).setScale(2), seed, step, log);
 
-            // dashboard do mês = entries; cashFlow do dashboard = totals.cashFlow da lista
             String last = month.equals("2026-10") ? "2026-10-31" : "2026-11-30";
             JsonNode dash = u.get("/v1/dashboard/summary?asOf=" + last).get("month");
             expect("dashboard consumo " + month, consumption, amount(dash.get("consumption")).setScale(2), seed, step, log);
@@ -600,7 +581,6 @@ class LedgerPropertyQaIT {
             expect("itens ACTIVE " + month, expectedCount, pagedItems("/v1/transactions?from=" + month + "-01&to=" + last + "&status=ACTIVE", seed, step, log), seed, step, log);
             expect("itens sem status (padrão ACTIVE) " + month, expectedCount, pagedItems("/v1/transactions?from=" + month + "-01&to=" + last, seed, step, log), seed, step, log);
         }
-        // sem dupla contagem: Σ postings EXPENSE ativos = Σ consumo do modelo (todos os meses)
         BigDecimal expenseBook = jdbc.queryForObject("select coalesce(sum(amount_cents),0) from ledger_postings where user_id = ? and active and book_type = 'EXPENSE'",
                 BigDecimal.class, u.id).movePointLeft(2).setScale(2);
         expect("Σ livro EXPENSE", modelConsumption("2026-", null).setScale(2), expenseBook, seed, step, log);

@@ -153,7 +153,7 @@ class RecurringTransactionTest {
         assertThat(inativa.occurrences(d("2026-10-01"), d("2026-10-31"))).isEmpty();
         assertThat(MonthlyEstimate.of(List.of(umaAssinatura(Schedule.custom(2, IntervalUnit.MONTHS, d("2026-10-10"))),
                 umaAssinatura(Schedule.of(Frequency.DAILY, d("2026-10-10")))), d("2026-10-10")).fixedCosts())
-                .isEqualTo(Money.of("3679.08")); // 119/2 + 119 × 365/12 = 59,50 + 3.619,5833 = 3.679,0833
+                .isEqualTo(Money.of("3679.08"));
     }
 
     @Test
@@ -225,19 +225,15 @@ class RecurringTransactionTest {
         assertThat(semFim.isEnded(today)).isFalse();
         RecurringTransaction fimPassado = umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10")).until(d("2026-03-10")));
         assertThat(fimPassado.isEnded(today)).isTrue();
-        // a ocorrência de hoje ainda é futura (hoje conta): encerrada hoje não está encerrada, só no dia seguinte
         RecurringTransaction fimHoje = umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10")).until(today));
         assertThat(fimHoje.isEnded(today)).isFalse();
         assertThat(fimHoje.isEnded(today.plusDays(1))).isTrue();
-        // fim depois de hoje mas sem ocorrência entre hoje e o fim (mensal dia 10, fim 09/11): a de 10/10 é a última
         RecurringTransaction fimEntre = umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10")).until(d("2026-11-09")));
         assertThat(fimEntre.isEnded(d("2026-10-11"))).isTrue();
         assertThat(fimEntre.isEnded(today)).isFalse();
-        // quantidade esgotada: 3 mensais desde 10/01 = 10/01, 10/02, 10/03
         RecurringTransaction esgotada = umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10")).limitedTo(3));
         assertThat(esgotada.isEnded(today)).isTrue();
         assertThat(umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-09-10")).limitedTo(3)).isEnded(today)).isFalse();
-        // início no futuro nunca está encerrada; desativar não muda o derivado
         assertThat(umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2027-01-10")).until(d("2027-06-10"))).isEnded(today)).isFalse();
         semFim.deactivate();
         assertThat(semFim.isEnded(today)).isFalse();
@@ -283,7 +279,6 @@ class RecurringTransactionTest {
                 .extracting("code").isEqualTo("RECURRENCE_ENDED");
         assertThatCode(() -> umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-10-10")).until(d("2026-12-10"))).ensureEndRemovalDoesNotReopen(today)).doesNotThrowAnyException();
         assertThatCode(() -> umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10"))).ensureEndRemovalDoesNotReopen(today)).doesNotThrowAnyException();
-        // esgotada só por quantidade: tirar o fim não a reabre
         assertThatCode(() -> umaAssinatura(Schedule.of(Frequency.MONTHLY, d("2026-01-10")).limitedTo(2)).ensureEndRemovalDoesNotReopen(today)).doesNotThrowAnyException();
     }
 }

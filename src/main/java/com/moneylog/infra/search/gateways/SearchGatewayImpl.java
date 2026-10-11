@@ -32,30 +32,13 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Busca global em JDBC (S-287). Cada grupo é <b>uma consulta própria</b>, sempre com {@code user_id = ?} (nenhum dado de outro usuário), sem
- * diferenciar acento nem caixa ({@code unaccent(coluna) ILIKE unaccent(padrão)}, com {@code %}, {@code _} e {@code \} do termo escapados: são
- * texto) e com ordem total (desempate por {@code id}), então a resposta é determinística. {@code unaccent()} é {@code STABLE}: não usa índice, a
- * consulta varre as linhas do usuário (medido com 50.000 movimentações no {@code RedesignVolumeQaIT}).
- *
- * <p>Cada consulta roda sob {@code statement_timeout} próprio, dentro de um <i>savepoint</i>: no Postgres uma consulta cancelada aborta a transação
- * inteira, e sem o savepoint os outros grupos (e o instantâneo {@code REPEATABLE_READ} do caso de uso) morreriam junto. Estourou: o grupo volta
- * vazio e marcado em {@code truncated}; a transação segue. Notas: só título e caminho (o corpo não é varrido). O termo nunca entra em mensagem de
- * erro nem em log: uma falha vira {@link SearchFailedException} só com o {@code SQLState}.
- */
 public class SearchGatewayImpl implements SearchGateway {
 
-    /** Teto de tempo por grupo (S-287: ≤ 3 s). */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
     private static final String QUERY_CANCELED = "57014";
     private static final int SNIPPET_MAX = 160;
     private static final int BODY_HEAD = 400;
 
-    /**
-     * BUG-QA-01/04: o termo cru (um parâmetro) é normalizado em NFC, desacentuado e <b>só então</b> escapado ({@code \}, {@code %}, {@code _}) e
-     * cercado de {@code %}; assim um caractere que o {@code unaccent} transforma em curinga (U+FF05, U+FF3F, U+2216...) fica literal. As colunas
-     * passam por {@code normalize(..., NFC)} antes do {@code unaccent}, para a descrição gravada em NFD (letra + marca combinante solta) casar.
-     */
     static final String PATTERN_SQL = "('%' || replace(replace(replace(unaccent(normalize(?, NFC)), '\\', '\\\\'), '%', '\\%'), '_', '\\_') || '%')";
 
     private final JdbcTemplate jdbc;
@@ -66,7 +49,6 @@ public class SearchGatewayImpl implements SearchGateway {
         this.timeoutMillis = Math.max(1, timeout.toMillis());
     }
 
-    /** Falha da busca sem o termo (nem o SQL com parâmetros) na mensagem. */
     public static final class SearchFailedException extends RuntimeException {
         public SearchFailedException(String sqlState) {
             super("falha ao executar a busca (SQLState " + sqlState + ")");
@@ -95,7 +77,6 @@ public class SearchGatewayImpl implements SearchGateway {
         });
     }
 
-    /** Uma consulta de grupo sob o teto de tempo; visível ao pacote para o teste do estouro (sem depender de dados lentos). */
     <T> List<T> group(Connection connection, SearchGroup group, Set<SearchGroup> truncated, Query<T> query) throws SQLException {
         Outcome<T> outcome = guarded(connection, query);
         if (outcome.truncated()) {
@@ -112,8 +93,6 @@ public class SearchGatewayImpl implements SearchGateway {
                 timeout.execute();
             }
             List<T> rows = query.run(connection);
-            // Consulta só de leitura: voltar ao savepoint desfaz o set_config local e devolve o teto original; senão o teto
-            // (ex.: 1 ms) continuaria valendo para o COMMIT e o cancelaria (QueryTimeoutException -> 500).
             connection.rollback(savepoint);
             return new Outcome<>(rows, false);
         } catch (SQLException e) {
@@ -125,13 +104,6 @@ public class SearchGatewayImpl implements SearchGateway {
         }
     }
 
-    // ------------------------------------------------------------------ grupos
-
-    /**
-     * A tabela grande: o padrão é desacentuado <b>uma vez</b> (subconsulta de uma linha) em vez de {@code unaccent(?)} a cada linha, porque
-     * {@code unaccent()} é {@code STABLE} e o Postgres não o reduz a constante. O ganho é pequeno (A/B em {@code RedesignVolumeQaIT} com 50.000
-     * movimentações: 186 contra 195 ms numa máquina calma; 416 contra 599 ms numa carregada); o custo dominante é o {@code unaccent} da coluna.
-     */
     private static List<TransactionHit> transactions(Connection c, UUID userId, String pattern, int limit) throws SQLException {
         String sql = """
                 SELECT t.id, t.description, t.transaction_date, t.amount_cents, t.type, t.category_id, cat.name AS category_name,
@@ -193,7 +165,6 @@ public class SearchGatewayImpl implements SearchGateway {
                 CardStatus.valueOf(rs.getString("status"))));
     }
 
-    /** Só título e caminho; o {@code snippet} é o começo do corpo (400 caracteres lidos), sem busca no corpo. */
     private static List<NoteHit> notes(Connection c, UUID userId, String pattern, int limit) throws SQLException {
         String sql = """
                 SELECT n.id, n.title, n.path, substr(n.body, 1, %d) AS head FROM notes n
@@ -207,8 +178,6 @@ public class SearchGatewayImpl implements SearchGateway {
             ps.setInt(4, limit);
         }, rs -> new NoteHit(rs.getObject("id", UUID.class), rs.getString("title"), rs.getString("path"), snippet(rs.getString("head"))));
     }
-
-    // ------------------------------------------------------------------ apoio
 
     @FunctionalInterface
     private interface Binder {
@@ -246,7 +215,6 @@ public class SearchGatewayImpl implements SearchGateway {
         return id == null ? null : new Ref(id, rs.getString(nameColumn));
     }
 
-    /** Texto puro de uma linha: controles viram espaço, espaços colapsam, até 160 caracteres. */
     static String snippet(String head) {
         if (head == null) {
             return "";
@@ -254,7 +222,6 @@ public class SearchGatewayImpl implements SearchGateway {
         return NoteSnippets.head(head.replaceAll("\\p{Cc}", " "), SNIPPET_MAX);
     }
 
-    /** {@code \}, {@code %} e {@code _} são literais. */
     static String escapeLike(String text) {
         return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }

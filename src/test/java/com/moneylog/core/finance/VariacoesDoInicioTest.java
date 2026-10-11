@@ -98,7 +98,6 @@ class VariacoesDoInicioTest {
 
     private static final UUID CONTA_ID = UUID.fromString("00000000-0000-0000-0000-00000000ac01");
 
-    /** Conta corrente aberta em 01/09/2026 com 1.000,00: em 30/09 o saldo em contas é 1.000,00. */
     private static Account contaDeSetembro() {
         return Account.open(CONTA_ID, USER_ID, "Conta de setembro", AccountType.CHECKING, null, Money.of("1000.00"), LocalDate.of(2026, 9, 1));
     }
@@ -129,7 +128,6 @@ class VariacoesDoInicioTest {
     @DisplayName("T188: previous = 0 → percent null; previous negativo → percent usa |previous| e o sinal de amount manda")
     void deveTratarBaseZeroENegativa() {
         FinanceScenarioFactory s = umCenarioBase();
-        // as contas do cenário base abrem em 01/10: em 30/09 o saldo é 0
         FinancialRecords fromZero = s.records();
         InAccountsChange zero = dashboard(fromZero, BASE_DATE, BASE_DATE).balances().inAccountsChange();
         assertThat(zero.previous().isZero()).isTrue();

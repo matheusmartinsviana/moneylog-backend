@@ -12,7 +12,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.qa.CardQaWorld.Actor;
 import com.moneylog.qa.CardQaWorld.Res;
 
-/** T82 (QA): chamadas e leituras da Etapa 4 (pessoas, dívidas, divisão, recorrências) sobre o {@link Actor} da T61. */
 final class DebtQa {
 
     private DebtQa() {
@@ -91,7 +90,6 @@ final class DebtQa {
         return a.call(HttpMethod.POST, "/v1/debts/" + debtId + "/void", "{\"reason\":\"qa\"}", null);
     }
 
-    /** Todas as páginas de uma lista (pageSize 50). */
     static List<JsonNode> all(Actor a, String url) throws Exception {
         List<JsonNode> out = new ArrayList<>();
         for (int page = 1; page < 200; page++) {

@@ -23,10 +23,6 @@ import com.moneylog.core.transaction.app.query.TransactionFilter;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 
-/**
- * Exportação CSV das movimentações (T97). Lê o mesmo {@link FinancialRecords} da lista e aplica o mesmo {@link TransactionFilter}: nada
- * é calculado à parte. As linhas são montadas dentro da transação de leitura; a escrita é em fluxo, depois dela.
- */
 public class ExportTransactionsCsvUseCaseImpl implements ExportTransactionsCsvUseCase {
 
     private static final char BOM = '﻿';
@@ -40,7 +36,6 @@ public class ExportTransactionsCsvUseCaseImpl implements ExportTransactionsCsvUs
         this(records, categories, ExportBackupUseCase.MAX_TRANSACTIONS);
     }
 
-    /** @param maxRows teto de linhas do arquivo (S-260); acima dele, {@link ExportTooLargeException} antes de qualquer byte */
     public ExportTransactionsCsvUseCaseImpl(FinancialRecordsGateway records, CategoryGateway categories, int maxRows) {
         this.records = records;
         this.categories = categories;
@@ -97,7 +92,6 @@ public class ExportTransactionsCsvUseCaseImpl implements ExportTransactionsCsvUs
         };
     }
 
-    /** O arquivo: cabeçalho + linhas já escapadas. */
     private record Csv(List<String> header, List<String[]> rows, String fileName) implements CsvExport {
 
         @Override

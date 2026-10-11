@@ -16,12 +16,6 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionFieldRequiredException;
 
-/**
- * Os handlers das movimentações de dívida (Etapa 4, T76): emprestar ({@code LOAN_GIVEN}), receber ({@code MONEY_RECEIVED}, devolução
- * ou captação) e pagar ({@code DEBT_PAYMENT}). Mesmo ponto de extensão dos demais tipos; as regras são as de
- * {@link DebtTransactions} (nenhuma toca {@code EXPENSE}/{@code INCOME}: empréstimo não é consumo e devolução não é renda, PR 01).
- * A dívida que nasce com a movimentação volta em {@link BuiltTransaction#newDebts()} para ser gravada antes dela.
- */
 public final class DebtTransactionHandlers {
 
     private DebtTransactionHandlers() {
@@ -71,7 +65,6 @@ public final class DebtTransactionHandlers {
             TransactionHeader header = header(support, c.common(), id, origin);
             Account account = support.account(c.userId(), c.accountId());
             if (c.debtId() != null) {
-                // uma dívida existente nunca recebe outra origem (S-41): a fábrica recusa com o motivo certo
                 Debt existing = support.debt(c.userId(), c.debtId());
                 return built(DebtTransactions.loanGiven(header, c.common().amount(), account, existing), false);
             }

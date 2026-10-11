@@ -41,10 +41,6 @@ import com.moneylog.core.transaction.domain.DebtTransactions;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 
-/**
- * T238 a T241: a visão total de dívidas lê o ESTADO (faturas e dívidas); compra → parcela → fatura → pagamento não conta em dobro (PR 01).
- * Cenário base de D1 §3: Roxinho fecha dia 25, vence dia 5; hoje 10/10/2026.
- */
 @DisplayName("Visão total de dívidas (T238 a T241, ADR-013)")
 class DebtOverviewTest {
 
@@ -67,8 +63,6 @@ class DebtOverviewTest {
         s.transactions.add(tx);
         return tx;
     }
-
-    // ------------------------------------------------------------------ cartões (T238)
 
     @Test
     @DisplayName("1.200 em 6x hoje: cartão 1.200 (fatura 200 + futuras 1.000), plano com 6 restantes e a parcela 1 não é somada de novo")
@@ -134,11 +128,11 @@ class DebtOverviewTest {
     void devePagamentoAMaiorAbaterAProximaFatura() {
         FinanceScenarioFactory s = umCenarioBase();
         s.caso2CompraParcelada();
-        s.pagarFatura("300.00", LocalDate.of(2026, 10, 25), LocalDate.of(2026, 11, 5)); // fatura era 200: 100 de crédito
+        s.pagarFatura("300.00", LocalDate.of(2026, 10, 25), LocalDate.of(2026, 11, 5));
 
         DebtOverview o = overview(s, LocalDate.of(2026, 11, 5), 12);
 
-        assertThat(o.cards().total()).isEqualTo(Money.of("900.00")); // 1.200 − 300 pagos
+        assertThat(o.cards().total()).isEqualTo(Money.of("900.00"));
         assertThat(o.cards().items().getFirst().adjustment()).isEqualTo(Money.of("-100.00"));
     }
 
@@ -168,8 +162,6 @@ class DebtOverviewTest {
         assertThat(o.total()).isEqualTo(Money.of("380.00"));
         assertThat(o.cards().items().getFirst().adjustment()).isEqualTo(Money.of("-120.00"));
     }
-
-    // ------------------------------------------------------------------ pessoas e outras (T238, T244)
 
     @Test
     @DisplayName("dívida PAYABLE de 200 com quitação de 50: pessoas 150; RECEIVABLE de 300 não entra e vai em receivablesInfo")
@@ -234,8 +226,6 @@ class DebtOverviewTest {
                 .isInstanceOf(DebtCreditorInvalidException.class);
     }
 
-    // ------------------------------------------------------------------ compra em andamento (T241)
-
     @Test
     @DisplayName("150 × 8 restantes de 10, próxima na fatura corrente: parcelas 3/10 a 10/10, total sobe 1.200 e é plano 'ongoing'")
     void deveCadastrarCompraEmAndamento() {
@@ -299,13 +289,11 @@ class DebtOverviewTest {
     @DisplayName("com categoria, a próxima parcela em mês passado é recusada (não cria consumo no passado)")
     void deveRecusarCategoriaRetroativa() {
         FinanceScenarioFactory s = umCenarioBase();
-        // fatura de setembro (fecha 25/09) ainda aberta na prática de quem já tem item nela: simula com uma compra que a torna CLOSED
         s.transactions.add(CardTransactions.purchase(s.header(LocalDate.of(2026, 9, 10), "Antiga"), Money.of("100.00"), s.roxinho,
                 s.alimentacao, 1, com.moneylog.core.card.domain.InvoiceChain.empty(s.roxinho), LocalDate.of(2026, 9, 10)));
 
         assertThatThrownBy(() -> ongoing(s, "150.00", 10, 8, LocalDate.of(2026, 9, 20), s.alimentacao, BASE_DATE))
                 .isInstanceOf(OngoingCategoryRetroactiveException.class);
-        // sem categoria a mesma data vale (fatura fechada e não paga, lançamento tardio)
         Transaction tx = ongoing(s, "150.00", 10, 8, LocalDate.of(2026, 9, 20), null, BASE_DATE);
         assertThat(tx.installments().getFirst().lateEntry()).isTrue();
     }
@@ -352,8 +340,6 @@ class DebtOverviewTest {
         assertThat(edited.installments()).isEqualTo(tx.installments());
         assertThat(edited.entries()).hasSameSizeAs(tx.entries());
     }
-
-    // ------------------------------------------------------------------ custo fixo, renda, comparação, curva (T239)
 
     @Test
     @DisplayName("custo fixo 3.000 e renda 6.000: fixedCostToIncome 0.5000 e o custo fixo NÃO entra no total")
@@ -417,7 +403,7 @@ class DebtOverviewTest {
     @DisplayName("fatura vencida fica em overdue (fora dos pontos); dívida sem data em undated e payoff nulo com UNDATED_DEBTS")
     void deveSepararVencidoESemData() {
         FinanceScenarioFactory s = umCenarioBase();
-        s.compraNoCartao("400.00", 1); // fatura que fecha 25/10, vence 05/11
+        s.compraNoCartao("400.00", 1);
         s.debts.add(Debt.withoutMovement(UUID.fromString("00000000-0000-0000-0000-00000000db12"), USER_ID, PersonTestFactory.umPedro(),
                 DebtDirection.PAYABLE, Money.of("90.00"), BASE_DATE, null, "sem data"));
 
@@ -447,7 +433,7 @@ class DebtOverviewTest {
         assertThat(empty.total()).isEqualTo(ZERO);
         assertThat(empty.schedule().payoffCompetence()).isNull();
         assertThat(empty.schedule().payoffReason()).isNull();
-        assertThat(empty.hasRecords()).isTrue(); // o cenário base tem um cartão
+        assertThat(empty.hasRecords()).isTrue();
         assertThat(overview(new FinancialRecords(List.of(), List.of(), List.of(), List.of()), BASE_DATE, 12, ZERO, ZERO).hasRecords()).isFalse();
     }
 

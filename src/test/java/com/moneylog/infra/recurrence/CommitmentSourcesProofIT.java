@@ -16,12 +16,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/**
- * T81: prova cruzada de que cada compromisso entra <b>uma vez</b> entre todas as fontes (faturas de cartão, dívidas e recorrências) em
- * {@code /v1/dashboard/upcoming} e no {@code summary}, e de que a lista, o dashboard e a tela da pessoa concordam. Cenário completo
- * (relógio 10/10/2026): fatura do Roxinho de 1.283,00 vence 05/11; Internet de 119,00 todo dia 10 com início 10/10; o João deve 150,00 com
- * previsão 05/11; eu devo 200,00 à Maria, sem data.
- */
 @DisplayName("Compromissos sem dupla contagem: cartões, faturas, dívidas e recorrências (T81)")
 class CommitmentSourcesProofIT extends E4ItBase {
 
@@ -57,7 +51,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         return new BigDecimal(money.get("amount").asString());
     }
 
-    /** Σ (valor) dos itens de um {@code kind} em {@code /upcoming}. */
     private static BigDecimal sumOf(JsonNode items, String... kinds) {
         BigDecimal sum = BigDecimal.ZERO;
         Set<String> wanted = Set.of(kinds);
@@ -69,7 +62,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         return sum;
     }
 
-    /** Σ (valor) dos itens de um {@code kind} e sentido em {@code /upcoming}. */
     private static BigDecimal sumDirected(JsonNode items, String kind, String direction) {
         BigDecimal sum = BigDecimal.ZERO;
         for (JsonNode item : items) {
@@ -80,10 +72,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         return sum;
     }
 
-    /**
-     * Oráculo independente das movimentações futuras (S-258), direto do razão: o efeito líquido, por movimentação e data, nas contas de caixa
-     * ({@code CHECKING}, {@code SAVINGS}, {@code WALLET}) dos lançamentos ativos com data depois de hoje e até o fim do horizonte, no sentido pedido.
-     */
     private BigDecimal scheduledFromLedger(String today, boolean outgoing) {
         Long cents = jdbc.queryForObject("""
                 SELECT coalesce(sum(abs(net)), 0) FROM (
@@ -95,11 +83,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         return BigDecimal.valueOf(cents, 2);
     }
 
-    /**
-     * A decomposição: cada fonte soma o que ela mesma diz (faturas = Σ outstanding das faturas não pagas com vencimento até o fim do
-     * horizonte; recorrências = Σ ocorrências pendentes de saída; dívidas = Σ saldo das PAYABLE datadas em aberto), o total de saídas é a
-     * soma das três e nenhum compromisso aparece duas vezes.
-     */
     private void assertNoDoubleCounting(String label) throws Exception {
         JsonNode upcoming = upcoming("from=2026-10-10&to=" + HORIZON_END);
         JsonNode items = upcoming.get("items");
@@ -130,7 +113,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         assertThat(sumOf(items, "INVOICE", "INVOICE_FORECAST")).as(label + ": faturas").isEqualByComparingTo(invoices);
         assertThat(sumOf(items, "RECURRENCE").subtract(sumOfIn(items))).as(label + ": recorrências").isEqualByComparingTo(pendingOut);
         assertThat(sumOf(items, "DEBT_PAYABLE")).as(label + ": dívidas a pagar").isEqualByComparingTo(payables);
-        // S-258: movimentações ativas com data futura são compromissos próprios, calculados à parte direto do razão
         String today = summary().get("asOf").asString();
         BigDecimal scheduledOut = scheduledFromLedger(today, true);
         assertThat(sumDirected(items, "SCHEDULED_TRANSACTION", "OUT")).as(label + ": movimentações futuras (saída)").isEqualByComparingTo(scheduledOut);
@@ -143,13 +125,11 @@ class CommitmentSourcesProofIT extends E4ItBase {
             String key = item.get("kind").asString() + "|" + item.get("refId").asString() + "|" + item.get("dueDate").asString();
             assertThat(keys.add(key)).as(label + ": item duplicado " + key).isTrue();
         }
-        // o aninhado nunca soma de novo: a fatura vale o seu outstanding, não o das parcelas somadas ao seu valor
         for (JsonNode item : items) {
             assertThat(item.get("kind").asString()).isNotEqualTo("INSTALLMENT");
         }
     }
 
-    /** Receitas previstas dentro das recorrências (nenhuma neste cenário): zero. */
     private static BigDecimal sumOfIn(JsonNode items) {
         BigDecimal sum = BigDecimal.ZERO;
         for (JsonNode item : items) {
@@ -180,7 +160,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         assertThat(money(items.get(2), "amount")).isEqualTo("150.00");
         assertThat(items.get(3).get("kind").asString()).isEqualTo("RECURRENCE");
         assertThat(items.get(3).get("dueDate").asString()).isEqualTo("2026-11-10");
-        // a dívida da Maria não tem data: undated e fora dos horizontes (S-145)
         assertThat(upcoming.get("undated")).hasSize(1);
         assertThat(upcoming.get("undated").get(0).get("refId").asString()).isEqualTo(mariaDebtId);
         assertThat(money(upcoming.get("totals"), "out")).isEqualTo("1521.00");
@@ -188,10 +167,8 @@ class CommitmentSourcesProofIT extends E4ItBase {
 
         JsonNode summary = summary();
         JsonNode committed = summary.get("committed");
-        // d30 vai até 09/11 (hoje + 30): Internet 10/10 + fatura de 05/11; a Internet de 10/11 é o dia 31 e a fatura de 05/12 também não entra
         assertThat(money(committed, "d30")).isEqualTo("1402.00");
         assertThat(money(committed, "d60")).isEqualTo("1721.00");
-        // as entradas (João) não abatem o comprometido, mas a projeção as soma como entrada prevista
         assertThat(money(summary.get("projected"), "d30")).isEqualTo("18598.00");
         assertThat(money(summary.get("balances"), "available")).isEqualTo("18448.00");
         assertNoDoubleCounting("cenário");
@@ -210,7 +187,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         assertThat(amount(after.get("month").get("consumption")).subtract(amount(before.get("month").get("consumption")))).isEqualByComparingTo("119.00");
         assertThat(upcoming("from=2026-10-10&to=2026-10-31").get("items")).extracting(i -> i.get("kind").asString()).doesNotContain("RECURRENCE");
         assertNoDoubleCounting("depois de realizar");
-        // estornar a movimentação reabre a ocorrência: o compromisso volta e o consumo some (S-49)
         String tx = jdbc.queryForObject("SELECT id::text FROM transactions WHERE recurrence_id = ?::uuid AND status = 'ACTIVE'", String.class, internetId);
         mockMvc.perform(post("/v1/transactions/" + tx + "/void", voidBody("errado"))).andExpect(status().isOk());
         assertThat(money(summary().get("committed"), "d30")).isEqualTo(money(before.get("committed"), "d30"));
@@ -246,7 +222,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         mockMvc.perform(post("/v1/recurrences/" + internetId + "/occurrences/2026-11-10/skip", "")).andExpect(status().isOk());
         assertNoDoubleCounting("2 Internet 10/11 pulada");
         realize(streaming, "2026-10-15");
-        // a ocorrência de cartão saiu das previsões e a fatura passou a carregar os 49,90 (sem dupla contagem)
         assertThat(upcoming("from=2026-10-10&to=2026-11-10").get("items")).extracting(i -> i.get("kind").asString() + i.get("dueDate").asString())
                 .doesNotContain("RECURRENCE2026-10-15");
         assertNoDoubleCounting("3 assinatura no cartão realizada");
@@ -288,7 +263,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         JsonNode future = created("{\"type\":\"EXPENSE\",\"amount\":\"1000.00\",\"date\":\"2026-10-15\",\"description\":\"Aluguel\",\"accountId\":\"" + nubank
                 + "\",\"categoryId\":\"" + bills + "\",\"method\":\"PIX\"}");
         assertNoDoubleCounting("1 despesa futura");
-        // o resumo mensal segue a competência: a despesa de 15/10 é consumo de outubro (no resumo e no dashboard, o mesmo número), mesmo antes de ser caixa
         JsonNode october = okBody(get("/v1/summaries/2026-10"));
         assertThat(money(october, "expenses")).isEqualTo(money(summary().get("month"), "consumption"));
         assertThat(amount(october.get("expenses")).subtract(amount(okBody(get("/v1/summaries/2026-09")).get("expenses")))).isGreaterThanOrEqualTo(new BigDecimal("1000.00"));
@@ -310,7 +284,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         mockMvc.perform(post("/v1/transactions/" + future.get("id").asString() + "/void", voidBody("engano"))).andExpect(status().isOk());
         assertNoDoubleCounting("6 despesa futura estornada");
 
-        // o relógio avança: as movimentações viram caixa e o total (em contas + entradas − saídas) não muda
         BigDecimal reference = totalOf(summary());
         for (String day : new String[] {"2026-10-16T15:00:00Z", "2026-10-21T15:00:00Z", "2026-10-26T15:00:00Z", "2026-11-04T15:00:00Z", "2026-11-11T15:00:00Z"}) {
             advanceTo(java.time.Instant.parse(day));
@@ -320,7 +293,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
         assertThat(ledgerTotal()).isZero();
     }
 
-    /** Em contas + Σ entradas − Σ saídas de TODOS os compromissos datados (o horizonte de 1 ano cobre o cenário). */
     private BigDecimal totalOf(JsonNode summary) throws Exception {
         JsonNode upcoming = upcoming("from=2026-10-01&to=" + HORIZON_END);
         return amount(summary.get("balances").get("inAccounts")).add(amount(upcoming.get("totals").get("in"))).subtract(amount(upcoming.get("totals").get("out")));
@@ -351,7 +323,6 @@ class CommitmentSourcesProofIT extends E4ItBase {
             byCategory = byCategory.add(amount(category.get("amount")));
         }
         assertThat(byCategory).isEqualByComparingTo(amount(month.get("consumption")));
-        // as linhas: as da lista (por movimentação) + as de dívida de consumo somam o total
         BigDecimal lines = BigDecimal.ZERO;
         for (JsonNode item : entries.get("items")) {
             lines = lines.add(amount(item.get("amount")));
@@ -362,11 +333,9 @@ class CommitmentSourcesProofIT extends E4ItBase {
         assertThat(lines).isEqualByComparingTo(amount(month.get("consumption")));
         assertThat(entries.get("debtItems")).hasSize(1);
         assertThat(money(month, "debtConsumption")).isEqualTo("30.00");
-        // consumo = pago + cartão − reembolso + dívida
         BigDecimal identity = amount(month.get("expensesPaid").get("total")).add(amount(month.get("credit"))).subtract(amount(month.get("refunds")))
                 .add(amount(month.get("debtConsumption")));
         assertThat(identity).isEqualByComparingTo(amount(month.get("consumption")));
-        // a tela da pessoa concorda com as dívidas: João deve 30 (passivo) e tem 110 a receber depois de pagar 40
         JsonNode joaoView = person(joao, true);
         assertThat(money(joaoView, "net")).isEqualTo("80.00");
         assertThat(ledgerTotal()).isZero();

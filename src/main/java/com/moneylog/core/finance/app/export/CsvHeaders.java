@@ -11,12 +11,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/**
- * Cabeçalho e rótulos do CSV de movimentações por idioma (S-153, S-261): português (padrão) e inglês. Tipo, método, status e direção saem
- * traduzidos conforme o cabeçalho. As colunas e a ordem não mudam; {@code Direção}/{@code Direction} é a 9ª coluna (aditiva): aplicação ou
- * resgate no {@code INVESTMENT}, crédito ou débito no {@code ADJUSTMENT}, vazia nos demais tipos. A 10ª coluna (aditiva, ADR-017) é a
- * competência da renda ({@code AAAA-MM}) quando a receita pertence a outro mês que o da data; vazia nas demais linhas.
- */
 final class CsvHeaders {
 
     private static final List<String> PT = List.of("Data", "Tipo", "Descrição", "Categoria", "Conta/Cartão", "Método", "Valor", "Status", "Direção", "Competência da renda");
@@ -67,7 +61,6 @@ final class CsvHeaders {
         return (english ? STATUS_EN : STATUS_PT).get(status);
     }
 
-    /** Sentido do dinheiro nos tipos em que o valor (sempre positivo) não o diz: aplicação/resgate e crédito/débito (S-261, M2). */
     String direction(Transaction t) {
         InvestmentDirection investment = t.investmentDirection();
         if (t.type() == TransactionType.INVESTMENT && investment != null) {

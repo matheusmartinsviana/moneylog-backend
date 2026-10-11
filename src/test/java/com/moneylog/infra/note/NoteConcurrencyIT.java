@@ -24,10 +24,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.core.note.domain.NotePath;
 import com.moneylog.core.note.domain.WikilinkResolver;
 
-/**
- * Concorrência do vault (ordem de travas da ADR-009): criar × criar, editar × mover × lixeira × restaurar. Nunca 5xx; só 200/201/404/409/422
- * esperados; e o estado final tem os wikilinks resolvidos exatamente como o índice atual manda (nenhum link órfão ou apontando para a lixeira).
- */
 @DisplayName("Notas: concorrência de criar, editar, mover e lixeira (ordem de travas, ADR-009)")
 class NoteConcurrencyIT extends NotesItBase {
 
@@ -63,7 +59,6 @@ class NoteConcurrencyIT extends NotesItBase {
         }
     }
 
-    /** Todo wikilink gravado resolve exatamente como o índice atual das notas ativas manda (e nunca para a lixeira). */
     private void assertWikilinksConsistent() {
         List<WikilinkResolver.Entry> index = jdbc.query("SELECT id, path FROM notes WHERE user_id = ? AND deleted_at IS NULL",
                 (rs, row) -> new WikilinkResolver.Entry(rs.getObject("id", UUID.class), NotePath.of(rs.getString("path"))), userId);

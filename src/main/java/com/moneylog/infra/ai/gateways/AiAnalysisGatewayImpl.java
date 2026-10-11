@@ -22,10 +22,6 @@ import com.moneylog.core.ai.domain.AiStatus;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 
-/**
- * Registro de análises em JDBC. Nunca grava chave, cabeçalhos nem a resposta bruta do provedor: só os campos de {@link AiAnalysis}.
- * Toda consulta filtra pelo usuário.
- */
 public class AiAnalysisGatewayImpl implements AiAnalysisGateway {
 
     private static final TypeReference<List<String>> LIST = new TypeReference<>() {

@@ -13,10 +13,6 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import com.moneylog.core.note.app.gateways.NoteTargetGateway;
 import com.moneylog.core.note.domain.NoteLinkType;
 
-/**
- * Lê rótulo e estado dos alvos de vínculo, uma consulta por tipo e sempre filtrada pelo usuário. Só {@code SELECT}: o vault nunca grava nem
- * trava nenhuma entidade financeira.
- */
 public class NoteTargetGatewayImpl implements NoteTargetGateway {
 
     private final NamedParameterJdbcTemplate named;

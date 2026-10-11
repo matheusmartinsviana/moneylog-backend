@@ -31,29 +31,15 @@ import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.transaction.persistence.TransactionEntity;
 
-/**
- * {@code Transaction} ⇄ {@code TransactionEntity} (+ {@code InstallmentEntity}). A reidratação usa
- * {@link Transaction#restore} (T45), que recusa estado gravado corrompido. Tipos em conta e de cartão (compra,
- * reembolso e pagamento de fatura) e de dívida (emprestar, receber, pagar). O domínio fala em {@code closingDate}:
- * só este mapper conhece {@code invoice_id} (ADR-006) e traduz pelas linhas de fatura já carregadas.
- */
 public final class TransactionRepositoryMapper {
 
     private TransactionRepositoryMapper() {
     }
 
-    /** Movimentação sem parcelas nem fatura (tipos em conta). */
     public static Transaction toDomain(TransactionEntity e, List<LedgerEntry> entries) {
         return toDomain(e, entries, List.of(), Map.of());
     }
 
-    /**
-     * @param entries         todos os lançamentos da movimentação. Uma movimentação ativa só leva os ativos (e, na compra no
-     *                        cartão, os inativos das parcelas canceladas); uma estornada leva os inativos (e nenhum ativo).
-     * @param installmentRows as parcelas gravadas (só a {@code CARD_PURCHASE} tem)
-     * @param invoices        as linhas de fatura referenciadas pela movimentação e pelas parcelas, por id
-     * @throws TransactionStateInconsistentException fatura sem linha, fatura de outro cartão ou parcelas que não batem
-     */
     public static Transaction toDomain(TransactionEntity e, List<LedgerEntry> entries, List<InstallmentEntity> installmentRows,
                                        Map<UUID, InvoiceRow> invoices) {
         CurrencyCode currency = CurrencyCode.of(e.getCurrency());
@@ -115,11 +101,6 @@ public final class TransactionRepositoryMapper {
         return row.closingDate();
     }
 
-    /**
-     * Linha nova para uma movimentação nova (versão 0).
-     *
-     * @param invoiceId id da linha da fatura do pagamento/reembolso no cartão ({@code null} nos demais tipos)
-     */
     public static TransactionEntity toEntity(Transaction transaction, Instant now, UUID invoiceId) {
         TransactionState s = transaction.state();
         TransactionOrigin origin = s.origin();

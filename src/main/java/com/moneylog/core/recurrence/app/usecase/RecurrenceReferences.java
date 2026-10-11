@@ -19,11 +19,6 @@ import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.AccountNotCashException;
 
-/**
- * Confere as referências de um modelo de recorrência com as mesmas regras da movimentação que ele vai gerar: conta do usuário,
- * ativa e {@code CASH}; cartão do usuário e ativo; categoria do tipo certo (despesa para {@code EXPENSE} e {@code CARD_PURCHASE},
- * receita para {@code INCOME}) e ativa. Referência de outro usuário = não encontrada.
- */
 final class RecurrenceReferences {
 
     private final CategoryGateway categories;
@@ -36,7 +31,6 @@ final class RecurrenceReferences {
         this.cards = cards;
     }
 
-    /** A categoria informada, conferida; ausente = a de sistema padrão do tipo (Outros / Outras receitas), 422 se faltar ou estiver arquivada. */
     Category category(UUID userId, UUID categoryId, TransactionType type) {
         CategoryKind kind = type == TransactionType.INCOME ? CategoryKind.INCOME : CategoryKind.EXPENSE;
         if (categoryId == null) {

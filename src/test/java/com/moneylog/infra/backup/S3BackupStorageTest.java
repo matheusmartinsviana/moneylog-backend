@@ -30,7 +30,6 @@ import tools.jackson.databind.ObjectMapper;
 import com.moneylog.core.backup.app.BackupException;
 import com.moneylog.core.backup.app.StoredBackup;
 
-/** S3 falso em memória (com.sun.net.httpserver): sem rede externa e sem credencial real. */
 @DisplayName("Armazenamento S3 contra um S3 falso")
 class S3BackupStorageTest {
 

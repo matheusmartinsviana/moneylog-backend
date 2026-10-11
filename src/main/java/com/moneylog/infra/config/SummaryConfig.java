@@ -24,10 +24,6 @@ import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.export.controller.ExportRateLimiter;
 
-/**
- * Ligação das leituras da Etapa 5 (T95 a T97): resumo mensal, projeções e exportação. Todas só leem, em um instantâneo único, o mesmo
- * carregamento dos registros do dashboard (S-79).
- */
 @Configuration(proxyBeanMethods = false)
 public class SummaryConfig {
 
@@ -60,7 +56,6 @@ public class SummaryConfig {
                 new ExportBackupUseCaseImpl(records, categories, people, recurrences, time, maxTransactions), tm);
     }
 
-    /** S-260: 6 pedidos de exportação por usuário por minuto (em memória, como o login). */
     @Bean
     ExportRateLimiter exportRateLimiter(Clock clock, @Value("${moneylog.export.rate-limit.max-requests:6}") int maxRequests,
                                         @Value("${moneylog.export.rate-limit.window:PT1M}") Duration window) {

@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Corpos de entrada de {@code /v1/categories} (contrato: {@code CategoryInput} e {@code CategoryUpdate}). */
 public final class CategoryRequests {
 
     private CategoryRequests() {

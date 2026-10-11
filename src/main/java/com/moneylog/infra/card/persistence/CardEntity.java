@@ -18,10 +18,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/**
- * Linha de {@code credit_cards}. Não tem número de cartão, CVV, bandeira nem dia de fechamento/vencimento: os dias são
- * da regra mais recente em {@code credit_card_billing_rules} (única fonte, D1 §2.5.1).
- */
 @Entity
 @Table(name = "credit_cards")
 public class CardEntity {
@@ -81,11 +77,6 @@ public class CardEntity {
         this.updatedAt = now;
     }
 
-    /**
-     * Aplica o estado do domínio. {@code updated_at} sobe a cada gravação (mesmo com o relógio parado): a linha sempre
-     * fica "suja" e o JPA sempre incrementa a versão, então trocar só as regras de fechamento também cria a versão
-     * seguinte do cartão (lock otimista do {@code PUT}).
-     */
     public void apply(String newName, String newInstitution, Long newLimitCents, UUID newDefaultPaymentAccountId,
                       CardStatus newStatus, Instant now) {
         this.name = newName;

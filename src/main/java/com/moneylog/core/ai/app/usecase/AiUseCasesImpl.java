@@ -65,10 +65,8 @@ import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/** Implementações dos casos de uso da IA. */
 public final class AiUseCasesImpl {
 
-    /** Teto de tokens da resposta; entra na estimativa da prévia e no pedido ao provedor. */
     public static final int MAX_OUTPUT_TOKENS = 600;
     private static final int SYSTEM_PROMPT_TOKENS = 250;
     private static final List<String> LANGUAGES = List.of("pt", "en", "es");
@@ -83,8 +81,6 @@ public final class AiUseCasesImpl {
             throw new IllegalStateException(e);
         }
     }
-
-    // ------------------------------------------------------------------ insights (sem IA)
 
     public static class GetInsights implements GetInsightsUseCase {
         private final FinancialRecordsGateway records;
@@ -102,7 +98,6 @@ public final class AiUseCasesImpl {
             FinancialRecords loaded = records.load(userId);
             var ledger = loaded.ledger();
             MonthlySummary summary = MonthlySummary.of(loaded, ledger, month, time.today());
-            // consumo por categoria: o mesmo EntryReport da lente de consumo (nada de transferência, investimento ou empréstimo como despesa)
             var current = EntryReport.of(loaded, ledger, EntryLens.CONSUMPTION, month).byCategory();
             var previous = EntryReport.of(loaded, ledger, EntryLens.CONSUMPTION, month.minusMonths(1)).byCategory();
             Map<UUID, String> names = categories.list(userId, null, true).stream().collect(Collectors.toMap(Category::id, Category::name));
@@ -110,8 +105,6 @@ public final class AiUseCasesImpl {
             return new InsightsView(month, summary, insights, names);
         }
     }
-
-    // ------------------------------------------------------------------ status
 
     public static class GetAiStatus implements GetAiStatusUseCase {
         private final AIService ai;
@@ -129,8 +122,6 @@ public final class AiUseCasesImpl {
                     usage.circuit());
         }
     }
-
-    // ------------------------------------------------------------------ prévia
 
     public static class CreateAiPreview implements CreateAiPreviewUseCase {
         private final GetInsightsUseCase insights;
@@ -178,13 +169,6 @@ public final class AiUseCasesImpl {
         }
     }
 
-    // ------------------------------------------------------------------ envio aprovado
-
-    /**
-     * Sem transação própria: cada chamada de gateway é uma transação curta, e o provedor é chamado fora de qualquer transação. Ordem:
-     * idempotência, prévia (dono, validade, uso único), negação, IA ligada, hash, guarda (limite, orçamento, disjuntor), reivindica a prévia,
-     * chama, valida (feito pelo {@link AIService}) e registra. A IA não escreve em nada além do próprio registro.
-     */
     public static class RunApprovedAnalysis implements RunApprovedAnalysisUseCase {
         private final AIService ai;
         private final AiGuard guard;
@@ -269,7 +253,6 @@ public final class AiUseCasesImpl {
             };
         }
 
-        /** Os fatos vêm do próprio payload aprovado (a única coisa que o modelo viu), nunca de uma nova leitura do banco. */
         private static AiFacts factsOf(AiPreview preview) {
             return preview.facts();
         }
@@ -281,8 +264,6 @@ public final class AiUseCasesImpl {
                     done == null ? List.of() : done.factRefs(), failureReason, createdAt, null);
         }
     }
-
-    // ------------------------------------------------------------------ histórico
 
     public static class ListAiAnalyses implements ListAiAnalysesUseCase {
         private final AiAnalysisGateway analyses;
@@ -309,8 +290,6 @@ public final class AiUseCasesImpl {
             return analyses.findById(userId, id).orElseThrow(() -> new AiAnalysisNotFoundException(id));
         }
     }
-
-    // ------------------------------------------------------------------ configurações
 
     public static class GetAiSettings implements GetAiSettingsUseCase {
         private final AiSettingsGateway settings;
@@ -342,8 +321,6 @@ public final class AiUseCasesImpl {
             return settings.save(new AiSettings(userId, dailyMessageEnabled));
         }
     }
-
-    // ------------------------------------------------------------------ retenção
 
     public static class PurgeExpiredAiData implements PurgeExpiredAiDataUseCase {
         private final AiAnalysisGateway analyses;

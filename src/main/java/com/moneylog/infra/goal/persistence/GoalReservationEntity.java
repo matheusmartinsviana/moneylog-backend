@@ -12,7 +12,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Linha de {@code goal_reservations}: só se insere (liberar é uma linha negativa). Não é lançamento do razão. */
 @Entity
 @Table(name = "goal_reservations")
 public class GoalReservationEntity {
@@ -45,7 +44,6 @@ public class GoalReservationEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** Igual a {@code createdAt}: a reserva não é editada (convenção do esquema: toda tabela tem os dois carimbos). */
     @Column(name = "updated_at", nullable = false, updatable = false)
     private Instant updatedAt;
 

@@ -21,11 +21,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.util.ContractValidation;
 
-/**
- * T57: estorno com a guarda de fatura fechada (S-36, S-122), cancelamento das parcelas restantes e edição limitada da
- * compra no cartão (S-121). Cenário padrão; Notebook 1.200,00 em 6x em 10/10 (faturas 25/10..25/03); toda requisição e
- * resposta validada contra o contrato.
- */
 @DisplayName("Estorno, cancelamento de parcelas e edição da compra no cartão (T57)")
 class CardPurchaseLifecycleIT extends CardItBase {
 
@@ -50,8 +45,6 @@ class CardPurchaseLifecycleIT extends CardItBase {
     private long activePostings(String id) {
         return jdbc.queryForObject("SELECT count(*) FROM ledger_postings WHERE transaction_id = ? AND active", Long.class, UUID.fromString(id));
     }
-
-    // ---------------------------------------------------------------- estornar
 
     @Test
     @DisplayName("CA1: compra com todas as parcelas em faturas FUTURE/OPEN: estorno com motivo vira VOIDED, parcelas e lançamentos inativos, o limite volta a 10.000,00 e a fatura corrente perde 200,00")
@@ -113,7 +106,6 @@ class CardPurchaseLifecycleIT extends CardItBase {
         mockMvc.perform(put("/v1/transactions/" + id, editBody("200.00", "2026-10-10", 1, food, "Fone", 0))).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("REFUND_CATEGORY_LOCKED")).andExpect(ContractValidation.conforms());
 
-        // o crédito sem origem (refund) não é reembolso desta compra: só o ligado (linked) a protege
         voidIt(linked, "desfeito").andExpect(status().isOk()).andExpect(ContractValidation.conforms());
         assertThat(okBody(get("/v1/transactions/" + id)).get("voidable").asBoolean()).isTrue();
         voidIt(id, "agora sim").andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.status").value("VOIDED"));
@@ -145,8 +137,6 @@ class CardPurchaseLifecycleIT extends CardItBase {
         paid(NOV_CLOSING, "170.00", "2026-10-30");
         voidIt(refundId, "x").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("TRANSACTION_IN_CLOSED_INVOICE"));
     }
-
-    // ---------------------------------------------------------------- cancelar parcelas
 
     @Test
     @DisplayName("CA3: com a parcela 1 em fatura CLOSED (30/10), cancelar as parcelas restantes deixa 2..6 CANCELED e a 1 como está; devolve 1.000,00 de limite e zera o comprometido; o motivo vai para a revisão")
@@ -220,14 +210,11 @@ class CardPurchaseLifecycleIT extends CardItBase {
         } finally {
             pool.shutdownNow();
         }
-        // a parcela 1 está na fatura OPEN e também é cancelada: nada sobra
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transaction_installments WHERE transaction_id = ? AND canceled_at IS NOT NULL", Long.class,
                 UUID.fromString(id))).isEqualTo(6);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transaction_revisions WHERE transaction_id = ?", Long.class, UUID.fromString(id))).isEqualTo(1);
         assertThat(money(cardNow(), "availableLimit")).isEqualTo("10000.00");
     }
-
-    // ---------------------------------------------------------------- editar
 
     @Test
     @DisplayName("CA4: PUT muda descrição, categoria e observação: 200, versão + 1, a anterior em transaction_revisions, parcelas e faturas iguais e os lançamentos de despesa só trocam de categoria")

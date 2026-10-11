@@ -25,7 +25,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** T45: reidratação de {@link RecurringTransaction} para o mapper da infra. */
 @DisplayName("RecurringTransaction.restore (T45)")
 class RecurringTransactionRestoreTest {
 
@@ -156,7 +155,6 @@ class RecurringTransactionRestoreTest {
         assertThatThrownBy(() -> RecurringTransaction.restore(r.id(), r.userId(), r.type(), r.amount(), r.description(),
                 r.categoryId(), r.accountId(), null, null, r.schedule(), List.of(), List.of(), true))
                 .isInstanceOf(RecurrenceStateInconsistentException.class);
-        // conta a definir (sem conta nem método) é um estado válido (2.14.0)
         assertThat(RecurringTransaction.restore(r.id(), r.userId(), r.type(), r.amount(), r.description(), r.categoryId(), null, null, null,
                 r.schedule(), List.of(), List.of(), true).accountId()).isNull();
         assertThatThrownBy(() -> RecurringTransaction.restore(r.id(), r.userId(), TransactionType.TRANSFER, r.amount(),

@@ -17,11 +17,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.moneylog.infra.exception.GlobalExceptionHandler;
 import com.moneylog.util.ContractValidation;
 
-/**
- * T21 CA6: o utilitário {@link ContractValidation} reprova resposta e requisição fora do contrato, com a mensagem do
- * validador. Usa um {@code MockMvc} autônomo (sem contexto Spring) com um controller de amostra em
- * {@code /v1/categories}, para os defeitos serem plantados à vontade sem colidir com os controllers reais.
- */
 @DisplayName("Conformidade com contracts/openapi.yaml")
 class ContractConformanceTest {
 

@@ -53,12 +53,6 @@ import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T53: compra no cartão (à vista e parcelada) por {@code POST /v1/transactions} e a prévia
- * {@code POST /v1/cards/{id}/purchase-preview}. Cenário padrão: Nubank 20.000,00, Roxinho (fecha 25, vence 5, limite
- * 10.000,00), categorias Alimentação e Tecnologia; relógio 10/10/2026 em {@code America/Sao_Paulo}. Toda requisição e
- * resposta é validada contra o contrato.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("Compra no cartão e prévia (T53)")
@@ -110,9 +104,6 @@ class CardPurchaseIT {
         income = category("Salário", CategoryKind.INCOME);
     }
 
-    // ---------------------------------------------------------------- helpers
-
-    /** Avança o relógio e renova o token (o JWT expira pelo relógio do contexto). */
     private void advanceTo(Instant instant) {
         clock.set(instant);
         bearer = auth.bearer(userId);
@@ -165,8 +156,6 @@ class CardPurchaseIT {
         return jdbc.queryForObject("SELECT count(*) FROM " + table + " WHERE user_id = ?", Long.class, userId);
     }
 
-    // ---------------------------------------------------------------- CA1
-
     @Test
     @DisplayName("CA1: 1.200,00 em 6x: 201 com 6 parcelas de 200, faturas 25/10..25/03, caixa 0, consumo de 200 por competência, comprometido 1.000 e patrimônio −200")
     void deveCriarACompraParcelada() throws Exception {
@@ -210,7 +199,6 @@ class CardPurchaseIT {
         assertThat(afterwards.get("usedRatio").asDouble()).isEqualTo(0.12);
         assertThat(afterwards.get("archivable").asBoolean()).isFalse();
 
-        // a mesma compra lida de novo, na lista, nos lançamentos por competência e no dashboard (S-79)
         mockMvc.perform(get("/v1/transactions/" + id)).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.impact.commitment.amount").value("1000.00")).andExpect(jsonPath("$.installments.length()").value(6));
         mockMvc.perform(get("/v1/transactions?type=CARD_PURCHASE")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
@@ -226,8 +214,6 @@ class CardPurchaseIT {
         assertThat(count("transaction_installments")).isEqualTo(6);
     }
 
-    // ---------------------------------------------------------------- CA2
-
     @Test
     @DisplayName("CA2: 1.000,00 em 3x vira 333,34 / 333,33 / 333,33; à vista gera uma parcela e nenhum comprometido")
     void deveDividirEmCentavos() throws Exception {
@@ -242,8 +228,6 @@ class CardPurchaseIT {
                 + "\",\"installments\":1}").andExpect(status().isCreated()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.description").value(""));
     }
-
-    // ---------------------------------------------------------------- CA3
 
     @Test
     @DisplayName("CA3: relógio 27/10 e fatura de 25/10 fechada e não paga: a compra de 20/10 entra nela como lançamento tardio, e a prévia avisa LATE_ENTRY")
@@ -282,7 +266,6 @@ class CardPurchaseIT {
         assertThat(cardNow().get("currentInvoice").get("total").get("amount").asString()).isEqualTo("90.00");
     }
 
-    /** Semeia o pagamento de uma fatura pelo domínio e pelo gateway (o endpoint de pagamento chega na T55). */
     private void payInvoice(String amount, LocalDate closing, LocalDate date) {
         CreditCard domainCard = cardGateway.findById(userId, UUID.fromString(card)).orElseThrow().value();
         Account account = accountGateway.findById(userId, UUID.fromString(nubank)).orElseThrow().value();
@@ -294,8 +277,6 @@ class CardPurchaseIT {
             ledger.append(userId, payment.entries());
         });
     }
-
-    // ---------------------------------------------------------------- CA4
 
     @Test
     @DisplayName("CA4: a prévia devolve os mesmos valores, faturas e limite que a criação e não grava nada (nenhuma linha nova em lugar nenhum)")
@@ -366,8 +347,6 @@ class CardPurchaseIT {
                 .andExpect(jsonPath("$.code").value("CARD_ARCHIVED")).andExpect(ContractValidation.conforms());
     }
 
-    // ---------------------------------------------------------------- CA5
-
     @Test
     @DisplayName("CA5: cartão arquivado é 422 CARD_ARCHIVED; cartão ou categoria de outro usuário é 404; categoria de receita é 422 CATEGORY_KIND_MISMATCH; nada é gravado")
     void deveRecusarEntradaInvalida() throws Exception {
@@ -399,7 +378,6 @@ class CardPurchaseIT {
                     .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
                     .andExpect(ContractValidation.responseOnly());
         }
-        // `installments` ausente é válido desde o contrato 2.11.0 (padrão 1x): coberto em OptionalFieldsIT
         createTx(purchase("10.005", 1, "2026-10-10", "x")).andExpect(status().isBadRequest()).andExpect(ContractValidation.responseOnly());
         createTx(purchase("10.00", 1, "2026-10-10", "x").replace(",\"cardId\":\"" + card + "\"", "")).andExpect(status().isBadRequest())
                 .andExpect(ContractValidation.responseOnly());
@@ -417,8 +395,6 @@ class CardPurchaseIT {
         assertThat(count("transactions")).isZero();
     }
 
-    // ---------------------------------------------------------------- CA6
-
     @Test
     @DisplayName("CA6: o mesmo Idempotency-Key e o mesmo corpo devolvem o mesmo id (uma compra, 6 parcelas, 6 faturas); corpo diferente é 409 IDEMPOTENCY_KEY_REUSED")
     void deveSerIdempotente() throws Exception {
@@ -434,13 +410,11 @@ class CardPurchaseIT {
         assertThat(count("transactions")).isEqualTo(1);
         assertThat(count("transaction_installments")).isEqualTo(6);
         assertThat(count("credit_card_invoices")).isEqualTo(6);
-        assertThat(count("ledger_postings")).isEqualTo(14); // 12 da compra + 2 do saldo inicial da conta
+        assertThat(count("ledger_postings")).isEqualTo(14);
         mockMvc.perform(post("/v1/transactions", purchase("1200.00", 5, "2026-10-10", "Notebook")).header("Idempotency-Key", key))
                 .andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED")).andExpect(ContractValidation.conforms());
         assertThat(count("transactions")).isEqualTo(1);
     }
-
-    // ---------------------------------------------------------------- arquivar com saldo (T51 CA4)
 
     @Test
     @DisplayName("T51 CA4: fatura CLOSED de 1.283 em aberto, ou só parcelas futuras, é 422 CARD_HAS_PENDING_BALANCE e o cartão não muda; quitado e sem parcelas, arquiva")
@@ -458,7 +432,6 @@ class CardPurchaseIT {
         payInvoice("1283.00", LocalDate.of(2026, 10, 25), LocalDate.of(2026, 10, 30));
         assertThat(cardNow().get("archivable").asBoolean()).isTrue();
         created(purchase("600.00", 3, "2026-10-30", "Cursos"));
-        // 200 na fatura corrente (25/11) e 400 em faturas futuras: nada pago ainda
         mockMvc.perform(post("/v1/cards/" + card + "/archive", "")).andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("CARD_HAS_PENDING_BALANCE"));
         assertThat(cardNow().get("committedFuture").get("amount").asString()).isEqualTo("400.00");
@@ -476,8 +449,6 @@ class CardPurchaseIT {
         mockMvc.perform(post("/v1/cards/" + card + "/unarchive", "")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
-
-    // ---------------------------------------------------------------- concorrência
 
     @Test
     @DisplayName("duas compras simultâneas no mesmo ciclo são aceitas em série: uma linha de fatura, limite consistente")

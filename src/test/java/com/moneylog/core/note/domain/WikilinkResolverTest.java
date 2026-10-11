@@ -78,23 +78,20 @@ class WikilinkResolverTest {
     void deveDesempatarSemDependerDoId() {
         UUID low = new UUID(0, 1);
         UUID high = new UUID(0, 2);
-        // qualquer ordem de ids e de entrada dá o mesmo resultado
         for (WikilinkResolver r : new WikilinkResolver[] {resolver(low, "Café.md", high, "Cafe.md"), resolver(high, "Café.md", low, "Cafe.md"),
                 resolver(high, "Cafe.md", low, "Café.md"), resolver(low, "Cafe.md", high, "Café.md")}) {
             UUID cafe = r.resolve("Café").orElseThrow();
             UUID cafeSemAcento = r.resolve("Cafe").orElseThrow();
             assertThat(cafe).isNotEqualTo(cafeSemAcento);
-            assertThat(r.resolve("cafe")).contains(cafeSemAcento); // nenhum é exato: ordem do caminho ("Cafe.md" < "Café.md")
+            assertThat(r.resolve("cafe")).contains(cafeSemAcento);
         }
         WikilinkResolver r = resolver(low, "Café.md", high, "Cafe.md");
         assertThat(r.resolve("Café")).contains(low);
         assertThat(r.resolve("Cafe")).contains(high);
         assertThat(r.resolve("Café.md")).contains(low);
-        // o mais curto vence mesmo que o outro seja exato
         WikilinkResolver deep = resolver(low, "pasta/Café.md", high, "Cafe.md");
         assertThat(deep.resolve("Café")).contains(high);
         assertThat(deep.resolve("pasta/Café")).contains(low);
-        // chave de nome: a mesma para o caminho e para o alvo escrito
         assertThat(WikilinkResolver.nameKey("pasta/CAFÉ.md")).isEqualTo(WikilinkResolver.nameKey(NotePath.of("outra/Cafe.md")));
     }
 }

@@ -5,9 +5,6 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/**
- * Detecta as marcas de revisão (S-167, S-168). Puro e conservador: na dúvida marca, e marcar só pede decisão, nunca deixa contar duas vezes (PR 01).
- */
 public final class LineFlagger {
 
     private static final java.util.List<String> INVOICE_PAYMENT_MARKERS = java.util.List.of("PAGAMENTO RECEBIDO", "PAGTO FATURA",
@@ -19,10 +16,6 @@ public final class LineFlagger {
     private LineFlagger() {
     }
 
-    /**
-     * @param cardBatch      o lote é de cartão
-     * @param oppositeLegFound existe, em outra conta do usuário, a perna oposta da linha (ver {@link TransferPairMatcher})
-     */
     public static Set<ImportLineFlag> flags(ImportLine line, boolean cardBatch, boolean oppositeLegFound) {
         Set<ImportLineFlag> flags = EnumSet.noneOf(ImportLineFlag.class);
         if (cardBatch) {

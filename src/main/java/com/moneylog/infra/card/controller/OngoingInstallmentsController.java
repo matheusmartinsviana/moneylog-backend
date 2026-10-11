@@ -21,10 +21,6 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.transaction.controller.TransactionResponse;
 
-/**
- * Compra parcelada em andamento (ADR-013): só as parcelas que faltam, sem consumo retroativo. {@code 201} devolve a compra
- * ({@code CARD_PURCHASE}, origem {@code ONGOING}) com {@code Location} na movimentação. Sem idempotência no MVP: repetir cria outra compra.
- */
 @RestController
 @RequestMapping("/v1/cards/{id}/ongoing-installments")
 public class OngoingInstallmentsController {
@@ -44,7 +40,6 @@ public class OngoingInstallmentsController {
         return ResponseEntity.created(URI.create("/v1/transactions/" + created.transaction().id())).body(TransactionResponse.of(created));
     }
 
-    /** O que a criação gravaria, calculado pelo mesmo caminho e sem gravar. */
     @PostMapping("/preview")
     public OngoingPreviewResponse preview(@CurrentUser UUID userId, @PathVariable UUID id,
                                           @Valid @RequestBody OngoingInstallmentsRequest body) {

@@ -11,10 +11,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-/**
- * Gera um {@code traceId} por requisição (nunca aceita o do cliente), devolve no header {@code X-Trace-Id}, expõe no
- * MDC dos logs e como atributo da requisição, para o {@code ProblemDetail} trazer o mesmo valor.
- */
 public class TraceIdFilter extends OncePerRequestFilter {
 
     public static final String HEADER = "X-Trace-Id";

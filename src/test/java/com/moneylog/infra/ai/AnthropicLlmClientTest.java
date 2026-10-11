@@ -24,7 +24,6 @@ import com.moneylog.core.ai.app.LlmClient.LlmRequest;
 import com.moneylog.core.ai.app.LlmClient.LlmResponse;
 import com.moneylog.infra.ai.llm.AnthropicLlmClient;
 
-/** Servidor HTTP falso do JDK: nenhuma chamada de rede real. */
 class AnthropicLlmClientTest {
 
     private static final String SENTINEL_KEY = "sk-ant-SENTINELA-123456";

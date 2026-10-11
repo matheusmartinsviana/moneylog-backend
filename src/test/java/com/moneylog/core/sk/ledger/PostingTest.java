@@ -84,7 +84,6 @@ class PostingTest {
 
         assertThat(renda.competence()).isEqualTo(Competence.of(2026, 10));
         assertThat(renda.effectiveDate()).isEqualTo(LocalDate.of(2026, 9, 16));
-        // a mesma competência do mês da data é normal; ausente também
         assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, Competence.of(2027, 1)).competence()).isEqualTo(Competence.of(2027, 1));
         assertThat(new Posting(BookRef.income(ID), Money.of("-1.00"), DIA, null).competence()).isEqualTo(Competence.of(2027, 1));
         assertThat(renda.inCompetence(Competence.of(2026, 9)).competence()).isEqualTo(Competence.of(2026, 9));

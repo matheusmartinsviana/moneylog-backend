@@ -32,7 +32,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/** T82 (QA): pontos levantados pela revisão de código da Etapa 4 (A1, A2, B1 a B6) e corridas que faltavam. */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: achados da revisão (A1, A2, B1-B6) e corridas restantes")
@@ -78,7 +77,6 @@ class DebtReviewQaIT {
         System.out.println("QA-E4-A1 fixedCosts=" + summary.get("fixedCosts") + " monthlyEstimate=" + rec.get("monthlyEstimate") + " nextOccurrence=" + rec.get("nextOccurrence")
                 + " active=" + rec.get("active"));
         assertThat(summary.get("fixedCosts").get("amount").asString()).as("encerrada ainda soma no custo fixo").isEqualTo("0.00");
-        // S-235: o item reflete o encerramento (estado derivado e estimativa 0,00) sem divergir do /upcoming: as vencidas seguem pendentes (S-20)
         assertThat(rec.get("ended").asBoolean()).isTrue();
         assertThat(rec.get("monthlyEstimate").get("amount").asString()).isEqualTo("0.00");
         assertThat(rec.get("active").asBoolean()).isTrue();
@@ -143,14 +141,12 @@ class DebtReviewQaIT {
         Res put = a.call(HttpMethod.PUT, "/v1/recurrences/" + id, "{\"amount\":\"110.00\",\"description\":\"Rec\",\"categoryId\":\"" + a.food + "\",\"accountId\":\"" + a.nubank
                 + "\",\"method\":\"PIX\",\"version\":" + rec.get("version").asInt() + "}", null);
         System.out.println("QA-E4-B3 put=" + put.status() + " " + put.code());
-        // S-236: reabrir em silêncio é recusado (422 RECURRENCE_ENDED) e nada muda; o fim só sai de uma recorrência ainda em curso
         assertThat(put.status()).as(put.toString()).isEqualTo(422);
         assertThat(put.code()).isEqualTo("RECURRENCE_ENDED");
         JsonNode after = a.getOk("/v1/recurrences/" + id);
         assertThat(after.get("endDate").asString()).isEqualTo("2026-03-10");
         assertThat(after.get("version").asInt()).isEqualTo(rec.get("version").asInt());
         assertThat(after.get("ended").asBoolean()).isTrue();
-        // recorrência em curso com fim futuro: remover o fim continua válido
         String running = monthly("100.00", "2026-10-10");
         CardQaWorld.ok(a.call(HttpMethod.POST, "/v1/recurrences/" + running + "/end", "{\"endDate\":\"2026-12-10\"}", null));
         JsonNode runningRec = a.getOk("/v1/recurrences/" + running);

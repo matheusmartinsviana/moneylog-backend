@@ -20,10 +20,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/**
- * Linha de {@code transactions}. Cartão ({@code card_id}, {@code invoice_id}, {@code late_entry}, {@code installments})
- * entra na Etapa 3; a dívida ({@code debt_id}) entra na Etapa 4.
- */
 @Entity
 @Table(name = "transactions")
 public class TransactionEntity {
@@ -71,14 +67,12 @@ public class TransactionEntity {
     @Column(name = "card_id", updatable = false)
     private UUID cardId;
 
-    /** Fatura do pagamento de fatura e do reembolso no cartão; as parcelas guardam a fatura em {@code transaction_installments}. */
     @Column(name = "invoice_id")
     private UUID invoiceId;
 
     @Column(name = "late_entry", nullable = false)
     private boolean lateEntry;
 
-    /** Número de parcelas ({@code CARD_PURCHASE}); {@code null} nos demais tipos. */
     @Column(name = "installments", updatable = false)
     private Short installmentCount;
 
@@ -88,11 +82,9 @@ public class TransactionEntity {
     @Column(name = "refund_of_id")
     private UUID refundOfId;
 
-    /** Dívida da movimentação de dívida ({@code LOAN_GIVEN}, {@code MONEY_RECEIVED}, {@code DEBT_PAYMENT}); a origem e as quitações dela. */
     @Column(name = "debt_id", updatable = false)
     private UUID debtId;
 
-    /** {@code CONTRIBUTION}/{@code REDEMPTION} (investimento) ou {@code INCREASE}/{@code DECREASE} (ajuste). */
     @Column(length = 16)
     private String direction;
 
@@ -117,7 +109,6 @@ public class TransactionEntity {
     @Column(name = "original_dedup_key", length = 64, columnDefinition = "char(64)")
     private String originalDedupKey;
 
-    /** Mês a que a receita pertence quando difere do mês da data ({@code AAAA-MM}, ADR-017); {@code null} = o mês da data. */
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(name = "income_competence", length = 7, columnDefinition = "char(7)")
     private String incomeCompetence;
@@ -189,10 +180,6 @@ public class TransactionEntity {
         this.updatedAt = now;
     }
 
-    /**
-     * Aplica o estado de uma edição ou de um estorno. {@code id}, {@code userId}, {@code type}, {@code currency},
-     * origem (importação, recorrência) e {@code createdAt} não mudam; o {@code version} é incrementado pelo JPA.
-     */
     @SuppressWarnings("java:S107")
     public void apply(TransactionStatus newStatus, long newAmountCents, LocalDate newDate, String newDescription, String newNotes,
                       PaymentMethod newPaymentMethod, UUID newAccountId, UUID newCounterpartAccountId, UUID newInvoiceId,
@@ -216,8 +203,6 @@ public class TransactionEntity {
         this.voidReason = newVoidReason;
         this.voidedAt = newVoidedAt;
         this.incomeCompetence = newIncomeCompetence;
-        // updated_at sobe a cada gravação (mesmo com o relógio parado): a linha sempre fica "suja" e o JPA sempre incrementa
-        // a versão, então uma edição sem mudança de valor também cria a versão seguinte
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, java.time.temporal.ChronoUnit.MICROS);
     }
 

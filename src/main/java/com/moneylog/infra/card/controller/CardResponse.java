@@ -9,7 +9,6 @@ import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.finance.app.cards.CardDetails;
 import com.moneylog.core.sk.money.Money;
 
-/** Saída de cartão (contrato: {@code Card}). Todos os números vêm calculados do backend (S-129). */
 public record CardResponse(UUID id, String name, String institution, Money limit, Money availableLimit, boolean overLimit,
                            Money creditBalance, BigDecimal usedRatio, int closingDay, int dueDay, UUID defaultPaymentAccountId,
                            CardStatus status, InvoiceResponse currentInvoice, Money totalCommitted, Money committedFuture,

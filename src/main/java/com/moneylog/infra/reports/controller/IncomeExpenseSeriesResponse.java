@@ -6,7 +6,6 @@ import java.util.List;
 import com.moneylog.core.finance.domain.IncomeExpenseSeries;
 import com.moneylog.core.sk.money.Money;
 
-/** {@code IncomeExpenseSeries} do contrato (S-283): tudo calculado pelo backend; o front só desenha. */
 public record IncomeExpenseSeriesResponse(String period, LocalDate from, LocalDate to, String basis, String granularity, List<Point> points,
                                           Totals totals) {
 

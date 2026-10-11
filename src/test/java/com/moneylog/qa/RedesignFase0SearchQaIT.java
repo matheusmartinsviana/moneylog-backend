@@ -42,11 +42,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T190 (QA independente): superfície de risco da busca global. Dois usuários com dados idênticos em todos os cinco grupos, cargas úteis de
- * SQL/LIKE/Unicode, determinismo, concorrência com escritas, notas só por título/caminho e validação de parâmetros. O limite de taxa fica alto
- * aqui (tem classe própria) para os laços não esbarrarem nele.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @TestPropertySource(properties = "moneylog.search.rate-limit.max-requests=1000000")
@@ -77,7 +72,6 @@ class RedesignFase0SearchQaIT {
         alice = world.new Actor("srchA");
         bob = world.new Actor("srchB");
         for (Actor a : List.of(alice, bob)) {
-            // dados idênticos nos dois usuários: conta (Nubank), categoria (Tecnologia, Alimentação), cartão (Roxinho), nota e descrição
             a.call(HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.tech, "10.00", "2026-10-09", "Gêmea Café da Manhã"), DebtQa.key());
             a.call(HttpMethod.POST, "/v1/transactions", QaWorld.expense(a.nubank, a.food, "11.00", "2026-10-08", "Gêmea Café da Manhã"), DebtQa.key());
             NoteQa.createOk(world, a, "gemea/Café Nota.md", "# Café Nota\ncorpo sigiloso do " + a.id);
@@ -124,8 +118,6 @@ class RedesignFase0SearchQaIT {
         return ids;
     }
 
-    // ------------------------------------------------------------------------------------------------ isolamento
-
     @Test
     @DisplayName("isolamento: com dados idênticos nos dois usuários, cada um vê só o seu em todos os cinco grupos (e nenhum UUID do outro aparece no corpo)")
     void isolamentoNosCincoGrupos() throws Exception {
@@ -141,23 +133,18 @@ class RedesignFase0SearchQaIT {
                     assertThat(mine).as("id " + id + " na busca '" + q + "'").contains(id);
                     assertThat(theirs).as("vazou id do outro usuário").doesNotContain(id);
                 }
-                // nada do outro no texto (nem o e-mail, nem o UUID do usuário, nem o corpo da nota)
                 assertThat(r.text()).doesNotContain(other.id.toString());
                 assertThat(r.text()).doesNotContain("corpo sigiloso do " + other.id);
             }
         }
-        // cada grupo achou algo para o dono (os dados gêmeos existem nos cinco)
         JsonNode a = search(alice, "gemea").node();
         assertThat(a.get("transactions")).hasSize(2);
         assertThat(a.get("notes")).hasSize(1);
         assertThat(search(alice, "nubank").node().get("accounts")).hasSize(1);
         assertThat(search(alice, "nubank").node().get("cards")).hasSize(1);
         assertThat(search(alice, "tecno").node().get("categories")).hasSize(1);
-        // o snippet mostra o começo do corpo da PRÓPRIA nota (decisão de Produto, achado B-2 da revisão); nunca o de outro usuário
         assertThat(search(alice, "gemea").text()).contains("corpo sigiloso do " + alice.id).doesNotContain("corpo sigiloso do " + bob.id);
     }
-
-    // ------------------------------------------------------------------------------------------------ cargas úteis
 
     private static final List<String> PAYLOADS = List.of("%%", "_%_", "\\", "\\\\", "\\%", "100%", "a_b", "'", "''", "' OR '1'='1", "\" OR \"1\"=\"1", "; DROP TABLE transactions;--",
             "--", "/* */", "'; select pg_sleep(5);--", "$1", "${jndi:ldap://x/a}", "{{7*7}}", "<script>alert(1)</script>", "<img src=x onerror=alert(1)>",
@@ -173,7 +160,6 @@ class RedesignFase0SearchQaIT {
             String description = "pl-" + planted++ + " " + payload + " fim";
             Res created = alice.call(HttpMethod.POST, "/v1/transactions", QaWorld.expense(alice.nubank, alice.food, "1.00", "2026-10-09",
                     world.json.writeValueAsString(description).replaceAll("^\"|\"$", "")), DebtQa.key());
-            // se o domínio recusa a descrição (controles), o teste de busca segue sem a linha plantada
             Res s = search(alice, payload);
             int length = payload.codePointCount(0, payload.length());
             boolean hasControl = payload.codePoints().anyMatch(Character::isISOControl);
@@ -200,7 +186,6 @@ class RedesignFase0SearchQaIT {
                     failures.add("id de outro usuário para " + show(payload) + ": " + id);
                 }
             }
-            // oráculo: a quantidade de movimentações ativas do dono que contêm o termo (substring literal, sem acento e sem caixa) em SQL
             Long expected = jdbc.queryForObject("select count(*) from transactions where user_id = ? and status = 'ACTIVE' and description is not null "
                     + "and position(lower(unaccent(?)) in lower(unaccent(description))) > 0", Long.class, alice.id, payload.strip());
             int got = s.node().get("transactions").size();
@@ -241,9 +226,6 @@ class RedesignFase0SearchQaIT {
         assertThat(search(alice, "acucar").node().get("transactions")).hasSize(1);
         assertThat(search(alice, "açúcar").node().get("transactions")).hasSize(1);
     }
-
-    // BUG-QA-01: o unaccent do Postgres mapeia alguns code points (U+FF05, U+FF3F...) para '%' e '_'; isso é propriedade dele. A proteção
-    // está na consulta (o termo é desacentuado ANTES do escape) e é coberta por larguraTotalNaoViraCuringa.
 
     @Test
     @DisplayName("BUG-QA-01: curinga de largura total é literal")
@@ -304,19 +286,15 @@ class RedesignFase0SearchQaIT {
         assertThat(raw(alice, "/v1/search?Q=gemea").code()).as("o nome do parâmetro diferencia caixa").isEqualTo("SEARCH_QUERY_INVALID");
         assertThat(raw(alice, "/v1/search").code()).isEqualTo("SEARCH_QUERY_INVALID");
         assertThat(raw(alice, "/v1/search?q=").code()).isEqualTo("SEARCH_QUERY_INVALID");
-        // POST/PUT/DELETE na rota: 405 (nunca 500)
         for (HttpMethod m : List.of(HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH)) {
             Res r = alice.raw(m, "/v1/search?q=gemea", "{}", null);
             assertThat(r.status()).as(m + " /v1/search").isIn(405, 404, 403);
         }
     }
 
-    // ------------------------------------------------------------------------------------------------ determinismo e conteúdo
-
     @Test
     @DisplayName("determinismo: 30 chamadas idênticas devolvem exatamente o mesmo corpo; empates de data e created_at saem por id desc; sem Cache-Control cacheável")
     void determinismo() throws Exception {
-        // 12 movimentações com a mesma data, e o created_at forçado igual para o desempate cair no id
         for (int i = 0; i < 12; i++) {
             alice.call(HttpMethod.POST, "/v1/transactions", QaWorld.expense(alice.nubank, alice.food, "1.00", "2026-10-07", "Empate"), DebtQa.key());
         }
@@ -352,7 +330,6 @@ class RedesignFase0SearchQaIT {
         String id = byPath.get(0).get("id").asString();
         NoteQa.trash(alice, id);
         assertThat(search(alice, "termoNoCaminho").node().get("notes")).isEmpty();
-        // movimentação estornada
         String tx = CardQaWorld.ok(DebtQa.createTx(alice, QaWorld.expense(alice.nubank, alice.food, "5.00", "2026-10-09", "Voidzinha"))).node().get("id").asString();
         assertThat(search(alice, "voidzinha").node().get("transactions")).hasSize(1);
         alice.voidTx(tx);
@@ -377,8 +354,6 @@ class RedesignFase0SearchQaIT {
         assertThat(c.get(1).get("archived").asBoolean()).isTrue();
         assertThat(alice.count("transactions") + alice.count("ledger_postings") + alice.count("accounts") + alice.count("categories")).isEqualTo(before);
     }
-
-    // ------------------------------------------------------------------------------------------------ concorrência
 
     @Test
     @DisplayName("concorrência: 4 buscadores e 3 escritores (criar, estornar, arquivar) por 6 s: nenhum 5xx, todo 200 válido e só do dono")

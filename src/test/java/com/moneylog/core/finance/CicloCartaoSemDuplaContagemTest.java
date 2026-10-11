@@ -19,9 +19,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.finance.util.FinanceScenarioFactory;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * D1 §2.5.4: compra → parcelas → faturas → pagamentos é uma despesa só (PR 01 regra 1).
- */
 @DisplayName("Ciclo do cartão sem dupla contagem (T8a CA2)")
 class CicloCartaoSemDuplaContagemTest {
 

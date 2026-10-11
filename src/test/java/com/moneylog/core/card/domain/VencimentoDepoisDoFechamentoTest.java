@@ -12,10 +12,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import com.moneylog.core.card.util.factory.CreditCardTestFactory;
 
-/**
- * S-77 (M2, BUG-QA-01): se o vencimento calculado cair no dia do fechamento ou antes dele (clamp em mês curto), vai
- * para o mesmo dia de vencimento do mês seguinte, ajustado ao fim do mês. O domínio garante {@code due > closing}.
- */
 @DisplayName("Vencimento estritamente depois do fechamento (S-77)")
 class VencimentoDepoisDoFechamentoTest {
 

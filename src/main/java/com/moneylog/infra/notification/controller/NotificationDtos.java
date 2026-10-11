@@ -26,7 +26,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** Entrada e saída de {@code /v1/notifications}, {@code /v1/reminders}, {@code /v1/settings/notifications}, {@code /v1/push} e {@code /v1/daily-message}. */
 public final class NotificationDtos {
 
     static final String TIME = "^([01]\\d|2[0-3]):[0-5]\\d$";
@@ -34,12 +33,9 @@ public final class NotificationDtos {
     private NotificationDtos() {
     }
 
-    // ---- saída
-
     public record Ref(String type, UUID id) {
     }
 
-    /** Texto por chave de i18n + parâmetros: o front traduz e formata (S-34). */
     public record NotificationResponse(UUID id, NotificationKind kind, String titleKey, String bodyKey, Map<String, String> params, Ref ref,
                                        LocalDate onDate, LocalDate dueOn, Instant readAt, Instant createdAt) {
         static NotificationResponse of(Notification n) {
@@ -71,14 +67,11 @@ public final class NotificationDtos {
     public record PushConfigResponse(boolean enabled, String publicKey) {
     }
 
-    /** {@code text} nunca é montado aqui: {@code key} + {@code params} (o front compõe a frase). */
     public record DailyMessageResponse(String key, Map<String, String> params, String source, Instant generatedAt) {
         static DailyMessageResponse of(DailyMessageView v) {
             return new DailyMessageResponse(v.message().key(), v.message().params(), v.source(), v.generatedAt());
         }
     }
-
-    // ---- entrada
 
     public record ReminderInput(@NotBlank @Size(max = 120) @NoControlChars String title, @NotNull LocalDate remindOn,
                                 @Pattern(regexp = TIME) String remindAt, @Size(max = 500) @NoControlChars(allowLineBreaks = true) String note,
@@ -88,7 +81,6 @@ public final class NotificationDtos {
         }
     }
 
-    /** {@code days} a partir de hoje (padrão 1 = amanhã). */
     public record SnoozeInput(@Min(1) @Max(365) Integer days) {
     }
 

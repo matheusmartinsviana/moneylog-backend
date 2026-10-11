@@ -10,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 
-/** Linha de {@code notes}. Toda gravação sobe {@code updatedAt} e, com ele, a versão (também ao trocar só os vínculos). */
 @Entity
 @Table(name = "notes")
 public class NoteEntity {
@@ -60,7 +59,6 @@ public class NoteEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o estado do domínio; {@code updatedAt} sempre avança, então a versão sobe a cada gravação. */
     public void apply(String newPath, String newPathKey, String newTitle, String newBody, Instant newDeletedAt, Instant now) {
         this.path = newPath;
         this.pathKey = newPathKey;

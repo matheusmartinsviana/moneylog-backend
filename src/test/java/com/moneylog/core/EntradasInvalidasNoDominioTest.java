@@ -22,7 +22,6 @@ import com.moneylog.core.sk.time.FinancialDates;
 import com.moneylog.core.sk.time.FinancialDates.DateOutOfRangeException;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 
-/** B4: caracteres de controle, janela de datas (S-114) e página gigante nunca chegam ao banco. */
 @DisplayName("Entradas inválidas barradas no domínio (B4)")
 class EntradasInvalidasNoDominioTest {
 

@@ -35,11 +35,6 @@ import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
 import com.moneylog.infra.transaction.gateways.TransactionHydrator;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
-/**
- * BUG-QA-26: uma escrita de dívida que confirma no meio da leitura do razão (em {@code READ COMMITTED}, num caso de uso de escrita) aparece
- * como estado inconsistente. A leitura é refeita (limpando o contexto de persistência) e, se persistir, vira falha de trava (409), nunca 500;
- * em {@code REPEATABLE_READ} (instantâneo único) a inconsistência é dado corrompido e propaga (fail-closed, S-94).
- */
 @DisplayName("Carregamento dos registros: leitura inconsistente sob escrita concorrente (BUG-QA-26)")
 class FinancialRecordsGatewayImplTest {
 

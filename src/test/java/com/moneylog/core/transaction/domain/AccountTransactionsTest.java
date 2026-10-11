@@ -390,7 +390,6 @@ class AccountTransactionsTest {
         return Money.sum(tx.postings().stream().map(Posting::amount).toList(), CurrencyCode.BRL);
     }
 
-    /** Uma movimentação válida de cada tipo do grupo de contas. */
     static final class TransactionSamples {
         static Transaction valida(TransactionType type) {
             return switch (type) {

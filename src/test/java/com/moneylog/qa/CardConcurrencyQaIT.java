@@ -35,10 +35,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T61 (QA), critério 3: concorrência no cartão. Ordem de travas do plano: movimentações → cartão → contas por id.
- * Nenhuma corrida pode dar 5xx, fatura duplicada, outstanding negativo ou violar o invariante do cartão.
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @DisplayName("QA T61: concorrência no cartão")
@@ -108,18 +104,12 @@ class CardConcurrencyQaIT {
         assertThat(world.contractViolations).isEmpty();
     }
 
-    /** Linhas de fatura sem nenhuma referência e que não são FUTURE seriam lixo; todas as linhas devem estar no calendário do cartão. */
     private long orphanRows(String cardId) {
         Long n = jdbc.queryForObject("SELECT count(*) FROM credit_card_invoices i WHERE card_id = ?::uuid AND NOT EXISTS (SELECT 1 FROM transaction_installments t "
                 + "WHERE t.invoice_id = i.id) AND NOT EXISTS (SELECT 1 FROM transactions t WHERE t.invoice_id = i.id)", Long.class, cardId);
         return n == null ? 0 : n;
     }
 
-    /**
-     * Trava a linha do cartão numa conexão à parte, enfileira a compra P e depois a mudança de dias A (A já travou as linhas
-     * de movimentação existentes e espera o cartão), solta a trava; assim que P confirma, dispara {@code follow(T)} sobre a
-     * movimentação nova T, que A não travou. Devolve {mudança, seguimento}.
-     */
     private List<CardQaWorld.Res> changeDaysThenFollowNewTx(String cardId, int closing, int due, java.util.function.Function<String, Callable<CardQaWorld.Res>> follow)
             throws Exception {
         JsonNode card0 = a.getOk("/v1/cards/" + cardId);
@@ -162,8 +152,6 @@ class CardConcurrencyQaIT {
             CardQaWorld.ok(a.purchaseOn(cardId, a.tech, "120.00", 6, "2026-10-1" + (i % 9), "Seed " + i));
         }
     }
-
-    // ------------------------------------------------------------------ S-215: mudança de dias x estorno concorrente
 
     @Test
     @DisplayName("S-215: mudança de dias x estorno de compra criada DURANTE a espera da mudança: sem deadlock (nenhum 5xx), os dois terminam")
@@ -216,7 +204,6 @@ class CardConcurrencyQaIT {
             }
             List<CardQaWorld.Res> r = race(tasks);
             assertNoServerError("rodada " + round, r);
-            // a mudança só pode perder para a confirmação velha (a compra cria fatura nova antes) ou ganhar
             assertThat(r.get(0).status()).as(r.get(0).toString()).isIn(200, 409);
             r.subList(1, r.size()).forEach(x -> assertThat(x.status()).as(x.toString()).isEqualTo(201));
             assertHealthy(a.card);
@@ -243,8 +230,6 @@ class CardConcurrencyQaIT {
         assertHealthy(a.card);
         assertThat(orphanRows(a.card)).isZero();
     }
-
-    // ------------------------------------------------------------------ pagamentos
 
     @Test
     @DisplayName("6 pagamentos de 300,00 simultâneos (chaves diferentes) da mesma fatura de 1.283,00: 5 x 200 em série e o 6º é 422 INVOICE_NOT_PAYABLE (já PAID); excedente vira creditCarry")
@@ -307,7 +292,6 @@ class CardConcurrencyQaIT {
             String paidStatus = r.get(0).node().get("status").asString();
             String purchaseClosing = local.getOk("/v1/invoices/" + r.get(1).node().get("installments").get(0).get("invoiceId").asString())
                     .get("closingDate").asString();
-            // o pagamento enxergou PAID e a compra mesmo assim entrou na fatura de 25/10: o item caiu numa fatura fechada e quitada
             if ("PAID".equals(paidStatus) && "2026-10-25".equals(purchaseClosing)) {
                 violations.add("rodada " + round + ": pagamento respondeu PAID e a compra tardia entrou em 25/10");
             }
@@ -372,8 +356,6 @@ class CardConcurrencyQaIT {
         }
     }
 
-    // ------------------------------------------------------------------ criação concorrente de fatura
-
     @Test
     @DisplayName("12 compras parceladas simultâneas num cartão sem linhas: todas 201, uma linha por fechamento (UUID v5 + ON CONFLICT), nenhuma duplicada")
     void criacaoConcorrenteDeFatura() throws Exception {
@@ -409,8 +391,6 @@ class CardConcurrencyQaIT {
         }
         assertThat(ids).hasSize(5);
     }
-
-    // ------------------------------------------------------------------ revisor B1: validação do pagamento depois da trava
 
     @Test
     @DisplayName("B1: pagamento espera a trava do cartão enquanto um estorno do pagamento anterior confirma: o novo pagamento vê a fatura de novo CLOSED (200), não a PAID velha (422)")

@@ -3,10 +3,6 @@ package com.moneylog.core.note.domain;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Extrai os {@code [[wikilinks]]} de um texto Markdown ignorando código (inline e em bloco). Puro: não resolve nada e não renderiza.
- * Alvo vazio ({@code [[#seção]]}, link para a própria nota) e alvo com mais de 255 caracteres não são links de nota.
- */
 public final class WikilinkParser {
 
     private static final int MAX_TARGET = 255;
@@ -18,7 +14,6 @@ public final class WikilinkParser {
         return parse(text, 0);
     }
 
-    /** @param from início da leitura (depois do frontmatter); os índices devolvidos são do texto inteiro */
     public static List<Wikilink> parse(String text, int from) {
         List<int[]> code = MarkdownCode.ranges(text, from);
         List<Wikilink> links = new ArrayList<>();
@@ -51,7 +46,6 @@ public final class WikilinkParser {
         return links;
     }
 
-    /** Posição de {@code ]]} sem {@code [}, {@code ]} nem quebra de linha antes. */
     private static int closing(String text, int from) {
         for (int k = from; k < text.length(); k++) {
             char c = text.charAt(k);

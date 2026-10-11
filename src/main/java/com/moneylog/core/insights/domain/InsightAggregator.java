@@ -9,12 +9,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Ordena, deduplica e marca as dispensas (ADR-019). Ordem estável: severidade (ALERT, ATTENTION, POSITIVE, INFO), depois {@code priority}
- * decrescente, depois a magnitude em centavos decrescente, depois {@code type} e {@code id}. Deduplicação: um insight por id;
- * {@code DUE_SOON} suprime o {@code CARD_CLOSING_SOON} da mesma fatura; {@code DAILY_BUDGET} é um só por dia (o ALERT "estourado" já substitui o INFO
- * porque os dois nunca saem juntos).
- */
 public final class InsightAggregator {
 
     private InsightAggregator() {
@@ -27,9 +21,6 @@ public final class InsightAggregator {
             .thenComparing((InsightItem i) -> i.insight().type())
             .thenComparing(InsightItem::id);
 
-    /**
-     * @param includeDismissed {@code false} remove os dispensados; {@code true} os mantém com {@code dismissed = true}
-     */
     public static List<InsightItem> aggregate(UUID userId, List<Insight> insights, List<Dismissal> dismissals, LocalDate today,
                                               boolean includeDismissed) {
         Set<String> dueRefs = new HashSet<>();

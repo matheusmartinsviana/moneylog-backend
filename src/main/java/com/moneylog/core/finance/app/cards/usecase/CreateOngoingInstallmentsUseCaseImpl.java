@@ -22,10 +22,6 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 
-/**
- * Compra parcelada em andamento (T241). Ordem de travas: o cartão (a cadeia de faturas é dele, ADR-006 §5); a cadeia só é lida
- * depois da trava. A montagem é {@link #plan}, a mesma da prévia.
- */
 public class CreateOngoingInstallmentsUseCaseImpl implements CreateOngoingInstallmentsUseCase {
 
     private final CardGateway cards;
@@ -60,7 +56,6 @@ public class CreateOngoingInstallmentsUseCaseImpl implements CreateOngoingInstal
         return assembler.assemble(saved);
     }
 
-    /** A compra que o comando, o cartão e a cadeia determinam: o único ponto de montagem (criação e prévia). */
     static Transaction plan(CreateOngoingInstallmentsCommand c, java.util.UUID id, CreditCard card, Category category, InvoiceChain chain,
                             LocalDate today) {
         LocalDate date = c.firstInvoiceDate() == null ? today : c.firstInvoiceDate();

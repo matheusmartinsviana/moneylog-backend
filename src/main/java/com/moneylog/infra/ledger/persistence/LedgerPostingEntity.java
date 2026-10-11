@@ -17,7 +17,6 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** Uma linha de {@code ledger_postings}: um posting com origem e vigência (D1 §1.1). */
 @Entity
 @Table(name = "ledger_postings")
 public class LedgerPostingEntity {

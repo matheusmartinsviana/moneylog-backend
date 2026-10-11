@@ -22,7 +22,6 @@ public class RenameCategoryUseCaseImpl implements RenameCategoryUseCase {
             throw new VersionConflictException(command.version(), category.version());
         }
         category.rename(command.name());
-        // O nome só precisa ser único entre as não arquivadas (a arquivada libera o nome; o desarquivar confere de novo).
         if (!category.isArchived()
                 && categories.existsActiveWithName(command.userId(), category.kind(), category.name(), category.id())) {
             throw new CategoryNameTakenException(category.name());

@@ -7,10 +7,6 @@ import com.moneylog.core.recurrence.domain.OccurrenceStatus;
 import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Ocorrência de uma recorrência como a API mostra. {@code amount} é o do modelo (pendente e pulada) ou o da movimentação gerada
- * (realizada, que pode ter valor real diferente); {@code overdue} é "pendente com data anterior a hoje" (continua pendente, S-20).
- */
 public record OccurrenceView(RecurringTransaction recurrence, LocalDate date, OccurrenceStatus status, boolean overdue, Money amount,
                              UUID transactionId) {
 

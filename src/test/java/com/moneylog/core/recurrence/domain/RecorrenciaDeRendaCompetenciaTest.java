@@ -25,7 +25,6 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-/** ADR-017: a recorrência de receita carrega o deslocamento da competência (0 ou 1); a ocorrência realizada herda mês da data + deslocamento. */
 @DisplayName("Recorrência de receita: competência da renda das ocorrências (ADR-017)")
 class RecorrenciaDeRendaCompetenciaTest {
 
@@ -99,7 +98,6 @@ class RecorrenciaDeRendaCompetenciaTest {
         assertThat(antes.incomeCompetence()).isEqualTo(Competence.of(2026, 10));
         assertThat(depois.incomeCompetence()).isNull();
         assertThat(r.incomeCompetenceOffsetMonths()).isZero();
-        // a edição sem o deslocamento mantém o atual
         r.updateDetails(Money.of("1500.00"), "Adiantamento", SALARIO_ID, NUBANK_ID, PaymentMethod.PIX, null, 1);
         r.updateDetails(Money.of("1600.00"), "Adiantamento", SALARIO_ID, NUBANK_ID, PaymentMethod.PIX, null);
         assertThat(r.incomeCompetenceOffsetMonths()).isEqualTo(1);

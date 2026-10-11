@@ -40,9 +40,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * Primeiro acesso do dono (ADR-015) sem hash no ambiente: a senha só vive no banco. Dados e senhas são sintéticos.
- */
 @IntegrationTest
 @Import({MutableClockConfig.class, WebFoundationSamples.class})
 @ExtendWith(OutputCaptureExtension.class)
@@ -202,7 +199,6 @@ class FirstAccessIT {
                 .andExpect(status().isOk());
         MvcResult login = mockMvc.perform(login(NEW_PASSWORD)).andExpect(status().isOk()).andReturn();
 
-        // redefinição pedida pelo dono (variável de uso único): derruba todas as sessões
         ensureOwner.handle(new EnsureOwnerCommand(EMAIL, true));
         prepareFirstAccess.handle(new PrepareFirstAccessCommand(CODE, Duration.ofHours(24)));
 
@@ -211,7 +207,6 @@ class FirstAccessIT {
                 .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.code").value("REFRESH_INVALID"));
         mockMvc.perform(login(NEW_PASSWORD)).andExpect(status().isUnauthorized());
 
-        // o novo primeiro acesso também revoga o que existir
         MvcResult nova = definirSenha();
         assertThat(cookieValue(nova)).isNotEqualTo(antigo);
         mockMvc.perform(post("/v1/auth/refresh").header("Origin", ORIGIN).cookie(new Cookie("ml_refresh", cookieValue(nova))))

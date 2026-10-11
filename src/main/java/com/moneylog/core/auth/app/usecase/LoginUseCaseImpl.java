@@ -14,10 +14,6 @@ import com.moneylog.core.auth.exception.AuthExceptions.InvalidCredentialsExcepti
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Login do dono (ADR-003). E-mail desconhecido e senha errada têm a mesma resposta e o mesmo custo: no primeiro caso a
- * senha é comparada com um hash fictício (S-86). O hash real é o do dono, único usuário (banco ou, por retrocompatibilidade, ambiente: ADR-015).
- */
 public class LoginUseCaseImpl implements LoginUseCase {
 
     private final UserGateway users;
@@ -51,10 +47,6 @@ public class LoginUseCaseImpl implements LoginUseCase {
         return sessions.open(user.get().id(), familyId, now);
     }
 
-    /**
-     * Ordem (ADR-015): a senha do banco, quando definida, é a única que vale; com redefinição pendente ninguém entra
-     * (nem pelo hash do ambiente) até o primeiro acesso; sem nada disso, vale o hash do ambiente (retrocompatibilidade).
-     */
     private boolean passwordMatches(User user, String password) {
         OwnerAccess access = users.findAccess(user.id()).orElse(null);
         if (access != null && access.hasStoredPassword()) {

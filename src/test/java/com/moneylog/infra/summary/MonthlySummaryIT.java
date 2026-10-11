@@ -16,11 +16,6 @@ import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T95: {@code GET /v1/summaries/{yyyy-MM}}. Cenário do plano: outubro com Salário 3.000,00, Pix 100,00 (Alimentação), compra de 1.200,00 em 6x no
- * cartão (Tecnologia), aplicação de 10.000,00 e reembolso de 50,00 (Alimentação) em 12/10; setembro com consumo de 150,00 e receita de
- * 3.000,00. Relógio 10/10/2026. O resumo bate com o dashboard e com a lista por competência (PR 01, regra 10).
- */
 @DisplayName("Resumo mensal: cálculo no backend, comparação e consistência com o dashboard e a lista (T95)")
 class MonthlySummaryIT extends E4ItBase {
 

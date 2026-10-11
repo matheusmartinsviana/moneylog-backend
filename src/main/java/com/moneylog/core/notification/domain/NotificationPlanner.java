@@ -8,10 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Sem spam (S-175): tira o que já foi gerado hoje (idempotência), ordena por prioridade e respeita o teto de {@value #MAX_PER_DAY} por dia; o que passar
- * vira <b>uma</b> notificação agrupada "N lembretes".
- */
 public final class NotificationPlanner {
 
     public static final int MAX_PER_DAY = 5;
@@ -23,10 +19,6 @@ public final class NotificationPlanner {
     private NotificationPlanner() {
     }
 
-    /**
-     * @param existingIdentities identidades {@code kind|refId|onDate} já gravadas
-     * @param createdToday       quantas notificações já existem hoje para o usuário
-     */
     public static List<NotificationDraft> plan(UUID userId, LocalDate today, List<NotificationDraft> drafts, Set<String> existingIdentities,
                                                int createdToday) {
         List<NotificationDraft> fresh = drafts.stream().filter(d -> !existingIdentities.contains(d.identity()))

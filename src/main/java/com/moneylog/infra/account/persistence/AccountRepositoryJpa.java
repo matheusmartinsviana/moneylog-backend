@@ -18,7 +18,6 @@ public interface AccountRepositoryJpa extends JpaRepository<AccountEntity, UUID>
 
     Optional<AccountEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** {@code SELECT ... FOR UPDATE} da linha (BUG-QA-08). */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from AccountEntity a where a.id = :id and a.userId = :userId")
     Optional<AccountEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);

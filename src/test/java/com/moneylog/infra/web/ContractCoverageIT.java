@@ -20,24 +20,10 @@ import io.swagger.v3.oas.models.PathItem;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.IntegrationTest;
 
-/**
- * T21 CA6 (S-66): cada operação de {@code contracts/openapi.yaml} tem handler e cada handler de {@code infra} tem
- * operação no contrato.
- *
- * <p>{@link #PENDING}: operações do contrato ainda sem handler. Cada task de endpoint tira as suas daqui (o teste
- * falha se uma operação já implementada continuar na lista). <b>No fim da Etapa 3 (T58) a lista ficou vazia.</b> Etapa 4: as 22
- * operações novas (pessoas, dívidas e recorrências, T73) ganharam handler (T74, T75, T77, T79, T80) no mesmo ciclo em que entraram no
- * contrato, então a lista nunca precisou ser preenchida: continua vazia.
- */
 @IntegrationTest
 @DisplayName("Cobertura do contrato: operações do arquivo × handlers mapeados")
 class ContractCoverageIT {
 
-    /**
-     * Operações do contrato sem handler. Etapa 2: preenchida na T21 e esvaziada por T22b a T29. Etapa 3: preenchida na
-     * T49 com as rotas de cartões/faturas; cada task (T51, T53, T54, T55, T57, T58) removeu as suas e a lista fechou vazia
-     * na T58. Operação nova de uma etapa seguinte entra aqui enquanto não tiver handler.
-     */
     private static final Set<String> PENDING = new TreeSet<>(Set.of());
 
     @Autowired
@@ -109,7 +95,6 @@ class ContractCoverageIT {
         return info.getPathPatternsCondition() == null ? Set.of() : info.getPathPatternsCondition().getPatternValues();
     }
 
-    /** {@code /v1/accounts/{id}} e {@code /v1/accounts/{accountId}} são a mesma rota. */
     private static String normalize(String path) {
         return path.replaceAll("\\{[^}/]+}", "{}");
     }

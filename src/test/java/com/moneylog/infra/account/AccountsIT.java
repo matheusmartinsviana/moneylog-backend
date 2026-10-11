@@ -43,10 +43,6 @@ import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
 import com.moneylog.util.SqlFixtures;
 
-/**
- * T25: contas (criar, consultar, editar, arquivar), saldo pelo razão e flags. Cada teste usa um usuário novo, então as
- * listas e os saldos não interferem entre si. "Hoje" é 10/10/2026 (relógio fixo).
- */
 @IntegrationTest
 @Import(FixedClockConfig.class)
 @DisplayName("Contas (T25)")
@@ -108,7 +104,6 @@ class AccountsIT {
                 .andExpect(ContractValidation.conforms()).andReturn());
     }
 
-    /** Grava, por SQL e pelo gateway do razão, uma movimentação de domínio já ativa (o POST de movimentações é de T26a). */
     private void insertTransaction(Transaction transaction) {
         committed(() -> {
             SqlFixtures.insertTransactionRow(jdbc, transaction);
@@ -133,8 +128,6 @@ class AccountsIT {
         return AccountTransactions.income(TransactionHeader.of(UUID.randomUUID(), userId, date, "Receita"), Money.of(amount), account,
                 insertCategory(CategoryKind.INCOME), PaymentMethod.TRANSFER);
     }
-
-    // ---------------------------------------------------------------- CA1, CA2, CA7
 
     @Test
     @DisplayName("CA1: POST cria a conta com saldo inicial como par de lançamentos ACCOUNT_OPENING (+20.000 / EQUITY −20.000)")
@@ -190,8 +183,6 @@ class AccountsIT {
         assertThat(jdbc.queryForObject("select count(*) from accounts where user_id = ?", Integer.class, userId)).isZero();
     }
 
-    // ---------------------------------------------------------------- CA3
-
     @Test
     @DisplayName("CA3: sem movimentação o PUT troca o saldo inicial (par antigo inativo, par novo ativo); com movimentação, 422 ACCOUNT_OPENING_LOCKED")
     void deveCorrigirOSaldoInicialSoSemMovimentacao() throws Exception {
@@ -230,8 +221,6 @@ class AccountsIT {
         assertThat(jdbc.queryForObject("select name from accounts where id = ?", String.class, UUID.fromString(id))).isEqualTo("Novo nome");
     }
 
-    // ---------------------------------------------------------------- CA4
-
     @Test
     @DisplayName("CA4: saldo zero arquiva (ARCHIVED) e desarquiva (ACTIVE); com saldo ≠ 0 é 422 e a conta não muda")
     void deveArquivarSoComSaldoZero() throws Exception {
@@ -267,8 +256,6 @@ class AccountsIT {
                     .andExpect(jsonPath("$.code").value("ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED")).andExpect(ContractValidation.conforms());
         }
     }
-
-    // ---------------------------------------------------------------- CA5, CA6
 
     @Test
     @DisplayName("CA5: lista filtra por status, ordena por nome e pagina com hasNext correto (pageSize=1 com 2 contas)")

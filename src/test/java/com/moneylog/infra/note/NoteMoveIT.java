@@ -21,7 +21,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.core.note.app.gateways.NoteGateway;
 import com.moneylog.util.ContractValidation;
 
-/** T110: renomear e mover com reescrita de wikilinks, atômica, pela API real com Postgres real. */
 @DisplayName("Notas: renomear e mover com reescrita de wikilinks (T110)")
 class NoteMoveIT extends NotesItBase {
 
@@ -100,7 +99,6 @@ class NoteMoveIT extends NotesItBase {
         JsonNode notMoved = getNote(alvo.get("id").asString());
         assertThat(notMoved.get("path").asString()).isEqualTo("alvo.md");
         assertThat(notMoved.get("version").asLong()).isZero();
-        // e a operação segue possível depois da falha
         assertThat(moveNote(alvo.get("id").asString(), "novo.md", 0).get("rewrittenNotes").size()).isEqualTo(4);
     }
 
@@ -128,7 +126,6 @@ class NoteMoveIT extends NotesItBase {
         assertThat(getNote(leitor.get("id").asString()).get("body").asString()).isEqualTo("[[novo]] `[[alvo]]`\n```\n[[alvo]]\n```\n[[Futuro]]");
         assertThat(moved.get("note").get("path").asString()).isEqualTo("novo.md");
         assertThat(getNote(alvo.get("id").asString()).get("body").asString()).isEqualTo("eu [[novo]] e `[[alvo]]`");
-        // renomear para o nome de um link pendente resolve esse link
         JsonNode second = moveNote(alvo.get("id").asString(), "Futuro.md", 1);
         assertThat(second.get("rewrittenNotes").size()).isEqualTo(1);
         JsonNode pending = getNote(leitor.get("id").asString());
@@ -163,7 +160,6 @@ class NoteMoveIT extends NotesItBase {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notes WHERE user_id = ? AND body LIKE '%[[Alvo%'", Long.class, userId)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM note_links WHERE user_id = ? AND origin = 'WIKILINK' AND target_note_id = ?::uuid AND target_text = 'Renomeado'", Long.class,
                 userId, alvoId)).isEqualTo(500L);
-        // limite documentado: 60 s em máquina de desenvolvimento com Postgres em contêiner (medido em ~segundos; registrado no relatório)
         assertThat(millis).isLessThan(60_000L);
     }
 }

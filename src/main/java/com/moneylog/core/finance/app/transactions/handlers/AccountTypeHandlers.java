@@ -28,11 +28,6 @@ import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionTypeNotAvailableException;
 
-/**
- * Os handlers dos tipos que só envolvem contas (Etapa 2): o mesmo comportamento que a fábrica tinha num {@code switch},
- * agora um handler por tipo (S-127). Comportamento idêntico: mesmas travas, na mesma ordem, e as mesmas fábricas do
- * domínio.
- */
 public final class AccountTypeHandlers {
 
     private AccountTypeHandlers() {
@@ -42,19 +37,12 @@ public final class AccountTypeHandlers {
         return all(support, null);
     }
 
-    /** Com o handler do crédito no cartão (Etapa 3); {@code null} deixa {@code REFUND} com {@code cardId} indisponível. */
     public static List<TransactionTypeHandler<?>> all(HandlerSupport support, CardRefundHandler cardRefund) {
         return List.of(new ExpenseHandler(support), new IncomeHandler(support), new TransferHandler(support),
                 new InvestmentHandler(support), new AdjustmentHandler(support), new RefundHandler(support, cardRefund),
                 new UnavailableHandler());
     }
 
-    /**
-     * Despesa. Com {@code shares} (S-40, S-137) é a despesa dividida: as dívidas nascem junto, uma por parte, e voltam em
-     * {@link BuiltTransaction#newDebts()}. A edição de uma despesa dividida só muda descrição, categoria e observação: valor,
-     * data, conta, meio de pagamento e divisão são os da despesa (senão {@code TRANSACTION_NOT_EDITABLE}, T78 CA7); a divisão
-     * não se cria numa edição.
-     */
     private record ExpenseHandler(HandlerSupport support) implements TransactionTypeHandler<Expense> {
         @Override
         public Class<Expense> commandType() {
@@ -113,11 +101,6 @@ public final class AccountTypeHandlers {
         }
     }
 
-    /**
-     * As partes do {@code PUT} são as mesmas das dívidas da despesa (S-241): mesma quantidade e, para cada parte, uma dívida distinta
-     * com a mesma pessoa, o mesmo valor e a mesma previsão (a descrição só vale se informada). A ordem não importa. Repetir o que já
-     * existe não muda nada; qualquer diferença continua recusada.
-     */
     private static boolean sameShares(List<Share> shares, List<Debt> debts) {
         if (shares.size() != debts.size()) {
             return false;
@@ -210,11 +193,6 @@ public final class AccountTypeHandlers {
         }
     }
 
-    /**
-     * Reembolso. Em conta ({@code accountId}) é o fluxo da Etapa 2; com {@code cardId} (crédito no cartão, T56) o handler
-     * delega a {@link CardRefundHandler}. Sem o handler de cartão registrado, o crédito no cartão responde
-     * {@code TRANSACTION_TYPE_NOT_AVAILABLE}.
-     */
     static final class RefundHandler implements TransactionTypeHandler<Refund> {
 
         private final HandlerSupport support;
@@ -259,7 +237,6 @@ public final class AccountTypeHandlers {
         }
     }
 
-    /** Tipos que existem no domínio mas ainda não têm fluxo: {@code TRANSACTION_TYPE_NOT_AVAILABLE}. */
     private record UnavailableHandler() implements TransactionTypeHandler<Unavailable> {
         @Override
         public Class<Unavailable> commandType() {

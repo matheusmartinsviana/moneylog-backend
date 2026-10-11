@@ -26,11 +26,6 @@ import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * Monta {@link CardDetails} dos {@link FinancialRecords} carregados uma vez (S-79): o limite sai do livro {@code CARD}
- * (a mesma conta do dashboard) e a fatura corrente e os comprometidos saem da cadeia de faturas
- * ({@code CardInvoices.chainFor}, a única forma de montá-la, S-135).
- */
 public final class CardViews {
 
     private CardViews() {
@@ -40,13 +35,11 @@ public final class CardViews {
         return of(persisted, records, postingsByCard(records), today);
     }
 
-    /** Vários cartões do mesmo carregamento: o razão é percorrido uma vez só. */
     public static List<CardDetails> ofAll(List<Persisted<CreditCard>> cards, FinancialRecords records, LocalDate today) {
         Map<UUID, List<Posting>> postings = postingsByCard(records);
         return cards.stream().map(card -> of(card, records, postings, today)).toList();
     }
 
-    /** A cadeia de faturas do cartão sobre as movimentações carregadas (todas, ativas e inativas). */
     public static InvoiceChain chainOf(CreditCard card, FinancialRecords records) {
         List<Transaction> ofCard = records.transactions().stream().filter(t -> card.id().equals(t.cardId())).toList();
         return CardInvoices.chainFor(card, ofCard);
@@ -84,10 +77,9 @@ public final class CardViews {
                 usedRatio(card.limit(), limit.available()), archivable);
     }
 
-    /** {@code (limite − disponível) / limite}, limitada a 0..1, com 4 casas (só para a barra; E3-12). */
     static BigDecimal usedRatio(Money limit, Money available) {
         if (limit == null || available == null) {
-            return null; // sem limite definido não há razão de uso (sem divisão por zero)
+            return null;
         }
         long used = limit.cents() - available.cents();
         if (used <= 0 || limit.cents() <= 0) {

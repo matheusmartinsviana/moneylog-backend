@@ -35,11 +35,8 @@ class InsightEngineTest {
     @DisplayName("limites exatos: 10% e R$ 50,00 entram; abaixo de qualquer um, não")
     void deveRespeitarOsLimitesExatos() {
         assertThat(InsightEngine.compute(Map.of(FOOD, Money.of("550.00")), Map.of(FOOD, Money.of("500.00")), ZERO, id -> "x")).hasSize(1);
-        // 9,98% e R$ 49,90
         assertThat(InsightEngine.compute(Map.of(FOOD, Money.of("549.90")), Map.of(FOOD, Money.of("500.00")), ZERO, id -> "x")).isEmpty();
-        // 20% mas R$ 20,00
         assertThat(InsightEngine.compute(Map.of(FOOD, Money.of("120.00")), Map.of(FOOD, Money.of("100.00")), ZERO, id -> "x")).isEmpty();
-        // queda de R$ 50,00 e 10% também é insight, com chave "down"
         var down = InsightEngine.compute(Map.of(FOOD, Money.of("450.00")), Map.of(FOOD, Money.of("500.00")), ZERO, id -> "x");
         assertThat(down).singleElement().extracting(Insight::key).isEqualTo("insight.category.down");
     }

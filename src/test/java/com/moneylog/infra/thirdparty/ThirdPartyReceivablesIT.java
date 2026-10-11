@@ -14,10 +14,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/**
- * ADR-014: despesa de terceiro paga pelo usuário. O gasto continua bruto do usuário até o reembolso; o reembolso recebido (REFUND ligado à compra)
- * reduz o consumo e nunca é receita. Relógio 10/10/2026.
- */
 @DisplayName("Dinheiro a receber de terceiros: bruto x terceiros x líquido (ADR-014)")
 class ThirdPartyReceivablesIT extends E4ItBase {
 
@@ -39,7 +35,6 @@ class ThirdPartyReceivablesIT extends E4ItBase {
         assertThat(ledgerTotal()).isEqualTo(ledger);
         mockMvc.perform(post("/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + maria + "\"}"))
                 .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("THIRD_PARTY_EXPENSE_ALREADY_MARKED"));
-        // corrigir o responsável: desfaz a marca (nada do razão muda) e marca de novo com a outra pessoa
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/third-party-expenses/" + mark.get("id").asString())
                 .header(org.springframework.http.HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNoContent());
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/third-party-expenses/" + mark.get("id").asString())
@@ -116,7 +111,6 @@ class ThirdPartyReceivablesIT extends E4ItBase {
                 .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
         mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"amount\":\"80.00\",\"note\":\"origem a confirmar\"}"))
                 .andExpect(status().isCreated()).andExpect(ContractValidation.conforms());
-        // corrigir o vínculo: remove o recebimento sem vínculo e o registra ligado à despesa
         String orphan = jdbc.queryForObject("SELECT id FROM third_party_receipts WHERE user_id = ? AND transaction_id IS NULL", String.class, userId);
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/v1/third-party-receipts/" + orphan)
                 .header(org.springframework.http.HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNoContent());
@@ -124,7 +118,6 @@ class ThirdPartyReceivablesIT extends E4ItBase {
                 .header(org.springframework.http.HttpHeaders.AUTHORIZATION, bearer)).andExpect(status().isNotFound());
         mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"amount\":\"80.00\",\"note\":\"origem a confirmar\"}"))
                 .andExpect(status().isCreated());
-        // de outra pessoa que a da marca, valor zero e despesa não marcada são recusados
         mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + joao + "\",\"transactionId\":\"" + tx + "\",\"amount\":\"1.00\"}"))
                 .andExpect(status().isUnprocessableEntity());
         mockMvc.perform(post("/v1/third-party-receipts", "{\"personId\":\"" + maria + "\",\"amount\":\"0.00\"}")).andExpect(status().isUnprocessableEntity());

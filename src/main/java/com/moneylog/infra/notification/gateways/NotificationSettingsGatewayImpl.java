@@ -16,7 +16,6 @@ import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.notification.domain.QuietHours;
 import com.moneylog.core.notification.domain.SummaryFrequency;
 
-/** Configurações de notificação (uma linha por usuário), com travamento otimista por {@code version}. */
 public class NotificationSettingsGatewayImpl implements NotificationSettingsGateway {
 
     private final JdbcTemplate jdbc;

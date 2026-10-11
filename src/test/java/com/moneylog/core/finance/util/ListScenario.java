@@ -23,11 +23,6 @@ import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionVoiding;
 import com.moneylog.core.transaction.domain.VoidContext;
 
-/**
- * Cenário de outubro de T28 (Nubank 20.000,00, XP 0, XP Invest 0): despesa Pix 100,00 Alimentação ("Mercado do bairro"),
- * débito 40,00 Transporte, receita 3.000,00, transferência 1.000,00 Nubank → XP, aplicação 500,00, reembolso 50,00 da
- * despesa Pix, uma despesa de 30,00 estornada e uma despesa de 70,00 em 05/11.
- */
 public final class ListScenario {
 
     public final Account nubank = AccountTestFactory.umaContaCorrente();

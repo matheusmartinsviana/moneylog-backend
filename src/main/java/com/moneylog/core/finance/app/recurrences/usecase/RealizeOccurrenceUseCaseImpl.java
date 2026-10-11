@@ -31,15 +31,8 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.exception.TransactionExceptions.IdempotencyKeyReusedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 
-/**
- * Realizar uma ocorrência (T80): uma transação com a movimentação e os lançamentos dela. No cartão delega a
- * {@link RealizeCardRecurrenceUseCase} (alocação na fatura com lançamento tardio); em conta, a
- * {@code RecurringTransaction.realize}. A ocorrência fica "realizada" por existir a movimentação ativa com o par
- * {@code (recurrenceId, occurrenceDate)}; estornar a movimentação a reabre (S-49).
- */
 public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
 
-    /** Validade da chave (S-72), a mesma da criação de movimentação. */
     private static final Duration IDEMPOTENCY_VALIDITY = Duration.ofHours(24);
 
     private final RecurrenceGateway recurrences;
@@ -80,7 +73,6 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
                 return replay(command, existing);
             }
         }
-        // ordem global de travas: movimentações (nenhuma) → recorrência → cartão → contas; tudo lido só depois das travas
         recurrences.lockForUpdate(userId, command.recurrenceId());
         RecurringTransaction recurrence = recurrences.findById(userId, command.recurrenceId())
                 .orElseThrow(() -> new RecurrenceNotFoundException(command.recurrenceId()));
@@ -88,7 +80,6 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
             return cardRealization.handle(new RealizeCardRecurrenceCommand(userId, command.recurrenceId(), command.occurrenceDate(),
                     command.actualAmount(), transactionId));
         }
-        // recorrência de "conta a definir": a conta e o meio vêm da confirmação
         UUID accountId = recurrence.accountId() != null ? recurrence.accountId() : command.accountId();
         if (accountId == null) {
             throw new com.moneylog.core.recurrence.exception.RecurrenceExceptions.AccountRequiredException();
@@ -103,7 +94,6 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
         return assembler.assemble(saved);
     }
 
-    /** {@code null} = a chave é nossa (primeira vez ou vencida); senão, o que ela guardou. */
     private Claim claimOrFind(RealizeOccurrenceCommand command, UUID resourceId) {
         String hash = hashOf(command);
         Instant now = time.now();
@@ -124,12 +114,10 @@ public class RealizeOccurrenceUseCaseImpl implements RealizeOccurrenceUseCase {
         if (!existing.requestHash().equals(hashOf(command))) {
             throw new IdempotencyKeyReusedException();
         }
-        // o replay devolve o estado ATUAL do recurso (S-87), não uma cópia da primeira resposta
         return transactions.findById(command.userId(), existing.resourceId()).map(assembler::assemble)
                 .orElseThrow(() -> new TransactionNotFoundException(existing.resourceId()));
     }
 
-    /** Hash do comando canônico: a recorrência, a data e o valor (ausente = o do modelo). O dono não entra (a chave é por usuário). */
     private static String hashOf(RealizeOccurrenceCommand command) {
         String canonical = "recurrenceId=" + command.recurrenceId() + ";date=" + command.occurrenceDate() + ";amount="
                 + (command.actualAmount() == null ? "-" : command.actualAmount().toPlainString()) + ";account="

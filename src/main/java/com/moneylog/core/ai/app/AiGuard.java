@@ -13,12 +13,6 @@ import com.moneylog.core.ai.exception.AiExceptions.AiProviderUnavailableExceptio
 import com.moneylog.core.ai.exception.AiExceptions.AiRateLimitedException;
 import com.moneylog.core.sk.time.TimeProvider;
 
-/**
- * Custo e resiliência (S-186): limite diário de chamadas (dia em {@code America/Sao_Paulo}), orçamento mensal de tokens e disjuntor (5 falhas
- * seguidas do provedor abrem por 5 min; depois disso a próxima chamada é a sondagem: sucesso fecha, falha reabre). O consumo é lido das análises
- * registradas; chamadas em andamento entram na conta ({@code inFlight}), então 10 chamadas simultâneas no limite nunca o ultrapassam. Uma instância
- * só (ADR-001): o estado do disjuntor e do {@code inFlight} é em memória.
- */
 public class AiGuard {
 
     public static final int FAILURES_TO_OPEN = 5;
@@ -46,10 +40,6 @@ public class AiGuard {
         this.limits = limits;
     }
 
-    /**
-     * Reserva uma chamada. Ordem: disjuntor (503), limite diário (429), orçamento (422).
-     * Quem recebe a reserva <b>deve</b> chamar {@link #release} (em {@code finally}).
-     */
     public void acquire(UUID userId, int estimatedTokens) {
         lock.lock();
         try {
@@ -68,7 +58,6 @@ public class AiGuard {
         }
     }
 
-    /** @param providerHealthy {@code false} só para falha do provedor (rede, timeout, 401/403/5xx); resposta inválida não conta para o disjuntor */
     public void release(boolean providerHealthy) {
         lock.lock();
         try {

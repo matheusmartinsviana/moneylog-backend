@@ -27,10 +27,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Fatura histórica (ADR-014): o valor de uma fatura passada conhecido só pelo pagamento. {@code 201} devolve a movimentação
- * ({@code CARD_PURCHASE}, origem {@code HISTORICAL}, sem categoria, sem consumo); a fatura é quitada depois pelo pagamento real.
- */
 @RestController
 @RequestMapping("/v1/cards/{id}/historical-invoices")
 public class HistoricalInvoiceController {

@@ -73,7 +73,6 @@ class SecurityComponentsTest {
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("32 bytes")
                     .hasMessageNotContaining("curto-demais-segredo");
             assertThatThrownBy(() -> JwtSecret.toKey(null)).isInstanceOf(IllegalStateException.class);
-            // 31 caracteres multibyte (ã = 2 bytes) passam em bytes, não em caracteres
             assertThatCode(() -> JwtSecret.toKey("ã".repeat(16))).doesNotThrowAnyException();
         }
     }

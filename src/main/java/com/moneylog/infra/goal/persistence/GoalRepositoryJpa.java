@@ -15,7 +15,6 @@ public interface GoalRepositoryJpa extends JpaRepository<GoalEntity, UUID> {
 
     Optional<GoalEntity> findByIdAndUserId(UUID id, UUID userId);
 
-    /** {@code SELECT ... FOR UPDATE} da linha: duas reservas na mesma meta se serializam aqui. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from GoalEntity g where g.id = :id and g.userId = :userId")
     Optional<GoalEntity> lockByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);

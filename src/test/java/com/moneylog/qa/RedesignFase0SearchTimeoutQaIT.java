@@ -41,11 +41,6 @@ import com.moneylog.util.ItAuth;
 import com.moneylog.util.MutableClock;
 import com.moneylog.util.MutableClockConfig;
 
-/**
- * T190 (QA independente): 100 buscas seguidas que estouram o {@code statement_timeout} (1 ms contra 30.000 movimentações) e, depois, a saúde do
- * pool: nenhuma conexão volta com {@code statement_timeout} alterado, transação aberta ou abortada, e uma consulta normal (lenta de propósito)
- * ainda roda em todas as conexões. Também verifica que, com o teto estourado, a resposta é 200 com {@code truncated} (nunca 500).
- */
 @IntegrationTest
 @Import(MutableClockConfig.class)
 @TestPropertySource(properties = {"moneylog.search.timeout=PT0.001S", "moneylog.search.rate-limit.max-requests=1000000"})
@@ -88,7 +83,6 @@ class RedesignFase0SearchTimeoutQaIT {
         System.out.println("QA-F0-TIMEOUT série: 100 buscas, truncated(transactions)=" + truncatedTransactions);
         assertThat(truncatedTransactions).as("o teto de 1 ms precisa estourar de verdade (senão o teste não prova nada)").isGreaterThan(80);
 
-        // em paralelo
         ExecutorService pool = Executors.newFixedThreadPool(8);
         AtomicInteger bad = new AtomicInteger();
         List<Future<?>> futures = new ArrayList<>();
@@ -114,7 +108,6 @@ class RedesignFase0SearchTimeoutQaIT {
         pool.shutdown();
         assertThat(bad.get()).as("buscas paralelas que não deram 200").isZero();
 
-        // saúde do pool: pega várias conexões ao mesmo tempo e confere o estado de cada uma
         List<Connection> held = new ArrayList<>();
         try {
             for (int i = 0; i < 8; i++) {
@@ -125,7 +118,6 @@ class RedesignFase0SearchTimeoutQaIT {
                         rs.next();
                         assertThat(rs.getString(1)).as("statement_timeout da conexão " + i).isIn("0", "0ms");
                     }
-                    // uma consulta que leva 150 ms precisa terminar (se o teto de 1 ms tivesse vazado, seria cancelada)
                     st.execute("select pg_sleep(0.15)");
                     try (ResultSet rs = st.executeQuery("select txid_current_if_assigned() is null, current_setting('transaction_isolation')")) {
                         rs.next();
@@ -143,7 +135,6 @@ class RedesignFase0SearchTimeoutQaIT {
                 Long.class);
         assertThat(idleInTx).as("conexões presas em 'idle in transaction'").isZero();
 
-        // e uma busca com teto estourado ainda devolve os grupos baratos (notas/contas/cartões podem completar) — só confere o formato
         var r = world.res(mvc.perform(MockMvcRequestBuilders.get("/v1/search").param("q", "nubank").header(HttpHeaders.AUTHORIZATION, a.bearer)).andReturn());
         assertThat(r.status()).isEqualTo(200);
     }

@@ -12,10 +12,6 @@ import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionState;
 
-/**
- * Linhas de cadastro inseridas por SQL, para ITs de persistência montarem um cenário a partir das factories do
- * domínio sem depender do gateway que ainda se está testando. Sempre dentro de uma transação de teste (rollback).
- */
 public final class SqlFixtures {
 
     private static final Timestamp NOW = Timestamp.from(Instant.parse("2026-10-10T12:00:00Z"));
@@ -42,7 +38,6 @@ public final class SqlFixtures {
                 c.isArchived(), NOW, NOW, c.version());
     }
 
-    /** Só a linha de {@code transactions} (tipos em conta); os lançamentos vão pelo gateway do razão. */
     public static void insertTransactionRow(JdbcTemplate jdbc, Transaction t) {
         TransactionState s = t.state();
         String direction = s.investmentDirection() != null ? s.investmentDirection().name()

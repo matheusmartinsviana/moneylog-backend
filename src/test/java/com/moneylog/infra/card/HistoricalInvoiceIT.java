@@ -12,7 +12,6 @@ import tools.jackson.databind.JsonNode;
 import com.moneylog.infra.debt.E4ItBase;
 import com.moneylog.util.ContractValidation;
 
-/** ADR-014: fatura histórica (pagamento de fatura de mês anterior sem as compras), contra o contrato. Relógio 10/10/2026; cartão fecha dia 25, vence dia 5. */
 @DisplayName("Fatura histórica: registrar, pagar de verdade e não contar em dobro (ADR-014)")
 class HistoricalInvoiceIT extends E4ItBase {
 

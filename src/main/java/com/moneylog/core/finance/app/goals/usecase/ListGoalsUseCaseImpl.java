@@ -36,10 +36,8 @@ public class ListGoalsUseCaseImpl implements ListGoalsUseCase {
             return Slice.empty();
         }
         FinancialRecords loaded = records.load(query.userId());
-        // uma única leitura do razão e um único cálculo de cada medida para a lista inteira (ADR-008, ADR-016)
         List<Versioned<Goal>> stored = goals.findAll(query.userId());
         GoalViews.Context context = model.context(query.userId(), stored, loaded, true);
-        // quem filtra é o domínio (status derivado), não o SQL (S-150); são poucas metas por usuário
         List<GoalDetails> all = stored.stream()
                 .map(goal -> GoalViews.of(goal, context))
                 .filter(details -> query.status() == null || details.status() == query.status())

@@ -6,16 +6,6 @@ import java.time.YearMonth;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Dispensa de um insight, <b>só inserção</b> (auditoria): revogar grava {@code revokedAt}, nunca apaga a linha.
- *
- * <p>Escopos: {@code TODAY} some só no dia da dispensa (mesmo insight); {@code MONTH} some o mesmo tipo e assunto até o fim do mês da dispensa;
- * {@code TYPE} ("parar de avisar deste tipo") some todo insight do tipo até reverter.
- *
- * @param fingerprint insight dispensado (período incluído)
- * @param subjectId   assunto dentro do tipo ({@code null} = único)
- * @param dismissedOn dia (no fuso do usuário) em que foi dispensado
- */
 public record Dismissal(UUID id, UUID userId, String fingerprint, String type, String subjectId, Scope scope, LocalDate dismissedOn,
                         Instant createdAt, Instant revokedAt) {
 
@@ -43,7 +33,6 @@ public record Dismissal(UUID id, UUID userId, String fingerprint, String type, S
         return revokedAt == null;
     }
 
-    /** Esta dispensa (ainda ativa) esconde o insight em {@code today}? */
     public boolean hides(String insightFingerprint, Insight insight, LocalDate today) {
         if (!isActive()) {
             return false;

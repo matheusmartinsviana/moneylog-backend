@@ -15,12 +15,6 @@ import java.util.regex.Pattern;
 
 import com.moneylog.core.sk.money.Money;
 
-/**
- * Detecta cobranças parecidas com assinatura (sem IA, Q11): lançamentos de consumo com a mesma descrição normalizada (minúsculas, sem
- * acento, sem dígitos), pelo menos {@value #MIN_OCCURRENCES} ocorrências, intervalo mediano de {@value #MIN_INTERVAL} a {@value #MAX_INTERVAL}
- * dias, valor dentro de ±10% da mediana, ainda ativa (última ocorrência há até {@value #ACTIVE_WITHIN_DAYS} dias) e que ainda não esteja
- * cadastrada como recorrência. Só sugere ("parece recorrente"): a descrição é opcional e livre, então nada é afirmado como fato.
- */
 public final class SubscriptionDetector {
 
     public static final int MIN_OCCURRENCES = 3;
@@ -36,7 +30,6 @@ public final class SubscriptionDetector {
     private SubscriptionDetector() {
     }
 
-    /** Uma linha de consumo positivo, fora parcela, dívida e recorrência já realizada. */
     public record Line(LocalDate date, String description, Money amount) {
     }
 
@@ -44,7 +37,6 @@ public final class SubscriptionDetector {
                            int intervalDays) {
     }
 
-    /** Minúsculas, sem acento, sem dígitos nem pontuação, espaços colapsados. {@code null} vira vazio. */
     public static String normalize(String description) {
         if (description == null) {
             return "";
@@ -53,10 +45,6 @@ public final class SubscriptionDetector {
         return NOT_LETTER.matcher(noMarks.toLowerCase(Locale.ROOT)).replaceAll(" ").strip();
     }
 
-    /**
-     * @param registered descrições (já normalizadas) das recorrências cadastradas: não duplica o que o usuário já acompanha
-     * @param asOf       fim da janela observada
-     */
     public static List<Detected> detect(List<Line> lines, Set<String> registered, LocalDate asOf) {
         Map<String, List<Line>> groups = new TreeMap<>();
         for (Line line : lines) {

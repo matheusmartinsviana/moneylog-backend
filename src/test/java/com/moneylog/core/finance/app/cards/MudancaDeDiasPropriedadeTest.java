@@ -23,11 +23,6 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.CardBillingChanges;
 import com.moneylog.core.transaction.domain.Transaction;
 
-/**
- * T58 CA7: o invariante do cartão (Σ outstanding − creditCarry da última = −saldo CARD, T54 CA8) vale antes e depois da
- * mudança de dias; o consumo por competência não muda; todo item aponta para um fechamento do calendário novo. 100 cenários
- * aleatórios (semente fixa) de compras, créditos e pagamentos, com mudanças de fechamento e/ou vencimento em seguida.
- */
 @DisplayName("Mudança de dias: invariante do cartão e consumo por competência (T58 CA7)")
 class MudancaDeDiasPropriedadeTest {
 
@@ -56,7 +51,6 @@ class MudancaDeDiasPropriedadeTest {
                         }
                     }
                 } catch (DomainException expected) {
-                    // recusado pelo domínio (fatura paga, não pagável...): segue
                 }
             }
             Money balanceBefore = s.cardBookBalance();
@@ -71,7 +65,7 @@ class MudancaDeDiasPropriedadeTest {
             assertInvariant(s, s.cardBookBalance(), seed);
             assertThat(s.cardBookBalance()).as("semente %d: o saldo do livro CARD não muda", seed).isEqualTo(balanceBefore);
             assertThat(consumption(s.transactions())).as("semente %d: consumo por competência", seed).isEqualTo(consumptionBefore);
-            s.chain(); // lança INVOICE_CHAIN_INCONSISTENT se algum item ficou fora do calendário novo
+            s.chain();
         }
         assertThat(changes).isEqualTo(100);
     }

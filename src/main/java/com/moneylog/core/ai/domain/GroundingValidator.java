@@ -8,14 +8,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Aterramento (S-184): o texto do modelo só vale se (a) toda referência de fato existe, (b) todo número, valor ou porcentagem do texto aparece
- * nos {@link AiFacts} (comparação normalizada: {@code 1.283,00}, {@code 1283.00} e {@code 1283} são o mesmo número; {@code 23%} compara 23) e
- * (c) a categoria escolhida, quando há, está entre as permitidas.
- *
- * <p>Política documentada: só algarismos são conferidos. Número por extenso ("dois mil") <b>não</b> é checado; o prompt proíbe e o risco restante
- * é aceito no MVP (o texto continua sem poder alterar nada no razão). Fatos com mês ({@code 2026-10}) liberam 2026 e 10.
- */
 public final class GroundingValidator {
 
     private static final Pattern NUMBER = Pattern.compile("\\d[\\d.,]*\\d|\\d");
@@ -27,7 +19,6 @@ public final class GroundingValidator {
         return ungroundedReason(text, factRefs, facts) == null;
     }
 
-    /** {@code null} se aterrado; senão o motivo (sem eco do conteúdo). */
     public static String ungroundedReason(String text, Collection<String> factRefs, AiFacts facts) {
         if (text == null || text.isBlank()) {
             return "EMPTY_TEXT";
@@ -61,7 +52,6 @@ public final class GroundingValidator {
         return numbers;
     }
 
-    /** Remove separadores de milhar e padroniza o decimal; {@code 1.283,00} e {@code 1283.00} viram {@code 1283}. */
     static String normalize(String token) {
         int comma = token.lastIndexOf(',');
         int dot = token.lastIndexOf('.');

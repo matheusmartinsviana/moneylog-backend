@@ -52,7 +52,6 @@ import com.moneylog.infra.card.gateways.InvoiceRowGateway;
 import com.moneylog.infra.card.persistence.BillingRuleRepositoryJpa;
 import com.moneylog.infra.card.persistence.CardRepositoryJpa;
 
-/** Ligação da feature cartão (T51): gateways e casos de uso transacionais. */
 @Configuration(proxyBeanMethods = false)
 public class CardConfig {
 

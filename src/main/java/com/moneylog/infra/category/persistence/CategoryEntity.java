@@ -64,7 +64,6 @@ public class CategoryEntity {
         this.updatedAt = now;
     }
 
-    /** Aplica o estado editável do domínio (o resto é imutável). */
     public void apply(String newName, boolean newArchived, Instant now) {
         if (!name.equals(newName) || archived != newArchived) {
             this.name = newName;

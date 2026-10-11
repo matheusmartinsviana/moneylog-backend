@@ -48,7 +48,6 @@ import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionTypeNotAvailableException;
 
-/** Despacho por handlers de tipo (S-127) e a ordem global de travas: movimentações → cartão → contas por id. */
 @DisplayName("Handlers por tipo e ordem de travas (S-127, ADR-006)")
 class TransactionHandlersTest {
 

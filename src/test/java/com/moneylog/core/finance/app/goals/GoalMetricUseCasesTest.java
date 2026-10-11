@@ -151,7 +151,7 @@ class GoalMetricUseCasesTest {
         assertThat(d.reservations()).isEmpty();
         assertThat(d.planning().stage()).isEqualTo(GoalStage.FANTASY);
         verify(snapshots).upsert(eq(USER_ID), eq(d.goal().id()), eq(Competence.from(TODAY)), eq(total), eq(NOW));
-        verify(snapshots, never()).touchIfAbsent(any(), any(), any(), any(), any()); // escrita não grava em transação própria
+        verify(snapshots, never()).touchIfAbsent(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -165,8 +165,8 @@ class GoalMetricUseCasesTest {
                 .isInstanceOf(GoalFieldRequiredException.class);
         GoalDetails first = metric(GoalMetric.CARD_DEBT, "100.00", null);
         assertThatThrownBy(() -> metric(GoalMetric.CARD_DEBT, "100.00", null)).isInstanceOf(GoalMetricDuplicateException.class);
-        metric(GoalMetric.CARD_DEBT, "200.00", null); // outro alvo na mesma medida vale
-        metric(GoalMetric.PEOPLE_DEBT, "100.00", null); // mesma alvo em outra medida vale
+        metric(GoalMetric.CARD_DEBT, "200.00", null);
+        metric(GoalMetric.PEOPLE_DEBT, "100.00", null);
         archive.handle(new ArchiveGoalCommand(USER_ID, first.goal().id()));
         GoalDetails again = metric(GoalMetric.CARD_DEBT, "100.00", null);
         assertThatThrownBy(() -> unarchive.handle(new UnarchiveGoalCommand(USER_ID, first.goal().id()))).isInstanceOf(GoalMetricDuplicateException.class);
@@ -190,7 +190,7 @@ class GoalMetricUseCasesTest {
         metric(GoalMetric.AVAILABLE_BALANCE, "90000.00", null);
         metric(GoalMetric.ACCOUNTS_BALANCE, "90000.00", null);
         metric(GoalMetric.FIXED_COSTS_MONTHLY, "100.00", null);
-        metric(GoalMetric.AVAILABLE_BALANCE, "95000.00", null); // mesma medida, outro alvo
+        metric(GoalMetric.AVAILABLE_BALANCE, "95000.00", null);
         metric(GoalMetric.CARD_DEBT, "10.00", null);
         metric(GoalMetric.TOTAL_DEBT, "10.00", null);
         org.mockito.Mockito.clearInvocations(records, sources, snapshots);
@@ -208,7 +208,7 @@ class GoalMetricUseCasesTest {
         org.mockito.Mockito.clearInvocations(records, sources);
         list.handle(new ListGoalsQuery(USER_ID, null, new com.moneylog.core.sk.page.PageQuery(1, 20)));
         verify(records, times(1)).load(USER_ID);
-        verify(sources, never()).recurrences(any()); // só dívidas: nem recorrências, nem dashboard
+        verify(sources, never()).recurrences(any());
     }
 
     @Test
@@ -283,7 +283,6 @@ class GoalMetricUseCasesTest {
         assertThat(anchored.goal().baseline()).isEqualTo(after);
         assertThat(anchored.progress().ratio()).isEqualByComparingTo("0.0000");
         verify(snapshots).upsert(eq(USER_ID), eq(created.goal().id()), eq(Competence.from(TODAY)), eq(after), eq(NOW));
-        // alvo igual ao valor atual: recusa e a meta não muda
         GoalDetails equal = metric(GoalMetric.CARD_DEBT, source(GoalMetric.CARD_DEBT).add(Money.of("100.00")).toPlainString(), null);
         scenario.compraNoCartao("100.00", 1);
         assertThatThrownBy(() -> anchor.handle(new AnchorDebtPayoffBaselineCommand(USER_ID, equal.goal().id())))

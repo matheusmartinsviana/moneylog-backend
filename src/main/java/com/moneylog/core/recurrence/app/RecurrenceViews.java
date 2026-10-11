@@ -19,7 +19,6 @@ import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.persistence.Versioned;
 
-/** Monta {@link RecurrenceView}: lê categoria, conta e cartão referenciados uma vez cada (sem consulta por item). */
 public final class RecurrenceViews {
 
     private final CategoryGateway categories;

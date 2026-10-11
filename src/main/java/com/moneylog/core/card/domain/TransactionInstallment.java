@@ -10,16 +10,6 @@ import com.moneylog.core.card.exception.CardExceptions.InvalidInstallmentExcepti
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
-/**
- * Parcela {@code k/N} de uma compra no cartão (D1 §2.5.2). Imutável.
- *
- * <ul>
- *   <li>Competência = mês da compra + (k−1); data efetiva = data da compra + (k−1) meses, com clamp no fim do mês.</li>
- *   <li>A fatura é identificada pela data de fechamento (S-13).</li>
- *   <li>{@code PENDING}/{@code PAID}/{@code OVERDUE} são derivados da fatura ({@link #statusFor}); só o cancelamento é
- *       gravado ({@code canceledAt}).</li>
- * </ul>
- */
 public final class TransactionInstallment {
 
     private final UUID id;
@@ -51,12 +41,10 @@ public final class TransactionInstallment {
         this.canceledAt = canceledAt;
     }
 
-    /** Id determinístico da parcela k de uma compra (UUID v3 de "transação#k"): estável entre recálculos. */
     public static UUID idFor(UUID transactionId, int number) {
         return UUID.nameUUIDFromBytes((transactionId + "#" + number).getBytes(StandardCharsets.UTF_8));
     }
 
-    /** Mesma parcela em outra fatura (realocação da mudança de dia, S-42); só {@link BillingChange} usa. */
     TransactionInstallment withInvoiceClosingDate(LocalDate newInvoiceClosingDate) {
         return new TransactionInstallment(id, transactionId, number, total, amount, effectiveDate,
                 Objects.requireNonNull(newInvoiceClosingDate, "newInvoiceClosingDate"), lateEntry, canceledAt);
@@ -68,7 +56,6 @@ public final class TransactionInstallment {
                 : new TransactionInstallment(id, transactionId, number, total, amount, effectiveDate, invoiceClosingDate, lateEntry, now);
     }
 
-    /** Status derivado da fatura a que a parcela pertence (D1 §2.5.2). */
     public InstallmentStatus statusFor(InvoiceStatus invoiceStatus) {
         if (isCanceled()) {
             return InstallmentStatus.CANCELED;

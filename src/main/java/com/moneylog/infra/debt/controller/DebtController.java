@@ -41,10 +41,6 @@ import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.SliceResponse;
 
-/**
- * Dívidas (D1 §2.6): leitura, criação sem movimentação, edição, perdão e estorno do registro. As dívidas com movimentação
- * nascem em {@code POST /v1/transactions} e o estorno delas é o da movimentação de origem.
- */
 @RestController
 @RequestMapping("/v1/debts")
 public class DebtController {
@@ -81,13 +77,11 @@ public class DebtController {
         return DebtResponse.of(update.handle(new UpdateDebtCommand(userId, id, body.expectedDate(), body.description(), body.version())));
     }
 
-    /** Perdão (S-19): zera o saldo restante contra {@code EQUITY}; não se desfaz. */
     @PostMapping("/{id}/cancel")
     public DebtResponse cancel(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody ReasonInput body) {
         return DebtResponse.of(cancel.handle(new CancelDebtCommand(userId, id, body.reason())));
     }
 
-    /** Estorno do registro de uma dívida sem movimentação (sem quitações ativas). */
     @PostMapping("/{id}/void")
     public DebtResponse voidRecord(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody ReasonInput body) {
         return DebtResponse.of(voidRecord.handle(new VoidDebtRecordCommand(userId, id, body.reason())));

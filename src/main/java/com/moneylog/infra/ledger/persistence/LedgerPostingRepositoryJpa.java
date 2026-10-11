@@ -14,7 +14,6 @@ import com.moneylog.core.sk.ledger.PostingSourceType;
 
 public interface LedgerPostingRepositoryJpa extends JpaRepository<LedgerPostingEntity, UUID> {
 
-    /** Carregamento único (S-79): usa um índice parcial {@code WHERE active} (T24 CA4). */
     @Query("""
             select p from LedgerPostingEntity p
             where p.userId = :userId and p.active = true
@@ -28,17 +27,12 @@ public interface LedgerPostingRepositoryJpa extends JpaRepository<LedgerPostingE
     List<LedgerPostingEntity> findByTransactions(@Param("userId") UUID userId,
                                                  @Param("transactionIds") Collection<UUID> transactionIds);
 
-    /** Todos os lançamentos (ativos e inativos) de movimentações do usuário, para reidratar as movimentações. */
     @Query("""
             select p from LedgerPostingEntity p
             where p.userId = :userId and p.transactionId is not null
             order by p.effectiveDate, p.createdAt, p.id""")
     List<LedgerPostingEntity> findAllOfTransactions(@Param("userId") UUID userId);
 
-    /**
-     * Uma única instrução SQL desativa a origem inteira. Faz flush antes e limpa o contexto depois: sem isso, uma leitura
-     * na mesma transação devolveria os lançamentos ainda como ativos (instâncias gerenciadas desatualizadas).
-     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update LedgerPostingEntity p
@@ -47,7 +41,6 @@ public interface LedgerPostingRepositoryJpa extends JpaRepository<LedgerPostingE
     int deactivateBySource(@Param("userId") UUID userId, @Param("sourceType") PostingSourceType sourceType,
                            @Param("sourceId") UUID sourceId, @Param("reason") String reason, @Param("at") Instant at);
 
-    /** Desativa, numa instrução, os lançamentos ativos das parcelas de uma movimentação (cancelamento de parcelas). */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
             update LedgerPostingEntity p
@@ -58,7 +51,6 @@ public interface LedgerPostingRepositoryJpa extends JpaRepository<LedgerPostingE
                                  @Param("installmentIds") Collection<UUID> installmentIds, @Param("reason") String reason,
                                  @Param("at") Instant at);
 
-    /** Os lançamentos próprios das dívidas (reconhecimento e perdão, ativos e inativos), para reidratá-las. */
     @Query("""
             select p from LedgerPostingEntity p
             where p.userId = :userId and p.sourceType in :types and p.sourceId in :sourceIds
@@ -66,7 +58,6 @@ public interface LedgerPostingRepositoryJpa extends JpaRepository<LedgerPostingE
     List<LedgerPostingEntity> findBySources(@Param("userId") UUID userId, @Param("types") Collection<PostingSourceType> types,
                                             @Param("sourceIds") Collection<UUID> sourceIds);
 
-    /** Os lançamentos próprios de todas as dívidas do usuário (carregamento único). */
     @Query("""
             select p from LedgerPostingEntity p
             where p.userId = :userId and p.sourceType in :types
