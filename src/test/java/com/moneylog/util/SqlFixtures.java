@@ -15,12 +15,14 @@ import com.moneylog.core.transaction.domain.TransactionState;
 public final class SqlFixtures {
 
     private static final Timestamp NOW = Timestamp.from(Instant.parse("2026-10-10T12:00:00Z"));
+    private static final Timestamp NEWER_THAN_ANY_OWNER = Timestamp.from(Instant.parse("2099-01-01T00:00:00Z"));
 
     private SqlFixtures() {
     }
 
     public static void insertUser(JdbcTemplate jdbc, UUID id, String email) {
-        jdbc.update("INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)", id, email, NOW, NOW);
+        jdbc.update("INSERT INTO users (id, email, created_at, updated_at) VALUES (?, ?, ?, ?)", id, email,
+                NEWER_THAN_ANY_OWNER, NEWER_THAN_ANY_OWNER);
     }
 
     public static void insertAccount(JdbcTemplate jdbc, Account a) {
