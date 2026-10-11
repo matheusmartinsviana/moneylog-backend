@@ -26,7 +26,7 @@ import com.moneylog.util.PostgresTestcontainer;
 class LocalEnvironmentConsistencyTest {
 
     private static final Path BACKEND = Path.of("").toAbsolutePath();
-    private static final Path ROOT = BACKEND.getParent();
+    private static final Path ROOT = BACKEND;
     private static final Pattern PLACEHOLDER = Pattern.compile("(?<!\\$)\\$\\{([A-Z][A-Z0-9_]*)[^}]*}");
     private static final Pattern ENV_LINE = Pattern.compile("^([A-Z][A-Z0-9_]*)=(.*)$");
 

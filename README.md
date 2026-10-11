@@ -1,6 +1,6 @@
 # moneylog — backend
 
-Spring Boot 4.1 (Java 21) com Clean Architecture por feature: `core` (domínio puro, sem framework) e `infra` (Spring, JPA, web). Decisões: [ADR-001](../docs/adrs/ADR-001-plataforma-dados-stack.md), [ADR-002](../docs/adrs/ADR-002-razao-e-dinheiro.md), [ADR-004](../docs/adrs/ADR-004-idioma-do-codigo.md). Modelo de domínio: [D1](../docs/arquitetura/dominio-financeiro.md). Arquitetura: [D2](../docs/arquitetura/arquitetura.md).
+Spring Boot 4.1 (Java 21) com Clean Architecture por feature: `core` (domínio puro, sem framework) e `infra` (Spring, JPA, web). Decisões: [ADR-001](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-001-plataforma-dados-stack.md), [ADR-002](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-002-razao-e-dinheiro.md), [ADR-004](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-004-idioma-do-codigo.md). Modelo de domínio: [D1](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/dominio-financeiro.md). Arquitetura: [D2](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/arquitetura.md).
 
 ## Pré-requisitos
 - **JDK 21**. O `java` padrão do PATH não serve (o Maven do brew usaria o JDK 26 e o `maven-enforcer-plugin` falha):
@@ -48,11 +48,10 @@ Propriedades (`application.yaml`, prefixo `moneylog.auth`): `access-token-ttl` (
 ## Rodando
 ```bash
 # 1. Postgres local (postgres:17, com healthcheck)
-docker compose up -d --wait          # na raiz
+docker compose up -d --wait
 
 # 2. Aplicação com o perfil dev, carregando o .env no ambiente
-cd backend
-set -a && source ../.env && set +a
+set -a && source .env && set +a
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 
 # 3. Health
@@ -100,6 +99,14 @@ Schema: `src/main/resources/db/migration/V1.00`–`V1.08` (editáveis até o pri
 - Imagens dos testes são **geradas por código** (`com.moneylog.util.SyntheticImages`); não há foto nem binário versionado. Não existe seed de demonstração no repositório: quando houver, deve gerar as fotos com `SyntheticImages`/`ImageIO`.
 
 ## Produção, imagem Docker e backup (Etapa 9)
-- Imagem: `docker build -t moneylog-backend:local backend/` (multi-stage, JRE 21 alpine, usuário não-root, `SPRING_PROFILES_ACTIVE=prod`). Subir com `docker compose -f docker-compose.prod.yml --env-file .env up --build` (precisa de `MONEYLOG_TRUSTED_PROXIES`; local: `172.16.0.0/12`).
+- Imagem: `docker build -t moneylog-backend:local .` (multi-stage, JRE 21 alpine, usuário não-root, `SPRING_PROFILES_ACTIVE=prod`). No repositório principal (moneylog), suba com `docker compose -f docker-compose.prod.yml --env-file .env up --build` (precisa de `MONEYLOG_TRUSTED_PROXIES`; local: `172.16.0.0/12`).
 - Perfil `prod` (`application-prod.yaml`): logs JSON (ECS), swagger e api-docs desligados, probes `liveness`/`readiness`, cookie `Secure`. Segredos por arquivo: cada arquivo de `SECRETS_DIR` (padrão `/run/secrets`) com o nome da variável (ex.: `JWT_SECRET`).
 - Backup: `docs/operacao/backup.md`. Deploy na AWS (preparado, não executado): `docs/operacao/deploy-aws.md` e `docs/adrs/ADR-005-topologia-aws-e-banco.md`.
+
+## Repositórios
+Este repositório (`moneylog-backend`) faz parte do projeto **moneylog**, que tem um repositório principal com
+`backend/` e `frontend/` como submódulos (docs, infra e scripts de deploy ficam lá). O contrato
+`contracts/openapi.yaml` é daqui; o frontend mantém uma cópia sincronizada (`npm run contract:sync`).
+
+Commits: Conventional Commits e **sem `Co-Authored-By`** nem linha de atribuição. Ative o hook com
+`git config core.hooksPath .githooks`.

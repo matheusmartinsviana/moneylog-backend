@@ -1,0 +1,14 @@
+# Segredos locais
+.env
+.env.*
+!.env.example
+
+# Maven
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDEs e SO
+.idea/
+*.iml
+.vscode/
+.DS_Store

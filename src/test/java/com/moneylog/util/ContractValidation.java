@@ -94,10 +94,10 @@ public final class ContractValidation {
     }
 
     private static Path locate() {
-        Path path = Path.of("").toAbsolutePath().resolve("../contracts/openapi.yaml").normalize();
+        Path path = Path.of("").toAbsolutePath().resolve("contracts/openapi.yaml").normalize();
         if (!Files.isRegularFile(path)) {
             throw new IllegalStateException("contracts/openapi.yaml não encontrado em " + path
-                    + " (rode o Maven a partir de backend/)");
+                    + " (rode o Maven a partir da raiz do repositório moneylog-backend)");
         }
         return path;
     }

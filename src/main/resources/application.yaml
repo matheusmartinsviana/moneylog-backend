@@ -1,4 +1,4 @@
-# Configuração base. Nenhum segredo aqui: tudo vem de variáveis de ambiente (veja .env.example na raiz).
+# Configuração base. Nenhum segredo aqui: tudo vem de variáveis de ambiente (veja .env.example).
 spring:
   application:
     name: moneylog

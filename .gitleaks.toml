@@ -1,0 +1,10 @@
+# Falsos positivos conhecidos (valores fictícios de teste/demo e chaves de i18n). Nada aqui é segredo real.
+[extend]
+useDefault = true
+[allowlist]
+description = "fixtures de teste, demo e chaves de i18n"
+regexes = [
+  "senha-forte-123",
+  "0c8a1d52-3f1e-4c0b-8a67-5d2e9b7f4a31",
+  "notification\\.[a-z.0-9]+",
+]

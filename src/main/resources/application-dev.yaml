@@ -1,5 +1,5 @@
 # Perfil de desenvolvimento local (Postgres do docker-compose.yml).
-# As variáveis vêm do ambiente: carregue o .env da raiz antes de subir a aplicação (veja backend/README.md).
+# As variáveis vêm do ambiente: carregue o .env antes de subir a aplicação (veja README.md).
 spring:
   flyway:
     # Só no perfil dev (revisão R-02): as etapas em paralelo reservam números V3.*..V9.* e o banco de dev persistente pode

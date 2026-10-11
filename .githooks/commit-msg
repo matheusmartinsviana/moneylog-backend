@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Conventional Commits (regra do projeto) e sem atribuição de IA/co-autor. Ative com: git config core.hooksPath .githooks
+msg="$(grep -v "^#" "$1")"
+first="$(printf "%s" "$msg" | head -1)"
+if ! printf "%s" "$first" | grep -Eq "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._-]+\))?!?: .+"; then
+  echo "commit recusado: use Conventional Commits (tipo(escopo): descrição no imperativo, minúscula)." >&2; exit 1
+fi
+if printf "%s" "$msg" | grep -Eiq "^(co-authored-by|claude-session|generated (with|by))"; then
+  echo "commit recusado: sem Co-Authored-By nem linhas de atribuição (regra fixa do moneylog)." >&2; exit 1
+fi
