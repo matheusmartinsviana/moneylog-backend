@@ -72,7 +72,7 @@ class GoalsIT extends E4ItBase {
 
     private String otherUserBearer() {
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         return auth.bearer(other);
     }
 
@@ -677,7 +677,7 @@ class GoalsIT extends E4ItBase {
     void deveReforcarAsRegrasNoBanco() throws Exception {
         String id = emergencia().get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "fk-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "fk-" + other + "@example.com"));
         UUID otherAccount = UUID.randomUUID();
         committed(() -> SqlFixtures.insertAccount(jdbc, com.moneylog.core.account.domain.Account.open(otherAccount, other, "Dele",
                 com.moneylog.core.account.domain.AccountType.CHECKING, null, com.moneylog.core.sk.money.Money.of("1.00"), java.time.LocalDate.of(2026, 10, 1))));

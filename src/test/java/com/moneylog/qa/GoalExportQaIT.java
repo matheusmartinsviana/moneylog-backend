@@ -309,7 +309,7 @@ class GoalExportQaIT {
         assertThat(voided).isTrue();
         String lower = text.toLowerCase();
         for (String forbidden : List.of(secretHash, idemKey, a.id.toString(), b.id.toString(), "despesa privada de b", "meta de b", "pessoa de b", b.nubank, bGoal, b.card, "jwt", "secret",
-                "password", "senha", "token", "idempot", "refresh", "@moneylog.com", "request_hash", "time_zone", "timezone")) {
+                "password", "senha", "token", "idempot", "refresh", "@example.com", "request_hash", "time_zone", "timezone")) {
             assertThat(lower).as("backup não pode conter '" + forbidden + "'").doesNotContain(forbidden.toLowerCase());
         }
         Set<String> keys = new HashSet<>();

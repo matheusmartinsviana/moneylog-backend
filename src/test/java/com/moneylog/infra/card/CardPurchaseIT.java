@@ -92,7 +92,7 @@ class CardPurchaseIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "compra-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "compra-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = body(mockMvc.perform(post("/v1/accounts", "{\"name\":\"Nubank\",\"type\":\"CHECKING\",\"institution\":\"Nubank\","
                 + "\"openingBalance\":{\"amount\":\"20000.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}"))
@@ -354,7 +354,7 @@ class CardPurchaseIT {
         UUID foreignCard = UUID.randomUUID();
         UUID foreignCategory = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@example.com");
             jdbc.update("INSERT INTO credit_cards (id, user_id, name, limit_cents, currency, status, created_at, updated_at) "
                     + "VALUES (?, ?, 'Alheio', 100000, 'BRL', 'ACTIVE', now(), now())", foreignCard, other);
             jdbc.update("INSERT INTO credit_card_billing_rules (id, user_id, card_id, effective_from, closing_day, due_day, created_at, updated_at) "

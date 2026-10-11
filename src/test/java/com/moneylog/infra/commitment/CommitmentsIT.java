@@ -108,7 +108,7 @@ class CommitmentsIT extends E4ItBase {
     void deveIsolarPorUsuario() throws Exception {
         String id = createdBody(post("/v1/commitments", project(null))).get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(getAs(otherBearer, "/v1/commitments/" + id)).andExpect(status().isNotFound());
         mockMvc.perform(postAs(otherBearer, "/v1/commitments/" + id + "/schedule/3/pay", "{\"paidOn\":\"2026-12-10\",\"version\":0}"))

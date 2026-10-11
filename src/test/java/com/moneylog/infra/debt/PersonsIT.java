@@ -92,7 +92,7 @@ class PersonsIT extends E4ItBase {
     @DisplayName("CA5: pessoa de outro usuário é 404 PERSON_NOT_FOUND em todas as rotas, e não aparece na lista")
     void deveIsolarPorUsuario() throws Exception {
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(getAs(otherBearer, "/v1/people/" + joao)).andExpect(status().isNotFound())
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("PERSON_NOT_FOUND"));

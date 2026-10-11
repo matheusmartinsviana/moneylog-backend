@@ -44,4 +44,16 @@ class AiPropertiesTest {
         AiProperties p = new AiProperties("anthropic", KEY, "claude-x", "https://u:p@host", 30, 50, 1, 90);
         assertThat(p.toString()).contains("****").doesNotContain(KEY).doesNotContain("SENTINELA").doesNotContain("u:p@host");
     }
+
+    @Test
+    @DisplayName("AI_BASE_URL exige https, aceitando http só em localhost e 127.0.0.1")
+    void deveExigirHttpsNaBaseUrl() {
+        assertThatThrownBy(() -> new AiProperties("anthropic", KEY, "claude-x", "http://api.exemplo.test", 30, 50, 1, 90))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("https").hasMessageNotContaining("exemplo.test");
+        assertThatThrownBy(() -> new AiProperties("anthropic", KEY, "claude-x", "ftp://localhost", 30, 50, 1, 90))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(new AiProperties("anthropic", KEY, "claude-x", "https://api.exemplo.test", 30, 50, 1, 90).enabled()).isTrue();
+        assertThat(new AiProperties("anthropic", KEY, "claude-x", "http://localhost:8089", 30, 50, 1, 90).enabled()).isTrue();
+        assertThat(new AiProperties("anthropic", KEY, "claude-x", "http://127.0.0.1:8089", 30, 50, 1, 90).enabled()).isTrue();
+    }
 }

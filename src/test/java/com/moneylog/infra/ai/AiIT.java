@@ -69,7 +69,7 @@ class AiIT extends E4ItBase {
     void naoDeveExporDadosDeOutroUsuario() throws Exception {
         JsonNode preview = preview();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "ai-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "ai-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
         mockMvc.perform(getAs(otherBearer, "/v1/ai/previews/" + preview.get("previewId").asString())).andExpect(status().isNotFound());

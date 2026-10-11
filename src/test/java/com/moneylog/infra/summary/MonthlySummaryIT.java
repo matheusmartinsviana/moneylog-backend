@@ -178,7 +178,7 @@ class MonthlySummaryIT extends E4ItBase {
     void deveIsolarPorUsuario() throws Exception {
         seed();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "resumo-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "resumo-" + other + "@example.com"));
 
         JsonNode theirs = body(mockMvc.perform(getAs(auth.bearer(other), "/v1/summaries/2026-10")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());

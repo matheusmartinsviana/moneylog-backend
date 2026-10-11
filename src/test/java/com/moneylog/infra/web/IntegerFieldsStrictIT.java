@@ -46,7 +46,7 @@ class IntegerFieldsStrictIT {
     void cenario() {
         UUID userId = UUID.randomUUID();
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "int-" + userId + "@moneylog.com"));
+                .executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "int-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
     }
 

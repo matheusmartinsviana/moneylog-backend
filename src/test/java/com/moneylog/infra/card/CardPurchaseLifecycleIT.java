@@ -311,7 +311,7 @@ class CardPurchaseLifecycleIT extends CardItBase {
     void deveIsolarUsuarios() throws Exception {
         String id = notebook();
         UUID other = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
         mockMvc.perform(postAs(otherBearer, "/v1/transactions/" + id + "/void", "{\"reason\":\"x\"}")).andExpect(status().isNotFound());

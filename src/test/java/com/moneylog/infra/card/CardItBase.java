@@ -87,7 +87,7 @@ abstract class CardItBase {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "cartao-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "cartao-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = body(mockMvc.perform(post("/v1/accounts", "{\"name\":\"Nubank\",\"type\":\"CHECKING\",\"institution\":\"Nubank\","
                 + "\"openingBalance\":{\"amount\":\"20000.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}"))

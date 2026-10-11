@@ -70,7 +70,7 @@ class AccountsIT {
     @BeforeEach
     void novoUsuario() {
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "conta-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "conta-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
     }
 
@@ -289,7 +289,7 @@ class AccountsIT {
         UUID other = UUID.randomUUID();
         UUID accountId = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "outra-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "outra-" + other + "@example.com");
             SqlFixtures.insertAccount(jdbc, Account.open(accountId, other, "Alheia", AccountType.CHECKING, null, Money.of("1.00"),
                     LocalDate.of(2026, 10, 1)));
         });

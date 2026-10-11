@@ -277,7 +277,7 @@ class OccurrencesIT extends E4ItBase {
     void deveIsolarARealizacao() throws Exception {
         String id = internet();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         mockMvc.perform(postAs(auth.bearer(other), "/v1/recurrences/" + id + "/occurrences/2026-10-10/realize", "{}")
                 .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isNotFound());
         assertThat(count("transactions")).isZero();

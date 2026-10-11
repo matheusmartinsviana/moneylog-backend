@@ -282,7 +282,7 @@ class SearchIT extends E4ItBase {
         String myNote = note("jp/Cozinha japonesa.md", "viagem");
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "other-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "other-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         Category otherCategory = Category.create(UUID.randomUUID(), other, "Japonesa", CategoryKind.EXPENSE);
         committed(() -> SqlFixtures.insertCategory(jdbc, otherCategory));
@@ -315,7 +315,7 @@ class SearchIT extends E4ItBase {
         assertThat(theirs.get("notes")).hasSize(1);
         assertThat(theirs.get("notes").get(0).get("id").asString()).isNotEqualTo(myNote);
         UUID empty = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, empty, "empty-" + empty + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, empty, "empty-" + empty + "@example.com"));
         JsonNode nothing = searchAs(auth.bearer(empty), "japon");
         assertThat(nothing.get("transactions")).isEmpty();
         assertThat(nothing.get("accounts")).isEmpty();
@@ -337,7 +337,7 @@ class SearchIT extends E4ItBase {
         mockMvc.perform(get("/v1/exports/transactions.csv")).andExpect(status().isOk());
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "rate-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "rate-" + other + "@example.com"));
         searchAs(auth.bearer(other), "limite");
 
         clock.advance(Duration.ofSeconds(61));

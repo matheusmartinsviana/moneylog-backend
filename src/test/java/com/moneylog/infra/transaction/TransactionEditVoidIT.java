@@ -66,7 +66,7 @@ class TransactionEditVoidIT {
     @BeforeEach
     void cenario() throws Exception {
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "edit-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "edit-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = account("Nubank", "20000.00");
         xp = account("XP", "0.00");
@@ -484,7 +484,7 @@ class TransactionEditVoidIT {
     void deveIsolarPorUsuario() throws Exception {
         String id = createExpense("100.00").get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
         mockMvc.perform(MockMvcRequestBuilders.put("/v1/transactions/" + id).header(HttpHeaders.AUTHORIZATION, otherBearer)

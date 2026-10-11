@@ -50,6 +50,7 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
                     mask(result.owner().email()));
         }
         if (result.passwordReset()) {
+            SecurityEventLog.ownerPasswordReset(result.owner().email());
             log.warn("Senha do dono redefinida (MONEYLOG_OWNER_RESET_PASSWORD): sessões revogadas e primeiro acesso pendente. "
                     + "Remova a variável para não repetir.");
         } else if (owner.resetPassword()) {

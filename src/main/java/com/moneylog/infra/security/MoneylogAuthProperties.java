@@ -13,6 +13,11 @@ public record MoneylogAuthProperties(
         @DefaultValue("true") boolean cookieSecure,
         @DefaultValue("5") int maxLoginFailures,
         @DefaultValue("PT15M") Duration loginWindow,
+        @DefaultValue("10") int maxAccountFailures,
+        @DefaultValue("PT1M") Duration accountLockBase,
+        @DefaultValue("PT15M") Duration accountLockMax,
+        @DefaultValue("P30D") Duration trustedIpTtl,
+        @DefaultValue("10000") int limiterMaxEntries,
         @DefaultValue("P90D") Duration maxSessionAge,
         @DefaultValue("P7D") Duration refreshRetention) {
 }

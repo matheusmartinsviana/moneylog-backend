@@ -68,7 +68,7 @@ class ExportLimitsIT extends E4ItBase {
 
     private String otherBearer() {
         java.util.UUID other = java.util.UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "limite-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "limite-" + other + "@example.com"));
         return auth.bearer(other);
     }
 }

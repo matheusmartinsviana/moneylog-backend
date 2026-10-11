@@ -360,7 +360,7 @@ class NotesIT extends NotesItBase {
     void deveProtegerOEsquema() throws Exception {
         String id = createNote("a.md", "x").get("id").asString();
         UUID otherUser = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, otherUser, "fk-" + otherUser + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, otherUser, "fk-" + otherUser + "@example.com"));
         UUID foreignGoal = UUID.randomUUID();
         committed(() -> jdbc.update("INSERT INTO goals (id, user_id, name, target_cents, currency, priority, archived, created_at, updated_at, version) "
                 + "VALUES (?, ?, 'x', 100, 'BRL', 'LOW', false, ?, ?, 0)", foreignGoal, otherUser, NOW, NOW));

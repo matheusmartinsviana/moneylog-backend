@@ -73,7 +73,7 @@ final class CardQaWorld {
         }
 
         Actor(String tag, int closingDay, int dueDay) throws Exception {
-            new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, tag + "-" + id + "@moneylog.com"));
+            new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, tag + "-" + id + "@example.com"));
             bearer = auth.bearer(id);
             nubank = ok(call(HttpMethod.POST, "/v1/accounts", "{\"name\":\"Nubank\",\"type\":\"CHECKING\",\"institution\":\"Nubank\","
                     + "\"openingBalance\":{\"amount\":\"20000.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}", null)).node().get("id").asString();

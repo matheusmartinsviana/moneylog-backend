@@ -61,7 +61,7 @@ class TransactionsIT {
     @BeforeEach
     void cenario() throws Exception {
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "mov-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "mov-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = account("Nubank", "CHECKING", "20000.00");
         xp = account("XP", "CHECKING", "0.00");
@@ -157,7 +157,7 @@ class TransactionsIT {
         assertThat(body(fetched)).isEqualTo(created);
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/transactions/" + created.get("id").asString()).header(HttpHeaders.AUTHORIZATION, auth.bearer(other)))
                 .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("TRANSACTION_NOT_FOUND")).andExpect(ContractValidation.conforms());
         mockMvc.perform(get("/v1/transactions/" + UUID.randomUUID())).andExpect(status().isNotFound());
@@ -311,7 +311,7 @@ class TransactionsIT {
         UUID other = UUID.randomUUID();
         UUID otherAccount = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@example.com");
             SqlFixtures.insertAccount(jdbc, com.moneylog.core.account.domain.Account.open(otherAccount, other, "Alheia",
                     com.moneylog.core.account.domain.AccountType.CHECKING, null, com.moneylog.core.sk.money.Money.of("1.00"), LocalDate.of(2026, 10, 1)));
         });

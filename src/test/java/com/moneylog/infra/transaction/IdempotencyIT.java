@@ -72,7 +72,7 @@ class IdempotencyIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "idem-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "idem-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = account("Nubank", "20000.00");
         xp = account("XP", "0.00");
@@ -223,7 +223,7 @@ class IdempotencyIT {
         JsonNode mine = body(create(expense("100.00"), key).andExpect(status().isCreated()).andReturn());
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         MvcResult theirs = mockMvc.perform(post(otherBearer, "/v1/accounts", "{\"name\":\"Conta\",\"type\":\"CHECKING\",\"openingBalance\":"
                 + "{\"amount\":\"500.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}")).andExpect(status().isCreated()).andReturn();

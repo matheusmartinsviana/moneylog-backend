@@ -55,7 +55,7 @@ class OptionalFieldsIT {
     @BeforeEach
     void cenario() throws Exception {
         userId = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "opt-" + userId + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "opt-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         otherExpense = systemCategory("OTHER_EXPENSE", "Outros", "EXPENSE");
         otherIncome = systemCategory("OTHER_INCOME", "Outras receitas", "INCOME");

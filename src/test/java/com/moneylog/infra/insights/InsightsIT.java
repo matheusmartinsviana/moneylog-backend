@@ -257,7 +257,7 @@ class InsightsIT extends E4ItBase {
         salaryAndExpense();
         String id = dailyBudget().get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "ins-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "ins-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
         mockMvc.perform(postAs(otherBearer, "/v1/insights/" + id + "/dismissals", "{\"scope\":\"TODAY\"}")).andExpect(status().isNotFound())

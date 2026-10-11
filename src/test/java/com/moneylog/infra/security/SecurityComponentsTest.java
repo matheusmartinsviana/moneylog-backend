@@ -75,6 +75,20 @@ class SecurityComponentsTest {
             assertThatThrownBy(() -> JwtSecret.toKey(null)).isInstanceOf(IllegalStateException.class);
             assertThatCode(() -> JwtSecret.toKey("ã".repeat(16))).doesNotThrowAnyException();
         }
+
+        @Test
+        @DisplayName("em prod recusa segredo de baixa entropia sem imprimi-lo e aceita o gerado por openssl")
+        void deveRecusarBaixaEntropiaEmProd() {
+            String[] weak = {"x".repeat(40), "abababababababababababababababab", "abcdefghijklmnopqrstuvwxyz0123456789",
+                    "aaaaaaaaaaaaaaaabbbbbbbbbbbbbbbbcccccccccccc", "umasenhaumasenhaumasenhaumasenhaumasenha"};
+            for (String secret : weak) {
+                assertThatThrownBy(() -> JwtSecret.toKey(secret, true)).isInstanceOf(IllegalStateException.class)
+                        .hasMessageContaining("baixa entropia").hasMessageNotContaining(secret);
+                assertThatCode(() -> JwtSecret.toKey(secret, false)).doesNotThrowAnyException();
+            }
+            String generated = "q7Vx2mKd9RtLw3ZpYb8HcNf5JgS1aEoUiT6yXz0BvDr4MkWn7QhPjCeA2sGlFu9O";
+            assertThatCode(() -> JwtSecret.toKey(generated, true)).doesNotThrowAnyException();
+        }
     }
 
     @Nested
@@ -156,33 +170,164 @@ class SecurityComponentsTest {
             }
         };
 
+        private LoginRateLimiter limiter(int maxIp, int maxAccount, int maxEntries) {
+            return new LoginRateLimiter(clock, new LoginRateLimiter.Settings(maxIp, Duration.ofMinutes(15), maxAccount,
+                    Duration.ofMinutes(1), Duration.ofMinutes(15), Duration.ofDays(30), maxEntries));
+        }
+
         @Test
         @DisplayName("bloqueia na 6ª tentativa, informa o Retry-After e libera depois da janela")
         void deveBloquearEDesbloquear() {
             LoginRateLimiter limiter = new LoginRateLimiter(clock, 5, Duration.ofMinutes(15));
             for (int i = 0; i < 5; i++) {
-                limiter.ensureNotBlocked("1.1.1.1");
-                limiter.recordFailure("1.1.1.1");
+                limiter.reserve("1.1.1.1", "a" + i);
                 now.set(now.get().plusSeconds(10));
             }
 
-            assertThatThrownBy(() -> limiter.ensureNotBlocked("1.1.1.1")).isInstanceOfSatisfying(TooManyAttemptsException.class,
-                    e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(900 - 50)));
-            assertThatCode(() -> limiter.ensureNotBlocked("2.2.2.2")).doesNotThrowAnyException();
+            assertThatThrownBy(() -> limiter.reserve("1.1.1.1", "outra")).isInstanceOfSatisfying(TooManyAttemptsException.class,
+                    e -> {
+                        assertThat(e.retryAfter()).isEqualTo(Duration.ofSeconds(900 - 50));
+                        assertThat(e.scope()).isEqualTo(TooManyAttemptsException.Scope.IP);
+                    });
+            assertThatCode(() -> limiter.reserve("2.2.2.2", "x")).doesNotThrowAnyException();
 
             now.set(now.get().plus(Duration.ofMinutes(15)));
-            assertThatCode(() -> limiter.ensureNotBlocked("1.1.1.1")).doesNotThrowAnyException();
+            assertThatCode(() -> limiter.reserve("1.1.1.1", "x")).doesNotThrowAnyException();
         }
 
         @Test
-        @DisplayName("login bem-sucedido zera o contador do IP")
+        @DisplayName("login bem-sucedido zera o contador do IP e da conta")
         void deveZerarNoSucesso() {
             LoginRateLimiter limiter = new LoginRateLimiter(clock, 2, Duration.ofMinutes(15));
-            limiter.recordFailure("1.1.1.1");
-            limiter.recordFailure("1.1.1.1");
-            limiter.reset("1.1.1.1");
+            limiter.reserve("1.1.1.1", "a");
+            LoginRateLimiter.Attempt attempt = limiter.reserve("1.1.1.1", "a");
+            limiter.succeeded(attempt);
 
-            assertThatCode(() -> limiter.ensureNotBlocked("1.1.1.1")).doesNotThrowAnyException();
+            assertThatCode(() -> limiter.reserve("1.1.1.1", "a")).doesNotThrowAnyException();
+            assertThatCode(() -> limiter.reserve("1.1.1.1", "a")).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("IPv6 é limitado pelo prefixo /64: trocar o final do endereço não zera o contador")
+        void deveAgruparIpv6PorPrefixo64() {
+            LoginRateLimiter limiter = limiter(3, 100, 100);
+            limiter.reserve("2001:db8:1:2:aaaa::1", "a");
+            limiter.reserve("2001:db8:1:2:bbbb::2", "a");
+            limiter.reserve("2001:db8:1:2:cccc::3", "a");
+
+            assertThatThrownBy(() -> limiter.reserve("2001:db8:1:2:dddd::4", "a")).isInstanceOf(TooManyAttemptsException.class);
+            assertThatCode(() -> limiter.reserve("2001:db8:1:3::1", "a")).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("rajada paralela do mesmo IP não passa do limite: a reserva é atômica")
+        void deveSerAtomicoSobConcorrencia() throws Exception {
+            LoginRateLimiter limiter = limiter(5, 1000, 100);
+            java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(32);
+            java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.atomic.AtomicInteger admitted = new java.util.concurrent.atomic.AtomicInteger();
+            List<java.util.concurrent.Future<?>> futures = new java.util.ArrayList<>();
+            for (int i = 0; i < 200; i++) {
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    try {
+                        limiter.reserve("9.9.9.9", "dono@example.com");
+                        admitted.incrementAndGet();
+                    } catch (TooManyAttemptsException blocked) {
+                        return null;
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (java.util.concurrent.Future<?> future : futures) {
+                future.get();
+            }
+            pool.shutdown();
+
+            assertThat(admitted.get()).isEqualTo(5);
+        }
+
+        @Test
+        @DisplayName("limite por conta vale mesmo trocando de IP, com bloqueio progressivo e teto de 15 min")
+        void deveBloquearPorContaComBackoff() {
+            LoginRateLimiter limiter = limiter(100, 3, 100);
+            for (int i = 0; i < 3; i++) {
+                limiter.reserve("10.0.0." + i, "login:dono@example.com");
+            }
+
+            assertThatThrownBy(() -> limiter.reserve("10.0.0.50", "login:dono@example.com"))
+                    .isInstanceOfSatisfying(TooManyAttemptsException.class, e -> {
+                        assertThat(e.scope()).isEqualTo(TooManyAttemptsException.Scope.ACCOUNT);
+                        assertThat(e.retryAfter()).isEqualTo(Duration.ofMinutes(1));
+                    });
+            assertThatCode(() -> limiter.reserve("10.0.0.50", "login:outro@example.com")).doesNotThrowAnyException();
+
+            now.set(now.get().plus(Duration.ofMinutes(1)));
+            for (int i = 0; i < 3; i++) {
+                limiter.reserve("10.0.1." + i, "login:dono@example.com");
+            }
+            assertThatThrownBy(() -> limiter.reserve("10.0.1.50", "login:dono@example.com"))
+                    .isInstanceOfSatisfying(TooManyAttemptsException.class, e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofMinutes(2)));
+
+            Duration lock = Duration.ofMinutes(2);
+            for (int round = 0; round < 6; round++) {
+                now.set(now.get().plus(lock));
+                limiter.reserve("10.0.2." + round, "login:dono@example.com");
+                limiter.reserve("10.0.3." + round, "login:dono@example.com");
+                limiter.reserve("10.0.4." + round, "login:dono@example.com");
+                lock = lock.multipliedBy(2).compareTo(Duration.ofMinutes(15)) > 0 ? Duration.ofMinutes(15) : lock.multipliedBy(2);
+            }
+            assertThatThrownBy(() -> limiter.reserve("10.9.9.9", "login:dono@example.com"))
+                    .isInstanceOfSatisfying(TooManyAttemptsException.class,
+                            e -> assertThat(e.retryAfter()).isEqualTo(Duration.ofMinutes(15)));
+        }
+
+        @Test
+        @DisplayName("IP que já autenticou não fica travado pelo bloqueio da conta, mas continua sujeito ao limite do IP")
+        void deveDeixarIpConhecidoEntrarComContaBloqueada() {
+            LoginRateLimiter limiter = limiter(100, 3, 100);
+            limiter.succeeded(limiter.reserve("7.7.7.7", "login:dono@example.com"));
+            for (int i = 0; i < 3; i++) {
+                limiter.reserve("8.8.8." + i, "login:dono@example.com");
+            }
+
+            assertThatThrownBy(() -> limiter.reserve("8.8.8.99", "login:dono@example.com")).isInstanceOf(TooManyAttemptsException.class);
+            assertThatCode(() -> limiter.reserve("7.7.7.7", "login:dono@example.com")).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("o e-mail é normalizado: maiúsculas caem na mesma conta")
+        void deveNormalizarOEmail() {
+            LoginRateLimiter limiter = limiter(100, 2, 100);
+            limiter.reserve("1.1.1.1", "login:Dono@Example.com");
+            limiter.reserve("1.1.1.2", "login:dono@EXAMPLE.com");
+
+            assertThatThrownBy(() -> limiter.reserve("1.1.1.3", "login:DONO@example.com")).isInstanceOf(TooManyAttemptsException.class);
+        }
+
+        @Test
+        @DisplayName("o mapa tem teto de entradas e expurga as expiradas: milhares de IPs não crescem a memória")
+        void deveLimitarEExpurgarOMapa() {
+            LoginRateLimiter limiter = limiter(5, 10, 50);
+            for (int i = 0; i < 5_000; i++) {
+                limiter.reserve("10.1." + (i / 250) + "." + (i % 250), "login:u" + i + "@example.com");
+            }
+            assertThat(limiter.trackedEntries()).isLessThanOrEqualTo(50 + 50 + 1);
+
+            now.set(now.get().plus(Duration.ofMinutes(20)));
+            limiter.reserve("10.200.0.1", "login:novo@example.com");
+            assertThat(limiter.trackedEntries()).isLessThanOrEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("chave de IP: IPv4 intacto, IPv4 mapeado em IPv6 vira IPv4 e lixo não quebra")
+        void deveNormalizarChaves() {
+            assertThat(LoginRateLimiter.ipKey("1.2.3.4")).isEqualTo("1.2.3.4");
+            assertThat(LoginRateLimiter.ipKey("::ffff:1.2.3.4")).isEqualTo("1.2.3.4");
+            assertThat(LoginRateLimiter.ipKey("2001:db8::1")).isEqualTo(LoginRateLimiter.ipKey("2001:db8::ffff"));
+            assertThat(LoginRateLimiter.ipKey("nao-e-ip")).isEqualTo("nao-e-ip");
+            assertThat(LoginRateLimiter.ipKey(null)).isEqualTo("unknown");
         }
     }
 

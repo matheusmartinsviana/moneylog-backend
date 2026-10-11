@@ -57,7 +57,7 @@ import com.moneylog.infra.web.WebFoundationSamples;
 class AuthIT {
 
     private static final String ORIGIN = "https://app.moneylog.test";
-    private static final String OWNER_EMAIL = "owner@moneylog.com";
+    private static final String OWNER_EMAIL = "owner@example.com";
     private static final String PASSWORD = "senha-forte-123";
     private static final AtomicInteger IPS = new AtomicInteger();
 
@@ -146,18 +146,18 @@ class AuthIT {
             UUID id = auth.ownerId();
             String bearer = auth.ownerBearer();
 
-            bootstrap("novo@moneylog.com").run(null);
+            bootstrap("novo@example.com").run(null);
 
             assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("select id from users", UUID.class)).isEqualTo(id);
-            assertThat(jdbc.queryForObject("select email from users", String.class)).isEqualTo("novo@moneylog.com");
+            assertThat(jdbc.queryForObject("select email from users", String.class)).isEqualTo("novo@example.com");
             assertThat(events.stream(OwnerCreated.class)).isEmpty();
-            assertThat(output.getAll()).contains("o***@moneylog.com").contains("n***@moneylog.com")
-                    .doesNotContain("novo@moneylog.com").doesNotContain("owner@moneylog.com");
+            assertThat(output.getAll()).contains("o***@example.com").contains("n***@example.com")
+                    .doesNotContain("novo@example.com").doesNotContain("owner@example.com");
             mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/test/me")
                             .header("Authorization", bearer))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.userId").value(id.toString()));
-            mockMvc.perform(login("novo@moneylog.com", PASSWORD, novoIp())).andExpect(status().isOk());
+            mockMvc.perform(login("novo@example.com", PASSWORD, novoIp())).andExpect(status().isOk());
         }
     }
 
@@ -188,7 +188,7 @@ class AuthIT {
             String ip = novoIp();
             MvcResult wrongPassword = mockMvc.perform(login(OWNER_EMAIL, "errada", ip)).andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS")).andExpect(ContractValidation.conforms()).andReturn();
-            MvcResult wrongEmail = mockMvc.perform(login("outro@moneylog.com", PASSWORD, ip)).andExpect(status().isUnauthorized())
+            MvcResult wrongEmail = mockMvc.perform(login("outro@example.com", PASSWORD, ip)).andExpect(status().isUnauthorized())
                     .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS")).andExpect(ContractValidation.conforms()).andReturn();
 
             assertThat(withoutTrace(wrongPassword)).isEqualTo(withoutTrace(wrongEmail));
@@ -213,6 +213,59 @@ class AuthIT {
             mockMvc.perform(login(OWNER_EMAIL, PASSWORD, novoIp())).andExpect(status().isOk());
             clock.advance(Duration.ofMinutes(16));
             mockMvc.perform(login(OWNER_EMAIL, PASSWORD, ip)).andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("S-01: falhas de IPs diferentes contra a mesma conta bloqueiam por conta, com o mesmo 429 exista ou não o e-mail")
+        void deveLimitarPorConta() throws Exception {
+            for (int i = 0; i < 10; i++) {
+                mockMvc.perform(login("alvo-inexistente@example.com", "errada" + i, novoIp())).andExpect(status().isUnauthorized());
+            }
+
+            mockMvc.perform(login("alvo-inexistente@example.com", "errada", novoIp())).andExpect(status().isTooManyRequests())
+                    .andExpect(jsonPath("$.code").value("TOO_MANY_ATTEMPTS")).andExpect(header().exists("Retry-After"))
+                    .andExpect(ContractValidation.conforms());
+            mockMvc.perform(login("ALVO-INEXISTENTE@example.com", "errada", novoIp())).andExpect(status().isTooManyRequests());
+            mockMvc.perform(login("outro-alvo@example.com", "errada", novoIp())).andExpect(status().isUnauthorized());
+        }
+
+        @Test
+        @DisplayName("S-02: rajada paralela do mesmo IP com senha errada passa de no máximo 5 tentativas até o bcrypt")
+        void deveSerAtomicoNaRajada() throws Exception {
+            String ip = novoIp();
+            ExecutorService pool = Executors.newFixedThreadPool(20);
+            List<Future<Integer>> results = new java.util.ArrayList<>();
+            for (int i = 0; i < 40; i++) {
+                int n = i;
+                Callable<Integer> call = () -> mockMvc.perform(login("rajada-" + n + "@example.com", "errada", ip)).andReturn()
+                        .getResponse().getStatus();
+                results.add(pool.submit(call));
+            }
+            int unauthorized = 0;
+            int tooMany = 0;
+            for (Future<Integer> result : results) {
+                int code = result.get();
+                if (code == 401) {
+                    unauthorized++;
+                } else if (code == 429) {
+                    tooMany++;
+                }
+            }
+            pool.shutdown();
+
+            assertThat(unauthorized).isEqualTo(5);
+            assertThat(tooMany).isEqualTo(35);
+        }
+
+        @Test
+        @DisplayName("S-08: falha e sucesso viram eventos com e-mail mascarado, sem a senha no log")
+        void deveRegistrarEventosSemSenha(CapturedOutput output) throws Exception {
+            String ip = novoIp();
+            mockMvc.perform(login(OWNER_EMAIL, "senha-errada-que-nao-pode-vazar", ip)).andExpect(status().isUnauthorized());
+            mockMvc.perform(login(OWNER_EMAIL, PASSWORD, ip)).andExpect(status().isOk());
+
+            assertThat(output.getAll()).contains("event=login_failed", "event=login_succeeded", "ip=" + ip, "email=o***@example.com")
+                    .doesNotContain("senha-errada-que-nao-pode-vazar").doesNotContain(PASSWORD).doesNotContain(OWNER_EMAIL);
         }
 
         @Test

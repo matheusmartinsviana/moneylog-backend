@@ -48,7 +48,7 @@ import com.moneylog.util.MutableClockConfig;
 class FirstAccessIT {
 
     private static final String ORIGIN = "https://app.moneylog.test";
-    private static final String EMAIL = "owner@moneylog.com";
+    private static final String EMAIL = "owner@example.com";
     private static final String CODE = "it-setup-code-0123456789";
     private static final String NEW_PASSWORD = "uma-senha-sintetica-forte";
     private static final AtomicInteger IPS = new AtomicInteger();
@@ -149,7 +149,7 @@ class FirstAccessIT {
     void codigoErrado() throws Exception {
         mockMvc.perform(setup(EMAIL, "codigo-errado-0123456789", NEW_PASSWORD, novoIp())).andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_SETUP_CODE")).andExpect(ContractValidation.conforms());
-        mockMvc.perform(setup("intruso@moneylog.com", CODE, NEW_PASSWORD, novoIp())).andExpect(status().isUnauthorized())
+        mockMvc.perform(setup("intruso@example.com", CODE, NEW_PASSWORD, novoIp())).andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_SETUP_CODE"));
 
         assertThat(jdbc.queryForObject("select password_hash from users", String.class)).isNull();

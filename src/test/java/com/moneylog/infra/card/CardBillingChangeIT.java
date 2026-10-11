@@ -382,7 +382,7 @@ class CardBillingChangeIT extends CardItBase {
                 .andExpect(jsonPath("$.closingDay").value(10)).andExpect(jsonPath("$.version").value(2));
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(getAs(otherBearer, "/v1/cards/" + card + "/billing-change-preview?closingDay=10&dueDay=5")).andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("CARD_NOT_FOUND")).andExpect(ContractValidation.conforms());

@@ -61,7 +61,7 @@ class DebtOverviewIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "ov-" + userId + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "ov-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         String nubank = body(mockMvc.perform(post("/v1/accounts", "{\"name\":\"Nubank\",\"type\":\"CHECKING\",\"institution\":\"Nubank\","
                 + "\"openingBalance\":{\"amount\":\"20000.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}"))
@@ -106,7 +106,7 @@ class DebtOverviewIT {
         mockMvc.perform(get("/v1/debts/overview?months=0")).andExpect(status().isBadRequest());
         mockMvc.perform(get("/v1/debts/overview?months=37")).andExpect(status().isBadRequest());
         UUID other = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "vazio-" + other + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "vazio-" + other + "@example.com"));
         bearer = auth.bearer(other);
         mockMvc.perform(get("/v1/debts/overview?months=6")).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.total.amount").value("0.00")).andExpect(jsonPath("$.hasRecords").value(false))
@@ -146,7 +146,7 @@ class DebtOverviewIT {
         assertThat(overview().get("total").get("amount").asString()).isEqualTo("2400.00");
 
         UUID other = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "o2-" + other + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "o2-" + other + "@example.com"));
         bearer = auth.bearer(other);
         assertThat(overview().get("total").get("amount").asString()).isEqualTo("0.00");
         ongoing("", "").andExpect(status().isNotFound());

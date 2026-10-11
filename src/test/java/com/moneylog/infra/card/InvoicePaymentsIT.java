@@ -289,7 +289,7 @@ class InvoicePaymentsIT extends CardItBase {
         twoPurchases();
         advanceTo(NOV_05);
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         long before = count("transactions");
 

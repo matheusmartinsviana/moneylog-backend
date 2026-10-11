@@ -188,7 +188,7 @@ class ProjectionIT extends E4ItBase {
         }
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/v1/projections")).andExpect(status().isUnauthorized());
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "proj-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "proj-" + other + "@example.com"));
         JsonNode theirs = body(mockMvc.perform(getAs(auth.bearer(other), "/v1/projections?horizon=M6")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
         assertThat(money(theirs, "startingBalance")).isEqualTo("0.00");
