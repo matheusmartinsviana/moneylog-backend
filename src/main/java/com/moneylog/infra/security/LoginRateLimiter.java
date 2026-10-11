@@ -100,10 +100,11 @@ public class LoginRateLimiter {
         return new Attempt(ipKey, accountKey);
     }
 
-    public synchronized void succeeded(Attempt attempt) {
+    public synchronized boolean succeeded(Attempt attempt) {
         ips.remove(attempt.ipKey());
         accounts.remove(attempt.accountKey());
         Instant now = clock.instant();
+        boolean newIp = !isTrusted(attempt.ipKey(), now);
         trustedIps.remove(attempt.ipKey());
         if (trustedIps.size() >= MAX_TRUSTED_IPS) {
             Iterator<String> eldest = trustedIps.keySet().iterator();
@@ -111,6 +112,7 @@ public class LoginRateLimiter {
             eldest.remove();
         }
         trustedIps.put(attempt.ipKey(), now.plus(settings.trustedIpTtl()));
+        return newIp;
     }
 
     synchronized int trackedEntries() {

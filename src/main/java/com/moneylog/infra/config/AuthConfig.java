@@ -40,6 +40,7 @@ import com.moneylog.infra.auth.persistence.UserRepositoryJpa;
 import com.moneylog.infra.security.MoneylogAuthProperties;
 import com.moneylog.infra.security.MoneylogOwnerProperties;
 import com.moneylog.infra.security.OwnerBootstrap;
+import com.moneylog.infra.security.SecurityAlerts;
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
@@ -125,8 +126,9 @@ public class AuthConfig {
 
     @Bean
     OwnerBootstrap ownerBootstrap(EnsureOwnerUseCase ensureOwner, PrepareFirstAccessUseCase prepareFirstAccess,
-                                  MoneylogOwnerProperties owner, ApplicationEventPublisher publisher, Environment environment) {
+                                  MoneylogOwnerProperties owner, ApplicationEventPublisher publisher, Environment environment,
+                                  SecurityAlerts alerts) {
         return new OwnerBootstrap(ensureOwner, prepareFirstAccess, owner, publisher,
-                environment.acceptsProfiles(Profiles.of("dev")));
+                environment.acceptsProfiles(Profiles.of("dev")), alerts);
     }
 }

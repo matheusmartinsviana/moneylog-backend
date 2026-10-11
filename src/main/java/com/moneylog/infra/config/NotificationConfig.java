@@ -1,6 +1,9 @@
 package com.moneylog.infra.config;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -9,13 +12,16 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import tools.jackson.databind.ObjectMapper;
 
 import com.moneylog.core.finance.app.gateways.CommitmentSourcesGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
+import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.notification.app.GenerationContextLoader;
+import com.moneylog.core.notification.app.SecurityAlertService;
 import com.moneylog.core.notification.app.gateways.NotificationGateway;
 import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
 import com.moneylog.core.notification.app.gateways.PushSender;
@@ -49,6 +55,7 @@ import com.moneylog.infra.notification.gateways.ReminderGatewayImpl;
 import com.moneylog.infra.notification.jobs.NotificationJob;
 import com.moneylog.infra.notification.push.NoopPushSender;
 import com.moneylog.infra.notification.push.WebPushSender;
+import com.moneylog.infra.security.SecurityAlerts;
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
@@ -86,6 +93,27 @@ public class NotificationConfig {
                     + "MONEYLOG_PUSH_VAPID_SUBJECT (veja .env.example). Sem as chaves o push fica desligado: moneylog.push.enabled=false.");
         }
         return new WebPushSender(publicKey, privateKey, subject, mapper, clock, ttlSeconds);
+    }
+
+    @Bean
+    SecurityAlertService securityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids,
+                                              TimeProvider time, @Value("${moneylog.security.alerts.throttle:PT10M}") Duration throttle) {
+        return new SecurityAlertService(users, subscriptions, sender, ids, time, throttle);
+    }
+
+    @Bean(destroyMethod = "shutdown")
+    ExecutorService securityAlertExecutor() {
+        return Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "security-alerts");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    @Bean
+    SecurityAlerts securityAlerts(SecurityAlertService service, ExecutorService securityAlertExecutor, PlatformTransactionManager tm) {
+        TransactionTemplate template = new TransactionTemplate(tm);
+        return new SecurityAlerts(service, securityAlertExecutor, work -> template.executeWithoutResult(status -> work.run()));
     }
 
     @Bean
@@ -163,8 +191,10 @@ public class NotificationConfig {
 
     @Bean
     DispatchPushUseCase dispatchPushUseCase(NotificationGateway notifications, PushSubscriptionGateway subscriptions, PushSender sender,
-                                            TimeProvider time, @Value("${moneylog.push.include-amounts:false}") boolean includeAmounts) {
-        return new NotificationUseCasesImpl.DispatchPush(notifications, subscriptions, sender, time, includeAmounts);
+                                            TimeProvider time, @Value("${moneylog.push.include-amounts:false}") boolean includeAmounts,
+                                            PlatformTransactionManager tm) {
+        return TransactionalProxies.required(DispatchPushUseCase.class,
+                new NotificationUseCasesImpl.DispatchPush(notifications, subscriptions, sender, time, includeAmounts), tm);
     }
 
     @Bean
