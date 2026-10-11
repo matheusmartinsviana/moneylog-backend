@@ -267,7 +267,7 @@ class ReportsIT extends E4ItBase {
     void deveIsolarPorUsuario() throws Exception {
         created(expense("77.00", "2026-10-10", "Meu", food));
         UUID other = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "other-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "other-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
         JsonNode series = body(mockMvc.perform(getAs(otherBearer, "/v1/reports/income-expenses?period=D30")).andExpect(status().isOk())

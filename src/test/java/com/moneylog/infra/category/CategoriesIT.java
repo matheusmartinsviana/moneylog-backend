@@ -113,14 +113,14 @@ class CategoriesIT {
             UUID owner = auth.ownerId();
             Integer before = jdbc.queryForObject("select count(*) from categories where user_id = ?", Integer.class, owner);
 
-            publisher.publishEvent(new OwnerCreated(owner, "owner@moneylog.com"));
+            publisher.publishEvent(new OwnerCreated(owner, "owner@example.com"));
 
             assertThat(jdbc.queryForObject("select count(*) from categories where user_id = ?", Integer.class, owner)).isEqualTo(before);
 
             UUID other = UUID.randomUUID();
-            committed(() -> SqlFixtures.insertUser(jdbc, other, "seed-" + other + "@moneylog.com"));
-            publisher.publishEvent(new OwnerCreated(other, "seed@moneylog.com"));
-            publisher.publishEvent(new OwnerCreated(other, "seed@moneylog.com"));
+            committed(() -> SqlFixtures.insertUser(jdbc, other, "seed-" + other + "@example.com"));
+            publisher.publishEvent(new OwnerCreated(other, "seed@example.com"));
+            publisher.publishEvent(new OwnerCreated(other, "seed@example.com"));
 
             assertThat(jdbc.queryForObject("select count(*) from categories where user_id = ? and system", Integer.class, other))
                     .isEqualTo(16);
@@ -235,7 +235,7 @@ class CategoriesIT {
         UUID other = UUID.randomUUID();
         UUID categoryId = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com");
             jdbc.update("""
                     INSERT INTO categories (id, user_id, name, kind, system, archived, created_at, updated_at, version)
                     VALUES (?, ?, 'Segredo', 'EXPENSE', false, false, now(), now(), 0)""", categoryId, other);

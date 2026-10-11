@@ -83,7 +83,7 @@ class TransactionListIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "lista-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "lista-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = account("Nubank", "CHECKING", "20000.00");
         xp = account("XP", "CHECKING", "0.00");
@@ -370,7 +370,7 @@ class TransactionListIT {
     @DisplayName("isolamento: cada usuário só vê (e soma) as próprias movimentações")
     void deveIsolarPorUsuario() throws Exception {
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
 
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/transactions" + OUTUBRO).header(HttpHeaders.AUTHORIZATION, auth.bearer(other)))
                 .andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.items").isEmpty())

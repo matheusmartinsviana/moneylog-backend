@@ -73,6 +73,16 @@ public class WebConfig implements WebMvcConfigurer {
         return registration;
     }
 
+    @Bean
+    FilterRegistrationBean<com.moneylog.infra.web.JsonBodyLimitFilter> jsonBodyLimitFilter(
+            @org.springframework.beans.factory.annotation.Value("${moneylog.web.max-json-body-bytes:1048576}") long maxBytes,
+            tools.jackson.databind.ObjectMapper mapper) {
+        FilterRegistrationBean<com.moneylog.infra.web.JsonBodyLimitFilter> registration =
+                new FilterRegistrationBean<>(new com.moneylog.infra.web.JsonBodyLimitFilter(maxBytes, mapper));
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 2);
+        return registration;
+    }
+
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new PageQueryResolver());

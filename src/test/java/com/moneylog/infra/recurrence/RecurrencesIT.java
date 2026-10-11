@@ -263,7 +263,7 @@ class RecurrencesIT extends E4ItBase {
     void deveIsolarPorUsuario() throws Exception {
         String id = internet("2026-10-10").get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(getAs(otherBearer, "/v1/recurrences/" + id)).andExpect(status().isNotFound()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.code").value("RECURRENCE_NOT_FOUND"));

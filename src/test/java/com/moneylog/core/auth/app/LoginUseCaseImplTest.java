@@ -69,6 +69,7 @@ class LoginUseCaseImplTest {
     @DisplayName("e-mail e senha certos abrem uma sessão com refresh gravado só pelo hash")
     void deveAbrirSessao() {
         when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
         when(passwordVerifier.verifyOwner("senha")).thenReturn(true);
         when(ids.next()).thenReturn(FAMILY_ID, TOKEN_ID);
         when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh-em-claro");
@@ -104,6 +105,7 @@ class LoginUseCaseImplTest {
     @DisplayName("senha errada responde com a mesma exceção e não grava nada")
     void deveRecusarSenhaErrada() {
         when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
         when(passwordVerifier.verifyOwner("errada")).thenReturn(false);
 
         assertThatThrownBy(() -> useCase.handle(new LoginCommand("dono@moneylog.test", "errada")))
@@ -118,5 +120,20 @@ class LoginUseCaseImplTest {
     void deveTratarCamposAusentes() {
         assertThatThrownBy(() -> useCase.handle(new LoginCommand(null, null))).isInstanceOf(InvalidCredentialsException.class);
         verify(passwordVerifier).verifyDummy("");
+    }
+
+    @Test
+    @DisplayName("linha de users que não é o dono nunca autentica, nem com a senha do dono")
+    void deveRecusarUsuarioQueNaoEODono() {
+        UUID other = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
+        when(users.findByEmail("outro@moneylog.test")).thenReturn(Optional.of(new User(other, "outro@moneylog.test")));
+        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+
+        assertThatThrownBy(() -> useCase.handle(new LoginCommand("outro@moneylog.test", "senha-do-dono")))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(passwordVerifier).verifyDummy("senha-do-dono");
+        verify(passwordVerifier, never()).verifyOwner(anyString());
+        verify(refreshTokens, never()).insert(any());
     }
 }

@@ -64,8 +64,8 @@ class LedgerPersistenceIT {
 
     @BeforeEach
     void inserirCadastros() {
-        SqlFixtures.insertUser(jdbc, USER_ID, "ledger@moneylog.com");
-        SqlFixtures.insertUser(jdbc, OTHER_USER_ID, "outro@moneylog.com");
+        SqlFixtures.insertUser(jdbc, USER_ID, "ledger@example.com");
+        SqlFixtures.insertUser(jdbc, OTHER_USER_ID, "outro@example.com");
         SqlFixtures.insertAccount(jdbc, nubank);
         SqlFixtures.insertCategory(jdbc, alimentacao);
     }
@@ -170,7 +170,7 @@ class LedgerPersistenceIT {
         Timestamp now = Timestamp.from(NOW);
         for (int u = 0; u < 20; u++) {
             UUID user = UUID.fromString(String.format("00000000-0000-0000-0000-0000000c%04d", u + 1));
-            users.add(new Object[] {user, "carga" + u + "@moneylog.com", now, now});
+            users.add(new Object[] {user, "carga" + u + "@example.com", now, now});
             for (int i = 0; i < 50; i++) {
                 boolean active = i % 5 != 0;
                 UUID account = UUID.randomUUID();

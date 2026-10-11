@@ -56,7 +56,7 @@ class UnknownFieldsIT {
     void cenario() throws Exception {
         userId = UUID.randomUUID();
         new TransactionTemplate(transactionManager)
-                .executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "unk-" + userId + "@moneylog.com"));
+                .executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "unk-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = account("Nubank");
         xp = account("XP");

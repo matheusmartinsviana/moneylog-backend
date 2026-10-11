@@ -72,7 +72,7 @@ class GoalPhotosIT extends E4ItBase {
 
     private String otherUserBearer() {
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         return auth.bearer(other);
     }
 

@@ -55,7 +55,7 @@ class VaultUploadQaIT {
 
     private String freshBearer() {
         UUID id = UUID.randomUUID();
-        new org.springframework.transaction.support.TransactionTemplate(tm).executeWithoutResult(st -> SqlFixtures.insertUser(jdbc, id, "up-" + id + "@moneylog.com"));
+        new org.springframework.transaction.support.TransactionTemplate(tm).executeWithoutResult(st -> SqlFixtures.insertUser(jdbc, id, "up-" + id + "@example.com"));
         return auth.bearer(id);
     }
 

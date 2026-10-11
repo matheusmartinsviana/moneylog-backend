@@ -133,7 +133,7 @@ class VaultIT extends NotesItBase {
         byte[] zip = exportBytes(bearer);
 
         UUID otherId = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, otherId, "outro-" + otherId + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, otherId, "outro-" + otherId + "@example.com"));
         String other = auth.bearer(otherId);
         String otherGoal = body(mockMvc.perform(postAs(other, "/v1/goals", "{\"name\":\"Reserva dele\",\"target\":\"10.00\",\"priority\":\"LOW\"}")).andExpect(status().isCreated()).andReturn()).get("id").asString();
         assertThat(otherGoal).isNotEqualTo(goalId);

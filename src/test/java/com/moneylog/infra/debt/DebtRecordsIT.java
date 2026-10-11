@@ -247,7 +247,7 @@ class DebtRecordsIT extends E4ItBase {
     void deveIsolarPorUsuario() throws Exception {
         String id = payable("200.00", null).get("id").asString();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(getAs(otherBearer, "/v1/debts/" + id)).andExpect(status().isNotFound()).andExpect(ContractValidation.conforms())
                 .andExpect(jsonPath("$.code").value("DEBT_NOT_FOUND"));

@@ -141,7 +141,7 @@ class CardRefundIT extends CardItBase {
         UUID other = UUID.randomUUID();
         UUID foreignCard = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@example.com");
             jdbc.update("INSERT INTO credit_cards (id, user_id, name, limit_cents, currency, status, created_at, updated_at) "
                     + "VALUES (?, ?, 'Alheio', 100000, 'BRL', 'ACTIVE', now(), now())", foreignCard, other);
             jdbc.update("INSERT INTO credit_card_billing_rules (id, user_id, card_id, effective_from, closing_day, due_day, created_at, updated_at) "

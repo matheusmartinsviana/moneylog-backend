@@ -81,14 +81,14 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtEncoder jwtEncoder(MoneylogSecurityProperties properties) {
-        SecretKey key = JwtSecret.toKey(properties.jwtSecret());
+    JwtEncoder jwtEncoder(MoneylogSecurityProperties properties, Environment environment) {
+        SecretKey key = JwtSecret.toKey(properties.jwtSecret(), environment.acceptsProfiles(Profiles.of("prod")));
         return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
     @Bean
-    JwtDecoder jwtDecoder(MoneylogSecurityProperties properties, Clock clock, UserGateway users) {
-        SecretKey key = JwtSecret.toKey(properties.jwtSecret());
+    JwtDecoder jwtDecoder(MoneylogSecurityProperties properties, Clock clock, UserGateway users, Environment environment) {
+        SecretKey key = JwtSecret.toKey(properties.jwtSecret(), environment.acceptsProfiles(Profiles.of("prod")));
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         JwtTimestampValidator timestamps = new JwtTimestampValidator(Duration.ZERO);
         timestamps.setClock(clock);
@@ -130,6 +130,7 @@ public class SecurityConfig {
 
     @Bean
     LoginRateLimiter loginRateLimiter(Clock clock, MoneylogAuthProperties auth) {
-        return new LoginRateLimiter(clock, auth.maxLoginFailures(), auth.loginWindow());
+        return new LoginRateLimiter(clock, new LoginRateLimiter.Settings(auth.maxLoginFailures(), auth.loginWindow(),
+                auth.maxAccountFailures(), auth.accountLockBase(), auth.accountLockMax(), auth.trustedIpTtl(), auth.limiterMaxEntries()));
     }
 }

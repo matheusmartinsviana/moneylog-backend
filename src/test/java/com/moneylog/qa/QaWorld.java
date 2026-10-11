@@ -48,7 +48,7 @@ final class QaWorld {
         String expenseTx;
 
         Actor(String tag) throws Exception {
-            new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, tag + "-" + id + "@moneylog.com"));
+            new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, tag + "-" + id + "@example.com"));
             bearer = auth.bearer(id);
             nubank = account("Nubank", "CHECKING", "20000.00");
             xp = account("XP", "CHECKING", "0.00");

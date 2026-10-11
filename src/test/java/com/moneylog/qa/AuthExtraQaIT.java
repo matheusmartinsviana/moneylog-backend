@@ -58,7 +58,7 @@ class AuthExtraQaIT {
     @DisplayName("refresh de 30 dias: vale em 29d23h e expira depois (401 REFRESH_INVALID)")
     void refreshExpira() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
-        MvcResult l = mvc.perform(login("owner@moneylog.com", "senha-forte-123")).andReturn();
+        MvcResult l = mvc.perform(login("owner@example.com", "senha-forte-123")).andReturn();
         String c = cookie(l);
         clock.advance(Duration.ofDays(30).minusMinutes(1));
         MvcResult ok = mvc.perform(MockMvcRequestBuilders.post("/v1/auth/refresh").header("Origin", ORIGIN).cookie(new Cookie("ml_refresh", c))).andReturn();
@@ -89,19 +89,19 @@ class AuthExtraQaIT {
     @Test
     @DisplayName("e-mail em outra caixa e com espaços nas pontas autentica o dono (normalização); senha errada continua 401")
     void emailNormalizado() throws Exception {
-        assertThat(mvc.perform(login("OWNER@MoneyLog.com", "senha-forte-123")).andReturn().getResponse().getStatus()).isEqualTo(200);
-        assertThat(mvc.perform(login("  owner@moneylog.com  ", "senha-forte-123")).andReturn().getResponse().getStatus()).isIn(200, 400);
+        assertThat(mvc.perform(login("OWNER@Example.COM", "senha-forte-123")).andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(login("  owner@example.com  ", "senha-forte-123")).andReturn().getResponse().getStatus()).isIn(200, 400);
     }
 
     @Test
     @DisplayName("senha e e-mail gigantes (72+ bytes, 100 mil caracteres): nunca 500")
     void entradasGigantesNoLogin() throws Exception {
         for (String password : new String[] {"x".repeat(72), "x".repeat(73), "x".repeat(100_000), "ç".repeat(80), "\\u0000abc"}) {
-            MvcResult r = mvc.perform(login("owner@moneylog.com", password)).andReturn();
+            MvcResult r = mvc.perform(login("owner@example.com", password)).andReturn();
             System.out.println("QA-LOGIN-PWD len=" + password.length() + " -> " + r.getResponse().getStatus());
             assertThat(r.getResponse().getStatus()).as("senha de " + password.length()).isLessThan(500);
         }
-        MvcResult r = mvc.perform(login("a".repeat(10_000) + "@moneylog.com", "x")).andReturn();
+        MvcResult r = mvc.perform(login("a".repeat(10_000) + "@example.com", "x")).andReturn();
         System.out.println("QA-LOGIN-EMAIL-10k -> " + r.getResponse().getStatus());
         assertThat(r.getResponse().getStatus()).isLessThan(500);
     }
@@ -109,7 +109,7 @@ class AuthExtraQaIT {
     @Test
     @DisplayName("access token continua válido depois do logout até o exp (JWT stateless, ADR-003); o refresh não")
     void accessTokenSobrevivePeloTtl() throws Exception {
-        MvcResult l = mvc.perform(login("owner@moneylog.com", "senha-forte-123")).andReturn();
+        MvcResult l = mvc.perform(login("owner@example.com", "senha-forte-123")).andReturn();
         String access = om.readTree(l.getResponse().getContentAsString()).get("accessToken").asString();
         mvc.perform(MockMvcRequestBuilders.post("/v1/auth/logout").header("Origin", ORIGIN).cookie(new Cookie("ml_refresh", cookie(l)))).andReturn();
         int viaAccess = mvc.perform(MockMvcRequestBuilders.get("/v1/accounts").header("Authorization", "Bearer " + access)).andReturn().getResponse().getStatus();
@@ -122,7 +122,7 @@ class AuthExtraQaIT {
     @Test
     @DisplayName("tokens de refresh guardados só como hash SHA-256 (64 hex), nunca o valor do cookie")
     void refreshSoComoHash() throws Exception {
-        MvcResult l = mvc.perform(login("owner@moneylog.com", "senha-forte-123")).andReturn();
+        MvcResult l = mvc.perform(login("owner@example.com", "senha-forte-123")).andReturn();
         String c = cookie(l);
         assertThat(jdbc.queryForObject("select count(*) from refresh_tokens where token_hash = ?", Integer.class, c)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from refresh_tokens where length(token_hash) <> 64", Integer.class)).isZero();

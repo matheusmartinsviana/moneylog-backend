@@ -71,7 +71,7 @@ class InAccountsChangeIT extends E4ItBase {
         assertThat(projection.get("balances").has("inAccountsChange")).isFalse();
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "empty-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "empty-" + other + "@example.com"));
         JsonNode empty = body(mockMvc.perform(getAs(auth.bearer(other), "/v1/dashboard/summary")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn());
         assertThat(empty.get("hasAccounts").asBoolean()).isFalse();

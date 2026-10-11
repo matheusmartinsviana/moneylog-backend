@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import tools.jackson.databind.ObjectMapper;
@@ -61,9 +63,18 @@ public class BackupConfig {
     @Bean
     BackupService backupService(DatabaseDumper dumper, BackupStorage storage, @Value("${moneylog.backup.encryption-key:}") String key,
                                 @Value("${moneylog.backup.prefix:moneylog/}") String prefix,
-                                @Value("${moneylog.backup.retention-days:7}") int retentionDays, Clock clock) {
+                                @Value("${moneylog.backup.retention-days:7}") int retentionDays, Clock clock,
+                                Environment environment) {
+        requireEncryptionKeyInProd(environment.acceptsProfiles(Profiles.of("prod")), key);
         Optional<BackupCrypto> crypto = key.isBlank() ? Optional.empty() : Optional.of(new BackupCrypto(key));
         return new BackupService(dumper, storage, crypto, prefix, retentionDays, clock);
+    }
+
+    static void requireEncryptionKeyInProd(boolean prod, String key) {
+        if (prod && (key == null || key.isBlank())) {
+            throw new IllegalStateException("BACKUP_ENCRYPTION_KEY é obrigatória em produção com o backup habilitado: "
+                    + "sem ela o dump do banco seria gravado sem cifra.");
+        }
     }
 
     @Bean

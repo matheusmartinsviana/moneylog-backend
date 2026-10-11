@@ -76,7 +76,7 @@ class RedesignFase0HttpQaIT {
     @DisplayName("requisições cruas: nenhum 5xx, o termo não vai a log nenhum (INFO nem DEBUG, inclusive Tomcat), erros fora do JSON do contrato são só os do container")
     void httpCru() throws Exception {
         UUID id = UUID.randomUUID();
-        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http-" + id + "@moneylog.com"));
+        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http-" + id + "@example.com"));
         String bearer = auth.bearer(id);
         Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         Level previous = root.getLevel();
@@ -136,7 +136,7 @@ class RedesignFase0HttpQaIT {
     @DisplayName("BUG-QA-05: percent-encoding inválido não pode dar 500")
     void percentInvalidoNaoDa500() throws Exception {
         UUID id = UUID.randomUUID();
-        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http3-" + id + "@moneylog.com"));
+        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http3-" + id + "@example.com"));
         String response = rawRequest("GET /v1/search?q=ab%ZZ HTTP/1.1", "Authorization: " + auth.bearer(id));
         assertThat(response.lines().findFirst().orElse("")).contains(" 400");
         assertThat(response).contains("SEARCH_QUERY_INVALID");
@@ -152,7 +152,7 @@ class RedesignFase0HttpQaIT {
     @DisplayName("BUG-QA-06: o termo não vai ao log do container")
     void termoNaoVazaNoLogDoTomcat() throws Exception {
         UUID id = UUID.randomUUID();
-        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http4-" + id + "@moneylog.com"));
+        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http4-" + id + "@example.com"));
         Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
@@ -169,7 +169,7 @@ class RedesignFase0HttpQaIT {
     @DisplayName("cabeçalhos: 200 com Cache-Control no-store e Content-Type JSON; Origin estranho não ganha CORS; 401 sem token em JSON; método errado 405")
     void cabecalhos() throws Exception {
         UUID id = UUID.randomUUID();
-        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http2-" + id + "@moneylog.com"));
+        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "http2-" + id + "@example.com"));
         String bearer = auth.bearer(id);
         HttpClient client = HttpClient.newHttpClient();
         for (String path : new String[] {"/v1/search?q=abc", "/v1/reports/income-expenses?period=D7", "/v1/reports/spending-by-category", "/v1/dashboard/summary",

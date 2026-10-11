@@ -143,7 +143,7 @@ class RedesignFase0BordersQaIT {
             }
         }
         UUID id = UUID.randomUUID();
-        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "bare-" + id + "@moneylog.com"));
+        new TransactionTemplate(tm).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, id, "bare-" + id + "@example.com"));
         String bearer = auth.bearer(id);
         for (String path : new String[] {"/v1/dashboard/summary", "/v1/projections", "/v1/projections?horizon=D30&includeTrend=true", "/v1/summaries/2026-10",
                 "/v1/reports/income-expenses?period=M12", "/v1/reports/income-expenses?period=D7", "/v1/reports/spending-by-category"}) {

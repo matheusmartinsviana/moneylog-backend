@@ -87,7 +87,7 @@ class ThirdPartyReceivablesIT extends E4ItBase {
         assertThat(money(okBody(get("/v1/debts/third-party-receivables")), "owed")).isEqualTo("100.00");
 
         UUID other = UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(postAs(otherBearer, "/v1/third-party-expenses", "{\"transactionId\":\"" + tx + "\",\"personId\":\"" + maria + "\"}"))
                 .andExpect(status().isNotFound());

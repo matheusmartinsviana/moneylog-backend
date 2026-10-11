@@ -60,7 +60,7 @@ class GoalMetricIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "gm-" + userId + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, userId, "gm-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         String account = body(mockMvc.perform(post("/v1/accounts", "{\"name\":\"Conta\",\"type\":\"CHECKING\",\"institution\":\"Banco\","
                 + "\"openingBalance\":{\"amount\":\"2000.00\",\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}"))
@@ -133,7 +133,7 @@ class GoalMetricIT {
         mockMvc.perform(post("/v1/goals", "{\"kind\":\"METRIC\",\"metric\":\"CARD_DEBT\"}")).andExpect(status().isBadRequest());
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/goals/" + id)).andExpect(status().isUnauthorized());
         UUID other = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "gm2-" + other + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "gm2-" + other + "@example.com"));
         bearer = auth.bearer(other);
         mockMvc.perform(get("/v1/goals/" + id)).andExpect(status().isNotFound());
         assertThat(body(mockMvc.perform(get("/v1/goals")).andReturn()).get("items")).isEmpty();
@@ -144,7 +144,7 @@ class GoalMetricIT {
     @DisplayName("sem cartões a medida do cartão vale 0,00 (não é erro); saldo em contas e disponível seguem o dashboard; custo fixo o resumo de recorrências")
     void deveSeguirAsFontes() throws Exception {
         UUID other = UUID.randomUUID();
-        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "gm3-" + other + "@moneylog.com"));
+        new TransactionTemplate(transactionManager).executeWithoutResult(s -> SqlFixtures.insertUser(jdbc, other, "gm3-" + other + "@example.com"));
         bearer = auth.bearer(other);
         mockMvc.perform(post("/v1/goals", "{\"kind\":\"METRIC\",\"metric\":\"ACCOUNTS_BALANCE\",\"target\":\"10.00\"}")).andExpect(status().isCreated())
                 .andExpect(jsonPath("$.current.amount").value("0.00")).andExpect(jsonPath("$.direction").value("INCREASE"));

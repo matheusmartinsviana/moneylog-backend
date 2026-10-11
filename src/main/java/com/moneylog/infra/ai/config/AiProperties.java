@@ -1,5 +1,6 @@
 package com.moneylog.infra.ai.config;
 
+import java.net.URI;
 import java.util.Locale;
 import java.util.Set;
 
@@ -37,6 +38,24 @@ public final class AiProperties {
         if (ANTHROPIC.equals(normalized) && (this.apiKey.isEmpty() || this.model.isEmpty())) {
             throw new IllegalStateException("AI_PROVIDER=anthropic exige AI_API_KEY e AI_MODEL no ambiente do servidor (veja .env.example). "
                     + "Sem eles, use AI_PROVIDER=none: o app funciona normalmente sem IA.");
+        }
+        if (ANTHROPIC.equals(normalized) && !this.baseUrl.isEmpty()) {
+            requireSecureBaseUrl(this.baseUrl);
+        }
+    }
+
+    static void requireSecureBaseUrl(String baseUrl) {
+        URI uri;
+        try {
+            uri = URI.create(baseUrl);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalStateException("AI_BASE_URL inválida.");
+        }
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        boolean local = host.equals("localhost") || host.equals("127.0.0.1");
+        if (!scheme.equals("https") && !(scheme.equals("http") && local)) {
+            throw new IllegalStateException("AI_BASE_URL precisa usar https (http só é aceito para localhost ou 127.0.0.1).");
         }
     }
 

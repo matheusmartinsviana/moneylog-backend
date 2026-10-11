@@ -32,7 +32,7 @@ Um usuário só (o dono), sem cadastro público. JWT HS256 de 15 min (em memóri
 | `MONEYLOG_OWNER_EMAIL` | e-mail do dono. Criado no primeiro boot; se mudar, o e-mail é atualizado mantendo o `id` (os dados continuam visíveis) |
 | `MONEYLOG_OWNER_PASSWORD_HASH` | (opcional desde o ADR-015; retrocompatibilidade) hash BCrypt da senha, **entre aspas simples** no `.env` (o `$` é interpolado por Compose e shell). Não use `$$` |
 | `MONEYLOG_OWNER_PASSWORD_HASH_FILE` | alternativa: caminho de um arquivo com só o hash (vale mais que o valor direto). Evita o problema do `$` |
-| `MONEYLOG_OWNER_SETUP_CODE` / `_FILE` | código de uso único do primeiro acesso (mín. 16 caracteres; em prod, por secret). Vazio: gerado e impresso **uma vez** no log do perfil dev |
+| `MONEYLOG_OWNER_SETUP_CODE` / `_FILE` | código de uso único do primeiro acesso (mín. 24 caracteres variados; em prod, por secret). Vazio: gerado e impresso **uma vez** no log do perfil dev |
 | `MONEYLOG_OWNER_RESET_PASSWORD` | `true` apaga a senha do banco e exige novo primeiro acesso (uso único: **remova depois**) |
 | `MONEYLOG_ALLOWED_ORIGINS` | origens do front, separadas por vírgula; `refresh` e `logout` conferem o header `Origin` (CSRF). Sem CORS |
 | `MONEYLOG_TRUSTED_PROXIES` | CIDRs de proxies de confiança (CloudFront/ALB). Só então o IP do rate limit vem de `X-Forwarded-For`. **Vazio = o header é ignorado** |

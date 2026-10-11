@@ -33,7 +33,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
 
     @Override
     public AuthSession handle(LoginCommand command) {
-        Optional<User> user = findUser(command.email());
+        Optional<User> user = findUser(command.email()).filter(this::isOwner);
         String password = command.password() == null ? "" : command.password();
         if (user.isEmpty()) {
             passwordVerifier.verifyDummy(password);
@@ -45,6 +45,10 @@ public class LoginUseCaseImpl implements LoginUseCase {
         Instant now = time.now();
         UUID familyId = ids.next();
         return sessions.open(user.get().id(), familyId, now);
+    }
+
+    private boolean isOwner(User candidate) {
+        return users.findOwner().map(owner -> owner.id().equals(candidate.id())).orElse(false);
     }
 
     private boolean passwordMatches(User user, String password) {

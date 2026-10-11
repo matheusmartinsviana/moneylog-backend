@@ -139,7 +139,7 @@ class ExportsIT extends E4ItBase {
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/exports/transactions.csv")).andExpect(status().isUnauthorized());
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/exports/backup")).andExpect(status().isUnauthorized());
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "export-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "export-" + other + "@example.com"));
         MvcResult theirs = mockMvc.perform(getAs(auth.bearer(other), "/v1/exports/transactions.csv")).andExpect(status().isOk())
                 .andExpect(ContractValidation.conforms()).andReturn();
         assertThat(text(theirs)).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda\r\n");
@@ -276,7 +276,7 @@ class ExportsIT extends E4ItBase {
                 assertThat(key.toLowerCase(Locale.ROOT)).as("chave proibida no backup: " + key).doesNotContain(word);
             }
         }
-        assertThat(raw).doesNotContain(jwtSecret).doesNotContain("$2a$").doesNotContain("$2b$").doesNotContain("@moneylog.com");
+        assertThat(raw).doesNotContain(jwtSecret).doesNotContain("$2a$").doesNotContain("$2b$").doesNotContain("@example.com");
         assertThat(keys).contains("schemaVersion", "generatedAt", "ledgerPostings");
     }
 
@@ -296,7 +296,7 @@ class ExportsIT extends E4ItBase {
     void naoDeveMisturarUsuarios() throws Exception {
         scenario();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-backup-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-backup-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
         mockMvc.perform(postAs(otherBearer, "/v1/accounts", "{\"name\":\"Conta Secreta\",\"type\":\"CHECKING\",\"openingBalance\":{\"amount\":\"777.00\","
                 + "\"currency\":\"BRL\"},\"openingDate\":\"2026-10-01\"}")).andExpect(status().isCreated());

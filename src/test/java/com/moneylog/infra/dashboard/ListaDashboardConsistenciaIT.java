@@ -67,7 +67,7 @@ class ListaDashboardConsistenciaIT {
     void cenario() {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
     }
 

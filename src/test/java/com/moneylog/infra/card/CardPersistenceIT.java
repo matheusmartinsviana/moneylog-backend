@@ -93,7 +93,7 @@ class CardPersistenceIT {
         nubank = Account.open(UUID.randomUUID(), userId, "Nubank", AccountType.CHECKING, "Nubank", Money.of("20000.00"), LocalDate.of(2026, 10, 1));
         food = Category.create(UUID.randomUUID(), userId, "Alimentação", CategoryKind.EXPENSE);
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, userId, "persist-" + userId + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, userId, "persist-" + userId + "@example.com");
             SqlFixtures.insertAccount(jdbc, nubank);
             SqlFixtures.insertCategory(jdbc, food);
         });
@@ -427,7 +427,7 @@ class CardPersistenceIT {
         persist(purchase("100.00", 1, TODAY));
         CreditCard other = newCard(10, 20);
         UUID otherUser = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, otherUser, "outro-" + otherUser + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, otherUser, "outro-" + otherUser + "@example.com"));
 
         assertThat(transactions.findAllOfCard(userId, card.id())).hasSize(1);
         assertThat(transactions.findAllOfCard(userId, other.id())).isEmpty();

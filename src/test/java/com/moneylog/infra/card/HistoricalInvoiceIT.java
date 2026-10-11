@@ -63,7 +63,7 @@ class HistoricalInvoiceIT extends E4ItBase {
                 .andExpect(status().is4xxClientError());
         mockMvc.perform(post("/v1/cards/" + card + "/historical-invoices", "{\"amount\":\"10.00\",\"description\":\"x\"}")).andExpect(status().isBadRequest());
         java.util.UUID other = java.util.UUID.randomUUID();
-        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> com.moneylog.util.SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         mockMvc.perform(postAs(auth.bearer(other), "/v1/cards/" + card + "/historical-invoices",
                 "{\"closingDate\":\"2026-08-25\",\"amount\":\"10.00\",\"description\":\"x\"}")).andExpect(status().isNotFound());
         assertThat(count("transactions")).isZero();

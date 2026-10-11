@@ -228,6 +228,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @Override
     protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex, HttpHeaders headers,
                                                                   HttpStatusCode status, WebRequest request) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof com.moneylog.infra.web.BodyTooLargeException) {
+                return respond(HttpStatus.CONTENT_TOO_LARGE, com.moneylog.infra.web.JsonBodyLimitFilter.CODE,
+                        "O corpo da requisição passa do limite de tamanho.", servlet(request));
+            }
+        }
         FieldIssue issue;
         if (ex.getCause() instanceof StreamReadException) {
             issue = new FieldIssue("body", "MALFORMED_JSON", "O corpo não é um JSON válido.");

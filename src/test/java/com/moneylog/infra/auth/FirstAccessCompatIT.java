@@ -27,7 +27,7 @@ import com.moneylog.util.IntegrationTest;
 @DisplayName("Primeiro acesso: retrocompatibilidade com o hash do ambiente")
 class FirstAccessCompatIT {
 
-    private static final String EMAIL = "owner@moneylog.com";
+    private static final String EMAIL = "owner@example.com";
     private static final String ENV_PASSWORD = "senha-forte-123";
     private static final AtomicInteger IPS = new AtomicInteger(100);
 

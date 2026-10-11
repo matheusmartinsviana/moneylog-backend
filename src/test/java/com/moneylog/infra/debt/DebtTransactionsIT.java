@@ -172,7 +172,7 @@ class DebtTransactionsIT extends E4ItBase {
                 .andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.code").value("TRANSACTION_ACCOUNT_NOT_CASH"));
 
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         String otherPerson = body(mockMvc.perform(postAs(auth.bearer(other), "/v1/people", "{\"name\":\"Alheio\"}")).andExpect(status().isCreated())
                 .andReturn()).get("id").asString();
         createTx("{\"type\":\"LOAN_GIVEN\",\"amount\":\"50.00\",\"date\":\"2026-10-10\",\"description\":\"Alheio\",\"accountId\":\"" + nubank

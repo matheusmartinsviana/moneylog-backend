@@ -31,9 +31,9 @@ public class PrepareFirstAccessUseCaseImpl implements PrepareFirstAccessUseCase 
         }
         boolean provided = command.providedCode() != null && !command.providedCode().isBlank();
         String code = provided ? command.providedCode().strip() : SetupCode.generate();
-        if (provided && code.length() < SetupCode.MIN_PROVIDED_LENGTH) {
-            throw new IllegalStateException("MONEYLOG_OWNER_SETUP_CODE precisa ter pelo menos " + SetupCode.MIN_PROVIDED_LENGTH
-                    + " caracteres.");
+        if (provided && SetupCode.weakness(code) != null) {
+            throw new IllegalStateException("MONEYLOG_OWNER_SETUP_CODE é fraco (" + SetupCode.weakness(code) + "): use pelo menos "
+                    + SetupCode.MIN_PROVIDED_LENGTH + " caracteres variados, por exemplo openssl rand -hex 16.");
         }
         var now = time.now();
         users.storeSetupCode(owner.id(), SetupCode.hash(code), now.plus(command.ttl()), now);

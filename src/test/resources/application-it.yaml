@@ -20,7 +20,7 @@ moneylog:
       # os ITs exportam muitas vezes por usuário; o limite tem teste próprio (ExportLimitsIT), que o reduz
       max-requests: 100000
   owner:
-    email: owner@moneylog.com
+    email: owner@example.com
     # BCrypt (custo 10) de "senha-forte-123".
     password-hash: '$2y$10$gNmLDyeHDZs73ARf5G3FUeDlMce4ALfLmVEFPpSrTbGERe5xcTIXS'
 

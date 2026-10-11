@@ -65,7 +65,7 @@ class IncomeCompetenceIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "renda-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "renda-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
         nubank = body(mockMvc.perform(post("/v1/accounts", "{\"name\":\"Conta\",\"type\":\"CHECKING\",\"openingBalance\":{\"amount\":\"10000.00\","
                 + "\"currency\":\"BRL\"},\"openingDate\":\"2026-09-01\"}")).andExpect(status().isCreated()).andReturn()).get("id").asString();

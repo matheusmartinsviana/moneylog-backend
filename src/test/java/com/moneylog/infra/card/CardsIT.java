@@ -62,7 +62,7 @@ class CardsIT {
     @BeforeEach
     void novoUsuario() {
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "cartao-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "cartao-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
     }
 
@@ -224,7 +224,7 @@ class CardsIT {
         UUID other = UUID.randomUUID();
         UUID foreign = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@example.com");
             SqlFixtures.insertAccount(jdbc, Account.open(foreign, other, "Alheia", AccountType.CHECKING, null, Money.of("1.00"),
                     LocalDate.of(2026, 10, 1)));
         });
@@ -277,7 +277,7 @@ class CardsIT {
         UUID other = UUID.randomUUID();
         UUID foreign = UUID.randomUUID();
         committed(() -> {
-            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@moneylog.com");
+            SqlFixtures.insertUser(jdbc, other, "alheio-" + other + "@example.com");
             jdbc.update("INSERT INTO credit_cards (id, user_id, name, limit_cents, currency, status, created_at, updated_at) "
                     + "VALUES (?, ?, 'Alheio', 100000, 'BRL', 'ACTIVE', now(), now())", foreign, other);
             jdbc.update("INSERT INTO credit_card_billing_rules (id, user_id, card_id, effective_from, closing_day, due_day, created_at, updated_at) "

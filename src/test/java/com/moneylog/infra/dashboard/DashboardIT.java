@@ -66,7 +66,7 @@ class DashboardIT {
     void cenario() {
         clock.set(MutableClockConfig.INITIAL);
         userId = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, userId, "dash-" + userId + "@example.com"));
         bearer = auth.bearer(userId);
     }
 
@@ -216,7 +216,7 @@ class DashboardIT {
     void deveIsolarPorUsuario() throws Exception {
         octoberScenario();
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
 
         mockMvc.perform(MockMvcRequestBuilders.get("/v1/dashboard/summary?asOf=2026-10-31").header(HttpHeaders.AUTHORIZATION, auth.bearer(other)))
                 .andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andExpect(jsonPath("$.hasAccounts").value(false))

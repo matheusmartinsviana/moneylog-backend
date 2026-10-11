@@ -31,6 +31,8 @@ import com.moneylog.infra.security.LoginRateLimiter;
 import com.moneylog.infra.security.MoneylogAuthProperties;
 import com.moneylog.infra.security.OriginCheck;
 import com.moneylog.infra.security.RefreshCookies;
+import com.moneylog.infra.security.SecurityEventLog;
+import com.moneylog.infra.security.TooManyAttemptsException;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -66,15 +68,16 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthTokenResponse> login(@Valid @RequestBody LoginRequest body, HttpServletRequest request) {
         String ip = clientIp.resolve(request);
-        rateLimiter.ensureNotBlocked(ip);
+        LoginRateLimiter.Attempt attempt = reserve(ip, "login", body.email());
         AuthSession session;
         try {
             session = login.handle(new LoginCommand(body.email(), body.password()));
         } catch (InvalidCredentialsException e) {
-            rateLimiter.recordFailure(ip);
+            SecurityEventLog.loginFailed(ip, body.email());
             throw e;
         }
-        rateLimiter.reset(ip);
+        rateLimiter.succeeded(attempt);
+        SecurityEventLog.loginSucceeded(ip, body.email());
         return sessionResponse(session);
     }
 
@@ -82,16 +85,26 @@ public class AuthController {
     public ResponseEntity<AuthTokenResponse> setupPassword(@Valid @RequestBody SetupPasswordRequest body,
                                                            HttpServletRequest request) {
         String ip = clientIp.resolve(request);
-        rateLimiter.ensureNotBlocked(ip);
+        LoginRateLimiter.Attempt attempt = reserve(ip, "setup", body.email());
         AuthSession session;
         try {
             session = setupPassword.handle(new SetupPasswordCommand(body.email(), body.setupCode(), body.newPassword()));
         } catch (InvalidSetupCodeException e) {
-            rateLimiter.recordFailure(ip);
+            SecurityEventLog.setupFailed(ip, body.email());
             throw e;
         }
-        rateLimiter.reset(ip);
+        rateLimiter.succeeded(attempt);
+        SecurityEventLog.setupSucceeded(ip, body.email());
         return sessionResponse(session);
+    }
+
+    private LoginRateLimiter.Attempt reserve(String ip, String scope, String email) {
+        try {
+            return rateLimiter.reserve(ip, scope + ":" + (email == null ? "" : email.strip()));
+        } catch (TooManyAttemptsException e) {
+            SecurityEventLog.blocked(e.scope(), ip, email);
+            throw e;
+        }
     }
 
     @GetMapping("/status")

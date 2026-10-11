@@ -49,7 +49,7 @@ abstract class NotesItBase extends E4ItBase {
 
     protected String otherUserBearer() {
         UUID other = UUID.randomUUID();
-        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@moneylog.com"));
+        committed(() -> SqlFixtures.insertUser(jdbc, other, "outro-" + other + "@example.com"));
         return auth.bearer(other);
     }
 

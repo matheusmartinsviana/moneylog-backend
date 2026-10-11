@@ -19,6 +19,8 @@ public final class AiFactsAssembler {
     public record Assembled(AiFacts facts, Set<String> redactions) {
     }
 
+    private static final Set<String> TEXT_PARAMS = Set.of("categoryName", "description", "cardName", "goalName");
+
     private AiFactsAssembler() {
     }
 
@@ -56,7 +58,7 @@ public final class AiFactsAssembler {
                     continue;
                 }
                 String value = param.getValue();
-                facts.put(prefix + param.getKey(), param.getKey().equals("categoryName") ? redact(redactor, value, redactions) : value);
+                facts.put(prefix + param.getKey(), TEXT_PARAMS.contains(param.getKey()) ? redact(redactor, value, redactions) : value);
             }
         }
         facts.put("insightCount", String.valueOf(view.insights().size()));
