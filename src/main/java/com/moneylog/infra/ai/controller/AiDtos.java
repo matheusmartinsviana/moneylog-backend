@@ -12,13 +12,12 @@ import com.moneylog.core.ai.domain.AiPreview;
 import com.moneylog.core.ai.domain.AiPurpose;
 import com.moneylog.core.ai.domain.AiSettings;
 import com.moneylog.core.ai.domain.AiStatus;
-import com.moneylog.core.ai.domain.Insight;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
-/** Entrada e saída de {@code /v1/ai/*}, {@code /v1/insights} e {@code /v1/settings/ai}. Nenhuma resposta carrega chave, URL base nem segredo. */
+/** Entrada e saída de {@code /v1/ai/*} e {@code /v1/settings/ai}. Nenhuma resposta carrega chave, URL base nem segredo. */
 public final class AiDtos {
 
     private AiDtos() {
@@ -75,12 +74,6 @@ public final class AiDtos {
 
     private static Result resultOf(AiAnalysis a) {
         return new Result(a.resultText(), a.caveat(), a.factRefs(), "AI");
-    }
-
-    public record InsightResponse(String type, String key, Map<String, String> params, List<String> factRefs, String source) {
-        static InsightResponse of(Insight i) {
-            return new InsightResponse(i.type(), i.key(), i.params(), i.factRefs(), "COMPUTED");
-        }
     }
 
     public record SettingsDto(@NotNull Boolean dailyMessageEnabled) {

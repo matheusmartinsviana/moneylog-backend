@@ -10,7 +10,7 @@ import java.util.Set;
 
 import com.moneylog.core.ai.app.usecase.AiUseCases.InsightsView;
 import com.moneylog.core.ai.domain.AiFacts;
-import com.moneylog.core.ai.domain.Insight;
+import com.moneylog.core.insights.domain.Insight;
 import com.moneylog.core.ai.domain.Redactor;
 import com.moneylog.core.finance.domain.MonthlySummary;
 

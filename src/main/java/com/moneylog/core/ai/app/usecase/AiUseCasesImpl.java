@@ -42,7 +42,7 @@ import com.moneylog.core.ai.domain.AiPreview;
 import com.moneylog.core.ai.domain.AiPurpose;
 import com.moneylog.core.ai.domain.AiSettings;
 import com.moneylog.core.ai.domain.AiStatus;
-import com.moneylog.core.ai.domain.InsightEngine;
+import com.moneylog.core.insights.domain.InsightEngine;
 import com.moneylog.core.ai.domain.Redactor;
 import com.moneylog.core.ai.exception.AiExceptions.AiAnalysisNotFoundException;
 import com.moneylog.core.ai.exception.AiExceptions.AiBudgetExceededException;

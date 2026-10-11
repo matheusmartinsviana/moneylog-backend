@@ -31,7 +31,7 @@ class ContractErrorCodesTest {
     private static final Set<String> INTERNAL = Set.of("INVOICE_CHAIN_INCONSISTENT", "CARD_INVALID_INSTALLMENT");
 
     /** Literais de cartão que são nomes de tipo ({@code TransactionType}, tipo de insight {@code CARD_COMMITTED}), não códigos de erro. */
-    private static final Set<String> NOT_CODES = Set.of("CARD_PURCHASE", "CARD_COMMITTED");
+    private static final Set<String> NOT_CODES = Set.of("CARD_PURCHASE", "CARD_COMMITTED", "CARD_LIMIT_USAGE", "CARD_CLOSING_SOON");
 
     @Test
     @DisplayName("todo code 404/409/422 da tabela do contrato existe no código")

@@ -1,4 +1,4 @@
-package com.moneylog.core.ai.domain;
+package com.moneylog.core.insights.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

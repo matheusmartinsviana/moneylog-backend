@@ -75,6 +75,19 @@ class ArchitectureTest {
             })
             .because("core.note só acopla com core.transaction pela Idempotency-Key (ADR-009 §7)");
 
+    /** ADR-019: insight é cálculo, não IA. O motor, o contexto, o controller e a ligação dos insights não conhecem o pacote {@code ai}; a IA pode ler insights, nunca o contrário. */
+    @ArchTest
+    static final ArchRule insightsNaoDependemDeIa = noClasses()
+            .that().resideInAnyPackage("com.moneylog.core.insights..", "com.moneylog.infra.insights..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.moneylog.core.ai..", "com.moneylog.infra.ai..")
+            .because("insights calculados valem sem IA, sem provedor e offline (ADR-019)");
+
+    @ArchTest
+    static final ArchRule dominioDosInsightsEFuncaoPura = noClasses()
+            .that().resideInAPackage("com.moneylog.core.insights.domain..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.moneylog.core.insights.app..", "com.moneylog.infra..")
+            .because("o domínio dos insights é função pura sobre fatos (ADR-019)");
+
     @ArchTest
     static final ArchRule coreNaoUsaPontoFlutuante = classes()
             .that().resideInAPackage(CORE)

@@ -10,7 +10,7 @@ import com.moneylog.core.ai.domain.AiPreview;
 import com.moneylog.core.ai.domain.AiPurpose;
 import com.moneylog.core.ai.domain.AiSettings;
 import com.moneylog.core.ai.domain.AiStatus;
-import com.moneylog.core.ai.domain.Insight;
+import com.moneylog.core.insights.domain.Insight;
 import com.moneylog.core.finance.domain.MonthlySummary;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;

@@ -1,7 +1,6 @@
 package com.moneylog.infra.ai.controller;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.CacheControl;
@@ -23,22 +22,17 @@ import com.moneylog.core.ai.app.usecase.AiUseCases.GetAiAnalysisUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.GetAiPreviewUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.GetAiSettingsUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.GetAiStatusUseCase;
-import com.moneylog.core.ai.app.usecase.AiUseCases.GetInsightsUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.ListAiAnalysesUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.RunAnalysisCommand;
 import com.moneylog.core.ai.app.usecase.AiUseCases.RunApprovedAnalysisUseCase;
 import com.moneylog.core.ai.app.usecase.AiUseCases.SaveAiSettingsUseCase;
 import com.moneylog.core.ai.domain.AiPurpose;
 import com.moneylog.core.ai.domain.AiStatus;
-import com.moneylog.core.ai.domain.Insight;
 import com.moneylog.core.sk.page.PageQuery;
-import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.time.Competence;
-import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.ai.controller.AiDtos.AnalysisInput;
 import com.moneylog.infra.ai.controller.AiDtos.AnalysisResponse;
 import com.moneylog.infra.ai.controller.AiDtos.AnalysisSummaryResponse;
-import com.moneylog.infra.ai.controller.AiDtos.InsightResponse;
 import com.moneylog.infra.ai.controller.AiDtos.PreviewInput;
 import com.moneylog.infra.ai.controller.AiDtos.PreviewResponse;
 import com.moneylog.infra.ai.controller.AiDtos.SettingsDto;
@@ -48,15 +42,13 @@ import com.moneylog.infra.web.QueryMonths;
 import com.moneylog.infra.web.SliceResponse;
 
 /**
- * IA (Etapa 8): status, prévia → aprovação → análise, histórico, insights determinísticos e preferências. Todo endpoint filtra pelo usuário do
- * token e nenhuma resposta é cacheada. Sem provedor configurado, tudo responde (status {@code enabled: false}, envio {@code 422 AI_DISABLED},
- * insights normais).
+ * IA (Etapa 8): status, prévia → aprovação → análise, histórico e preferências. Os insights calculados saíram daqui (ADR-019: {@code InsightsController}). Todo endpoint filtra pelo usuário do
+ * token e nenhuma resposta é cacheada. Sem provedor configurado, tudo responde (status {@code enabled: false}, envio {@code 422 AI_DISABLED}).
  */
 @RestController
 public class AiController {
 
     private static final CacheControl NO_STORE = CacheControl.noStore().cachePrivate();
-    public static final String INSIGHTS_MONTH_INVALID = "INSIGHTS_MONTH_INVALID";
 
     private final GetAiStatusUseCase status;
     private final CreateAiPreviewUseCase createPreview;
@@ -64,25 +56,21 @@ public class AiController {
     private final RunApprovedAnalysisUseCase runAnalysis;
     private final ListAiAnalysesUseCase listAnalyses;
     private final GetAiAnalysisUseCase getAnalysis;
-    private final GetInsightsUseCase insights;
     private final GetAiSettingsUseCase getSettings;
     private final SaveAiSettingsUseCase saveSettings;
-    private final TimeProvider time;
 
     @SuppressWarnings("java:S107")
     public AiController(GetAiStatusUseCase status, CreateAiPreviewUseCase createPreview, GetAiPreviewUseCase getPreview,
                         RunApprovedAnalysisUseCase runAnalysis, ListAiAnalysesUseCase listAnalyses, GetAiAnalysisUseCase getAnalysis,
-                        GetInsightsUseCase insights, GetAiSettingsUseCase getSettings, SaveAiSettingsUseCase saveSettings, TimeProvider time) {
+                        GetAiSettingsUseCase getSettings, SaveAiSettingsUseCase saveSettings) {
         this.status = status;
         this.createPreview = createPreview;
         this.getPreview = getPreview;
         this.runAnalysis = runAnalysis;
         this.listAnalyses = listAnalyses;
         this.getAnalysis = getAnalysis;
-        this.insights = insights;
         this.getSettings = getSettings;
         this.saveSettings = saveSettings;
-        this.time = time;
     }
 
     @GetMapping("/v1/ai/status")
@@ -123,18 +111,6 @@ public class AiController {
     @GetMapping("/v1/ai/analyses/{id}")
     public ResponseEntity<AnalysisResponse> analysis(@CurrentUser UUID userId, @PathVariable UUID id) {
         return ResponseEntity.ok().cacheControl(NO_STORE).body(AnalysisResponse.of(getAnalysis.handle(userId, id)));
-    }
-
-    /** Insights determinísticos do mês (padrão: o corrente): valem sem IA. */
-    @GetMapping("/v1/insights")
-    public ResponseEntity<SliceResponse<InsightResponse>> insights(@CurrentUser UUID userId, @RequestParam(required = false) String month,
-                                                                   PageQuery page) {
-        Competence competence = month == null ? Competence.from(time.today()) : QueryMonths.parse(month, INSIGHTS_MONTH_INVALID, "month");
-        List<Insight> all = insights.handle(userId, competence).insights();
-        int from = (int) Math.min(page.offset(), all.size());
-        int to = Math.min(all.size(), from + page.pageSize());
-        Slice<Insight> slice = new Slice<>(all.subList(from, to), to < all.size());
-        return ResponseEntity.ok().cacheControl(NO_STORE).body(SliceResponse.of(slice, InsightResponse::of));
     }
 
     @GetMapping("/v1/settings/ai")

@@ -44,13 +44,14 @@ class Redesign260ContractTest {
     }
 
     @Test
-    @DisplayName("a versão é 2.19.0 (só acréscimos sobre a 2.6.0) e as rotas do redesign, da Etapa 7 e da Etapa 8 existem")
+    @DisplayName("a versão é 2.20.0 (só acréscimos sobre a 2.6.0) e as rotas do redesign, da Etapa 7 e da Etapa 8 existem")
     void deveDeclararAVersaoEAsRotas() {
         var spec = ContractValidation.spec();
-        assertThat(spec.getInfo().getVersion()).isEqualTo("2.19.0");
+        assertThat(spec.getInfo().getVersion()).isEqualTo("2.20.0");
         assertThat(spec.getPaths()).containsKeys("/v1/reports/income-expenses", "/v1/reports/spending-by-category", "/v1/search");
         assertThat(spec.getPaths()).containsKeys("/v1/ai/status", "/v1/ai/previews", "/v1/ai/previews/{id}", "/v1/ai/analyses", "/v1/ai/analyses/{id}",
                 "/v1/insights", "/v1/settings/ai");
+        assertThat(spec.getPaths()).containsKeys("/v1/insights/monthly", "/v1/insights/daily", "/v1/insights/history", "/v1/insights/{id}/dismissals");
         assertThat(spec.getPaths()).containsKeys("/v1/imports", "/v1/imports/{id}", "/v1/imports/{id}/lines", "/v1/imports/{id}/lines/{lineId}",
                 "/v1/imports/{id}/lines:bulk", "/v1/imports/{id}/apply", "/v1/imports/{id}/undo", "/v1/import-mappings/{sourceId}",
                 "/v1/categorization-rules", "/v1/categorization-rules/{id}", "/v1/notifications", "/v1/notifications/unread-count",

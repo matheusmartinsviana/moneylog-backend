@@ -25,7 +25,7 @@ import com.moneylog.core.ai.app.usecase.AiUseCases.InsightsView;
 import com.moneylog.core.ai.app.usecase.AiUseCasesImpl.CreateAiPreview;
 import com.moneylog.core.ai.domain.AiPreview;
 import com.moneylog.core.ai.domain.AiPurpose;
-import com.moneylog.core.ai.domain.InsightEngine;
+import com.moneylog.core.insights.domain.InsightEngine;
 import com.moneylog.core.ai.exception.AiExceptions.AiPurposeNotSupportedException;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.finance.domain.MonthlySummary;

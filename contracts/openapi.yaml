@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.19.0
+  version: 2.20.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
@@ -16,6 +16,14 @@ info:
     ## Fatura histórica (2.16.0, só acréscimos compatíveis; ADR-014)
     `POST /v1/cards/{id}/historical-invoices` registra o valor de uma fatura passada que o usuário só conhece pelo pagamento (item `CARD -X / EQUITY +X`,
     sem categoria e sem consumo, `Transaction.source = HISTORICAL`); em seguida o pagamento real quita a fatura. Acréscimo: `TransactionSource.HISTORICAL`.
+
+    ## Insights calculados (2.20.0, só acréscimos compatíveis; ADR-019)
+    Insights financeiros determinísticos (fórmulas sobre o razão, sem IA, sem provedor, offline), em dois horizontes: `GET /v1/insights/monthly`
+    (mês) e `GET /v1/insights/daily` (dia, no fuso do usuário), mais `GET /v1/insights/history` (até 12 meses), `POST` e `DELETE
+    /v1/insights/{id}/dismissals` (dispensa auditada, só inserção). `GET /v1/insights` continua como alias do mensal **na forma
+    original** (só `CATEGORY_DELTA` e `CARD_COMMITTED`, schema `Insight` inalterado). O insight completo é o `InsightItem`, com `id`, `severity`,
+    `priority`, `period`, `basis`, `confidence`, `subjectId` e `dismissed`. A lista ganha `insufficient[]`: por que um insight **não** saiu (nunca se inventa número com dado
+    insuficiente). O cálculo é só do backend; o front traduz `key` + `params` e formata. `/v1/ai/*` não muda e os insights nunca chamam a IA.
 
     ## Metas de sonho com fotos (2.19.0, só acréscimos compatíveis; ADR-018)
     A meta `SAVINGS` ganha `featured` (meta em destaque da Home: no máximo uma por usuário), `coverPhotoId` e `photos[]` (só metadados, na
@@ -165,6 +173,10 @@ tags:
       IA opcional (2.8.0). O app funciona sem chave (`GET /v1/ai/status` traz `enabled: false`). Todo envio exige uma prévia aprovada pelo usuário
       (`POST /v1/ai/previews` e depois `POST /v1/ai/analyses`), com o payload já minimizado e redigido. A chave, o provedor e a URL base vivem só no
       ambiente do servidor e **nunca** aparecem em nenhuma resposta. A IA nunca altera o razão.
+  - name: Insights
+    description: |
+      Insights calculados (2.20.0, ADR-019): fórmulas sobre o razão, mensais e do dia, sem IA, sem provedor e offline. O backend devolve `key` e
+      `params`; o front traduz e formata. Dispensa auditada (só inserção).
 
 paths:
   # ---------------------------------------------------------------- Auth
@@ -5214,13 +5226,13 @@ paths:
           $ref: '#/components/responses/InternalServerError'
   /v1/insights:
     get:
-      tags: [AI]
+      tags: [Insights]
       operationId: listInsights
-      summary: Insights determinísticos do mês (valem sem IA)
+      summary: Insights do mês (alias de `/v1/insights/monthly`, paginado)
       description: |
-        Calculados pelo backend sobre os mesmos números do resumo mensal. O backend não monta a frase: devolve `key` (i18n) e `params`.
-        `CATEGORY_DELTA` (variação de uma categoria vs. mês anterior, só com 10% ou mais **e** R$ 50,00 ou mais) e `CARD_COMMITTED`
-        (fatura que vence no mês com saldo a pagar). Mês sem dados = lista vazia.
+        Alias de `GET /v1/insights/monthly` mantido para clientes antigos: só os insights `CATEGORY_DELTA` e `CARD_COMMITTED`, com exatamente os
+        campos de sempre (`type`, `key`, `params`, `factRefs`, `source`), sem nenhum campo novo e sem os demais tipos. Paginado por `page` e
+        `pageSize`. Mês sem dados = lista vazia. Clientes novos usam `/v1/insights/monthly`.
       parameters:
         - name: month
           in: query
@@ -5244,6 +5256,177 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/insights/monthly:
+    get:
+      tags: [Insights]
+      operationId: listMonthlyInsights
+      summary: Insights do mês, ordenados e sem repetição
+      description: |
+        Calculados pelo backend sobre o razão (uma leitura por requisição). Ordem estável: `severity` (ALERT, ATTENTION, POSITIVE, INFO), depois
+        `priority` decrescente, depois a magnitude em centavos e `type`/`id`. Tipos: `SAVINGS_RATE`, `SPEND_VS_BASELINE`, `CATEGORY_DELTA`,
+        `MONTH_PROJECTION`, `FREE_MONEY`, `COMMITMENT_INDEX`, `DEBT_SERVICE`, `INSTALLMENT_LOAD`, `EMERGENCY_COVERAGE`, `INCOME_STABILITY`,
+        `GOAL_PACE`, `CONCENTRATION`, `CARD_COMMITTED`, `CARD_LIMIT_USAGE`, `RECURRING_DETECTED`. Os que dependem do estado de hoje
+        (projeção, dinheiro livre, cobertura da reserva, metas, limite do cartão) só saem no mês corrente. `insufficient[]` diz por que um
+        insight não saiu. Mês futuro responde `insufficient: [{type: ALL, reason: FUTURE_MONTH}]`.
+      parameters:
+        - name: month
+          in: query
+          description: Competência `AAAA-MM` (padrão = mês corrente).
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+        - $ref: '#/components/parameters/InsightLimit'
+        - $ref: '#/components/parameters/IncludeDismissed'
+      responses:
+        '200':
+          description: Os insights do mês.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/insights/daily:
+    get:
+      tags: [Insights]
+      operationId: listDailyInsights
+      summary: Insights do dia (fuso do usuário)
+      description: |
+        Tipos: `DAILY_BUDGET`, `TODAY_VS_AVERAGE`, `DUE_SOON`, `MIN_BALANCE_FORECAST`, `ATYPICAL_ENTRY`, `CARD_CLOSING_SOON`. `date` padrão = hoje no
+        fuso do usuário; data depois de hoje é `400 INSIGHTS_DATE_INVALID`. A agenda e o caixa usam o estado atual (a data só define o dia de
+        referência). Sem renda recebida no mês o orçamento do dia não sai (`insufficient`), nunca é estimado.
+      parameters:
+        - name: date
+          in: query
+          description: Dia `AAAA-MM-DD` (padrão = hoje no fuso do usuário; futuro é recusado).
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/InsightLimit'
+        - $ref: '#/components/parameters/IncludeDismissed'
+      responses:
+        '200':
+          description: Os insights do dia.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/insights/history:
+    get:
+      tags: [Insights]
+      operationId: listInsightHistory
+      summary: Insights mês a mês (recalculados, não armazenados)
+      description: |
+        Os insights mensais de cada mês de `from` a `to` (no máximo 12 meses; `INSIGHTS_RANGE_INVALID` se passar), até 10 por mês, uma
+        leitura do razão no total. Insights de estado atual (projeção, dinheiro livre, cobertura, metas, limite do cartão) só aparecem no mês corrente.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^\d{4}-\d{2}$'
+      responses:
+        '200':
+          description: Um item por mês, do mais antigo ao mais recente.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightHistory'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/insights/{id}/dismissals:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: 'Id do insight (`ins_` + 32 hexadecimais), como veio na lista.'
+        schema:
+          type: string
+          pattern: '^ins_[0-9a-f]{32}$'
+    post:
+      tags: [Insights]
+      operationId: dismissInsight
+      summary: Dispensar um insight
+      description: |
+        `TODAY` esconde só hoje; `MONTH` esconde o mesmo tipo e assunto até o fim do mês; `TYPE` para de avisar deste tipo até reverter.
+        Auditoria só de inserção. Id que não é de um insight do usuário (ou que já não é calculado) é `404 INSIGHT_NOT_FOUND`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsightDismissInput'
+      responses:
+        '201':
+          description: O insight atualizado, com `dismissed = true`.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags: [Insights]
+      operationId: restoreInsight
+      summary: Reverter a dispensa
+      description: Grava `revoked_at` em todas as dispensas ativas que escondem o insight; a linha de auditoria continua existindo.
+      responses:
+        '200':
+          description: O insight atualizado.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /v1/settings/ai:
@@ -5328,6 +5511,22 @@ components:
         minimum: 1
         maximum: 50
         default: 10
+    InsightLimit:
+      name: limit
+      in: query
+      description: Quantos insights devolver (1 a 50; padrão 20).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+    IncludeDismissed:
+      name: includeDismissed
+      in: query
+      description: Inclui os dispensados, marcados com `dismissed = true`.
+      schema:
+        type: boolean
+        default: false
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -11891,12 +12090,15 @@ components:
       type: object
       required: [type, key, params, factRefs, source]
       additionalProperties: false
+      description: |
+        Insight no formato original (2.8.0), só os tipos `CATEGORY_DELTA` e `CARD_COMMITTED`: é o que `GET /v1/insights` (alias) devolve, sem
+        nenhum campo novo, para não quebrar clientes antigos. Os insights completos (catálogo inteiro e campos novos) são o `InsightItem`.
       properties:
         type: {type: string, enum: [CATEGORY_DELTA, CARD_COMMITTED]}
         key: {type: string, description: 'Chave de i18n (`insight.category.up`, `insight.category.down`, `insight.card.committed`).'}
         params:
           type: object
-          description: 'Decimais em string. `CATEGORY_DELTA`: `categoryId`, `categoryName`, `current`, `previous`, `deltaAmount`, `deltaPercent`. `CARD_COMMITTED`: `amount`.'
+          description: 'Decimais em string. `CATEGORY_DELTA`: `categoryId`, `categoryName`, `current`, `previous`, `deltaAmount`, `deltaPercent` (mais `baseline` e `months`, 2.20.0). `CARD_COMMITTED`: `amount`.'
           additionalProperties: {type: string}
         factRefs: {type: array, items: {type: string}}
         source: {type: string, enum: [COMPUTED], description: 'Calculado pelos dados do usuário, sem IA.'}
@@ -11911,6 +12113,98 @@ components:
               items:
                 $ref: '#/components/schemas/Insight'
       unevaluatedProperties: false
+    InsightItem:
+      type: object
+      required: [id, type, key, params, factRefs, severity, priority, source, dismissed]
+      additionalProperties: false
+      description: 'Insight calculado completo (2.20.0, ADR-019). Todos os campos listados em `required` são sempre enviados; `period`, `basis`, `confidence` e `subjectId` podem ser `null`.'
+      properties:
+        id:
+          type: string
+          pattern: '^ins_[0-9a-f]{32}$'
+          description: '`ins_` + hash de (usuário, tipo, período, assunto): estável entre chamadas.'
+        type: {type: string, enum: [SAVINGS_RATE, SPEND_VS_BASELINE, CATEGORY_DELTA, MONTH_PROJECTION, FREE_MONEY, COMMITMENT_INDEX, DEBT_SERVICE, INSTALLMENT_LOAD, EMERGENCY_COVERAGE, INCOME_STABILITY, GOAL_PACE, CONCENTRATION, CARD_COMMITTED, CARD_LIMIT_USAGE, RECURRING_DETECTED, DAILY_BUDGET, TODAY_VS_AVERAGE, DUE_SOON, MIN_BALANCE_FORECAST, ATYPICAL_ENTRY, CARD_CLOSING_SOON]}
+        key: {type: string, description: 'Chave de i18n (`insight.<área>.<variante>`); chave desconhecida mostra texto neutro.'}
+        params:
+          type: object
+          description: 'Decimais em string, já calculados (o front só formata). Depende do `type` (ver `docs/arquitetura/insights.md`).'
+          additionalProperties: {type: string}
+        factRefs: {type: array, items: {type: string}}
+        severity: {type: string, enum: [ALERT, ATTENTION, POSITIVE, INFO]}
+        priority: {type: integer, description: 'Desempate dentro da severidade (maior primeiro).'}
+        period:
+          type: [object, 'null']
+          required: [kind, value]
+          additionalProperties: false
+          properties:
+            kind: {type: string, enum: [MONTH, DAY]}
+            value: {type: string, description: '`AAAA-MM` ou `AAAA-MM-DD`.'}
+        source: {type: string, enum: [COMPUTED], description: 'Calculado pelos dados do usuário, sem IA.'}
+        basis:
+          type: [string, 'null']
+          enum: [KNOWN_SCHEDULE, HISTORY, PROJECTION, null]
+          description: 'Como o número nasceu: só a agenda conhecida, estatística do histórico ou projeção do mês corrente.'
+        confidence:
+          type: [object, 'null']
+          required: [n, window]
+          additionalProperties: false
+          properties:
+            n: {type: integer, description: Observações usadas.}
+            window: {type: integer, description: Janela pedida (meses; dias na projeção).}
+            z: {type: [string, 'null'], description: z robusto (decimal em texto), quando houver.}
+        subjectId: {type: [string, 'null'], description: 'O que o insight descreve dentro do tipo (categoria, meta, cartão, lançamento).'}
+        dismissed: {type: boolean}
+    InsightInsufficient:
+      type: object
+      required: [type, reason]
+      additionalProperties: false
+      properties:
+        type: {type: string, description: 'Tipo que não saiu (`ALL` = o mês inteiro não se aplica).'}
+        reason: {type: string, enum: [HISTORY, NO_INCOME, PARTIAL_MONTH, NO_DATA, NO_BASELINE, NO_ACCOUNTS, NO_SCHEDULE, NO_LIMIT, NO_PLAN, FUTURE_MONTH]}
+        missing: {type: [integer, 'null'], description: 'Quantos meses (ou dias) faltam para emitir.'}
+    InsightList:
+      allOf:
+        - $ref: '#/components/schemas/SliceBase'
+        - type: object
+          required: [items, insufficient]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InsightItem'
+            insufficient:
+              type: array
+              items:
+                $ref: '#/components/schemas/InsightInsufficient'
+      unevaluatedProperties: false
+    InsightHistory:
+      type: object
+      required: [items]
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [month, items, hasNext, insufficient]
+            additionalProperties: false
+            properties:
+              month: {type: string, pattern: '^\d{4}-\d{2}$'}
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InsightItem'
+              hasNext: {type: boolean}
+              insufficient:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InsightInsufficient'
+    InsightDismissInput:
+      type: object
+      required: [scope]
+      additionalProperties: false
+      properties:
+        scope: {type: string, enum: [TODAY, MONTH, TYPE]}
     AiSettings:
       type: object
       required: [dailyMessageEnabled]

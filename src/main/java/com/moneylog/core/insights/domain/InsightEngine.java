@@ -1,4 +1,4 @@
-package com.moneylog.core.ai.domain;
+package com.moneylog.core.insights.domain;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

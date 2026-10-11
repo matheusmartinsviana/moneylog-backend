@@ -127,6 +127,7 @@ public final class Account {
      * datas).
      *
      * @param hasActiveMovements a conta tem movimentação ativa (informado pelo caso de uso, que lê o razão)
+     * @throws AccountWithBalanceCannotBeArchivedException se houver saldo diferente de zero hoje
      * @throws AccountOpeningLockedException se houver movimentação ativa
      */
     public List<Posting> correctOpening(AccountType newType, Money newBalance, LocalDate newDate, boolean hasActiveMovements) {
