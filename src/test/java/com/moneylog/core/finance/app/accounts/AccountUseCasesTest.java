@@ -56,7 +56,7 @@ import com.moneylog.core.account.exception.AccountExceptions.AccountWithFutureBa
 import com.moneylog.core.account.util.factory.AccountTestFactory;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.exception.VersionConflictException;
 import com.moneylog.core.sk.id.IdGenerator;

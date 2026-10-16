@@ -165,7 +165,7 @@ class CardSecurityQaIT {
         long cards = a.count("credit_cards");
         List<String> failures = new ArrayList<>();
         String base = "\"name\":\"Novo\",\"institution\":\"X\",\"limit\":{\"amount\":\"100.00\",\"currency\":\"BRL\"},\"closingDay\":10,\"dueDay\":15";
-        for (String extra : List.of("\"number\":\"4111111111111111\"", "\"cvv\":\"123\"", "\"brand\":\"VISA\"", "\"lastDigits\":\"1111\"", "\"cardNumber\":\"4111\"",
+        for (String extra : List.of("\"number\":\"4111111111111111\"", "\"cvv\":\"123\"", "\"lastDigits\":\"1111\"", "\"cardNumber\":\"4111\"",
                 "\"id\":\"" + UUID.randomUUID() + "\"", "\"status\":\"ARCHIVED\"", "\"userId\":\"" + b.id + "\"", "\"version\":5", "\"availableLimit\":{\"amount\":\"1.00\",\"currency\":\"BRL\"}")) {
             CardQaWorld.Res r = a.raw(HttpMethod.POST, "/v1/cards", "{" + base + "," + extra + "}", null);
             if (r.status() != 400) {
@@ -199,11 +199,11 @@ class CardSecurityQaIT {
     void semDadosSensiveisDeCartao() throws Exception {
         List<String> columns = jdbc.queryForList("select column_name from information_schema.columns where table_name in ('credit_cards','credit_card_billing_rules','credit_card_invoices')", String.class);
         assertThat(columns).isNotEmpty();
-        assertThat(columns.stream().filter(c -> c.matches("(?i).*(number|numero|cvv|cvc|pan|brand|bandeira|digits|last4|holder|expir).*")).toList()).isEmpty();
+        assertThat(columns.stream().filter(c -> c.matches("(?i).*(number|numero|cvv|cvc|pan|holder|expir).*")).toList()).isEmpty();
         JsonNode card = a.cardNow();
         List<String> keys = new ArrayList<>();
         card.propertyNames().forEach(keys::add);
-        assertThat(keys.stream().filter(c -> c.matches("(?i).*(number|cvv|cvc|brand|digits|holder|expir).*")).toList()).isEmpty();
+        assertThat(keys.stream().filter(c -> c.matches("(?i).*(number|cvv|cvc|holder|expir).*")).toList()).isEmpty();
         CardQaWorld.Res r = a.raw(HttpMethod.POST, "/v1/cards", "{\"name\":\"4111 1111 1111 1111\",\"limit\":{\"amount\":\"100.00\",\"currency\":\"BRL\"},\"closingDay\":10,\"dueDay\":15}", null);
         assertThat(r.status()).as(r.toString()).isLessThan(500);
     }

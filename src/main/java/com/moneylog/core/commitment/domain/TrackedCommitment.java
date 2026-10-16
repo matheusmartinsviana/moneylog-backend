@@ -5,8 +5,11 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -15,6 +18,7 @@ import java.util.UUID;
 import com.moneylog.core.commitment.exception.CommitmentExceptions.InvalidCommitmentException;
 import com.moneylog.core.commitment.exception.CommitmentExceptions.ScheduleItemAlreadyPaidException;
 import com.moneylog.core.commitment.exception.CommitmentExceptions.ScheduleItemNotFoundException;
+import com.moneylog.core.commitment.exception.CommitmentExceptions.SharesInvalidException;
 import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
@@ -38,10 +42,11 @@ public final class TrackedCommitment {
     private Integer installmentsPaid;
     private LocalDate nextDueDate;
     private final List<ScheduleItem> schedule;
+    private CommitmentClauses clauses;
 
     private TrackedCommitment(UUID id, UUID userId, CommitmentKind kind, String name, String counterparty, String notes, Money total,
                               Money informedPaid, Integer installmentsTotal, Integer installmentsPaid, LocalDate nextDueDate,
-                              List<ScheduleItem> schedule) {
+                              List<ScheduleItem> schedule, CommitmentClauses clauses) {
         this.id = Objects.requireNonNull(id, "id");
         this.userId = Objects.requireNonNull(userId, "userId");
         this.kind = Objects.requireNonNull(kind, "kind");
@@ -73,6 +78,7 @@ public final class TrackedCommitment {
         this.informedPaid = informedPaid;
         this.installmentsTotal = installmentsTotal;
         this.installmentsPaid = installmentsPaid;
+        this.clauses = clauses;
         validateShape();
     }
 
@@ -102,6 +108,9 @@ public final class TrackedCommitment {
                 }
             }
         } else {
+            if (clauses != null || schedule.stream().anyMatch(ScheduleItem::sharesDefined)) {
+                throw new InvalidCommitmentException("cotas e cláusulas existem só no projeto de longo prazo.");
+            }
             if (!schedule.isEmpty() || total != null) {
                 throw new InvalidCommitmentException("o compromisso de terceiro não tem cronograma nem total: só o que foi informado.");
             }
@@ -114,22 +123,34 @@ public final class TrackedCommitment {
 
     public static TrackedCommitment longTermProject(UUID id, UUID userId, String name, String counterparty, String notes, Money total,
                                                     List<ScheduleItem> schedule) {
+        return longTermProject(id, userId, name, counterparty, notes, total, schedule, null);
+    }
+
+    public static TrackedCommitment longTermProject(UUID id, UUID userId, String name, String counterparty, String notes, Money total,
+                                                    List<ScheduleItem> schedule, CommitmentClauses clauses) {
         return new TrackedCommitment(id, userId, CommitmentKind.LONG_TERM_PROJECT, name, counterparty, notes, total, null, null, null,
-                null, schedule);
+                null, schedule, clauses);
     }
 
     public static TrackedCommitment trackedThirdParty(UUID id, UUID userId, String name, String counterparty, String notes,
                                                       int installmentsTotal, int installmentsPaid, Money paidAmount,
                                                       LocalDate nextDueDate) {
         return new TrackedCommitment(id, userId, CommitmentKind.TRACKED_THIRD_PARTY, name, counterparty, notes, null, paidAmount,
-                installmentsTotal, installmentsPaid, nextDueDate, List.of());
+                installmentsTotal, installmentsPaid, nextDueDate, List.of(), null);
     }
 
     public static TrackedCommitment restore(UUID id, UUID userId, CommitmentKind kind, String name, String counterparty, String notes,
                                             Money total, Money informedPaid, Integer installmentsTotal, Integer installmentsPaid,
                                             LocalDate nextDueDate, List<ScheduleItem> schedule) {
+        return restore(id, userId, kind, name, counterparty, notes, total, informedPaid, installmentsTotal, installmentsPaid,
+                nextDueDate, schedule, null);
+    }
+
+    public static TrackedCommitment restore(UUID id, UUID userId, CommitmentKind kind, String name, String counterparty, String notes,
+                                            Money total, Money informedPaid, Integer installmentsTotal, Integer installmentsPaid,
+                                            LocalDate nextDueDate, List<ScheduleItem> schedule, CommitmentClauses clauses) {
         return new TrackedCommitment(id, userId, kind, name, counterparty, notes, total, informedPaid, installmentsTotal,
-                installmentsPaid, nextDueDate, schedule);
+                installmentsPaid, nextDueDate, schedule, clauses);
     }
 
     public void markItemPaid(int position, LocalDate paidOn) {
@@ -143,6 +164,75 @@ public final class TrackedCommitment {
             throw new ScheduleItemAlreadyPaidException(position);
         }
         schedule.set(position - 1, item.markPaid(paidOn));
+    }
+
+    public void updateItemShares(int position, List<ItemShare> shares, UUID coBuyerPersonId) {
+        requireProject();
+        ScheduleItem item = schedule.stream().filter(i -> i.position() == position).findFirst()
+                .orElseThrow(() -> new ScheduleItemNotFoundException(id, position));
+        if (shares == null || shares.isEmpty()) {
+            throw new SharesInvalidException("informe ao menos uma cota.");
+        }
+        schedule.set(position - 1, item.withShares(shares, coBuyerPersonId));
+    }
+
+    public void defineClauses(CommitmentClauses newClauses) {
+        requireProject();
+        this.clauses = Objects.requireNonNull(newClauses, "clauses");
+    }
+
+    private void requireProject() {
+        if (kind != CommitmentKind.LONG_TERM_PROJECT) {
+            throw new InvalidCommitmentException("só o projeto de longo prazo tem cotas e cláusulas.");
+        }
+    }
+
+    public Set<UUID> personIds() {
+        Set<UUID> ids = new LinkedHashSet<>();
+        schedule.forEach(i -> ids.addAll(i.personIds()));
+        return ids;
+    }
+
+    public List<PersonTotals> totalsByPerson() {
+        if (kind != CommitmentKind.LONG_TERM_PROJECT) {
+            return List.of();
+        }
+        Map<UUID, List<PersonTotals.PersonItem>> itemsByPerson = new LinkedHashMap<>();
+        boolean ownerPresent = false;
+        for (ScheduleItem item : schedule) {
+            for (ItemShare share : item.effectiveShares()) {
+                ownerPresent |= share.isOwner();
+                itemsByPerson.computeIfAbsent(share.personId(), p -> new ArrayList<>()).add(new PersonTotals.PersonItem(item.position(),
+                        item.label(), item.type(), item.dueDate(), share.amount(), item.isPaid(), !item.sharesDefined()));
+            }
+        }
+        List<UUID> order = new ArrayList<>();
+        if (ownerPresent) {
+            order.add(null);
+        }
+        itemsByPerson.keySet().stream().filter(Objects::nonNull).forEach(order::add);
+        List<PersonTotals> result = new ArrayList<>();
+        for (UUID personId : order) {
+            List<PersonTotals.PersonItem> items = itemsByPerson.get(personId);
+            Money paidSum = Money.sum(items.stream().filter(PersonTotals.PersonItem::paid).map(PersonTotals.PersonItem::amount).toList(),
+                    CurrencyCode.BRL);
+            Money pendingSum = Money.sum(items.stream().filter(i -> !i.paid()).map(PersonTotals.PersonItem::amount).toList(),
+                    CurrencyCode.BRL);
+            result.add(new PersonTotals(personId, List.copyOf(items), paidSum, pendingSum));
+        }
+        return result;
+    }
+
+    public List<Integer> undefinedSharePositions() {
+        return schedule.stream().filter(i -> !i.sharesDefined()).map(ScheduleItem::position).toList();
+    }
+
+    public Money terminationRetentionAmount() {
+        return clauses == null ? null : clauses.terminationRetentionOver(nominalTotal());
+    }
+
+    public CommitmentClauses clauses() {
+        return clauses;
     }
 
     public void updateProgress(int newInstallmentsPaid, Money newPaidAmount, LocalDate newNextDueDate, String newNotes) {

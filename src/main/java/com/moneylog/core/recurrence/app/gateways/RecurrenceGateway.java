@@ -28,6 +28,8 @@ public interface RecurrenceGateway {
 
     List<RecurringTransaction> findAll(UUID userId);
 
+    List<Versioned<RecurringTransaction>> findAllVersioned(UUID userId);
+
     Slice<Versioned<RecurringTransaction>> list(UUID userId, Boolean active, PageQuery page);
 
     Map<UUID, Map<LocalDate, RealizedOccurrence>> realizedOccurrences(UUID userId, Collection<UUID> recurrenceIds);

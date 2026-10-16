@@ -12,7 +12,8 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 
 public record DashboardSummary(LocalDate asOf, boolean isProjection, Balances balances, Map<Horizon, Money> committed,
-                               Map<Horizon, Money> projected, ConsumptionReport month, CashFlowReport cashFlow, NetWorth netWorth) {
+                               Map<Horizon, Money> projected, ConsumptionReport month, CashFlowReport cashFlow, NetWorth netWorth,
+                               ConsumptionView view) {
 
     public static final List<Horizon> PROJECTION_HORIZONS = List.of(Horizon.D30, Horizon.D90, Horizon.M6, Horizon.M12);
 
@@ -29,6 +30,11 @@ public record DashboardSummary(LocalDate asOf, boolean isProjection, Balances ba
 
     public static DashboardSummary of(FinancialRecords records, Collection<RecurringTransaction> recurrences, LocalDate asOf,
                                       LocalDate today) {
+        return of(records, recurrences, asOf, today, ConsumptionView.MINE);
+    }
+
+    public static DashboardSummary of(FinancialRecords records, Collection<RecurringTransaction> recurrences, LocalDate asOf,
+                                      LocalDate today, ConsumptionView view) {
         Ledger ledger = records.ledger();
         CashPosition cash = CashPosition.at(records, ledger, asOf);
         CommitmentSchedule schedule = CommitmentSchedule.of(records, recurrences, asOf);
@@ -47,8 +53,8 @@ public record DashboardSummary(LocalDate asOf, boolean isProjection, Balances ba
                 cash.inAccounts().subtract(committed30).subtract(reserved), reserved, committed30,
                 inAccountsChange(records, ledger, cash, competence, asOf.isAfter(today)));
         return new DashboardSummary(asOf, asOf.isAfter(today), balances, Map.copyOf(committed), Map.copyOf(projected),
-                ConsumptionReport.of(records, ledger, competence), CashFlowReport.forCompetence(records, ledger, competence),
-                NetWorth.at(ledger, asOf));
+                ConsumptionReport.of(records, ConsumptionView.orDefault(view).ledgerOf(records), competence), CashFlowReport.forCompetence(records, ledger, competence),
+                NetWorth.at(ledger, asOf), ConsumptionView.orDefault(view));
     }
 
     private static InAccountsChange inAccountsChange(FinancialRecords records, Ledger ledger, CashPosition cash, Competence competence,

@@ -114,7 +114,7 @@ public final class DebtOverviewCalculator {
         Money receivables = ZERO;
         for (Debt debt : records.debts()) {
             DebtStatus status = debt.status();
-            if (status != DebtStatus.OPEN && status != DebtStatus.PARTIALLY_SETTLED) {
+            if (status != DebtStatus.OPEN && status != DebtStatus.PARTIALLY_SETTLED || debt.carriedByCard()) {
                 continue;
             }
             if (debt.direction() == DebtDirection.RECEIVABLE) {
@@ -122,10 +122,12 @@ public final class DebtOverviewCalculator {
                 continue;
             }
             boolean free = debt.personId() == null;
-            boolean overdue = debt.isOverdue(today);
+            boolean payroll = debt.deductedInPayroll();
+            boolean overdue = !payroll && debt.isOverdue(today);
+            LocalDate expectedDate = payroll ? null : debt.expectedDate();
             DebtItem item = new DebtItem(debt.id(), debt.personId(), free ? debt.creditorName() : personNames.getOrDefault(debt.personId(), ""),
-                    debt.description(), debt.outstanding(), debt.expectedDate(), overdue);
-            obligations.add(new Obligation(free ? Part.OTHER : Part.PEOPLE, debt.outstanding(), debt.expectedDate(), overdue));
+                    debt.description(), debt.outstanding(), expectedDate, overdue);
+            obligations.add(new Obligation(free ? Part.OTHER : Part.PEOPLE, debt.outstanding(), expectedDate, overdue));
             if (free) {
                 other.add(item);
                 otherTotal = otherTotal.add(item.outstanding());

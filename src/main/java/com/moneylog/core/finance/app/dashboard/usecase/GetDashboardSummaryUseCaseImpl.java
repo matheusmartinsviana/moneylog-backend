@@ -26,7 +26,7 @@ public class GetDashboardSummaryUseCaseImpl implements GetDashboardSummaryUseCas
         FinancialRecords loaded = records.load(query.userId());
         LocalDate today = time.today();
         LocalDate asOf = query.asOf() == null ? today : query.asOf();
-        DashboardSummary summary = DashboardSummary.of(loaded, sources.recurrences(query.userId()), asOf, today);
+        DashboardSummary summary = DashboardSummary.of(loaded, sources.recurrences(query.userId()), asOf, today, query.view());
         return new DashboardView(summary, !loaded.accounts().isEmpty());
     }
 }

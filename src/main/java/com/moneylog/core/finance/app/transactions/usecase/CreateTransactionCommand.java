@@ -8,8 +8,12 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.ShareLine;
+import com.moneylog.core.transaction.domain.SplitMode;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionType;
 
 public sealed interface CreateTransactionCommand {
@@ -27,11 +31,15 @@ public sealed interface CreateTransactionCommand {
     record Share(Money amount, NewDebtSpec newDebt) {
     }
 
-    record Expense(Common common, UUID accountId, UUID categoryId, PaymentMethod method, List<Share> shares)
-            implements CreateTransactionCommand {
+    record Expense(Common common, UUID accountId, UUID categoryId, PaymentMethod method, List<Share> shares,
+                   TransactionNature nature) implements CreateTransactionCommand {
 
         public Expense {
             shares = shares == null ? List.of() : List.copyOf(shares);
+        }
+
+        public Expense(Common common, UUID accountId, UUID categoryId, PaymentMethod method, List<Share> shares) {
+            this(common, accountId, categoryId, method, shares, null);
         }
 
         public Expense(Common common, UUID accountId, UUID categoryId, PaymentMethod method) {
@@ -118,7 +126,26 @@ public sealed interface CreateTransactionCommand {
         }
     }
 
-    record CardPurchase(Common common, UUID cardId, UUID categoryId, int installments) implements CreateTransactionCommand {
+    record CardPurchase(Common common, UUID cardId, UUID categoryId, int installments, SplitMode splitMode, List<ShareLine> shares,
+                        ForeignCharge foreignCharge, String lastDigits) implements CreateTransactionCommand {
+
+        public CardPurchase {
+            shares = shares == null ? List.of() : List.copyOf(shares);
+        }
+
+        public CardPurchase(Common common, UUID cardId, UUID categoryId, int installments, SplitMode splitMode, List<ShareLine> shares,
+                            ForeignCharge foreignCharge) {
+            this(common, cardId, categoryId, installments, splitMode, shares, foreignCharge, null);
+        }
+
+        public CardPurchase(Common common, UUID cardId, UUID categoryId, int installments, SplitMode splitMode, List<ShareLine> shares) {
+            this(common, cardId, categoryId, installments, splitMode, shares, null);
+        }
+
+        public CardPurchase(Common common, UUID cardId, UUID categoryId, int installments) {
+            this(common, cardId, categoryId, installments, null, List.of());
+        }
+
         @Override
         public UUID userId() {
             return common.userId();

@@ -5,7 +5,7 @@ import com.moneylog.core.finance.app.accounts.AccountViews;
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.Posting;

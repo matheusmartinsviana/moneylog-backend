@@ -36,6 +36,9 @@ public final class CanonicalCommandHash {
                 field(canonical, "accountId", c.accountId());
                 field(canonical, "categoryId", c.categoryId());
                 field(canonical, "method", c.method());
+                if (c.nature() != null) {
+                    field(canonical, "nature", c.nature());
+                }
                 shares(canonical, c.shares());
             }
             case Income c -> {
@@ -83,6 +86,18 @@ public final class CanonicalCommandHash {
                 field(canonical, "cardId", c.cardId());
                 field(canonical, "categoryId", c.categoryId());
                 field(canonical, "installments", c.installments());
+                if (c.lastDigits() != null) {
+                    field(canonical, "lastDigits", c.lastDigits());
+                }
+                if (c.foreignCharge() != null) {
+                    field(canonical, "foreign", c.foreignCharge().original().toPlainString() + c.foreignCharge().original().currency()
+                            + "@" + c.foreignCharge().fxRate().toPlainString() + "/" + c.foreignCharge().iofBps());
+                }
+                if (!c.shares().isEmpty()) {
+                    field(canonical, "splitMode", c.splitMode());
+                    c.shares().forEach(line -> field(canonical, "personShare", line.personId() + ":" + line.bps() + ":"
+                            + (line.amount() == null ? null : line.amount().toPlainString())));
+                }
             }
             case LoanGiven c -> {
                 field(canonical, "type", "LOAN_GIVEN");

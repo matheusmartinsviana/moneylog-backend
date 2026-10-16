@@ -106,6 +106,11 @@ public class InMemoryDebtGateway implements DebtGateway {
         return found;
     }
 
+    @Override
+    public Map<UUID, List<com.moneylog.core.sk.money.Money>> installmentSchedules(UUID userId, Collection<UUID> transactionIds) {
+        return new HashMap<>();
+    }
+
     private Versioned<Debt> versioned(Debt debt) {
         return new Versioned<>(debt, versions.get(debt.id()), Instant.EPOCH, Instant.EPOCH);
     }

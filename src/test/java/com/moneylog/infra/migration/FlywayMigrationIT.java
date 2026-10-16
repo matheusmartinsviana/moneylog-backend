@@ -92,20 +92,24 @@ class FlywayMigrationIT {
                         + " AND table_name <> 'flyway_schema_history'", String.class);
         assertThat(tables).contains("users", "categories", "accounts", "credit_cards", "credit_card_billing_rules",
                 "credit_card_invoices", "persons", "debts", "transactions", "transaction_installments", "ledger_postings");
-        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs");
-        Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs");
+        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
+        Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
+        Set<String> referenceData = Set.of("tax_tables", "tax_table_brackets", "tax_table_sources");
+        Set<String> v9 = Set.of("card_purchase_shares", "tax_tables", "tax_table_brackets", "tax_table_sources", "tracked_commitment_item_shares",
+                "payroll_loan_applications", "purchase_groups", "purchase_group_members", "recurrence_shares", "income_profiles", "income_profile_deductions",
+                "income_profile_occurrences", "transaction_foreign_charges", "income_occurrence_loans", "third_party_mark_migrations", "assets", "asset_balances");
         Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts", "insight_dismissals");
         for (String table : tables) {
-            if (!keyedByUser.contains(table)) {
+            if (!keyedByUser.contains(table) && (!v9.contains(table) || hasColumn(table, "id"))) {
                 assertThat(column(table, "id")).as(table + ".id").isEqualTo("uuid|NO|null");
             }
-            if (!keyedByUser.contains(table) && !noTimestamps.contains(table)) {
+            if (!keyedByUser.contains(table) && !noTimestamps.contains(table) && (!v9.contains(table) || hasColumn(table, "created_at"))) {
                 assertThat(column(table, "created_at")).as(table + ".created_at").startsWith("timestamp with time zone|NO");
             }
-            if (!appendOnly.contains(table) && !noTimestamps.contains(table)) {
+            if (!appendOnly.contains(table) && !noTimestamps.contains(table) && (!v9.contains(table) || hasColumn(table, "updated_at"))) {
                 assertThat(column(table, "updated_at")).as(table + ".updated_at").startsWith("timestamp with time zone|NO");
             }
-            if (!table.equals("users")) {
+            if (!table.equals("users") && !referenceData.contains(table)) {
                 assertThat(column(table, "user_id")).as(table + ".user_id").startsWith("uuid|NO");
             }
         }
@@ -121,7 +125,8 @@ class FlywayMigrationIT {
         List<String> decimais = jdbc.queryForList(
                 "SELECT table_name || '.' || column_name FROM information_schema.columns WHERE table_schema = 'public'"
                         + " AND data_type IN ('numeric', 'real', 'double precision', 'money')", String.class);
-        assertThat(decimais).isEmpty();
+        assertThat(decimais).as("só a taxa de câmbio (metadado, ADR-025) é decimal; dinheiro é sempre centavos").containsExactlyInAnyOrder(
+                "transaction_foreign_charges.fx_rate", "recurring_transactions.reference_fx_rate");
         List<String> cents = jdbc.queryForList(
                 "SELECT table_name || '.' || column_name || ':' || data_type FROM information_schema.columns"
                         + " WHERE table_schema = 'public' AND column_name LIKE '%\\_cents'", String.class);
@@ -506,6 +511,11 @@ class FlywayMigrationIT {
 
     private String constraintDef(String name) {
         return jdbc.queryForObject("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = ?", String.class, name);
+    }
+
+    private boolean hasColumn(String table, String column) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT count(*) > 0 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = ? "
+                + "AND column_name = ?", Boolean.class, table, column));
     }
 
     private String column(String table, String column) {

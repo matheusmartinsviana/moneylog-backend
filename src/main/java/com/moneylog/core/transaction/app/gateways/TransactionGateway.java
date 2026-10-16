@@ -28,4 +28,6 @@ public interface TransactionGateway {
     List<Transaction> findAllOfCard(UUID userId, UUID cardId);
 
     Money sumActiveRefundsOf(UUID userId, UUID originalId);
+
+    List<Transaction> findActiveRefundsOf(UUID userId, UUID originalId);
 }

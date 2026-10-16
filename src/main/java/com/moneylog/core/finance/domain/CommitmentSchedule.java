@@ -63,7 +63,7 @@ public final class CommitmentSchedule {
             }
         }
         for (Debt debt : records.debts()) {
-            if (debt.status() != DebtStatus.OPEN && debt.status() != DebtStatus.PARTIALLY_SETTLED) {
+            if (debt.status() != DebtStatus.OPEN && debt.status() != DebtStatus.PARTIALLY_SETTLED || debt.deductedInPayroll()) {
                 continue;
             }
             boolean payable = debt.direction() == DebtDirection.PAYABLE;

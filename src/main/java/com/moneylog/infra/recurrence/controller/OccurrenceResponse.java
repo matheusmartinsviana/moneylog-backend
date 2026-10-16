@@ -12,12 +12,16 @@ import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceTyp
 
 public record OccurrenceResponse(UUID recurrenceId, LocalDate date, OccurrenceStatus status, boolean overdue, RecurrenceType type,
                                  FlowDirection direction, Money amount, String description, UUID categoryId, UUID accountId,
-                                 UUID cardId, UUID transactionId) {
+                                 UUID cardId, UUID transactionId, Money originalAmount, String referenceFxRate,
+                                 Integer iofBps) {
 
     public static OccurrenceResponse of(OccurrenceView v) {
         RecurringTransaction r = v.recurrence();
         return new OccurrenceResponse(r.id(), v.date(), v.status(), v.overdue(), RecurrenceType.valueOf(r.type().name()), r.direction(),
-                v.amount(), r.description(), r.categoryId(), r.accountId(), r.cardId(), v.transactionId());
+                v.amount(), r.description(), r.categoryId(), r.accountId(), r.cardId(), v.transactionId(),
+                r.foreignBasis() == null ? null : r.foreignBasis().original(),
+                r.foreignBasis() == null ? null : r.foreignBasis().fxRate().toPlainString(),
+                r.foreignBasis() == null ? null : r.foreignBasis().iofBps());
     }
 
     public record Slice(java.util.List<OccurrenceResponse> items, boolean hasNext, boolean overdueTruncated) {

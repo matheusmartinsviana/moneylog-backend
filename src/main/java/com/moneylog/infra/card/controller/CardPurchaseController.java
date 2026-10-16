@@ -15,6 +15,8 @@ import com.moneylog.core.finance.app.cards.usecase.PreviewCardPurchaseUseCase.Pr
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.security.CurrentUser;
+import com.moneylog.infra.transaction.controller.OriginalAmountInput;
+import com.moneylog.infra.transaction.controller.PersonShareInput;
 
 @RestController
 @RequestMapping("/v1/cards/{id}/purchase-preview")
@@ -30,6 +32,7 @@ public class CardPurchaseController {
     public PurchasePreviewResponse preview(@CurrentUser UUID userId, @PathVariable UUID id,
                                            @Valid @RequestBody PurchasePreviewRequest body) {
         return PurchasePreviewResponse.of(preview.handle(new PreviewCardPurchaseQuery(userId, id,
-                Money.of(body.amount(), CurrencyCode.BRL), body.installments(), body.date())));
+                Money.of(body.amount(), CurrencyCode.BRL), body.installments(), body.date(), body.splitMode(),
+                PersonShareInput.lines(body.shares()), OriginalAmountInput.foreign(body.originalAmount(), body.fxRate(), body.iofBps()))));
     }
 }

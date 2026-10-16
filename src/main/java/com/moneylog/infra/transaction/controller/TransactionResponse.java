@@ -13,10 +13,14 @@ import com.moneylog.core.finance.app.transactions.TransactionDetails;
 import com.moneylog.core.finance.app.transactions.TransactionDetails.CardInfo;
 import com.moneylog.core.finance.app.transactions.VoidBlockedBy;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.card.domain.TransactionInstallment;
+import com.moneylog.core.transaction.domain.InstallmentSplit;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.SplitMode;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionStatus;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.card.controller.InvoiceRefResponse;
 import com.moneylog.infra.debt.controller.DebtSummaryResponse;
@@ -28,7 +32,9 @@ public record TransactionResponse(UUID id, TransactionType type, TransactionStat
                                   boolean editable, boolean voidable, VoidBlockedBy voidBlockedBy, String voidReason,
                                   Instant voidedAt, TransactionSource source, long version, Instant createdAt, Instant updatedAt,
                                   DebtSummaryResponse debt, List<DebtSummaryResponse> shares, UUID recurrenceId,
-                                  LocalDate occurrenceDate, String incomeCompetence) {
+                                  LocalDate occurrenceDate, String incomeCompetence, SplitMode splitMode,
+                                  List<PersonShareLineResponse> personShares, Money myAmount, Money thirdPartyAmount,
+                                  TransactionNature nature, Money originalAmount, String fxRate, Integer iofBps, String lastDigits) {
 
     public record Ref(UUID id, String name) {
     }
@@ -70,7 +76,25 @@ public record TransactionResponse(UUID id, TransactionType type, TransactionStat
                 t.debtId() != null && !d.debts().isEmpty() ? DebtSummaryResponse.of(d.debts().get(0)) : null,
                 t.debtId() == null ? d.debts().stream().map(DebtSummaryResponse::of).toList() : List.of(),
                 t.origin().recurrenceId(), t.origin().occurrenceDate(),
-                t.incomeCompetence() == null ? null : t.incomeCompetence().toString());
+                t.incomeCompetence() == null ? null : t.incomeCompetence().toString(),
+                t.purchaseShares() == null ? null : t.purchaseShares().mode(),
+                t.purchaseShares() == null ? List.of() : t.purchaseShares().lines().stream().map(PersonShareLineResponse::of).toList(),
+                shareTotal(t, true), shareTotal(t, false), t.nature(),
+                t.foreignCharge() == null ? null : t.foreignCharge().original(),
+                t.foreignCharge() == null ? null : t.foreignCharge().fxRate().toPlainString(),
+                t.foreignCharge() == null ? null : t.foreignCharge().iofBps(), t.lastDigits());
+    }
+
+    private static Money shareTotal(Transaction t, boolean mine) {
+        if (t.purchaseShares() == null) {
+            return null;
+        }
+        Money total = Money.zero(t.amount().currency());
+        for (TransactionInstallment installment : t.installments()) {
+            InstallmentSplit split = t.purchaseShares().split(installment.amount());
+            total = total.add(mine ? split.mine() : split.thirdParties());
+        }
+        return total;
     }
 
     private static Ref ref(Account account) {

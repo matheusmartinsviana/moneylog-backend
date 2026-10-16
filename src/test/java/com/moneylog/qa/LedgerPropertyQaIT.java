@@ -14,6 +14,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +37,7 @@ import com.moneylog.util.MutableClockConfig;
 
 @IntegrationTest
 @Import(MutableClockConfig.class)
+@Tag("slow")
 @DisplayName("QA T43: propriedade do razão com semente fixa")
 class LedgerPropertyQaIT {
 

@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.card.domain.CreditCard;
@@ -22,6 +24,9 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.money.MoneyExceptions.CurrencyMismatchException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidTransactionOperationException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.RefundExceedsOriginalException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.SharesBelowReceivedException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionAlreadyVoidedException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException;
 
 public final class CardTransactions {
 
@@ -35,7 +40,36 @@ public final class CardTransactions {
         requireChain(card, chain, today);
         InstallmentPlan.validateCount(installments);
         return build(header, amount, card, category, installments,
-                InvoiceAllocator.forInstallments(header.date(), installments, chain, today));
+                InvoiceAllocator.forInstallments(header.date(), installments, chain, today), null, null);
+    }
+
+    public static Transaction purchase(TransactionHeader header, Money amount, CreditCard card, Category category, int installments,
+                                       InvoiceChain chain, LocalDate today, SplitMode splitMode, List<ShareLine> shares) {
+        AccountTransactions.requireHeaderAndAmount(header, amount);
+        requireUsableCard(header, amount, card);
+        requireChain(card, chain, today);
+        InstallmentPlan.validateCount(installments);
+        return build(header, amount, card, category, installments,
+                InvoiceAllocator.forInstallments(header.date(), installments, chain, today), splitMode, shares);
+    }
+
+    static List<LedgerEntry> installmentEntries(UUID transactionId, TransactionInstallment installment, BookRef categoryBook,
+                                                BookRef cardBook, PurchaseShares shares) {
+        List<Posting> postings = new ArrayList<>();
+        LocalDate date = installment.effectiveDate();
+        if (shares == null) {
+            postings.add(new Posting(categoryBook, installment.amount(), date));
+        } else {
+            InstallmentSplit split = shares.split(installment.amount());
+            if (split.mine().isPositive()) {
+                postings.add(new Posting(categoryBook, split.mine(), date));
+            }
+            for (PersonAmount part : split.byPerson()) {
+                postings.add(new Posting(BookRef.personReceivable(part.personId()), part.amount(), date));
+            }
+        }
+        postings.add(new Posting(cardBook, installment.amount().negate(), date));
+        return LedgerEntry.activeGroup(PostingSource.installment(transactionId, installment.id()), postings);
     }
 
     public static Transaction ongoingPurchase(TransactionHeader header, Money installmentAmount, int totalInstallments,
@@ -133,6 +167,12 @@ public final class CardTransactions {
 
     public static Transaction refundToCard(TransactionHeader header, Money amount, CreditCard card, Category category,
                                            RefundOrigin refundOf, InvoiceChain chain, LocalDate today) {
+        return refundToCard(header, amount, card, category, refundOf, chain, today, Map.of());
+    }
+
+    public static Transaction refundToCard(TransactionHeader header, Money amount, CreditCard card, Category category,
+                                           RefundOrigin refundOf, InvoiceChain chain, LocalDate today,
+                                           Map<UUID, Money> thirdsAlreadyRefunded) {
         AccountTransactions.requireHeaderAndAmount(header, amount);
         requireUsableCard(header, amount, card);
         AccountTransactions.requireCategory(header, category, CategoryKind.EXPENSE);
@@ -142,9 +182,8 @@ public final class CardTransactions {
         return Transaction.builder(header, TransactionType.REFUND, amount)
                 .card(card.id()).category(category.id()).refundOf(refundOf == null ? null : refundOf.original().id())
                 .invoice(allocation.invoice().closingDate(), allocation.lateEntry())
-                .entries(AccountTransactions.entries(header,
-                        new Posting(card.book(), amount, header.date()),
-                        new Posting(category.book(), amount.negate(), header.date())))
+                .entries(LedgerEntry.activeGroup(PostingSource.transaction(header.id()),
+                        AccountTransactions.refundPostings(header, amount, category, card.book(), refundOf, thirdsAlreadyRefunded)))
                 .build();
     }
 
@@ -153,6 +192,10 @@ public final class CardTransactions {
         if (purchase.type() != TransactionType.CARD_PURCHASE || !purchase.isActive()) {
             throw new InvalidTransactionOperationException("TRANSACTION_NOT_CANCELABLE",
                     "Só uma compra no cartão ativa tem parcelas para cancelar.");
+        }
+        if (purchase.isCardCashOut()) {
+            throw new InvalidTransactionOperationException("TRANSACTION_NOT_CANCELABLE",
+                    "O Pix no crédito não tem parcelas para cancelar; estorne a movimentação inteira.");
         }
         TransactionHeader.required(chain, "chain").ensureFor(purchase.cardId());
         List<TransactionInstallment> updated = InstallmentPlan.cancelRemaining(purchase.installments(), chain, today, now);
@@ -183,34 +226,74 @@ public final class CardTransactions {
             throw new com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException(
                     "o id e a data da compra não mudam.");
         }
+        if (current.isCardCashOut()) {
+            throw new TransactionNotEditableException("o Pix no crédito não é editável; estorne e lance de novo.");
+        }
         if (activeRefunds != null && activeRefunds.isPositive() && !category.id().equals(current.categoryId())) {
             throw new com.moneylog.core.transaction.exception.TransactionExceptions.RefundCategoryLockedException();
         }
         BookRef cardBook = BookRef.card(current.cardId());
         List<LedgerEntry> entries = new ArrayList<>();
         for (TransactionInstallment installment : current.installments()) {
-            List<LedgerEntry> group = LedgerEntry.activeGroup(PostingSource.installment(current.id(), installment.id()), List.of(
-                    new Posting(category.book(), installment.amount(), installment.effectiveDate()),
-                    new Posting(cardBook, installment.amount().negate(), installment.effectiveDate())));
+            List<LedgerEntry> group = installmentEntries(current.id(), installment, category.book(), cardBook, current.purchaseShares());
             group.stream().map(entry -> installment.isCanceled() ? entry.deactivate() : entry).forEach(entries::add);
         }
         Transaction replacement = Transaction.builder(newHeader, TransactionType.CARD_PURCHASE, current.amount())
-                .card(current.cardId()).category(category.id()).installments(current.installments()).entries(entries).build();
+                .card(current.cardId()).category(category.id()).purchaseShares(current.purchaseShares())
+                .installments(current.installments()).entries(entries).build();
+        return TransactionEditing.replace(current, replacement, null);
+    }
+
+    public static Transaction reshare(Transaction current, SplitMode mode, List<ShareLine> lines, Map<UUID, Money> receivedByPerson) {
+        java.util.Objects.requireNonNull(current, "current");
+        if (current.type() != TransactionType.CARD_PURCHASE) {
+            throw new TransactionNotEditableException("só a compra no cartão tem rateio.");
+        }
+        if (!current.isActive()) {
+            throw new TransactionAlreadyVoidedException();
+        }
+        if (current.categoryId() == null) {
+            throw new TransactionNotEditableException("a compra parcelada em andamento, sem categoria, não tem rateio.");
+        }
+        if (current.isCardCashOut()) {
+            throw new TransactionNotEditableException("o Pix no crédito não tem rateio.");
+        }
+        Money smallest = current.installments().stream().map(TransactionInstallment::amount).min(Money::compareTo).orElseThrow();
+        PurchaseShares shares = PurchaseShares.create(mode, lines, smallest);
+        BookRef categoryBook = BookRef.expense(current.categoryId());
+        BookRef cardBook = BookRef.card(current.cardId());
+        List<LedgerEntry> entries = new ArrayList<>();
+        for (TransactionInstallment installment : current.installments()) {
+            List<LedgerEntry> group = installmentEntries(current.id(), installment, categoryBook, cardBook, shares);
+            group.stream().map(entry -> installment.isCanceled() ? entry.deactivate() : entry).forEach(entries::add);
+        }
+        Transaction replacement = Transaction.builder(
+                new TransactionHeader(current.id(), current.userId(), current.date(), current.description(), current.notes(), current.origin()),
+                TransactionType.CARD_PURCHASE, current.amount())
+                .card(current.cardId()).category(current.categoryId()).purchaseShares(shares)
+                .installments(current.installments()).entries(entries).build();
+        Map<UUID, Money> owed = SharePayables.owedByPerson(replacement);
+        Money zero = Money.zero(current.amount().currency());
+        for (Map.Entry<UUID, Money> received : receivedByPerson.entrySet()) {
+            if (received.getValue().isGreaterThan(owed.getOrDefault(received.getKey(), zero))) {
+                throw new SharesBelowReceivedException();
+            }
+        }
         return TransactionEditing.replace(current, replacement, null);
     }
 
     private static Transaction build(TransactionHeader header, Money amount, CreditCard card, Category category,
-                                     int installments, List<Allocation> allocations) {
+                                     int installments, List<Allocation> allocations, SplitMode splitMode, List<ShareLine> shareLines) {
         AccountTransactions.requireCategory(header, category, CategoryKind.EXPENSE);
         List<TransactionInstallment> plan = InstallmentPlan.generate(header.id(), amount, installments, header.date(), allocations);
+        Money smallest = plan.stream().map(TransactionInstallment::amount).min(Money::compareTo).orElseThrow();
+        PurchaseShares shares = PurchaseShares.create(splitMode, shareLines, smallest);
         List<LedgerEntry> entries = new ArrayList<>();
         for (TransactionInstallment installment : plan) {
-            entries.addAll(LedgerEntry.activeGroup(PostingSource.installment(header.id(), installment.id()), List.of(
-                    new Posting(category.book(), installment.amount(), installment.effectiveDate()),
-                    new Posting(card.book(), installment.amount().negate(), installment.effectiveDate()))));
+            entries.addAll(installmentEntries(header.id(), installment, category.book(), card.book(), shares));
         }
         return Transaction.builder(header, TransactionType.CARD_PURCHASE, amount)
-                .card(card.id()).category(category.id()).installments(plan).entries(entries)
+                .card(card.id()).category(category.id()).purchaseShares(shares).installments(plan).entries(entries)
                 .build();
     }
 

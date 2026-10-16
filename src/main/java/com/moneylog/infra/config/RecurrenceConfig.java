@@ -7,7 +7,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCase;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCaseImpl;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeOccurrenceUseCase;
@@ -15,6 +16,8 @@ import com.moneylog.core.finance.app.recurrences.usecase.RealizeOccurrenceUseCas
 import com.moneylog.core.finance.app.recurrences.usecase.SkipOccurrenceUseCase;
 import com.moneylog.core.finance.app.recurrences.usecase.SkipOccurrenceUseCaseImpl;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
+import com.moneylog.core.debt.app.gateways.DebtGateway;
+import com.moneylog.core.income.app.gateways.PayrollLoanGateway;
 import com.moneylog.core.recurrence.app.RecurrenceViews;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
 import com.moneylog.core.recurrence.app.usecase.CreateRecurrenceUseCase;
@@ -30,15 +33,19 @@ import com.moneylog.core.recurrence.app.usecase.GetRecurrenceUseCaseImpl;
 import com.moneylog.core.recurrence.app.usecase.ListOccurrencesUseCase;
 import com.moneylog.core.recurrence.app.usecase.ListOccurrencesUseCaseImpl;
 import com.moneylog.core.recurrence.app.usecase.ListRecurrencesUseCase;
+import com.moneylog.core.recurrence.app.usecase.ListSubscriptionsUseCase;
+import com.moneylog.core.recurrence.app.usecase.ListSubscriptionsUseCaseImpl;
 import com.moneylog.core.recurrence.app.usecase.ListRecurrencesUseCaseImpl;
 import com.moneylog.core.recurrence.app.usecase.UpdateRecurrenceUseCase;
 import com.moneylog.core.recurrence.app.usecase.UpdateRecurrenceUseCaseImpl;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.app.gateways.ForeignChargeGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
 import com.moneylog.infra.recurrence.gateways.RecurrenceGatewayImpl;
 import com.moneylog.infra.recurrence.persistence.RecurrenceRepositoryJpa;
+import com.moneylog.infra.recurrence.persistence.RecurrenceShareRepositoryJpa;
 import com.moneylog.infra.recurrence.persistence.RecurrenceSkipRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
@@ -47,8 +54,9 @@ public class RecurrenceConfig {
 
     @Bean
     RecurrenceGateway recurrenceGateway(RecurrenceRepositoryJpa repository, RecurrenceSkipRepositoryJpa skips,
-                                        TransactionRepositoryJpa transactions, IdGenerator ids, TimeProvider time) {
-        return new RecurrenceGatewayImpl(repository, skips, transactions, ids, time);
+                                        RecurrenceShareRepositoryJpa shares, TransactionRepositoryJpa transactions, IdGenerator ids,
+                                        TimeProvider time) {
+        return new RecurrenceGatewayImpl(repository, skips, shares, transactions, ids, time);
     }
 
     @Bean
@@ -59,16 +67,17 @@ public class RecurrenceConfig {
     @Bean
     CreateRecurrenceUseCase createRecurrenceUseCase(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
                                                     CardGateway cards, IdempotencyGateway idempotency, IdGenerator ids,
-                                                    TimeProvider time, PlatformTransactionManager tm) {
+                                                    TimeProvider time, PersonGateway persons, PlatformTransactionManager tm) {
         return TransactionalProxies.required(CreateRecurrenceUseCase.class,
-                new CreateRecurrenceUseCaseImpl(recurrences, categories, accounts, cards, idempotency, ids, time), tm);
+                new CreateRecurrenceUseCaseImpl(recurrences, categories, accounts, cards, idempotency, ids, time, persons), tm);
     }
 
     @Bean
     UpdateRecurrenceUseCase updateRecurrenceUseCase(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
-                                                    CardGateway cards, TimeProvider time, PlatformTransactionManager tm) {
+                                                    CardGateway cards, TimeProvider time, PersonGateway persons,
+                                                    PlatformTransactionManager tm) {
         return TransactionalProxies.required(UpdateRecurrenceUseCase.class,
-                new UpdateRecurrenceUseCaseImpl(recurrences, categories, accounts, cards, time), tm);
+                new UpdateRecurrenceUseCaseImpl(recurrences, categories, accounts, cards, time, persons), tm);
     }
 
     @Bean
@@ -98,6 +107,13 @@ public class RecurrenceConfig {
     }
 
     @Bean
+    ListSubscriptionsUseCase listSubscriptionsUseCase(RecurrenceGateway recurrences, RecurrenceViews views, TimeProvider time,
+                                                      PlatformTransactionManager tm) {
+        return TransactionalProxies.snapshotReadOnly(ListSubscriptionsUseCase.class,
+                new ListSubscriptionsUseCaseImpl(recurrences, views, time), tm);
+    }
+
+    @Bean
     ListOccurrencesUseCase listOccurrencesUseCase(RecurrenceGateway recurrences, TimeProvider time, PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(ListOccurrencesUseCase.class, new ListOccurrencesUseCaseImpl(recurrences, time), tm);
     }
@@ -111,9 +127,11 @@ public class RecurrenceConfig {
     RealizeCardRecurrenceUseCase realizeCardRecurrenceUseCase(RecurrenceGateway recurrences, CardGateway cards, CategoryGateway categories,
                                                               TransactionGateway transactions, LedgerWriteGateway ledger,
                                                               TransactionDetailsAssembler assembler, IdGenerator ids, TimeProvider time,
+                                                              PersonGateway persons, ForeignChargeGateway foreignCharges,
                                                               PlatformTransactionManager tm) {
         return TransactionalProxies.required(RealizeCardRecurrenceUseCase.class,
-                new RealizeCardRecurrenceUseCaseImpl(recurrences, cards, categories, transactions, ledger, assembler, ids, time), tm);
+                new RealizeCardRecurrenceUseCaseImpl(recurrences, cards, categories, transactions, ledger, assembler, ids, time, persons,
+                        foreignCharges), tm);
     }
 
     @Bean
@@ -121,10 +139,11 @@ public class RecurrenceConfig {
                                                       TransactionGateway transactions, LedgerWriteGateway ledger,
                                                       TransactionDetailsAssembler assembler, IdempotencyGateway idempotency,
                                                       RealizeCardRecurrenceUseCase cardRealization, IdGenerator ids, TimeProvider time,
+                                                      ForeignChargeGateway foreignCharges, PayrollLoanGateway payrollLoans, DebtGateway debts,
                                                       PlatformTransactionManager tm) {
         return TransactionalProxies.required(RealizeOccurrenceUseCase.class,
                 new RealizeOccurrenceUseCaseImpl(recurrences, accounts, categories, transactions, ledger, assembler, idempotency,
-                        cardRealization, ids, time), tm);
+                        cardRealization, ids, time, foreignCharges, payrollLoans, debts), tm);
     }
 
     @Bean

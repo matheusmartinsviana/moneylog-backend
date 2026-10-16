@@ -9,8 +9,9 @@ import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.InvoiceChain;
 import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;
+import com.moneylog.core.finance.app.transactions.ShareSettlement;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
@@ -36,9 +37,18 @@ public class CancelInstallmentsUseCaseImpl implements CancelInstallmentsUseCase 
     private final LedgerWriteGateway ledger;
     private final TransactionDetailsAssembler assembler;
     private final TimeProvider time;
+    private final ShareSettlement shareSettlement;
 
     public CancelInstallmentsUseCaseImpl(TransactionGateway transactions, CardGateway cards, TransactionRevisionGateway revisions,
                                          LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time) {
+        this(transactions, cards, revisions, ledger, assembler, time, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public CancelInstallmentsUseCaseImpl(TransactionGateway transactions, CardGateway cards, TransactionRevisionGateway revisions,
+                                         LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time,
+                                         ShareSettlement shareSettlement) {
+        this.shareSettlement = shareSettlement;
         this.transactions = transactions;
         this.cards = cards;
         this.revisions = revisions;
@@ -64,6 +74,10 @@ public class CancelInstallmentsUseCaseImpl implements CancelInstallmentsUseCase 
             throw new InvalidTransactionOperationException("TRANSACTION_NOT_CANCELABLE", "Só uma compra no cartão ativa tem parcelas para cancelar.");
         }
         cards.lockForUpdate(userId, current.cardId());
+        boolean shared = shareSettlement != null && current.purchaseShares() != null;
+        if (shared) {
+            shareSettlement.lockPersons(userId, current.purchaseShares().personIds());
+        }
         CreditCard card = cards.findById(userId, current.cardId()).map(Persisted::value)
                 .orElseThrow(() -> new CardNotFoundException(current.cardId()));
         List<Transaction> ofCard = transactions.findAllOfCard(userId, card.id());
@@ -76,9 +90,15 @@ public class CancelInstallmentsUseCaseImpl implements CancelInstallmentsUseCase 
         CardTransactions.cancelRemainingInstallments(purchase, chain, time.today(), now, activeRefunds);
         List<UUID> canceled = purchase.installments().stream().filter(i -> i.isCanceled() && before.contains(i.id()))
                 .map(TransactionInstallment::id).toList();
+        ShareSettlement.Plan conversion = shared
+                ? shareSettlement.planConversion(userId, purchase, shareSettlement.owedNet(userId, purchase), time.today())
+                : ShareSettlement.Plan.NONE;
         Persisted<Transaction> saved = transactions.update(purchase);
-        revisions.save(userId, current, Math.toIntExact(current.version()) + 1, now, REVISION_CHANGE, reason);
+        revisions.save(userId, current, Math.toIntExact(current.version()) + 1, now, REVISION_CHANGE, conversion.describe(reason));
         ledger.deactivateByInstallments(userId, purchase.id(), canceled, CANCEL_REASON, now);
+        if (shared) {
+            shareSettlement.apply(userId, conversion);
+        }
         return assembler.assemble(saved);
     }
 }

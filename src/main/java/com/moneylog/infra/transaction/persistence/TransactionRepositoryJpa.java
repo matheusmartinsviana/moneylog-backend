@@ -26,6 +26,9 @@ public interface TransactionRepositoryJpa extends JpaRepository<TransactionEntit
 
     List<TransactionEntity> findByUserIdAndCardId(UUID userId, UUID cardId);
 
+    List<TransactionEntity> findByUserIdAndRefundOfIdAndStatus(UUID userId, UUID refundOfId,
+                                                               com.moneylog.core.transaction.domain.TransactionStatus status);
+
     @Query("""
             select coalesce(sum(t.amountCents), 0) from TransactionEntity t
             where t.userId = :userId and t.refundOfId = :originalId and t.type = com.moneylog.core.transaction.domain.TransactionType.REFUND
@@ -33,13 +36,17 @@ public interface TransactionRepositoryJpa extends JpaRepository<TransactionEntit
     long sumActiveRefundsCents(@Param("userId") UUID userId, @Param("originalId") UUID originalId);
 
     @Query("""
-            select t.id as id, t.debtId as debtId, t.amountCents as amountCents, t.status as status, t.transactionDate as date
-            from TransactionEntity t where t.userId = :userId and t.debtId in :debtIds""")
+            select t.id as id, t.debtId as debtId, coalesce(a.principalCents, t.amountCents) as amountCents, t.status as status,
+                   t.transactionDate as date
+            from TransactionEntity t left join PayrollLoanApplicationEntity a on a.transactionId = t.id
+            where t.userId = :userId and t.debtId in :debtIds""")
     List<DebtLinkRow> findDebtLinks(@Param("userId") UUID userId, @Param("debtIds") java.util.Collection<UUID> debtIds);
 
     @Query("""
-            select t.id as id, t.debtId as debtId, t.amountCents as amountCents, t.status as status, t.transactionDate as date
-            from TransactionEntity t where t.userId = :userId and t.debtId is not null""")
+            select t.id as id, t.debtId as debtId, coalesce(a.principalCents, t.amountCents) as amountCents, t.status as status,
+                   t.transactionDate as date
+            from TransactionEntity t left join PayrollLoanApplicationEntity a on a.transactionId = t.id
+            where t.userId = :userId and t.debtId is not null""")
     List<DebtLinkRow> findAllDebtLinks(@Param("userId") UUID userId);
 
     interface DebtLinkRow {

@@ -40,7 +40,7 @@ import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryKindMismatchException;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails.InstallmentView;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.CardPurchase;

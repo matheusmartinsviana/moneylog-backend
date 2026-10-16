@@ -64,6 +64,7 @@ public class CardRepositoryGatewayImpl implements CardGateway {
             entity.apply(card.name(), card.institution(), card.limit() == null ? null : card.limit().cents(), card.defaultPaymentAccountId(), card.status(), now);
         }
         entity.setClosingConfirmed(card.closingDayConfirmed());
+        entity.applyProfile(card.profile().autoDebit(), card.profile().brand(), card.profile().bestPurchaseDay(), card.profile().storedLastDigits());
         CardEntity saved = cards.saveAndFlush(entity);
         List<BillingRuleEntity> savedRules = syncRules(saved, card, now);
         return CardRepositoryMapper.toPersisted(saved, savedRules);

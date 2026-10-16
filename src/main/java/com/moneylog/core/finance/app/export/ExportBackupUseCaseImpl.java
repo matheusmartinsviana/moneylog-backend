@@ -21,17 +21,19 @@ public class ExportBackupUseCaseImpl implements ExportBackupUseCase {
     private final CategoryGateway categories;
     private final PersonGateway people;
     private final RecurrenceGateway recurrences;
+    private final BackupExtrasReader extras;
     private final TimeProvider time;
     private final int maxTransactions;
 
     public ExportBackupUseCaseImpl(FinancialRecordsGateway records, CategoryGateway categories, PersonGateway people,
-                                   RecurrenceGateway recurrences, TimeProvider time) {
-        this(records, categories, people, recurrences, time, MAX_TRANSACTIONS);
+                                   RecurrenceGateway recurrences, BackupExtrasReader extras, TimeProvider time) {
+        this(records, categories, people, recurrences, extras, time, MAX_TRANSACTIONS);
     }
 
     public ExportBackupUseCaseImpl(FinancialRecordsGateway records, CategoryGateway categories, PersonGateway people,
-                                   RecurrenceGateway recurrences, TimeProvider time, int maxTransactions) {
+                                   RecurrenceGateway recurrences, BackupExtrasReader extras, TimeProvider time, int maxTransactions) {
         this.maxTransactions = maxTransactions;
+        this.extras = extras;
         this.records = records;
         this.categories = categories;
         this.people = people;
@@ -48,7 +50,7 @@ public class ExportBackupUseCaseImpl implements ExportBackupUseCase {
         }
         return new BackupSnapshot(BackupSnapshot.SCHEMA_VERSION, time.now(), loaded.accounts(), categories.list(userId, null, true),
                 loaded.cards(), loaded.transactions(), loaded.debts(), allPeople(userId), recurrences.findAll(userId), loaded.goals(),
-                loaded.entries());
+                loaded.entries(), extras.read(userId));
     }
 
     private List<Person> allPeople(UUID userId) {

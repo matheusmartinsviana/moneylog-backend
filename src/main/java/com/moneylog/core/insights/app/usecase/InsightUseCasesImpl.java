@@ -58,7 +58,7 @@ public final class InsightUseCasesImpl {
 
         @Override
         public InsightsView handle(MonthlyQuery q) {
-            InsightContext context = contexts.create(q.userId());
+            InsightContext context = contexts.create(q.userId(), q.view());
             LocalDate today = time.today();
             Competence month = q.month() == null ? Competence.from(today) : q.month();
             InsightSink sink = new InsightSink();
@@ -87,7 +87,7 @@ public final class InsightUseCasesImpl {
             if (date.isAfter(today)) {
                 throw new IllegalArgumentException("date depois de hoje");
             }
-            InsightContext context = contexts.create(q.userId());
+            InsightContext context = contexts.create(q.userId(), q.view());
             InsightSink sink = new InsightSink();
             DailyInsights.compute(context.dayFacts(date), sink);
             List<InsightItem> all = InsightAggregator.aggregate(q.userId(), sink.insights(), dismissals.findActive(q.userId()), today,
@@ -112,7 +112,7 @@ public final class InsightUseCasesImpl {
             if (q.from().isAfter(q.to())) {
                 throw new IllegalArgumentException("from depois de to");
             }
-            InsightContext context = contexts.create(q.userId());
+            InsightContext context = contexts.create(q.userId(), q.view());
             LocalDate today = time.today();
             List<Dismissal> active = dismissals.findActive(q.userId());
             List<HistoryMonth> months = new ArrayList<>();

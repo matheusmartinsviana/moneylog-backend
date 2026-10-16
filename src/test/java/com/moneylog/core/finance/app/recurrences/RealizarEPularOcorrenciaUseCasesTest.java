@@ -34,7 +34,7 @@ import com.moneylog.core.card.util.factory.CreditCardTestFactory;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCase;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCase.RealizeCardRecurrenceCommand;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeOccurrenceUseCase.RealizeOccurrenceCommand;

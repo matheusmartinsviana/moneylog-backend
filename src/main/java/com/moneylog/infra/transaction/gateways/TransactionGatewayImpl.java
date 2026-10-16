@@ -36,6 +36,8 @@ import com.moneylog.infra.card.gateways.InvoiceRowGateway;
 import com.moneylog.infra.card.gateways.InvoiceRowGateway.InvoiceRow;
 import com.moneylog.infra.ledger.gateways.LedgerRepositoryMapper;
 import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
+import com.moneylog.infra.transaction.persistence.CardPurchaseShareEntity;
+import com.moneylog.infra.transaction.persistence.CardPurchaseShareRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.InstallmentEntity;
 import com.moneylog.infra.transaction.persistence.InstallmentRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionEntity;
@@ -45,6 +47,7 @@ public class TransactionGatewayImpl implements TransactionGateway {
 
     private final TransactionRepositoryJpa repository;
     private final InstallmentRepositoryJpa installments;
+    private final CardPurchaseShareRepositoryJpa shares;
     private final LedgerPostingRepositoryJpa postings;
     private final TransactionHydrator hydrator;
     private final InvoiceRowGateway invoices;
@@ -54,10 +57,11 @@ public class TransactionGatewayImpl implements TransactionGateway {
 
     @SuppressWarnings("java:S107")
     public TransactionGatewayImpl(TransactionRepositoryJpa repository, InstallmentRepositoryJpa installments,
-                                  LedgerPostingRepositoryJpa postings, TransactionHydrator hydrator, InvoiceRowGateway invoices,
+                                  CardPurchaseShareRepositoryJpa shares, LedgerPostingRepositoryJpa postings, TransactionHydrator hydrator, InvoiceRowGateway invoices,
                                   CardGateway cards, TimeProvider time, EntityManager entityManager) {
         this.repository = repository;
         this.installments = installments;
+        this.shares = shares;
         this.postings = postings;
         this.hydrator = hydrator;
         this.invoices = invoices;
@@ -110,7 +114,11 @@ public class TransactionGatewayImpl implements TransactionGateway {
         if (!rows.isEmpty()) {
             installments.saveAllAndFlush(rows);
         }
-        return new Persisted<>(TransactionRepositoryMapper.toDomain(saved, transaction.entries(), rows, binding.rows()),
+        List<CardPurchaseShareEntity> shareRows = TransactionRepositoryMapper.shareRows(transaction, now);
+        if (!shareRows.isEmpty()) {
+            shares.saveAllAndFlush(shareRows);
+        }
+        return new Persisted<>(TransactionRepositoryMapper.toDomain(saved, transaction.entries(), rows, binding.rows(), shareRows),
                 saved.getCreatedAt(), saved.getUpdatedAt());
     }
 
@@ -130,15 +138,43 @@ public class TransactionGatewayImpl implements TransactionGateway {
         entity.apply(s.status(), s.amount().cents(), s.date(), s.description(), s.notes(), s.paymentMethod(), s.accountId(),
                 s.counterpartAccountId(), invoiceId, s.lateEntry(), s.categoryId(), s.refundOfId(), direction,
                 s.adjustmentKind() == null ? null : s.adjustmentKind().name(), s.reason(), s.voidReason(), s.voidedAt(),
-                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), now);
+                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), s.nature(), now);
         TransactionEntity saved = repository.saveAndFlush(entity);
         List<InstallmentEntity> rows = syncInstallments(s, binding, now);
         Map<UUID, InvoiceRow> invoiceRows = new HashMap<>(binding.rows());
         if (!rows.isEmpty()) {
             invoiceRows.putAll(invoices.rowsByIds(s.userId(), rows.stream().map(InstallmentEntity::getInvoiceId).distinct().toList()));
         }
-        return new Persisted<>(TransactionRepositoryMapper.toDomain(saved, transaction.entries(), rows, invoiceRows),
+        List<CardPurchaseShareEntity> shareRows = s.type() == com.moneylog.core.transaction.domain.TransactionType.CARD_PURCHASE
+                ? syncShares(transaction, now) : List.of();
+        return new Persisted<>(TransactionRepositoryMapper.toDomain(saved, transaction.entries(), rows, invoiceRows, shareRows),
                 saved.getCreatedAt(), saved.getUpdatedAt());
+    }
+
+    private List<CardPurchaseShareEntity> syncShares(Transaction transaction, Instant now) {
+        List<CardPurchaseShareEntity> existing = shares.findByUserIdAndTransactionIdIn(transaction.userId(), List.of(transaction.id()))
+                .stream().sorted(java.util.Comparator.comparingInt(CardPurchaseShareEntity::getPosition)).toList();
+        List<CardPurchaseShareEntity> desired = TransactionRepositoryMapper.shareRows(transaction, now);
+        if (sameShares(existing, desired)) {
+            return existing;
+        }
+        shares.deleteByTransaction(transaction.userId(), transaction.id());
+        return desired.isEmpty() ? List.of() : shares.saveAllAndFlush(desired);
+    }
+
+    private static boolean sameShares(List<CardPurchaseShareEntity> existing, List<CardPurchaseShareEntity> desired) {
+        if (existing.size() != desired.size()) {
+            return false;
+        }
+        for (int i = 0; i < existing.size(); i++) {
+            CardPurchaseShareEntity a = existing.get(i);
+            CardPurchaseShareEntity b = desired.get(i);
+            if (a.getSplitMode() != b.getSplitMode() || !java.util.Objects.equals(a.getPersonId(), b.getPersonId())
+                    || !java.util.Objects.equals(a.getBps(), b.getBps()) || !java.util.Objects.equals(a.getAmountCents(), b.getAmountCents())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private List<InstallmentEntity> syncInstallments(TransactionState s, InvoiceBinding binding, Instant now) {
@@ -212,7 +248,16 @@ public class TransactionGatewayImpl implements TransactionGateway {
 
     @Override
     public List<Transaction> findAllOfCard(UUID userId, UUID cardId) {
-        List<TransactionEntity> entities = repository.findByUserIdAndCardId(userId, cardId);
+        return hydrate(userId, repository.findByUserIdAndCardId(userId, cardId));
+    }
+
+    @Override
+    public List<Transaction> findActiveRefundsOf(UUID userId, UUID originalId) {
+        return hydrate(userId, repository.findByUserIdAndRefundOfIdAndStatus(userId, originalId,
+                com.moneylog.core.transaction.domain.TransactionStatus.ACTIVE));
+    }
+
+    private List<Transaction> hydrate(UUID userId, List<TransactionEntity> entities) {
         if (entities.isEmpty()) {
             return List.of();
         }

@@ -326,13 +326,13 @@ class RecorrenciasUseCasesTest {
                 nubank.id(), PaymentMethod.PIX, null, Frequency.WEEKLY, null, null, LocalDate.of(2026, 10, 12), null, null));
         create.handle(new CreateRecurrenceCommand(USER_ID, TransactionType.INCOME, Money.of("5000.00"), "Salário", salary.id(), nubank.id(),
                 PaymentMethod.TRANSFER, null, Frequency.MONTHLY, null, null, LocalDate.of(2026, 10, 5), null, null));
-        var estimate = summary.handle(new GetRecurrenceSummaryQuery(USER_ID));
+        var estimate = summary.handle(new GetRecurrenceSummaryQuery(USER_ID, false));
         assertThat(estimate.fixedCosts()).isEqualTo(Money.of("552.33"));
         assertThat(estimate.recurringIncome()).isEqualTo(Money.of("5000.00"));
         assertThat(estimate.estimate()).isTrue();
         deactivate.handle(new DeactivateRecurrenceCommand(USER_ID, weekly.recurrence().id()));
-        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID)).fixedCosts()).isEqualTo(Money.of("119.00"));
-        assertThat(summary.handle(new GetRecurrenceSummaryQuery(OTHER_USER_ID)).fixedCosts()).isEqualTo(Money.of("0.00"));
+        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID, false)).fixedCosts()).isEqualTo(Money.of("119.00"));
+        assertThat(summary.handle(new GetRecurrenceSummaryQuery(OTHER_USER_ID, false)).fixedCosts()).isEqualTo(Money.of("0.00"));
     }
 
     @Test
@@ -347,10 +347,10 @@ class RecorrenciasUseCasesTest {
         assertThat(ended.recurrence().isActive()).as("encerrar não desativa").isTrue();
         assertThat(ended.nextOccurrence()).isEqualTo(LocalDate.of(2026, 1, 10));
         assertThat(get.handle(new GetRecurrenceQuery(USER_ID, running.recurrence().id())).ended()).isTrue();
-        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID)).fixedCosts()).isEqualTo(Money.of("0.00"));
+        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID, false)).fixedCosts()).isEqualTo(Money.of("0.00"));
         RecurrenceView today = create.handle(internet(LocalDate.of(2026, 1, 10)));
         assertThat(end.handle(new EndRecurrenceCommand(USER_ID, today.recurrence().id(), TODAY)).ended()).isFalse();
-        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID)).fixedCosts()).isEqualTo(Money.of("119.00"));
+        assertThat(summary.handle(new GetRecurrenceSummaryQuery(USER_ID, false)).fixedCosts()).isEqualTo(Money.of("119.00"));
     }
 
     @Test

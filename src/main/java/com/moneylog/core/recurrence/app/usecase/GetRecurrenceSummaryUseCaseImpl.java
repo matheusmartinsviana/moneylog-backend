@@ -16,6 +16,6 @@ public class GetRecurrenceSummaryUseCaseImpl implements GetRecurrenceSummaryUseC
 
     @Override
     public MonthlyEstimate handle(GetRecurrenceSummaryQuery query) {
-        return MonthlyEstimate.of(recurrences.findAll(query.userId()), time.today());
+        return MonthlyEstimate.of(recurrences.findAll(query.userId()), time.today(), query.gross());
     }
 }

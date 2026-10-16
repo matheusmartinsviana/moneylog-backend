@@ -37,7 +37,7 @@ public class UpdateCardDetailsUseCaseImpl implements UpdateCardDetailsUseCase {
         if (current.closingDay() != command.closingDay() || current.dueDay() != command.dueDay()) {
             return billingDays.handle(new ChangeCardBillingDaysUseCase.ChangeCardBillingDaysCommand(command.userId(), command.cardId(),
                     command.name(), command.institution(), command.limit(), command.closingDay(), command.dueDay(),
-                    command.defaultPaymentAccountId(), command.confirmedEffectiveFrom(), command.version()));
+                    command.defaultPaymentAccountId(), command.confirmedEffectiveFrom(), command.version(), command.profile()));
         }
         cards.lockForUpdate(command.userId(), command.cardId());
         CreditCard card = cards.findById(command.userId(), command.cardId()).map(Persisted::value)
@@ -49,6 +49,7 @@ public class UpdateCardDetailsUseCaseImpl implements UpdateCardDetailsUseCase {
             CardAccounts.requireUsablePaymentAccount(accounts, command.userId(), command.defaultPaymentAccountId());
         }
         card.updateDetails(command.name(), command.institution(), command.limit(), command.defaultPaymentAccountId());
+        card.updateProfile(command.profile());
         Persisted<CreditCard> saved = cards.save(card);
         return CardViews.of(saved, records.load(command.userId()), time.today());
     }

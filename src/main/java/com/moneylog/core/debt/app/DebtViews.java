@@ -11,8 +11,11 @@ import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.app.gateways.PersonGateway;
 import com.moneylog.core.debt.domain.Debt;
+import com.moneylog.core.debt.domain.DebtKind;
+import com.moneylog.core.debt.domain.EffectiveRate;
 import com.moneylog.core.debt.domain.Person;
 import com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException;
+import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Versioned;
 
 public final class DebtViews {
@@ -35,13 +38,18 @@ public final class DebtViews {
                 categoryNames.put(categoryId, categories.findById(userId, categoryId).map(Category::name).orElse(null));
             }
         }
+        Map<UUID, List<Money>> schedules = debts.installmentSchedules(userId, items.stream().map(Versioned::value)
+                .filter(d -> d.kind() == DebtKind.CARD_CASH_OUT && d.originTransactionId() != null)
+                .map(Debt::originTransactionId).toList());
         return items.stream().map(item -> {
             Debt debt = item.value();
             Person person = debt.personId() == null ? null : persons.get(debt.personId());
             if (person == null && debt.personId() != null) {
                 throw new PersonNotFoundException(debt.personId());
             }
-            return DebtView.of(item, person, categoryNames.get(debt.categoryId()), dates, today);
+            EffectiveRate rate = debt.originTransactionId() == null ? null : EffectiveRate
+                    .irr(debt.principal(), schedules.getOrDefault(debt.originTransactionId(), List.of())).orElse(null);
+            return DebtView.of(item, person, categoryNames.get(debt.categoryId()), dates, today, rate);
         }).toList();
     }
 

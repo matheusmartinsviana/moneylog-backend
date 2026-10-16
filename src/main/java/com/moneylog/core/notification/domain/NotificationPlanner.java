@@ -14,7 +14,11 @@ public final class NotificationPlanner {
 
     private static final List<NotificationKind> PRIORITY = List.of(NotificationKind.DAILY_SUMMARY, NotificationKind.INVOICE_DUE,
             NotificationKind.DEBT_PAYABLE_DUE, NotificationKind.DEBT_COLLECT, NotificationKind.RECURRENCE_PENDING, NotificationKind.REMINDER,
-            NotificationKind.GOAL_DEADLINE, NotificationKind.COMMITTED_NEXT_MONTH, NotificationKind.GROUPED);
+            NotificationKind.GOAL_DEADLINE, NotificationKind.INVOICE_DUE_AUTODEBIT_OFF, NotificationKind.NEGATIVE_MONTH_PROJECTED,
+            NotificationKind.BALANCE_BELOW_REAL_ESTATE, NotificationKind.THIRD_PARTY_OVERDUE, NotificationKind.NEW_DEBT_BEFORE_FINANCING,
+            NotificationKind.CARD_CASH_OUT_COST, NotificationKind.DOCUMENT_DIVERGENCE, NotificationKind.SUBSCRIPTION_OVERLAP,
+            NotificationKind.SUBSCRIPTION_UNUSED, NotificationKind.WEEKLY_CHARGE, NotificationKind.COMMITTED_NEXT_MONTH,
+            NotificationKind.GROUPED);
 
     private NotificationPlanner() {
     }

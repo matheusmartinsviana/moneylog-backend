@@ -284,7 +284,7 @@ class GoalExportQaIT {
         ContractValidation.conforms().match(result);
         String text = result.getResponse().getContentAsString(StandardCharsets.UTF_8);
         JsonNode backup = om.readTree(text);
-        assertThat(backup.get("schemaVersion").asInt()).isEqualTo(1);
+        assertThat(backup.get("schemaVersion").asInt()).isEqualTo(2);
         assertThat(result.getResponse().getHeader(HttpHeaders.CACHE_CONTROL)).isEqualTo("no-store");
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("attachment; filename=\"moneylog-backup-2026-10-10.json\"");
         assertThat(backup.get("accounts")).hasSize((int) a.count("accounts"));

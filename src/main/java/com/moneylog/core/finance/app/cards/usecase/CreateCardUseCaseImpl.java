@@ -32,6 +32,7 @@ public class CreateCardUseCaseImpl implements CreateCardUseCase {
         CardAccounts.requireUsablePaymentAccount(accounts, command.userId(), command.defaultPaymentAccountId());
         CreditCard card = CreditCard.create(ids.next(), command.userId(), command.name(), command.institution(), command.limit(),
                 command.closingDay(), command.dueDay(), command.defaultPaymentAccountId(), time.today());
+        card.updateProfile(command.profile());
         Persisted<CreditCard> saved = cards.save(card);
         return CardViews.of(saved, records.load(command.userId()), time.today());
     }

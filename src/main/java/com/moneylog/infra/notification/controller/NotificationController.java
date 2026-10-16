@@ -37,6 +37,7 @@ import com.moneylog.core.notification.app.usecase.NotificationUseCases.Subscribe
 import com.moneylog.core.notification.app.usecase.NotificationUseCases.UnsubscribePushUseCase;
 import com.moneylog.core.notification.app.usecase.NotificationUseCases.UpdateReminderUseCase;
 import com.moneylog.core.notification.domain.NotificationKind;
+import com.moneylog.core.profile.app.usecase.ProfilePhotoUseCases.GetProfilePhotoInfoUseCase;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.notification.controller.NotificationDtos.DailyMessageResponse;
@@ -72,6 +73,7 @@ public class NotificationController {
     private final UnsubscribePushUseCase unsubscribe;
     private final GetPushStatusUseCase pushStatus;
     private final GetDailyMessageUseCase dailyMessage;
+    private final GetProfilePhotoInfoUseCase photoInfo;
     private final TimeProvider time;
 
     @SuppressWarnings("java:S107")
@@ -80,7 +82,7 @@ public class NotificationController {
                                   ListRemindersUseCase listReminders, CompleteReminderUseCase completeReminder, SnoozeReminderUseCase snoozeReminder,
                                   GetNotificationSettingsUseCase getSettings, SaveNotificationSettingsUseCase saveSettings,
                                   SubscribePushUseCase subscribe, UnsubscribePushUseCase unsubscribe, GetPushStatusUseCase pushStatus,
-                                  GetDailyMessageUseCase dailyMessage, TimeProvider time) {
+                                  GetDailyMessageUseCase dailyMessage, GetProfilePhotoInfoUseCase photoInfo, TimeProvider time) {
         this.list = list;
         this.unread = unread;
         this.markRead = markRead;
@@ -96,6 +98,7 @@ public class NotificationController {
         this.unsubscribe = unsubscribe;
         this.pushStatus = pushStatus;
         this.dailyMessage = dailyMessage;
+        this.photoInfo = photoInfo;
         this.time = time;
     }
 
@@ -161,14 +164,14 @@ public class NotificationController {
 
     @GetMapping("/v1/settings/notifications")
     public SettingsDto settings(@CurrentUser UUID userId) {
-        return SettingsDto.of(getSettings.handle(userId));
+        return SettingsDto.of(getSettings.handle(userId)).withPhoto(photoInfo.info(userId));
     }
 
     @PutMapping("/v1/settings/notifications")
     public SettingsDto saveSettings(@CurrentUser UUID userId, @Valid @RequestBody SettingsDto body) {
         return SettingsDto.of(saveSettings.handle(new SaveSettingsCommand(userId, body.dailySummary().enabled(),
                 LocalTime.parse(body.dailySummary().time()), body.dailySummary().frequency(), body.checkedKinds(), body.quiet(), body.push().enabled(),
-                body.displayName(), body.version())));
+                body.displayName(), body.version(), body.alertsPatch()))).withPhoto(photoInfo.info(userId));
     }
 
     @GetMapping("/v1/push/config")

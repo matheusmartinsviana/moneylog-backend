@@ -1,6 +1,8 @@
 package com.moneylog.infra.category.gateways;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -73,6 +75,22 @@ public class CategoryGatewayImpl implements CategoryGateway {
     @Override
     public Set<String> systemKeysOf(UUID userId) {
         return repository.findSystemKeys(userId);
+    }
+
+    @Override
+    public Map<UUID, String> systemKeysById(UUID userId) {
+        Map<UUID, String> keys = new HashMap<>();
+        for (CategoryEntity entity : repository.findByUserId(userId)) {
+            if (entity.getSystemKey() != null) {
+                keys.put(entity.getId(), entity.getSystemKey());
+            }
+        }
+        return keys;
+    }
+
+    @Override
+    public void deleteAllOf(UUID userId) {
+        repository.deleteAllOf(userId);
     }
 
     private Category insert(CategoryEntity entity, String name) {

@@ -10,6 +10,7 @@ import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.exception.AccountExceptions.AccountNotFoundException;
 import com.moneylog.core.card.app.gateways.CardGateway;
+import com.moneylog.core.card.app.gateways.InvoiceDocumentGateway;
 import com.moneylog.core.card.app.gateways.InvoiceLookupGateway;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.InvoiceChain;
@@ -18,7 +19,7 @@ import com.moneylog.core.finance.app.cards.CardViews;
 import com.moneylog.core.finance.app.cards.InvoiceDetails;
 import com.moneylog.core.finance.app.cards.InvoiceViews;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.CanonicalCommandHash;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.id.IdGenerator;
@@ -48,11 +49,13 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
     private final IdempotencyGateway idempotency;
     private final IdGenerator ids;
     private final TimeProvider time;
+    private final InvoiceDocumentGateway documents;
 
     @SuppressWarnings("java:S107")
     public PayInvoiceUseCaseImpl(InvoiceLookupGateway lookup, CardGateway cards, AccountGateway accounts, TransactionGateway transactions,
                                  LedgerWriteGateway ledger, FinancialRecordsGateway records, IdempotencyGateway idempotency,
-                                 IdGenerator ids, TimeProvider time) {
+                                 IdGenerator ids, TimeProvider time, InvoiceDocumentGateway documents) {
+        this.documents = documents;
         this.lookup = lookup;
         this.cards = cards;
         this.accounts = accounts;
@@ -131,7 +134,8 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
         FinancialRecords loaded = records.load(userId);
         CreditCard card = loaded.cards().stream().filter(c -> c.id().equals(cardId)).findFirst()
                 .orElseThrow(() -> new CardNotFoundException(cardId));
-        return InvoiceViews.details(cardId, CardViews.chainOf(card, loaded).invoice(closingDate), InvoiceViews.index(loaded), today);
+        InvoiceDetails details = InvoiceViews.details(cardId, CardViews.chainOf(card, loaded).invoice(closingDate), InvoiceViews.index(loaded), today);
+        return details.withDocument(documents.find(userId, details.invoice().id()));
     }
 
     private record UserDay(UUID userId, LocalDate today) {

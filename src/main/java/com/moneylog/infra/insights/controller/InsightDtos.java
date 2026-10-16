@@ -5,6 +5,7 @@ import java.util.Map;
 
 import jakarta.validation.constraints.NotNull;
 
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.insights.app.usecase.InsightUseCases.HistoryMonth;
 import com.moneylog.core.insights.app.usecase.InsightUseCases.InsightsView;
 import com.moneylog.core.insights.domain.Dismissal;
@@ -49,9 +50,9 @@ public final class InsightDtos {
         }
     }
 
-    public record InsightListResponse(List<InsightResponse> items, boolean hasNext, List<InsufficientResponse> insufficient) {
-        static InsightListResponse of(InsightsView view) {
-            return new InsightListResponse(view.items().stream().map(InsightResponse::of).toList(), view.hasNext(),
+    public record InsightListResponse(ConsumptionView view, List<InsightResponse> items, boolean hasNext, List<InsufficientResponse> insufficient) {
+        static InsightListResponse of(InsightsView view, ConsumptionView mode) {
+            return new InsightListResponse(mode, view.items().stream().map(InsightResponse::of).toList(), view.hasNext(),
                     view.insufficient().stream().map(InsufficientResponse::of).toList());
         }
     }
@@ -63,9 +64,9 @@ public final class InsightDtos {
         }
     }
 
-    public record HistoryResponse(List<HistoryMonthResponse> items) {
-        static HistoryResponse of(List<HistoryMonth> months) {
-            return new HistoryResponse(months.stream().map(HistoryMonthResponse::of).toList());
+    public record HistoryResponse(ConsumptionView view, List<HistoryMonthResponse> items) {
+        static HistoryResponse of(List<HistoryMonth> months, ConsumptionView mode) {
+            return new HistoryResponse(mode, months.stream().map(HistoryMonthResponse::of).toList());
         }
     }
 

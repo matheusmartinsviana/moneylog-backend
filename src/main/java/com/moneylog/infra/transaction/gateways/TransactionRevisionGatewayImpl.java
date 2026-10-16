@@ -70,6 +70,16 @@ public class TransactionRevisionGatewayImpl implements TransactionRevisionGatewa
         if (s.incomeCompetence() != null) {
             fields.put("incomeCompetence", s.incomeCompetence().toString());
         }
+        if (s.purchaseShares() != null) {
+            fields.put("splitMode", s.purchaseShares().mode().name());
+            fields.put("personShares", s.purchaseShares().lines().stream().map(line -> {
+                Map<String, Object> part = new LinkedHashMap<>();
+                part.put("personId", line.personId() == null ? null : line.personId().toString());
+                part.put("bps", line.bps());
+                part.put("amount", line.amount() == null ? null : line.amount().toPlainString());
+                return part;
+            }).toList());
+        }
         fields.put("version", s.version());
         return fields;
     }

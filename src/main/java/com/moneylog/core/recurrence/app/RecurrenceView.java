@@ -29,7 +29,7 @@ public record RecurrenceView(Versioned<RecurringTransaction> stored, Category ca
     }
 
     public static Money monthlyEstimateOf(RecurringTransaction recurrence, LocalDate today) {
-        MonthlyEstimate estimate = MonthlyEstimate.of(List.of(recurrence), today);
+        MonthlyEstimate estimate = MonthlyEstimate.of(List.of(recurrence), today, true);
         return recurrence.direction() == FlowDirection.IN ? estimate.recurringIncome() : estimate.fixedCosts();
     }
 

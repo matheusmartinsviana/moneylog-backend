@@ -17,8 +17,11 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.SplitMode;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.exception.RequestValidationException;
 
@@ -65,11 +68,12 @@ public sealed interface TransactionInput {
     record Expense(@NotNull @Pattern(regexp = AMOUNT_PATTERN) String amount, @NotNull @DateInWindow LocalDate date,
                    @Size(max = 200) @NoControlChars String description, @Size(max = 2000) @NoControlChars(allowLineBreaks = true) String notes, @NotNull UUID accountId,
                    UUID categoryId, PaymentMethod method, @Valid @Size(min = 1, max = 20) List<ShareInput> shares,
-                   Long version) implements TransactionInput {
+                   String nature, Long version) implements TransactionInput {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
             List<Share> parts = shares == null ? List.of() : shares.stream().map(ShareInput::toShare).toList();
-            return new CreateTransactionCommand.Expense(common(userId, amount, date, description, notes), accountId, categoryId, method == null ? PaymentMethod.OTHER : method, parts);
+            return new CreateTransactionCommand.Expense(common(userId, amount, date, description, notes), accountId, categoryId, method == null ? PaymentMethod.OTHER : method, parts,
+                    TransactionNature.parse(nature));
         }
     }
 
@@ -166,11 +170,20 @@ public sealed interface TransactionInput {
                         @Size(max = 2000, groups = Strict.class) @NoControlChars(allowLineBreaks = true, groups = Strict.class) String notes,
                         @NotNull(groups = Strict.class) UUID cardId, UUID categoryId,
                         @Min(value = 1, groups = Strict.class) @Max(value = 36, groups = Strict.class) Integer installments,
-                        Long version) implements TransactionInput, StrictValidated {
+                        SplitMode splitMode,
+                        @Size(max = 20, groups = Strict.class) @Valid List<@NotNull(groups = Strict.class) PersonShareInput> shares,
+                        Long version, @Valid OriginalAmountInput originalAmount,
+                        @Pattern(regexp = OriginalAmountInput.FX_RATE_PATTERN, groups = Strict.class) String fxRate,
+                        @Min(value = 0, groups = Strict.class) @Max(value = 10000, groups = Strict.class) Integer iofBps,
+                        @Pattern(regexp = "^\\d{4}$", groups = Strict.class) String lastDigits)
+            implements TransactionInput, StrictValidated {
         @Override
         public CreateTransactionCommand toCommand(UUID userId) {
-            return new CreateTransactionCommand.CardPurchase(common(userId, amount, date, description, notes), cardId, categoryId,
-                    installments == null ? 1 : installments);
+            ForeignCharge charge = OriginalAmountInput.foreign(originalAmount, fxRate, iofBps).toBasis();
+            Common common = charge == null ? common(userId, amount, date, description, notes)
+                    : new Common(userId, charge.brl(), date, description, notes);
+            return new CreateTransactionCommand.CardPurchase(common, cardId, categoryId, installments == null ? 1 : installments,
+                    splitMode, PersonShareInput.lines(shares), charge, lastDigits);
         }
     }
 

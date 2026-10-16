@@ -81,10 +81,10 @@ public final class AccountTypeHandlers {
                             + "não mudam; só descrição, categoria e observação.");
                 }
                 return BuiltTransaction.of(AccountTransactions.expenseKeepingShares(header, c.common().amount(), account, category,
-                        c.method(), existing));
+                        c.method(), existing, c.nature()));
             }
             if (c.shares().isEmpty()) {
-                return BuiltTransaction.of(AccountTransactions.expense(header, c.common().amount(), account, category, c.method()));
+                return BuiltTransaction.of(AccountTransactions.expense(header, c.common().amount(), account, category, c.method(), c.nature()));
             }
             if (editing != null) {
                 throw new TransactionNotEditableException("a despesa só se divide ao ser criada.");
@@ -96,7 +96,7 @@ public final class AccountTypeHandlers {
                         newDebt.description()));
             }
             ExpenseOperation operation = AccountTransactions.expenseWithShares(header, c.common().amount(), account, category,
-                    c.method(), shares);
+                    c.method(), shares, c.nature());
             return new BuiltTransaction(operation.transaction(), operation.debts());
         }
     }
@@ -224,16 +224,30 @@ public final class AccountTypeHandlers {
         }
 
         @Override
+        public List<UUID> personsToLock(Refund c) {
+            return support.sharedPersonsOf(c.userId(), c.refundOfTransactionId());
+        }
+
+        @Override
         public Transaction build(Refund c, UUID id, TransactionOrigin origin, Transaction editing) {
+            return buildWithEffects(c, id, origin, editing).transaction();
+        }
+
+        @Override
+        public BuiltTransaction buildWithEffects(Refund c, UUID id, TransactionOrigin origin, Transaction editing) {
+            var refundOf = support.refundOrigin(c, editing);
+            var thirds = support.refundedThirds(c, refundOf, editing);
+            Transaction refund;
             if (c.cardId() != null) {
                 if (cardHandler == null) {
                     throw new TransactionTypeNotAvailableException(TransactionType.REFUND);
                 }
-                return cardHandler.build(c, id, origin, editing);
+                refund = cardHandler.build(c, id, origin, editing, refundOf, thirds);
+            } else {
+                refund = AccountTransactions.refundToAccount(support.header(c.common(), id, origin), c.common().amount(),
+                        support.account(c.userId(), c.accountId()), support.refundCategory(c, refundOf, editing), refundOf, thirds);
             }
-            var refundOf = support.refundOrigin(c, editing);
-            return AccountTransactions.refundToAccount(support.header(c.common(), id, origin), c.common().amount(),
-                    support.account(c.userId(), c.accountId()), support.refundCategory(c, refundOf, editing), refundOf);
+            return new BuiltTransaction(refund, List.of(), support.refundSettlement(refund, refundOf));
         }
     }
 

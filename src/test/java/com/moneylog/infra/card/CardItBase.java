@@ -31,7 +31,7 @@ import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.InvoiceIds;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
 import com.moneylog.core.transaction.domain.CardInvoices;

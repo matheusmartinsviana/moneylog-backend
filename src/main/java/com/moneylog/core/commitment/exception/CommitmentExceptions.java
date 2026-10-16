@@ -33,4 +33,16 @@ public final class CommitmentExceptions {
             super("COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID", "A parcela " + position + " do cronograma já está paga.");
         }
     }
+
+    public static class SharesInvalidException extends BusinessRuleException {
+        public SharesInvalidException(String reason) {
+            super("COMMITMENT_SHARES_INVALID", "As cotas do item são inválidas: " + reason);
+        }
+    }
+
+    public static class CommitmentPersonInvalidException extends BusinessRuleException {
+        public CommitmentPersonInvalidException() {
+            super("COMMITMENT_SHARES_INVALID", "Pessoa inválida nas cotas do item.");
+        }
+    }
 }

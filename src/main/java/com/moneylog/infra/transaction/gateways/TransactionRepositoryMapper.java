@@ -13,6 +13,7 @@ import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionStateInconsistentException;
 import com.moneylog.infra.card.gateways.InvoiceRowGateway.InvoiceRow;
+import com.moneylog.infra.transaction.persistence.CardPurchaseShareEntity;
 import com.moneylog.infra.transaction.persistence.InstallmentEntity;
 
 import com.moneylog.core.importing.domain.DedupKey;
@@ -23,6 +24,8 @@ import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AdjustmentDirection;
 import com.moneylog.core.transaction.domain.AdjustmentKind;
 import com.moneylog.core.transaction.domain.InvestmentDirection;
+import com.moneylog.core.transaction.domain.PurchaseShares;
+import com.moneylog.core.transaction.domain.ShareLine;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionSource;
@@ -42,6 +45,11 @@ public final class TransactionRepositoryMapper {
 
     public static Transaction toDomain(TransactionEntity e, List<LedgerEntry> entries, List<InstallmentEntity> installmentRows,
                                        Map<UUID, InvoiceRow> invoices) {
+        return toDomain(e, entries, installmentRows, invoices, List.of());
+    }
+
+    public static Transaction toDomain(TransactionEntity e, List<LedgerEntry> entries, List<InstallmentEntity> installmentRows,
+                                       Map<UUID, InvoiceRow> invoices, List<CardPurchaseShareEntity> shareRows) {
         CurrencyCode currency = CurrencyCode.of(e.getCurrency());
         boolean active = e.getStatus() == TransactionStatus.ACTIVE;
         List<TransactionInstallment> installments = installments(e, currency, installmentRows, invoices);
@@ -63,8 +71,46 @@ public final class TransactionRepositoryMapper {
                 origin(e), e.getPaymentMethod(), e.getAccountId(), e.getCounterpartAccountId(), e.getCardId(), e.getCategoryId(),
                 e.getDebtId(), e.getRefundOfId(), investment, adjustment, kind, e.getReason(), invoiceClosingDate, e.isLateEntry(),
                 installments, e.getStatus(), e.getVoidReason(), e.getVoidedAt(), e.getVersion(),
-                e.getIncomeCompetence() == null ? null : Competence.parse(e.getIncomeCompetence().strip()));
-        return Transaction.restore(state, relevant);
+                e.getIncomeCompetence() == null ? null : Competence.parse(e.getIncomeCompetence().strip()),
+                purchaseShares(currency, shareRows), e.getNature());
+        Transaction restored = Transaction.restore(state, relevant);
+        restored.attachLastDigits(e.getLastDigits());
+        return restored;
+    }
+
+    private static PurchaseShares purchaseShares(CurrencyCode currency, List<CardPurchaseShareEntity> rows) {
+        if (rows.isEmpty()) {
+            return null;
+        }
+        try {
+            List<ShareLine> lines = rows.stream().sorted(Comparator.comparingInt(CardPurchaseShareEntity::getPosition))
+                    .map(row -> new ShareLine(row.getPersonId(), row.getBps(),
+                            row.getAmountCents() == null ? null : Money.ofCents(row.getAmountCents(), currency),
+                            row.provenance()))
+                    .toList();
+            return PurchaseShares.restore(rows.get(0).getSplitMode(), lines);
+        } catch (DomainException ex) {
+            throw new TransactionStateInconsistentException(ex.getMessage(), ex);
+        }
+    }
+
+    public static List<CardPurchaseShareEntity> shareRows(Transaction transaction, Instant now) {
+        PurchaseShares shares = transaction.purchaseShares();
+        if (shares == null) {
+            return List.of();
+        }
+        List<CardPurchaseShareEntity> rows = new java.util.ArrayList<>();
+        int position = 1;
+        for (ShareLine line : shares.lines()) {
+            CardPurchaseShareEntity row = new CardPurchaseShareEntity(
+                    UUID.nameUUIDFromBytes((transaction.id() + "#share#" + position).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
+                    transaction.userId(), transaction.id(), position, shares.mode(), line.personId(), line.bps(),
+                    line.amount() == null ? null : line.amount().cents(), transaction.amount().currency().value(), now);
+            row.applyProvenance(line.provenance());
+            rows.add(row);
+            position++;
+        }
+        return rows;
     }
 
     private static List<TransactionInstallment> installments(TransactionEntity e, CurrencyCode currency,
@@ -106,13 +152,15 @@ public final class TransactionRepositoryMapper {
         TransactionOrigin origin = s.origin();
         String direction = s.investmentDirection() != null ? s.investmentDirection().name()
                 : s.adjustmentDirection() == null ? null : s.adjustmentDirection().name();
-        return new TransactionEntity(s.id(), s.userId(), s.type(), s.status(), s.amount().cents(), s.amount().currency().value(),
+        TransactionEntity entity = new TransactionEntity(s.id(), s.userId(), s.type(), s.status(), s.amount().cents(), s.amount().currency().value(),
                 s.date(), s.description(), s.notes(), s.paymentMethod(), s.accountId(), s.counterpartAccountId(), s.cardId(),
                 invoiceId, s.lateEntry(), s.installments().isEmpty() ? null : s.installments().size(), s.categoryId(), s.refundOfId(), s.debtId(), direction, s.adjustmentKind() == null ? null : s.adjustmentKind().name(), s.reason(),
                 origin.source(), origin.importBatchId(), origin.dedupKey() == null ? null : origin.dedupKey().value(),
                 origin.originalDedupKey() == null ? null : origin.originalDedupKey().value(), origin.recurrenceId(),
                 origin.occurrenceDate(), s.voidReason(), s.voidedAt(),
-                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), now);
+                s.incomeCompetence() == null ? null : s.incomeCompetence().toString(), s.nature(), now);
+        entity.assignLastDigits(transaction.lastDigits());
+        return entity;
     }
 
     private static TransactionOrigin origin(TransactionEntity e) {

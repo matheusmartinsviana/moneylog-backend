@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.moneylog.core.commitment.app.CommitmentPersons;
 import com.moneylog.core.commitment.app.CommitmentView;
 import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
 import com.moneylog.core.commitment.domain.CommitmentKind;
@@ -11,6 +12,7 @@ import com.moneylog.core.commitment.domain.ScheduleItem;
 import com.moneylog.core.commitment.domain.TrackedCommitment;
 import com.moneylog.core.commitment.exception.CommitmentExceptions.CommitmentNotFoundException;
 import com.moneylog.core.commitment.exception.CommitmentExceptions.InvalidCommitmentException;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.IdempotentClaim;
@@ -23,8 +25,11 @@ public class CreateCommitmentUseCaseImpl implements CreateCommitmentUseCase {
     private final IdempotencyGateway idempotency;
     private final IdGenerator ids;
     private final TimeProvider time;
+    private final PersonGateway persons;
 
-    public CreateCommitmentUseCaseImpl(CommitmentGateway commitments, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time) {
+    public CreateCommitmentUseCaseImpl(CommitmentGateway commitments, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                       PersonGateway persons) {
+        this.persons = persons;
         this.commitments = commitments;
         this.idempotency = idempotency;
         this.ids = ids;
@@ -51,12 +56,18 @@ public class CreateCommitmentUseCaseImpl implements CreateCommitmentUseCase {
             List<ScheduleItem> items = new ArrayList<>();
             int position = 1;
             for (ItemInput i : c.schedule() == null ? List.<ItemInput>of() : c.schedule()) {
-                items.add(new ScheduleItem(position++, i.label(), i.type(), i.dueDate(), i.amount(), i.paid(), i.paidOn()));
+                items.add(new ScheduleItem(position++, i.label(), i.type(), i.dueDate(), i.amount(), i.paid(), i.paidOn(), i.shares(),
+                        i.coBuyerPersonId(), i.provenance()));
             }
-            commitment = TrackedCommitment.longTermProject(id, c.userId(), c.name(), c.counterparty(), c.notes(), c.total(), items);
+            commitment = TrackedCommitment.longTermProject(id, c.userId(), c.name(), c.counterparty(), c.notes(), c.total(), items,
+                    c.clauses());
+            CommitmentPersons.requireOwned(persons, c.userId(), commitment.personIds());
         } else {
             if (c.installmentsTotal() == null || c.installmentsPaid() == null) {
                 throw new InvalidCommitmentException("informe parcelas pagas e total de parcelas.");
+            }
+            if (c.clauses() != null || c.schedule() != null && c.schedule().stream().anyMatch(i -> i.shares() != null && !i.shares().isEmpty())) {
+                throw new InvalidCommitmentException("cotas e cláusulas existem só no projeto de longo prazo.");
             }
             commitment = TrackedCommitment.trackedThirdParty(id, c.userId(), c.name(), c.counterparty(), c.notes(),
                     c.installmentsTotal(), c.installmentsPaid(), c.paidAmount(), c.nextDueDate());
@@ -71,7 +82,15 @@ public class CreateCommitmentUseCaseImpl implements CreateCommitmentUseCase {
                 + ";next=" + nz(c.nextDueDate()) + ";");
         if (c.schedule() != null) {
             c.schedule().forEach(i -> sb.append(i.label()).append('|').append(i.type()).append('|').append(nz(i.dueDate())).append('|').append(i.paid()).append('|')
-                    .append(i.amount() == null ? "-" : i.amount().toPlainString()).append('|').append(nz(i.paidOn())).append(';'));
+                    .append(i.amount() == null ? "-" : i.amount().toPlainString()).append('|').append(nz(i.paidOn())).append('|')
+                    .append(nz(i.coBuyerPersonId())).append('|')
+                    .append(i.shares() == null ? "-" : i.shares().stream().map(s -> nz(s.personId()) + "=" + s.amount().toPlainString())
+                            .collect(java.util.stream.Collectors.joining(",")))
+                    .append(';'));
+        }
+        if (c.clauses() != null) {
+            sb.append("clauses=").append(c.clauses().lateFeeBps()).append('|').append(c.clauses().monthlyInterestBps()).append('|')
+                    .append(c.clauses().terminationRetentionBps()).append('|').append(nz(c.clauses().notes())).append(';');
         }
         return IdempotentClaim.hash(sb.toString());
     }

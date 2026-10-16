@@ -44,7 +44,7 @@ import com.moneylog.core.debt.exception.DebtExceptions.SettlementExceedsOutstand
 import com.moneylog.core.debt.util.InMemoryDebtGateway;
 import com.moneylog.core.debt.util.InMemoryPersonGateway;
 import com.moneylog.core.debt.util.factory.PersonTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails.Flags;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;

@@ -41,17 +41,22 @@ import com.moneylog.core.recurrence.app.usecase.ListRecurrencesUseCase.ListRecur
 import com.moneylog.core.recurrence.app.usecase.UpdateRecurrenceUseCase;
 import com.moneylog.core.recurrence.app.usecase.UpdateRecurrenceUseCase.UpdateRecurrenceCommand;
 import com.moneylog.core.recurrence.domain.MonthlyEstimate;
+import com.moneylog.core.finance.domain.ConsumptionView;
+import com.moneylog.infra.web.QueryViews;
 import com.moneylog.core.recurrence.domain.OccurrenceStatus;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionType;
+import com.moneylog.infra.web.ProvenanceInput;
 import com.moneylog.infra.web.QueryDates;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.EndInput;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RealizeInput;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceInput;
 import com.moneylog.infra.recurrence.controller.RecurrenceRequests.RecurrenceUpdate;
 import com.moneylog.infra.security.CurrentUser;
+import com.moneylog.infra.transaction.controller.PersonShareInput;
 import com.moneylog.infra.transaction.controller.TransactionResponse;
 import com.moneylog.infra.web.SliceResponse;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -103,14 +108,17 @@ public class RecurrenceController {
         RecurrenceView created = create.handle(new CreateRecurrenceCommand(userId, TransactionType.valueOf(body.type().name()),
                 Money.of(body.amount(), CurrencyCode.BRL), body.description(), body.categoryId(), body.accountId(), body.method(),
                 body.cardId(), body.frequency(), body.interval(), body.unit(), body.startDate(), body.endDate(),
-                body.maxOccurrences(), idempotencyKey, body.incomeCompetenceOffsetMonths()));
+                body.maxOccurrences(), idempotencyKey, body.incomeCompetenceOffsetMonths(),
+                TransactionNature.parse(body.nature()), body.splitMode(), PersonShareInput.lines(body.shares()), body.foreign(),
+                body.subscription(), ProvenanceInput.toDomain(body.provenance())));
         return ResponseEntity.created(URI.create("/v1/recurrences/" + created.recurrence().id())).body(RecurrenceResponse.of(created));
     }
 
     @GetMapping("/summary")
-    public RecurrenceSummaryResponse summary(@CurrentUser UUID userId) {
-        MonthlyEstimate estimate = summary.handle(new GetRecurrenceSummaryQuery(userId));
-        return new RecurrenceSummaryResponse(estimate.fixedCosts(), estimate.recurringIncome(), estimate.estimate());
+    public RecurrenceSummaryResponse summary(@CurrentUser UUID userId, @RequestParam(required = false) String view) {
+        ConsumptionView parsed = QueryViews.parse(view);
+        MonthlyEstimate estimate = summary.handle(new GetRecurrenceSummaryQuery(userId, parsed == ConsumptionView.GROSS));
+        return new RecurrenceSummaryResponse(parsed, estimate.fixedCosts(), estimate.recurringIncome(), estimate.estimate());
     }
 
     @GetMapping("/occurrences")
@@ -135,13 +143,16 @@ public class RecurrenceController {
     public RecurrenceResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody RecurrenceUpdate body) {
         return RecurrenceResponse.of(update.handle(new UpdateRecurrenceCommand(userId, id, Money.of(body.amount(), CurrencyCode.BRL),
                 body.description(), body.categoryId(), body.accountId(), body.method(), body.cardId(), body.endDate(), body.version(),
-                body.incomeCompetenceOffsetMonths())));
+                body.incomeCompetenceOffsetMonths(), TransactionNature.parse(body.nature()), body.splitMode(),
+                body.shares() == null ? null : PersonShareInput.lines(body.shares()), body.foreign(), body.subscription(),
+                ProvenanceInput.toDomain(body.provenance()))));
     }
 
     @PostMapping("/{id}/end")
     public RecurrenceResponse end(@CurrentUser UUID userId, @PathVariable UUID id,
                                   @Valid @RequestBody(required = false) EndInput body) {
-        return RecurrenceResponse.of(end.handle(new EndRecurrenceCommand(userId, id, body == null ? null : body.endDate())));
+        return RecurrenceResponse.of(end.handle(new EndRecurrenceCommand(userId, id, body == null ? null : body.endDate(),
+                body == null ? null : body.activeUntil())));
     }
 
     @PostMapping("/{id}/deactivate")
@@ -156,7 +167,7 @@ public class RecurrenceController {
                                                        @Valid @RequestBody(required = false) RealizeInput body) {
         Money amount = body == null || body.amount() == null ? null : Money.of(body.amount(), CurrencyCode.BRL);
         TransactionDetails created = realize.handle(new RealizeOccurrenceCommand(userId, id, date, amount, idempotencyKey,
-                body == null ? null : body.accountId(), body == null ? null : body.method()));
+                body == null ? null : body.accountId(), body == null ? null : body.method(), body == null ? null : body.foreign()));
         return ResponseEntity.created(URI.create("/v1/transactions/" + created.transaction().id())).body(TransactionResponse.of(created));
     }
 

@@ -120,7 +120,8 @@ class LentesFinanceirasTest {
                         e -> e.posting().amount(), Money::add)));
         assertThat(porOrigem.values()).allMatch(Money::isZero);
         assertThat(s.transactions.stream().map(Transaction::type).distinct()).hasSize(TransactionType.values().length);
-        assertThat(ledger.entries().stream().map(e -> e.source().type()).distinct()).hasSize(PostingSourceType.values().length);
+        assertThat(ledger.entries().stream().map(e -> e.source().type()).distinct()).containsExactlyInAnyOrder(PostingSourceType.TRANSACTION,
+                PostingSourceType.ACCOUNT_OPENING, PostingSourceType.DEBT_RECOGNITION, PostingSourceType.DEBT_CANCELLATION);
     }
 
     @Test

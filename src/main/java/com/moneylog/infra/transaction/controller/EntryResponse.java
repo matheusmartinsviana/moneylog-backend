@@ -6,13 +6,14 @@ import java.util.UUID;
 
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.finance.app.transactions.EntryListing;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 
-public record EntryResponse(List<Item> items, boolean hasNext, Totals totals, List<DebtItem> debtItems) {
+public record EntryResponse(ConsumptionView view, List<Item> items, boolean hasNext, Totals totals, List<DebtItem> debtItems) {
 
     public record DebtItem(UUID debtId, LocalDate date, String competence, String description, CategoryRef category, Money amount) {
     }
@@ -34,7 +35,7 @@ public record EntryResponse(List<Item> items, boolean hasNext, Totals totals, Li
     public record Totals(Money total, List<CategoryAmount> byCategory) {
     }
 
-    public static EntryResponse of(EntryListing listing) {
+    public static EntryResponse of(EntryListing listing, ConsumptionView view) {
         List<Item> items = listing.items().items().stream().map(row -> {
             Transaction t = row.transaction();
             var line = row.line();
@@ -47,7 +48,7 @@ public record EntryResponse(List<Item> items, boolean hasNext, Totals totals, Li
         List<DebtItem> debtItems = listing.debtItems().stream().map(row -> new DebtItem(row.line().debtId(), row.line().date(),
                 row.line().competence().toString(), row.line().description() == null ? "" : row.line().description(),
                 ref(row.category()), row.line().amount())).toList();
-        return new EntryResponse(items, listing.items().hasNext(), new Totals(listing.total(),
+        return new EntryResponse(view, items, listing.items().hasNext(), new Totals(listing.total(),
                 listing.byCategory().stream().map(c -> new CategoryAmount(ref(c.category()), c.amount())).toList()), debtItems);
     }
 

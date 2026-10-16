@@ -33,7 +33,7 @@ import com.moneylog.core.account.util.factory.AccountTestFactory;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionUseCaseImpl;

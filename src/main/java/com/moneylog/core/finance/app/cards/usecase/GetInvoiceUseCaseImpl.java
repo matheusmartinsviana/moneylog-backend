@@ -1,5 +1,6 @@
 package com.moneylog.core.finance.app.cards.usecase;
 
+import com.moneylog.core.card.app.gateways.InvoiceDocumentGateway;
 import com.moneylog.core.card.app.gateways.InvoiceLookupGateway;
 import com.moneylog.core.card.domain.InvoiceChain;
 import com.moneylog.core.finance.app.cards.CardViews;
@@ -14,8 +15,11 @@ public class GetInvoiceUseCaseImpl implements GetInvoiceUseCase {
     private final InvoiceLookupGateway lookup;
     private final FinancialRecordsGateway records;
     private final TimeProvider time;
+    private final InvoiceDocumentGateway documents;
 
-    public GetInvoiceUseCaseImpl(InvoiceLookupGateway lookup, FinancialRecordsGateway records, TimeProvider time) {
+    public GetInvoiceUseCaseImpl(InvoiceLookupGateway lookup, FinancialRecordsGateway records, TimeProvider time,
+                                 InvoiceDocumentGateway documents) {
+        this.documents = documents;
         this.lookup = lookup;
         this.records = records;
         this.time = time;
@@ -26,6 +30,8 @@ public class GetInvoiceUseCaseImpl implements GetInvoiceUseCase {
         FinancialRecords loaded = records.load(query.userId());
         InvoiceResolver.Resolved resolved = InvoiceResolver.resolve(query.userId(), query.invoiceId(), lookup, loaded, time.today());
         InvoiceChain chain = CardViews.chainOf(resolved.card(), loaded);
-        return InvoiceViews.details(resolved.card().id(), chain.invoice(resolved.closingDate()), InvoiceViews.index(loaded), time.today());
+        InvoiceDetails details = InvoiceViews.details(resolved.card().id(), chain.invoice(resolved.closingDate()), InvoiceViews.index(loaded),
+                time.today());
+        return details.withDocument(documents.find(query.userId(), details.invoice().id()));
     }
 }

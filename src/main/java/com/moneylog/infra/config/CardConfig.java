@@ -7,10 +7,17 @@ import org.springframework.transaction.PlatformTransactionManager;
 
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
+import com.moneylog.core.card.app.gateways.InvoiceDocumentGateway;
+import com.moneylog.infra.card.gateways.InvoiceDocumentGatewayImpl;
+import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
 import com.moneylog.core.finance.app.cards.usecase.ArchiveCardUseCase;
 import com.moneylog.core.finance.app.cards.usecase.ArchiveCardUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.ChangeCardBillingDaysUseCase;
 import com.moneylog.core.finance.app.cards.usecase.ChangeCardBillingDaysUseCaseImpl;
+import com.moneylog.core.debt.app.gateways.DebtGateway;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.finance.app.cards.usecase.CreateCardCashOutUseCase;
+import com.moneylog.core.finance.app.cards.usecase.CreateCardCashOutUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.CreateCardUseCase;
 import com.moneylog.core.finance.app.cards.usecase.CreateCardUseCaseImpl;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
@@ -23,6 +30,8 @@ import com.moneylog.core.finance.app.cards.usecase.GetCardUseCase;
 import com.moneylog.core.finance.app.cards.usecase.GetCardUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.GetFutureInstallmentsUseCase;
 import com.moneylog.core.finance.app.cards.usecase.GetFutureInstallmentsUseCaseImpl;
+import com.moneylog.core.finance.app.cards.usecase.ChangeInvoiceDocumentAmountUseCase;
+import com.moneylog.core.finance.app.cards.usecase.ChangeInvoiceDocumentAmountUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.GetInvoiceUseCase;
 import com.moneylog.core.finance.app.cards.usecase.GetInvoiceUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.ListCardsUseCase;
@@ -42,7 +51,7 @@ import com.moneylog.core.finance.app.cards.usecase.UnarchiveCardUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.UpdateCardDetailsUseCase;
 import com.moneylog.core.finance.app.cards.usecase.UpdateCardDetailsUseCaseImpl;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
@@ -122,9 +131,9 @@ public class CardConfig {
 
     @Bean
     PreviewCardPurchaseUseCase previewCardPurchaseUseCase(CardGateway cards, FinancialRecordsGateway records, IdGenerator ids,
-                                                          TimeProvider time, PlatformTransactionManager tm) {
+                                                          TimeProvider time, CommitmentGateway commitments, PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(PreviewCardPurchaseUseCase.class,
-                new PreviewCardPurchaseUseCaseImpl(cards, records, ids, time), tm);
+                new PreviewCardPurchaseUseCaseImpl(cards, records, ids, time, commitments), tm);
     }
 
     @Bean
@@ -159,8 +168,21 @@ public class CardConfig {
 
     @Bean
     GetInvoiceUseCase getInvoiceUseCase(InvoiceRowGateway invoices, FinancialRecordsGateway records, TimeProvider time,
-                                        PlatformTransactionManager tm) {
-        return TransactionalProxies.snapshotReadOnly(GetInvoiceUseCase.class, new GetInvoiceUseCaseImpl(invoices, records, time), tm);
+                                        InvoiceDocumentGateway documents, PlatformTransactionManager tm) {
+        return TransactionalProxies.snapshotReadOnly(GetInvoiceUseCase.class, new GetInvoiceUseCaseImpl(invoices, records, time, documents), tm);
+    }
+
+    @Bean
+    InvoiceDocumentGateway invoiceDocumentGateway(JdbcTemplate jdbc, InvoiceRowGateway rows, TimeProvider time) {
+        return new InvoiceDocumentGatewayImpl(jdbc, rows, time);
+    }
+
+    @Bean
+    ChangeInvoiceDocumentAmountUseCase changeInvoiceDocumentAmountUseCase(InvoiceRowGateway invoices, CardGateway cards,
+                                                                          FinancialRecordsGateway records, InvoiceDocumentGateway documents,
+                                                                          TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(ChangeInvoiceDocumentAmountUseCase.class,
+                new ChangeInvoiceDocumentAmountUseCaseImpl(invoices, cards, records, documents, time), tm);
     }
 
     @Bean
@@ -173,9 +195,10 @@ public class CardConfig {
     @Bean
     PayInvoiceUseCase payInvoiceUseCase(InvoiceRowGateway invoices, CardGateway cards, AccountGateway accounts,
                                         TransactionGateway transactions, LedgerWriteGateway ledger, FinancialRecordsGateway records,
-                                        IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time, PlatformTransactionManager tm) {
+                                        IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time, InvoiceDocumentGateway documents,
+                                        PlatformTransactionManager tm) {
         return TransactionalProxies.required(PayInvoiceUseCase.class,
-                new PayInvoiceUseCaseImpl(invoices, cards, accounts, transactions, ledger, records, idempotency, ids, time), tm);
+                new PayInvoiceUseCaseImpl(invoices, cards, accounts, transactions, ledger, records, idempotency, ids, time, documents), tm);
     }
 
     @Bean
@@ -189,5 +212,15 @@ public class CardConfig {
     ListCardsUseCase listCardsUseCase(CardGateway cards, FinancialRecordsGateway records, TimeProvider time,
                                       PlatformTransactionManager tm) {
         return TransactionalProxies.snapshotReadOnly(ListCardsUseCase.class, new ListCardsUseCaseImpl(cards, records, time), tm);
+    }
+
+    @Bean
+    CreateCardCashOutUseCase createCardCashOutUseCase(CardGateway cards, AccountGateway accounts, CategoryGateway categories,
+                                                      PersonGateway persons, DebtGateway debts, TransactionGateway transactions,
+                                                      LedgerWriteGateway ledger, IdempotencyGateway idempotency, IdGenerator ids,
+                                                      TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(CreateCardCashOutUseCase.class,
+                new CreateCardCashOutUseCaseImpl(cards, accounts, categories, persons, debts, transactions, ledger, idempotency, ids,
+                        time), tm);
     }
 }

@@ -8,14 +8,21 @@ import org.springframework.transaction.PlatformTransactionManager;
 import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
 import com.moneylog.core.commitment.app.usecase.CreateCommitmentUseCase;
 import com.moneylog.core.commitment.app.usecase.CreateCommitmentUseCaseImpl;
+import com.moneylog.core.commitment.app.usecase.GetCommitmentByPersonUseCase;
+import com.moneylog.core.commitment.app.usecase.GetCommitmentByPersonUseCaseImpl;
 import com.moneylog.core.commitment.app.usecase.GetCommitmentUseCase;
 import com.moneylog.core.commitment.app.usecase.GetCommitmentUseCaseImpl;
 import com.moneylog.core.commitment.app.usecase.ListCommitmentsUseCase;
 import com.moneylog.core.commitment.app.usecase.ListCommitmentsUseCaseImpl;
 import com.moneylog.core.commitment.app.usecase.MarkScheduleItemPaidUseCase;
 import com.moneylog.core.commitment.app.usecase.MarkScheduleItemPaidUseCaseImpl;
+import com.moneylog.core.commitment.app.usecase.UpdateCommitmentClausesUseCase;
+import com.moneylog.core.commitment.app.usecase.UpdateCommitmentClausesUseCaseImpl;
+import com.moneylog.core.commitment.app.usecase.UpdateCommitmentItemSharesUseCase;
+import com.moneylog.core.commitment.app.usecase.UpdateCommitmentItemSharesUseCaseImpl;
 import com.moneylog.core.commitment.app.usecase.UpdateCommitmentProgressUseCase;
 import com.moneylog.core.commitment.app.usecase.UpdateCommitmentProgressUseCaseImpl;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
@@ -31,9 +38,9 @@ class CommitmentConfig {
 
     @Bean
     CreateCommitmentUseCase createCommitmentUseCase(CommitmentGateway commitments, IdempotencyGateway idempotency, IdGenerator ids,
-                                                    TimeProvider time, PlatformTransactionManager tm) {
+                                                    TimeProvider time, PersonGateway persons, PlatformTransactionManager tm) {
         return TransactionalProxies.required(CreateCommitmentUseCase.class,
-                new CreateCommitmentUseCaseImpl(commitments, idempotency, ids, time), tm);
+                new CreateCommitmentUseCaseImpl(commitments, idempotency, ids, time, persons), tm);
     }
 
     @Bean
@@ -54,5 +61,24 @@ class CommitmentConfig {
     @Bean
     UpdateCommitmentProgressUseCase updateCommitmentProgressUseCase(CommitmentGateway commitments, PlatformTransactionManager tm) {
         return TransactionalProxies.required(UpdateCommitmentProgressUseCase.class, new UpdateCommitmentProgressUseCaseImpl(commitments), tm);
+    }
+
+    @Bean
+    UpdateCommitmentItemSharesUseCase updateCommitmentItemSharesUseCase(CommitmentGateway commitments, PersonGateway persons,
+                                                                        PlatformTransactionManager tm) {
+        return TransactionalProxies.required(UpdateCommitmentItemSharesUseCase.class,
+                new UpdateCommitmentItemSharesUseCaseImpl(commitments, persons), tm);
+    }
+
+    @Bean
+    UpdateCommitmentClausesUseCase updateCommitmentClausesUseCase(CommitmentGateway commitments, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(UpdateCommitmentClausesUseCase.class, new UpdateCommitmentClausesUseCaseImpl(commitments), tm);
+    }
+
+    @Bean
+    GetCommitmentByPersonUseCase getCommitmentByPersonUseCase(CommitmentGateway commitments, PersonGateway persons,
+                                                              PlatformTransactionManager tm) {
+        return TransactionalProxies.snapshotReadOnly(GetCommitmentByPersonUseCase.class,
+                new GetCommitmentByPersonUseCaseImpl(commitments, persons), tm);
     }
 }

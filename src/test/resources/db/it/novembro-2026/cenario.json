@@ -1,0 +1,415 @@
+{
+ "descricao": "Cenario sintetico de novembro/2026. Todos os nomes, valores e cartoes sao inventados.",
+ "relogio": "2026-10-15T15:00:00Z",
+ "steps": [
+  {
+   "id": "contaA",
+   "post": "/v1/accounts",
+   "body": {
+    "name": "Conta A",
+    "type": "CHECKING",
+    "institution": "Banco Exemplo",
+    "openingBalance": {
+     "amount": "5000.00",
+     "currency": "BRL"
+    },
+    "openingDate": "2026-10-01"
+   }
+  },
+  {
+   "id": "ana",
+   "post": "/v1/people",
+   "body": {
+    "name": "Ana"
+   }
+  },
+  {
+   "id": "beto",
+   "post": "/v1/people",
+   "body": {
+    "name": "Beto"
+   }
+  },
+  {
+   "id": "bancoExemplo",
+   "post": "/v1/people",
+   "body": {
+    "name": "Financeira Exemplo"
+   }
+  },
+  {
+   "id": "catMercado",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Mercado",
+    "kind": "EXPENSE"
+   }
+  },
+  {
+   "id": "catAssinaturas",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Servicos recorrentes",
+    "kind": "EXPENSE"
+   }
+  },
+  {
+   "id": "catJuros",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Juros do credito",
+    "kind": "EXPENSE"
+   }
+  },
+  {
+   "id": "catEletronicos",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Eletronicos",
+    "kind": "EXPENSE"
+   }
+  },
+  {
+   "id": "catMoradia",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Habitacao",
+    "kind": "EXPENSE"
+   }
+  },
+  {
+   "id": "catSalario",
+   "post": "/v1/categories",
+   "body": {
+    "name": "Renda mensal",
+    "kind": "INCOME"
+   }
+  },
+  {
+   "id": "cartaoA",
+   "post": "/v1/cards",
+   "body": {
+    "name": "Cartao A",
+    "institution": "Banco Exemplo",
+    "limit": {
+     "amount": "20000.00",
+     "currency": "BRL"
+    },
+    "closingDay": 25,
+    "dueDay": 5,
+    "defaultPaymentAccountId": "{{contaA}}"
+   }
+  },
+  {
+   "id": "cartaoB",
+   "post": "/v1/cards",
+   "body": {
+    "name": "Cartao B",
+    "institution": "Banco Exemplo",
+    "limit": {
+     "amount": "20000.00",
+     "currency": "BRL"
+    },
+    "closingDay": 20,
+    "dueDay": 10,
+    "defaultPaymentAccountId": "{{contaA}}"
+   }
+  },
+  {
+   "id": "compraTerco",
+   "post": "/v1/transactions",
+   "idempotent": true,
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "100.00",
+    "date": "2026-10-10",
+    "description": "Mercado dividido em tres",
+    "cardId": "{{cartaoA}}",
+    "categoryId": "{{catMercado}}",
+    "installments": 1,
+    "splitMode": "EQUAL",
+    "shares": [
+     {
+      "personId": null
+     },
+     {
+      "personId": "{{ana}}"
+     },
+     {
+      "personId": "{{beto}}"
+     }
+    ]
+   }
+  },
+  {
+   "id": "compraMetade",
+   "post": "/v1/transactions",
+   "idempotent": true,
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "300.00",
+    "date": "2026-10-05",
+    "description": "Jantar dividido ao meio",
+    "cardId": "{{cartaoA}}",
+    "categoryId": "{{catMercado}}",
+    "installments": 3,
+    "splitMode": "BPS",
+    "shares": [
+     {
+      "personId": null,
+      "bps": 5000
+     },
+     {
+      "personId": "{{ana}}",
+      "bps": 5000
+     }
+    ]
+   }
+  },
+  {
+   "id": "grupoNotebook",
+   "post": "/v1/purchase-groups",
+   "body": {
+    "name": "Notebook",
+    "interest": false,
+    "members": [
+     {
+      "cardId": "{{cartaoA}}",
+      "totalInstallments": 8,
+      "installmentAmount": "110.00",
+      "remainingInstallments": 5,
+      "firstInvoiceDate": "2026-10-10",
+      "categoryId": "{{catEletronicos}}"
+     },
+     {
+      "cardId": "{{cartaoB}}",
+      "totalInstallments": 4,
+      "installmentAmount": "45.00",
+      "firstInvoiceDate": "2026-10-10",
+      "categoryId": "{{catEletronicos}}"
+     }
+    ]
+   }
+  },
+  {
+   "id": "assinaturaUsd",
+   "post": "/v1/recurrences",
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "1.00",
+    "description": "Servico USD",
+    "categoryId": "{{catAssinaturas}}",
+    "cardId": "{{cartaoA}}",
+    "frequency": "MONTHLY",
+    "startDate": "2026-10-20",
+    "isSubscription": true,
+    "originalAmount": {
+     "amount": "5.00",
+     "currency": "USD"
+    },
+    "referenceFxRate": "5.000000",
+    "iofBps": 350,
+    "overlapGroup": "streaming"
+   }
+  },
+  {
+   "id": "assinaturaSemanal",
+   "post": "/v1/recurrences",
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "5.30",
+    "description": "Servico semanal",
+    "categoryId": "{{catAssinaturas}}",
+    "cardId": "{{cartaoA}}",
+    "frequency": "WEEKLY",
+    "startDate": "2026-10-19",
+    "isSubscription": true
+   }
+  },
+  {
+   "id": "assinaturaEmpresa",
+   "post": "/v1/recurrences",
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "30.00",
+    "description": "Ferramenta da empresa",
+    "categoryId": "{{catAssinaturas}}",
+    "cardId": "{{cartaoA}}",
+    "frequency": "MONTHLY",
+    "startDate": "2026-10-22",
+    "isSubscription": true,
+    "scope": "COMPANY"
+   }
+  },
+  {
+   "id": "assinaturaStreaming",
+   "post": "/v1/recurrences",
+   "body": {
+    "type": "CARD_PURCHASE",
+    "amount": "20.00",
+    "description": "Streaming",
+    "categoryId": "{{catAssinaturas}}",
+    "cardId": "{{cartaoA}}",
+    "frequency": "MONTHLY",
+    "startDate": "2026-10-21",
+    "isSubscription": true,
+    "overlapGroup": "streaming"
+   }
+  },
+  {
+   "id": "emprestimoFolha",
+   "post": "/v1/transactions",
+   "idempotent": true,
+   "capture": {
+    "debtFolha": "debt.id"
+   },
+   "body": {
+    "type": "MONEY_RECEIVED",
+    "amount": "3000.00",
+    "date": "2026-10-02",
+    "description": "Consignado contratado",
+    "accountId": "{{contaA}}",
+    "newDebt": {
+     "personId": "{{bancoExemplo}}"
+    }
+   }
+  },
+  {
+   "id": "perfilRenda",
+   "post": "/v1/income-profiles",
+   "body": {
+    "source": "Empresa Exemplo",
+    "gross": "8000.00",
+    "dependents": 1,
+    "advance": {
+     "dayOfMonth": 16,
+     "percentBps": 4000
+    },
+    "balanceDayOfMonth": 1,
+    "deductions": [
+     {
+      "kind": "UNION",
+      "label": "Mensalidade sindical",
+      "amount": "50.00"
+     },
+     {
+      "kind": "LOAN",
+      "label": "Consignado",
+      "amount": "300.00",
+      "interestAmount": "40.00",
+      "debtId": "{{debtFolha}}",
+      "startsOn": "2026-10-01",
+      "endsOn": "2027-05-31"
+     }
+    ],
+    "thirteenth": {
+     "enabled": true,
+     "firstInstallmentMonth": 11
+    }
+   }
+  },
+  {
+   "id": "imovel",
+   "post": "/v1/commitments",
+   "body": {
+    "kind": "LONG_TERM_PROJECT",
+    "name": "Apartamento Exemplo",
+    "counterparty": "Construtora Exemplo",
+    "total": "12400.00",
+    "clauses": {
+     "lateFeeBps": 200,
+     "monthlyInterestBps": 100,
+     "terminationRetentionBps": 700
+    },
+    "schedule": [
+     {
+      "label": "Parcela 1",
+      "type": "INSTALLMENT",
+      "dueDate": "2026-11-10",
+      "amount": "2400.00",
+      "shares": [
+       {
+        "personId": null,
+        "amount": "1500.00"
+       },
+       {
+        "personId": "{{beto}}",
+        "amount": "900.00"
+       }
+      ],
+      "paid": false
+     },
+     {
+      "label": "Parcela 2",
+      "type": "INSTALLMENT",
+      "dueDate": "2026-12-10",
+      "amount": "6500.00",
+      "shares": [
+       {
+        "personId": null,
+        "amount": "2300.00"
+       },
+       {
+        "personId": "{{ana}}",
+        "amount": "4200.00"
+       }
+      ],
+      "paid": false
+     },
+     {
+      "label": "Parcela 3",
+      "type": "INSTALLMENT",
+      "dueDate": "2027-01-10",
+      "amount": "3500.00",
+      "paid": false
+     }
+    ]
+   }
+  },
+  {
+   "id": "pixNoCredito",
+   "post": "/v1/card-cash-outs",
+   "idempotent": true,
+   "body": {
+    "cardId": "{{cartaoA}}",
+    "accountId": "{{contaA}}",
+    "principal": "1000.00",
+    "installments": 4,
+    "totalWithInterest": "1120.00",
+    "firstInvoiceDate": "2026-10-10",
+    "channel": "Pix no credito",
+    "interestCategoryId": "{{catJuros}}"
+   }
+  },
+  {
+   "id": "condominio",
+   "post": "/v1/recurrences",
+   "body": {
+    "type": "EXPENSE",
+    "amount": "800.00",
+    "description": "Condominio",
+    "categoryId": "{{catMoradia}}",
+    "accountId": "{{contaA}}",
+    "method": "BOLETO",
+    "nature": "FIXED",
+    "frequency": "MONTHLY",
+    "startDate": "2026-11-10"
+   }
+  },
+  {
+   "id": "gastoPix",
+   "post": "/v1/transactions",
+   "idempotent": true,
+   "body": {
+    "type": "EXPENSE",
+    "amount": "120.00",
+    "date": "2026-11-03",
+    "description": "Servico avulso",
+    "categoryId": "{{catMercado}}",
+    "accountId": "{{contaA}}",
+    "method": "PIX",
+    "nature": "VARIABLE"
+   }
+  }
+ ]
+}

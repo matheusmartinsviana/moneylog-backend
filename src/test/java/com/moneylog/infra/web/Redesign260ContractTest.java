@@ -40,10 +40,10 @@ class Redesign260ContractTest {
     }
 
     @Test
-    @DisplayName("a versão é 2.20.0 (só acréscimos sobre a 2.6.0) e as rotas do redesign, da Etapa 7 e da Etapa 8 existem")
+    @DisplayName("a versão é 2.20.0 ou posterior (só acréscimos sobre a 2.6.0) e as rotas do redesign, da Etapa 7 e da Etapa 8 existem")
     void deveDeclararAVersaoEAsRotas() {
         var spec = ContractValidation.spec();
-        assertThat(spec.getInfo().getVersion()).isEqualTo("2.20.0");
+        assertThat(spec.getInfo().getVersion()).matches("^2\\.(2[0-9]|[3-9][0-9])\\.\\d+$");
         assertThat(spec.getPaths()).containsKeys("/v1/reports/income-expenses", "/v1/reports/spending-by-category", "/v1/search");
         assertThat(spec.getPaths()).containsKeys("/v1/ai/status", "/v1/ai/previews", "/v1/ai/previews/{id}", "/v1/ai/analyses", "/v1/ai/analyses/{id}",
                 "/v1/insights", "/v1/settings/ai");

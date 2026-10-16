@@ -31,7 +31,7 @@ public class GetSpendingByCategoryUseCaseImpl implements GetSpendingByCategoryUs
     @Override
     public SpendingByCategoryView handle(GetSpendingByCategoryQuery query) {
         FinancialRecords loaded = records.load(query.userId());
-        Ledger ledger = loaded.ledger();
+        Ledger ledger = query.view().ledgerOf(loaded);
         Competence month = query.month() == null ? Competence.from(time.today()) : query.month();
         Map<UUID, Category> byId = categories.list(query.userId(), null, true).stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));

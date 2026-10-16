@@ -4,7 +4,7 @@ import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.card.domain.InvoiceChain;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.sk.id.IdGenerator;

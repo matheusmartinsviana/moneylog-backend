@@ -6,14 +6,18 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
+import com.moneylog.core.commitment.domain.CommitmentClauses;
 import com.moneylog.core.commitment.domain.CommitmentKind;
+import com.moneylog.core.commitment.domain.ItemShare;
 import com.moneylog.core.commitment.domain.ScheduleItem;
 import com.moneylog.core.commitment.domain.ScheduleItemType;
 import com.moneylog.core.commitment.domain.TrackedCommitment;
@@ -23,6 +27,7 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
+import com.moneylog.core.sk.provenance.Provenance;
 import com.moneylog.core.sk.time.TimeProvider;
 
 public class CommitmentGatewayImpl implements CommitmentGateway {
@@ -40,11 +45,14 @@ public class CommitmentGatewayImpl implements CommitmentGateway {
         Timestamp now = Timestamp.from(time.now());
         jdbc.update("""
                 INSERT INTO tracked_commitments (id, user_id, kind, name, counterparty, notes, total_cents, informed_paid_cents,
-                    installments_total, installments_paid, next_due_date, created_at, updated_at, version)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                    installments_total, installments_paid, next_due_date, created_at, updated_at, version,
+                    late_fee_bps, monthly_interest_bps, termination_retention_bps, clauses_notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)""",
                 c.id(), c.userId(), c.kind().name(), c.name(), c.counterparty(), c.notes(),
                 c.declaredTotal() == null ? null : c.declaredTotal().cents(), c.informedPaid() == null ? null : c.informedPaid().cents(),
-                c.installmentsTotal(), c.installmentsPaid(), toSql(c.storedNextDueDate()), now, now);
+                c.installmentsTotal(), c.installmentsPaid(), toSql(c.storedNextDueDate()), now, now,
+                clause(c, CommitmentClauses::lateFeeBps), clause(c, CommitmentClauses::monthlyInterestBps),
+                clause(c, CommitmentClauses::terminationRetentionBps), c.clauses() == null ? null : c.clauses().notes());
         writeItems(c);
         return findById(c.userId(), c.id()).orElseThrow();
     }
@@ -53,10 +61,13 @@ public class CommitmentGatewayImpl implements CommitmentGateway {
     public Versioned<TrackedCommitment> update(TrackedCommitment c, long expectedVersion) {
         int rows = jdbc.update("""
                 UPDATE tracked_commitments SET name = ?, counterparty = ?, notes = ?, informed_paid_cents = ?, installments_paid = ?, next_due_date = ?,
-                    updated_at = ?, version = version + 1
+                    updated_at = ?, version = version + 1, late_fee_bps = ?, monthly_interest_bps = ?, termination_retention_bps = ?,
+                    clauses_notes = ?
                 WHERE id = ? AND user_id = ? AND version = ?""",
                 c.name(), c.counterparty(), c.notes(), c.informedPaid() == null ? null : c.informedPaid().cents(), c.installmentsPaid(),
-                toSql(c.storedNextDueDate()), Timestamp.from(time.now()), c.id(), c.userId(), expectedVersion);
+                toSql(c.storedNextDueDate()), Timestamp.from(time.now()), clause(c, CommitmentClauses::lateFeeBps),
+                clause(c, CommitmentClauses::monthlyInterestBps), clause(c, CommitmentClauses::terminationRetentionBps),
+                c.clauses() == null ? null : c.clauses().notes(), c.id(), c.userId(), expectedVersion);
         if (rows == 0) {
             long stored = jdbc.query("SELECT version FROM tracked_commitments WHERE id = ? AND user_id = ?",
                     (rs, i) -> rs.getLong(1), c.id(), c.userId()).stream().findFirst().orElse(-1L);
@@ -70,10 +81,22 @@ public class CommitmentGatewayImpl implements CommitmentGateway {
     private void writeItems(TrackedCommitment c) {
         for (ScheduleItem i : c.schedule()) {
             jdbc.update("""
-                    INSERT INTO tracked_commitment_items (commitment_id, user_id, position, label, item_type, due_date, amount_cents, paid, paid_on)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    c.id(), c.userId(), i.position(), i.label(), i.type().name(), toSql(i.dueDate()), i.amount().cents(), i.isPaid(), toSql(i.paidOn()));
+                    INSERT INTO tracked_commitment_items (commitment_id, user_id, position, label, item_type, due_date, amount_cents, paid, paid_on,
+                        co_buyer_person_id, provenance_origin, provenance_confidence)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    c.id(), c.userId(), i.position(), i.label(), i.type().name(), toSql(i.dueDate()), i.amount().cents(), i.isPaid(), toSql(i.paidOn()),
+                    i.coBuyerPersonId(), i.provenance().origin().name(), i.provenance().confidence().name());
+            int order = 1;
+            for (ItemShare share : i.shares()) {
+                jdbc.update("""
+                        INSERT INTO tracked_commitment_item_shares (commitment_id, user_id, position, share_order, person_id, amount_cents)
+                        VALUES (?, ?, ?, ?, ?, ?)""", c.id(), c.userId(), i.position(), order++, share.personId(), share.amount().cents());
+            }
         }
+    }
+
+    private static Integer clause(TrackedCommitment c, java.util.function.ToIntFunction<CommitmentClauses> field) {
+        return c.clauses() == null ? null : field.applyAsInt(c.clauses());
     }
 
     @Override
@@ -105,15 +128,29 @@ public class CommitmentGatewayImpl implements CommitmentGateway {
     private Versioned<TrackedCommitment> map(ResultSet rs) throws SQLException {
         UUID id = rs.getObject("id", UUID.class);
         UUID userId = rs.getObject("user_id", UUID.class);
+        Map<Integer, List<ItemShare>> sharesByPosition = new HashMap<>();
+        jdbc.query("""
+                SELECT position, person_id, amount_cents FROM tracked_commitment_item_shares
+                WHERE commitment_id = ? AND user_id = ? ORDER BY position, share_order""", (r) -> {
+            sharesByPosition.computeIfAbsent(r.getInt("position"), p -> new ArrayList<>()).add(new ItemShare(r.getObject("person_id", UUID.class),
+                    Money.ofCents(r.getLong("amount_cents"), CurrencyCode.BRL)));
+        }, id, userId);
         List<ScheduleItem> items = new ArrayList<>(jdbc.query("""
-                SELECT position, label, item_type, due_date, amount_cents, paid, paid_on FROM tracked_commitment_items
+                SELECT position, label, item_type, due_date, amount_cents, paid, paid_on, co_buyer_person_id,
+                    provenance_origin, provenance_confidence FROM tracked_commitment_items
                 WHERE commitment_id = ? AND user_id = ? ORDER BY position""", (r, n) -> new ScheduleItem(r.getInt("position"),
                 r.getString("label"), ScheduleItemType.valueOf(r.getString("item_type")), toLocal(r.getDate("due_date")),
-                Money.ofCents(r.getLong("amount_cents"), CurrencyCode.BRL), r.getBoolean("paid"), toLocal(r.getDate("paid_on"))), id, userId));
+                Money.ofCents(r.getLong("amount_cents"), CurrencyCode.BRL), r.getBoolean("paid"), toLocal(r.getDate("paid_on")),
+                sharesByPosition.getOrDefault(r.getInt("position"), List.of()), r.getObject("co_buyer_person_id", UUID.class),
+                new Provenance(Provenance.Origin.valueOf(r.getString("provenance_origin")),
+                        Provenance.Confidence.valueOf(r.getString("provenance_confidence")))), id, userId));
+        Integer lateFee = (Integer) rs.getObject("late_fee_bps");
+        CommitmentClauses clauses = lateFee == null ? null : new CommitmentClauses(lateFee, rs.getInt("monthly_interest_bps"),
+                rs.getInt("termination_retention_bps"), rs.getString("clauses_notes"));
         TrackedCommitment commitment = TrackedCommitment.restore(id, userId, CommitmentKind.valueOf(rs.getString("kind")),
                 rs.getString("name"), rs.getString("counterparty"), rs.getString("notes"), money(rs, "total_cents"),
                 money(rs, "informed_paid_cents"), (Integer) rs.getObject("installments_total"), (Integer) rs.getObject("installments_paid"),
-                toLocal(rs.getDate("next_due_date")), items);
+                toLocal(rs.getDate("next_due_date")), items, clauses);
         return new Versioned<>(commitment, rs.getLong("version"), rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("updated_at").toInstant());
     }

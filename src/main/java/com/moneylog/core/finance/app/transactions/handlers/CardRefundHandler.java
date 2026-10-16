@@ -1,6 +1,7 @@
 package com.moneylog.core.finance.app.transactions.handlers;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 import com.moneylog.core.card.app.gateways.CardGateway;
@@ -32,12 +33,17 @@ public class CardRefundHandler {
     }
 
     public Transaction build(Refund c, UUID id, TransactionOrigin origin, Transaction editing) {
+        var refundOf = support.refundOrigin(c, editing);
+        return build(c, id, origin, editing, refundOf, support.refundedThirds(c, refundOf, editing));
+    }
+
+    public Transaction build(Refund c, UUID id, TransactionOrigin origin, Transaction editing, RefundOrigin refundOf,
+                             Map<UUID, Money> thirdsAlreadyRefunded) {
         CreditCard card = cards.findById(c.userId(), c.cardId()).map(Persisted::value)
                 .orElseThrow(() -> new CardNotFoundException(c.cardId()));
         InvoiceChain chain = CardInvoices.chainFor(card, support.transactions().findAllOfCard(c.userId(), card.id()));
-        var refundOf = support.refundOrigin(c, editing);
-        return plan(support.header(c.common(), id, origin), c.common().amount(), card,
-                support.refundCategory(c, refundOf, editing), refundOf, chain, time.today());
+        return CardTransactions.refundToCard(support.header(c.common(), id, origin), c.common().amount(), card,
+                support.refundCategory(c, refundOf, editing), refundOf, chain, time.today(), thirdsAlreadyRefunded);
     }
 
     public static Transaction plan(TransactionHeader header, Money amount, CreditCard card, Category category, RefundOrigin refundOf,

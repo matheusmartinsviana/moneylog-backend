@@ -30,7 +30,7 @@ import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.category.exception.CategoryExceptions.DefaultCategoryUnavailableException;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionUseCaseImpl;

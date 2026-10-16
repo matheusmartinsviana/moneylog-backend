@@ -20,7 +20,15 @@ import com.moneylog.core.finance.app.gateways.CommitmentSourcesGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
+import com.moneylog.core.debt.app.gateways.DebtGateway;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.finance.app.statement.GetOwnerStatementUseCase;
+import com.moneylog.core.notification.app.AlertInputsLoader;
 import com.moneylog.core.notification.app.GenerationContextLoader;
+import com.moneylog.core.notification.app.gateways.AlertSourcesGateway;
+import com.moneylog.core.thirdparty.app.gateways.ThirdPartyExpenseGateway;
+import com.moneylog.infra.notification.gateways.AlertSourcesGatewayImpl;
 import com.moneylog.core.notification.app.SecurityAlertService;
 import com.moneylog.core.notification.app.gateways.NotificationGateway;
 import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
@@ -117,9 +125,22 @@ public class NotificationConfig {
     }
 
     @Bean
+    AlertSourcesGateway alertSourcesGateway(JdbcTemplate jdbc) {
+        return new AlertSourcesGatewayImpl(jdbc);
+    }
+
+    @Bean
+    AlertInputsLoader alertInputsLoader(GetOwnerStatementUseCase statement, CommitmentGateway commitments, DebtGateway debts,
+                                        ThirdPartyExpenseGateway marks, PersonGateway persons, AlertSourcesGateway sources,
+                                        com.moneylog.core.card.app.gateways.InvoiceDocumentGateway invoiceDocuments) {
+        return new AlertInputsLoader(statement, commitments, debts, marks, persons, sources, invoiceDocuments);
+    }
+
+    @Bean
     GenerationContextLoader generationContextLoader(FinancialRecordsGateway records, CommitmentSourcesGateway sources, GoalGateway goals,
-                                                    ReminderGateway reminders, NotificationSettingsGateway settings, TimeProvider time) {
-        return new GenerationContextLoader(records, sources, goals, reminders, settings, time);
+                                                    ReminderGateway reminders, NotificationSettingsGateway settings, TimeProvider time,
+                                                    AlertInputsLoader alertInputs) {
+        return new GenerationContextLoader(records, sources, goals, reminders, settings, time, alertInputs);
     }
 
     @Bean

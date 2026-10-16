@@ -57,10 +57,11 @@ class MigrationUpgradeQaIT {
 
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
-            assertThat(result.migrationsExecuted).isEqualTo(38);
+            assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("1.08"));
             assertThat(result.success).isTrue();
             List<String> versions = jdbc.queryForList("select version from flyway_schema_history where version is not null order by installed_rank", String.class);
-            assertThat(versions).containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02", "7.00", "7.01", "7.02", "7.03", "8.00", "8.01", "8.02", "8.03", "8.04", "8.05", "8.06", "8.07", "8.08", "8.09", "8.10", "8.11", "8.12", "8.13", "8.14", "8.15", "8.16", "8.17");
+            assertThat(versions.subList(0, 47)).as("as 47 primeiras versões (até a V8.17) não mudam").containsExactly("1.00", "1.01", "1.02", "1.03", "1.04", "1.05", "1.06", "1.07", "1.08", "2.00", "2.01", "2.02", "2.03", "2.04", "2.05", "2.06", "3.01", "3.02", "4.00", "4.01", "4.02", "5.00", "6.00", "6.01", "6.02", "7.00", "7.01", "7.02", "7.03", "8.00", "8.01", "8.02", "8.03", "8.04", "8.05", "8.06", "8.07", "8.08", "8.09", "8.10", "8.11", "8.12", "8.13", "8.14", "8.15", "8.16", "8.17");
+            assertThat(versions.get(versions.size() - 1)).isEqualTo(com.moneylog.util.MigrationFiles.latest());
             assertThat(all.validateWithResult().validationSuccessful).as("checksums").isTrue();
             assertThat(all.migrate().migrationsExecuted).as("re-execução é no-op").isZero();
 

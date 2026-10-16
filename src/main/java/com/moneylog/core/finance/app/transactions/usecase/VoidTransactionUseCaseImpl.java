@@ -3,6 +3,7 @@ package com.moneylog.core.finance.app.transactions.usecase;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.moneylog.core.account.app.gateways.AccountGateway;
@@ -16,8 +17,9 @@ import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.debt.exception.DebtExceptions.DebtNotFoundException;
 import com.moneylog.core.sk.persistence.Versioned;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;
+import com.moneylog.core.finance.app.transactions.ShareSettlement;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.sk.ledger.PostingSourceType;
 import com.moneylog.core.sk.money.CurrencyCode;
@@ -30,6 +32,7 @@ import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.core.transaction.domain.TransactionVoiding;
 import com.moneylog.core.transaction.domain.VoidContext;
+import com.moneylog.core.transaction.exception.TransactionExceptions.InvalidTransactionOperationException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionTypeNotAvailableException;
 
@@ -42,6 +45,7 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
     private final TransactionDetailsAssembler assembler;
     private final TimeProvider time;
     private final DebtGateway debts;
+    private final ShareSettlement shareSettlement;
 
     public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, LedgerWriteGateway ledger,
                                       TransactionDetailsAssembler assembler, TimeProvider time) {
@@ -53,10 +57,17 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
         this(transactions, accounts, cards, ledger, assembler, time, null);
     }
 
-    @SuppressWarnings("java:S107")
     public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, CardGateway cards,
                                       LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time,
                                       DebtGateway debts) {
+        this(transactions, accounts, cards, ledger, assembler, time, debts, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public VoidTransactionUseCaseImpl(TransactionGateway transactions, AccountGateway accounts, CardGateway cards,
+                                      LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time,
+                                      DebtGateway debts, ShareSettlement shareSettlement) {
+        this.shareSettlement = shareSettlement;
         this.debts = debts;
         this.transactions = transactions;
         this.accounts = accounts;
@@ -72,6 +83,7 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
         transactions.lockForUpdate(userId, command.transactionId());
         Transaction transaction = transactions.findById(userId, command.transactionId()).map(Persisted::value)
                 .orElseThrow(() -> new TransactionNotFoundException(command.transactionId()));
+        requireRefundOfSharedVoidable(userId, transaction);
         if (transaction.cardId() != null) {
             return voidCardTransaction(userId, command, transaction);
         }
@@ -106,6 +118,20 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
         return assembler.assemble(saved);
     }
 
+    private void requireRefundOfSharedVoidable(UUID userId, Transaction refund) {
+        if (shareSettlement == null || refund.type() != TransactionType.REFUND || refund.refundOfId() == null) {
+            return;
+        }
+        transactions.lockForUpdate(userId, refund.refundOfId());
+        boolean converted = transactions.findById(userId, refund.refundOfId()).map(Persisted::value)
+                .filter(original -> original.purchaseShares() != null)
+                .map(original -> shareSettlement.hasConversion(userId, original.id())).orElse(false);
+        if (converted) {
+            throw new InvalidTransactionOperationException("TRANSACTION_NOT_VOIDABLE",
+                    "O estorno de uma compra rateada cujo excedente já virou valor a pagar não pode ser desfeito.");
+        }
+    }
+
     private List<Versioned<Debt>> lockLinkedDebts(UUID userId, Transaction transaction) {
         if (debts == null) {
             return List.of();
@@ -129,6 +155,11 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
             throw new TransactionTypeNotAvailableException(transaction.type());
         }
         cards.lockForUpdate(userId, transaction.cardId());
+        List<Versioned<Debt>> cashOutDebts = lockCashOutDebts(userId, transaction);
+        boolean shared = shareSettlement != null && transaction.purchaseShares() != null;
+        if (shared) {
+            shareSettlement.lockPersons(userId, transaction.purchaseShares().personIds());
+        }
         if (transaction.accountId() != null) {
             accounts.lockForUpdate(userId, transaction.accountId());
         }
@@ -139,14 +170,39 @@ public class VoidTransactionUseCaseImpl implements VoidTransactionUseCase {
                     .orElseThrow(() -> new AccountNotFoundException(transaction.accountId()));
             account.ensureCanReceiveTransactions();
         }
+        cashOutDebts.forEach(linked -> linked.value().ensureCanVoidTransaction(transaction.id()));
         InvoiceChain chain = CardInvoices.chainFor(card, transactions.findAllOfCard(userId, card.id()));
         Money activeRefunds = transaction.type() == TransactionType.CARD_PURCHASE
                 ? transactions.sumActiveRefundsOf(userId, transaction.id()) : Money.zero(CurrencyCode.BRL);
         Instant now = time.now();
+        ShareSettlement.Plan conversion = shared ? shareSettlement.planConversion(userId, transaction, Map.of(), time.today())
+                : ShareSettlement.Plan.NONE;
+        Transaction before = conversion.isEmpty() ? null : Transaction.restore(transaction.state(), transaction.entries());
         TransactionVoiding.voidTransaction(transaction, VoidContext.of(command.reason(), now, time.today()).withCard(card, chain)
                 .withActiveRefunds(activeRefunds));
         Persisted<Transaction> saved = transactions.update(transaction);
         ledger.deactivateBySource(userId, PostingSourceType.TRANSACTION, transaction.id(), VOID_REASON, now);
+        if (!conversion.isEmpty()) {
+            shareSettlement.audit(userId, before, now, ShareSettlement.REVISION_VOID, conversion.describe(command.reason()));
+            shareSettlement.apply(userId, conversion);
+        }
+        for (Versioned<Debt> linked : cashOutDebts) {
+            linked.value().markOriginVoided(transaction.id(), command.reason(), time.today());
+            debts.update(linked.value(), linked.version());
+        }
         return assembler.assemble(saved);
+    }
+
+    private List<Versioned<Debt>> lockCashOutDebts(UUID userId, Transaction transaction) {
+        if (debts == null || transaction.type() != TransactionType.CARD_PURCHASE) {
+            return List.of();
+        }
+        List<UUID> ids = debts.findIdsByOriginTransaction(userId, transaction.id());
+        ids.stream().sorted().forEach(id -> debts.lockForUpdate(userId, id));
+        List<Versioned<Debt>> linked = new ArrayList<>();
+        for (UUID id : ids) {
+            linked.add(debts.findById(userId, id).orElseThrow(() -> new DebtNotFoundException(id)));
+        }
+        return linked;
     }
 }

@@ -18,7 +18,7 @@ import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.core.transaction.domain.Transaction;
 
 public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, List<Transaction> transactions, List<Debt> debts,
-                               List<Goal> goals) {
+                               List<Goal> goals, List<LedgerEntry> receiptEntries) {
 
     public FinancialRecords {
         accounts = List.copyOf(accounts);
@@ -26,6 +26,12 @@ public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, L
         transactions = List.copyOf(transactions);
         debts = List.copyOf(debts);
         goals = List.copyOf(goals);
+        receiptEntries = receiptEntries == null ? List.of() : List.copyOf(receiptEntries);
+    }
+
+    public FinancialRecords(List<Account> accounts, List<CreditCard> cards, List<Transaction> transactions, List<Debt> debts,
+                            List<Goal> goals) {
+        this(accounts, cards, transactions, debts, goals, List.of());
     }
 
     public FinancialRecords(List<Account> accounts, List<CreditCard> cards, List<Transaction> transactions, List<Debt> debts) {
@@ -41,6 +47,7 @@ public record FinancialRecords(List<Account> accounts, List<CreditCard> cards, L
         }
         transactions.forEach(t -> entries.addAll(t.entries()));
         debts.forEach(d -> entries.addAll(d.entries()));
+        entries.addAll(receiptEntries);
         return List.copyOf(entries);
     }
 

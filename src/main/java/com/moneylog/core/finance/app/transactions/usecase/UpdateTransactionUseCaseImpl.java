@@ -6,7 +6,7 @@ import java.util.UUID;
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.exception.AccountExceptions.AccountNotFoundException;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.AccountTransactionFactory;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;

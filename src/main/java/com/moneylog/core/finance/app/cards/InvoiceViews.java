@@ -2,6 +2,7 @@ package com.moneylog.core.finance.app.cards;
 
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,6 +15,9 @@ import com.moneylog.core.card.domain.InvoiceItemKind;
 import com.moneylog.core.card.domain.InvoicePayment;
 import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.finance.domain.FinancialRecords;
+import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.transaction.domain.PersonAmount;
+import com.moneylog.core.transaction.domain.PurchaseShares;
 import com.moneylog.core.transaction.domain.Transaction;
 
 public final class InvoiceViews {
@@ -26,8 +30,24 @@ public final class InvoiceViews {
     }
 
     public static InvoiceDetails details(UUID cardId, CreditCardInvoice invoice, Map<UUID, Transaction> transactions, LocalDate today) {
-        return new InvoiceDetails(InvoiceView.of(cardId, invoice, today), items(invoice.items(), transactions, false),
-                payments(invoice.payments(), transactions));
+        InvoiceView view = InvoiceView.of(cardId, invoice, today);
+        List<PersonAmount> byPerson = shareByPerson(invoice.items(), transactions);
+        Money thirdParty = Money.sum(byPerson.stream().map(PersonAmount::amount).toList(), view.total().currency());
+        return new InvoiceDetails(view, items(invoice.items(), transactions, false), payments(invoice.payments(), transactions),
+                view.total().subtract(thirdParty), thirdParty, byPerson, null, null, 0);
+    }
+
+    private static List<PersonAmount> shareByPerson(List<InvoiceItem> items, Map<UUID, Transaction> transactions) {
+        Map<UUID, Money> totals = new LinkedHashMap<>();
+        items.stream().filter(InvoiceItem::active).filter(item -> item.kind() == InvoiceItemKind.INSTALLMENT).forEach(item -> {
+            Transaction transaction = transactions.get(item.transactionId());
+            PurchaseShares shares = transaction == null ? null : transaction.purchaseShares();
+            if (shares != null) {
+                shares.split(item.amount()).byPerson().forEach(part -> totals.merge(part.personId(), part.amount(), Money::add));
+            }
+        });
+        return totals.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .map(entry -> new PersonAmount(entry.getKey(), entry.getValue())).toList();
     }
 
     public static List<InvoiceDetails.Item> items(List<InvoiceItem> items, Map<UUID, Transaction> transactions,

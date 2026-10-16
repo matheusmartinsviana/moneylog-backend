@@ -234,7 +234,7 @@ class ExportsIT extends E4ItBase {
 
         assertThat(result.getResponse().getHeader(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("attachment; filename=\"moneylog-backup-2026-10-10.json\"");
         assertThat(result.getResponse().getContentType()).startsWith("application/json");
-        assertThat(backup.get("schemaVersion").asInt()).isEqualTo(1);
+        assertThat(backup.get("schemaVersion").asInt()).isEqualTo(2);
         assertThat(backup.get("generatedAt").asString()).startsWith("2026-10-10");
         assertThat(backup.get("accounts")).hasSize(1);
         assertThat(backup.get("accounts").get(0).get("name").asString()).isEqualTo("Nubank");

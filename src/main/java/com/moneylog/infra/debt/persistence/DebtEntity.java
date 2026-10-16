@@ -10,6 +10,7 @@ import org.hibernate.type.SqlTypes;
 
 import com.moneylog.core.debt.domain.DebtClosure;
 import com.moneylog.core.debt.domain.DebtDirection;
+import com.moneylog.core.debt.domain.DebtKind;
 import com.moneylog.core.debt.domain.DebtOrigin;
 
 import jakarta.persistence.Column;
@@ -76,6 +77,13 @@ public class DebtEntity {
     @Column(name = "closure_reason", length = 500)
     private String closureReason;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private DebtKind kind = DebtKind.PERSONAL;
+
+    @Column(length = 60)
+    private String channel;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -120,6 +128,19 @@ public class DebtEntity {
         this.closureDate = newClosureDate;
         this.closureReason = newClosureReason;
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+    }
+
+    public void defineKindAndChannel(DebtKind newKind, String newChannel) {
+        this.kind = newKind;
+        this.channel = newChannel;
+    }
+
+    public DebtKind getKind() {
+        return kind;
+    }
+
+    public String getChannel() {
+        return channel;
     }
 
     public UUID getId() {

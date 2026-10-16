@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.moneylog.core.finance.app.gateways.LedgerReadGateway;
+import com.moneylog.core.sk.ledger.LedgerReadGateway;
 import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.PostingSource;
 import com.moneylog.infra.ledger.persistence.LedgerPostingEntity;
@@ -29,6 +29,11 @@ public class LedgerReadGatewayImpl implements LedgerReadGateway {
             bySource.computeIfAbsent(entry.source(), key -> new ArrayList<>()).add(entry);
         }
         return bySource;
+    }
+
+    @Override
+    public List<LedgerEntry> entriesOfSource(UUID userId, com.moneylog.core.sk.ledger.PostingSourceType type, UUID sourceId) {
+        return repository.findBySources(userId, List.of(type), List.of(sourceId)).stream().map(LedgerRepositoryMapper::toDomain).toList();
     }
 
     @Override

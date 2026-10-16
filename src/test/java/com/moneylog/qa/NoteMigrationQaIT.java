@@ -105,8 +105,8 @@ class NoteMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(25);
-            assertThat(all.info().current().getVersion().getVersion()).isEqualTo("8.17");
+            assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("5.00"));
+            assertThat(all.info().current().getVersion().getVersion()).isEqualTo(com.moneylog.util.MigrationFiles.latest());
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
             assertThat(jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class)).isEqualTo(ledgerBefore);

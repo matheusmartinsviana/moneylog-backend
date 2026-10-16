@@ -2,6 +2,8 @@ package com.moneylog.core.transaction.domain;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.domain.AccountType;
@@ -42,12 +44,17 @@ public final class AccountTransactions {
 
     public static Transaction expense(TransactionHeader header, Money amount, Account account, Category category,
                                       PaymentMethod method) {
+        return expense(header, amount, account, category, method, null);
+    }
+
+    public static Transaction expense(TransactionHeader header, Money amount, Account account, Category category,
+                                      PaymentMethod method, TransactionNature nature) {
         requireHeaderAndAmount(header, amount);
         requireCashAccount(header, amount, account, TransactionType.EXPENSE);
         requireCategory(header, category, CategoryKind.EXPENSE);
         requireMethod(method, TransactionType.EXPENSE);
         return Transaction.builder(header, TransactionType.EXPENSE, amount)
-                .paymentMethod(method).account(account.id()).category(category.id())
+                .paymentMethod(method).account(account.id()).category(category.id()).nature(nature)
                 .entries(entries(header,
                         new Posting(category.book(), amount, header.date()),
                         new Posting(account.book(), amount.negate(), header.date())))
@@ -56,6 +63,11 @@ public final class AccountTransactions {
 
     public static ExpenseOperation expenseWithShares(TransactionHeader header, Money amount, Account account, Category category,
                                                      PaymentMethod method, List<ExpenseShare> shares) {
+        return expenseWithShares(header, amount, account, category, method, shares, null);
+    }
+
+    public static ExpenseOperation expenseWithShares(TransactionHeader header, Money amount, Account account, Category category,
+                                                     PaymentMethod method, List<ExpenseShare> shares, TransactionNature nature) {
         requireHeaderAndAmount(header, amount);
         requireCashAccount(header, amount, account, TransactionType.EXPENSE);
         requireCategory(header, category, CategoryKind.EXPENSE);
@@ -85,11 +97,16 @@ public final class AccountTransactions {
                     header.date(), share.expectedDate(), share.description() == null ? header.description() : share.description(),
                     header.id()));
         }
-        return new ExpenseOperation(sharedExpense(header, amount, account, category, method, debts), debts);
+        return new ExpenseOperation(sharedExpense(header, amount, account, category, method, debts, nature), debts);
     }
 
     public static Transaction expenseKeepingShares(TransactionHeader header, Money amount, Account account, Category category,
                                                    PaymentMethod method, List<Debt> debts) {
+        return expenseKeepingShares(header, amount, account, category, method, debts, null);
+    }
+
+    public static Transaction expenseKeepingShares(TransactionHeader header, Money amount, Account account, Category category,
+                                                   PaymentMethod method, List<Debt> debts, TransactionNature nature) {
         requireHeaderAndAmount(header, amount);
         requireCashAccount(header, amount, account, TransactionType.EXPENSE);
         requireCategory(header, category, CategoryKind.EXPENSE);
@@ -104,11 +121,11 @@ public final class AccountTransactions {
         if (debts.isEmpty() || !total.isLessThan(amount)) {
             throw new SharesExceedAmountException();
         }
-        return sharedExpense(header, amount, account, category, method, debts);
+        return sharedExpense(header, amount, account, category, method, debts, nature);
     }
 
     private static Transaction sharedExpense(TransactionHeader header, Money amount, Account account, Category category,
-                                             PaymentMethod method, List<Debt> debts) {
+                                             PaymentMethod method, List<Debt> debts, TransactionNature nature) {
         Money total = Money.zero(amount.currency());
         List<Posting> postings = new ArrayList<>();
         for (Debt debt : debts) {
@@ -118,7 +135,7 @@ public final class AccountTransactions {
         postings.add(0, new Posting(category.book(), amount.subtract(total), header.date()));
         postings.add(new Posting(account.book(), amount.negate(), header.date()));
         return Transaction.builder(header, TransactionType.EXPENSE, amount)
-                .paymentMethod(method).account(account.id()).category(category.id())
+                .paymentMethod(method).account(account.id()).category(category.id()).nature(nature)
                 .entries(entries(header, postings.toArray(Posting[]::new)))
                 .build();
     }
@@ -215,6 +232,11 @@ public final class AccountTransactions {
 
     public static Transaction refundToAccount(TransactionHeader header, Money amount, Account account, Category category,
                                               RefundOrigin refundOf) {
+        return refundToAccount(header, amount, account, category, refundOf, Map.of());
+    }
+
+    public static Transaction refundToAccount(TransactionHeader header, Money amount, Account account, Category category,
+                                              RefundOrigin refundOf, Map<UUID, Money> thirdsAlreadyRefunded) {
         requireHeaderAndAmount(header, amount);
         requireCashAccount(header, amount, account, TransactionType.REFUND);
         requireCategory(header, category, CategoryKind.EXPENSE);
@@ -222,10 +244,18 @@ public final class AccountTransactions {
         return Transaction.builder(header, TransactionType.REFUND, amount)
                 .account(account.id()).category(category.id())
                 .refundOf(refundOf == null ? null : refundOf.original().id())
-                .entries(entries(header,
-                        new Posting(account.book(), amount, header.date()),
-                        new Posting(category.book(), amount.negate(), header.date())))
+                .entries(LedgerEntry.activeGroup(PostingSource.transaction(header.id()),
+                        refundPostings(header, amount, category, account.book(), refundOf, thirdsAlreadyRefunded)))
                 .build();
+    }
+
+    static List<Posting> refundPostings(TransactionHeader header, Money amount, Category category, BookRef counterpart,
+                                        RefundOrigin refundOf, Map<UUID, Money> thirdsAlreadyRefunded) {
+        if (refundOf == null) {
+            return List.of(new Posting(counterpart, amount, header.date()), new Posting(category.book(), amount.negate(), header.date()));
+        }
+        return SharePayables.refundPostings(refundOf.original(), amount, refundOf.alreadyRefunded(), thirdsAlreadyRefunded,
+                category.book(), counterpart, header.date());
     }
 
     static void requireHeaderAndAmount(TransactionHeader header, Money amount) {
@@ -270,6 +300,9 @@ public final class AccountTransactions {
         }
         if (original.type() != TransactionType.EXPENSE && original.type() != TransactionType.CARD_PURCHASE) {
             throw new InvalidRefundOriginException("só despesa ou compra no cartão pode ser reembolsada.");
+        }
+        if (original.isCardCashOut()) {
+            throw new InvalidRefundOriginException("o Pix no crédito não tem reembolso; estorne a movimentação inteira.");
         }
         if (!category.id().equals(original.categoryId())) {
             throw new InvalidRefundOriginException("o reembolso volta para a categoria da despesa original.");

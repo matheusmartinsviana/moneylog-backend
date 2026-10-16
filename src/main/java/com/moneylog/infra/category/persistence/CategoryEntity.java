@@ -84,6 +84,10 @@ public class CategoryEntity {
         return name;
     }
 
+    public String getSystemKey() {
+        return systemKey;
+    }
+
     public CategoryKind getKind() {
         return kind;
     }

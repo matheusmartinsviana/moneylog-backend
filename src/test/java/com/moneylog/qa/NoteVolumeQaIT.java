@@ -12,6 +12,7 @@ import java.util.zip.ZipInputStream;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -34,6 +35,7 @@ import com.moneylog.util.MutableClockConfig;
 
 @IntegrationTest
 @Import(MutableClockConfig.class)
+@Tag("slow")
 @DisplayName("QA T113: limites e desempenho do vault")
 class NoteVolumeQaIT {
 

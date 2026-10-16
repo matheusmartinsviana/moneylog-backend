@@ -15,6 +15,8 @@ import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
+import com.moneylog.core.commitment.app.gateways.CommitmentGateway;
+import com.moneylog.core.commitment.domain.FinancingPending;
 import com.moneylog.core.finance.app.cards.CardViews;
 import com.moneylog.core.finance.app.cards.PurchasePreviewView;
 import com.moneylog.core.finance.app.cards.PurchasePreviewView.InvoiceTarget;
@@ -28,6 +30,9 @@ import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.Posting;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.domain.ForeignCharge;
+import com.moneylog.core.transaction.domain.InstallmentSplit;
+import com.moneylog.core.transaction.domain.PurchaseShares;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
@@ -38,8 +43,15 @@ public class PreviewCardPurchaseUseCaseImpl implements PreviewCardPurchaseUseCas
     private final FinancialRecordsGateway records;
     private final IdGenerator ids;
     private final TimeProvider time;
+    private final CommitmentGateway commitments;
 
     public PreviewCardPurchaseUseCaseImpl(CardGateway cards, FinancialRecordsGateway records, IdGenerator ids, TimeProvider time) {
+        this(cards, records, ids, time, null);
+    }
+
+    public PreviewCardPurchaseUseCaseImpl(CardGateway cards, FinancialRecordsGateway records, IdGenerator ids, TimeProvider time,
+                                          CommitmentGateway commitments) {
+        this.commitments = commitments;
         this.cards = cards;
         this.records = records;
         this.ids = ids;
@@ -56,14 +68,19 @@ public class PreviewCardPurchaseUseCaseImpl implements PreviewCardPurchaseUseCas
         Category stand = Category.create(ids.next(), query.userId(), "Prévia", CategoryKind.EXPENSE);
         TransactionHeader header = new TransactionHeader(ids.next(), query.userId(), query.date(), null, null, TransactionOrigin.manual());
 
-        Transaction purchase = CardPurchaseHandler.plan(header, query.amount(), card, stand, query.installments(), chain, today);
+        ForeignCharge charge = query.foreign().toBasis();
+        Transaction purchase = CardPurchaseHandler.plan(header, charge == null ? query.amount() : charge.brl(), card, stand, query.installments(), chain, today,
+                query.splitMode(), query.shares());
+        PurchaseShares shares = purchase.purchaseShares();
 
         List<PurchasePreviewView.Installment> installments = new ArrayList<>();
         for (TransactionInstallment i : purchase.installments()) {
             InvoicePeriod period = chain.calendar().periodClosingIn(java.time.YearMonth.from(i.invoiceClosingDate()));
+            InstallmentSplit split = shares == null ? new InstallmentSplit(i.amount(), List.of()) : shares.split(i.amount());
             installments.add(new PurchasePreviewView.Installment(i.number(), i.total(), i.amount(), i.competence(),
                     new InvoiceTarget(InvoiceIds.of(card.id(), i.invoiceClosingDate()), period.referenceMonth(), period.closingDate(),
-                            period.dueDate(), chain.statusOf(i.invoiceClosingDate(), today)), i.lateEntry()));
+                            period.dueDate(), chain.statusOf(i.invoiceClosingDate(), today)), i.lateEntry(), split.mine(),
+                    split.thirdParties(), split.byPerson()));
         }
         AvailableLimit after = AvailableLimitCalculator.calculate(card, postingsAfter(card, loaded, purchase));
         List<Warning> warnings = new ArrayList<>();
@@ -76,7 +93,11 @@ public class PreviewCardPurchaseUseCaseImpl implements PreviewCardPurchaseUseCas
         if (query.date().isAfter(today)) {
             warnings.add(Warning.FUTURE_DATE);
         }
-        return new PurchasePreviewView(installments, purchase.amount(), after.available(), after.overLimit(), warnings);
+        if (query.installments() > 1 && commitments != null && FinancingPending.exists(commitments.findAll(query.userId()))) {
+            warnings.add(Warning.FINANCING_PENDING);
+        }
+        return new PurchasePreviewView(installments, purchase.amount(), after.available(), after.overLimit(), warnings,
+                shares == null ? null : shares.mode(), shares == null ? List.of() : shares.lines());
     }
 
     private static List<Posting> postingsAfter(CreditCard card, FinancialRecords loaded, Transaction purchase) {
