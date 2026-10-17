@@ -46,7 +46,7 @@ public class SetupPasswordUseCaseImpl implements SetupPasswordUseCase {
                 && SetupCode.sameHash(SetupCode.hash(command.setupCode()), access.setupCodeHash());
         boolean required = access.passwordSetupRequired(passwordVerifier.hasEnvironmentHash());
         boolean fresh = access.setupCodeValidAt(now);
-        if (!(emailOk & codeOk & required & fresh)) {
+        if (!(emailOk && codeOk && required && fresh)) {
             throw new InvalidSetupCodeException();
         }
 

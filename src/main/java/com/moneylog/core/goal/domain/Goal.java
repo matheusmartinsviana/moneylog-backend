@@ -633,8 +633,9 @@ public final class Goal {
             throw new GoalNameRequiredException();
         }
         String stripped = value.strip();
+        int length = stripped.length();
         PlainText.requireClean(stripped, "name", false);
-        if (stripped.length() > NAME_MAX_LENGTH) {
+        if (length > NAME_MAX_LENGTH) {
             throw new GoalNameTooLongException(NAME_MAX_LENGTH);
         }
         return stripped;
