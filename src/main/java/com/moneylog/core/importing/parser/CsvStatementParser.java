@@ -85,16 +85,16 @@ public final class CsvStatementParser {
                 skipped.add(new Skipped(lineNumber, cell(cells, mapping.date()).isBlank() ? "linha sem data (total ou rodapé)" : "data inválida"));
                 continue;
             }
-            Optional<Long> cents = signedCents(cells, mapping);
-            if (cents == null) {
+            SignedCents cents = signedCents(cells, mapping);
+            if (cents.state() == CentsState.INVALID) {
                 skipped.add(new Skipped(lineNumber, "valor inválido"));
                 continue;
             }
-            if (cents.isEmpty() || cents.get() == 0L) {
+            if (cents.state() == CentsState.ABSENT || cents.cents() == 0L) {
                 skipped.add(new Skipped(lineNumber, "valor zero"));
                 continue;
             }
-            long value = cents.get();
+            long value = cents.cents();
             ImportDirection direction = value > 0 ? ImportDirection.IN : ImportDirection.OUT;
             if (mapping.invert() && mapping.amount() != null) {
                 direction = direction == ImportDirection.IN ? ImportDirection.OUT : ImportDirection.IN;
@@ -108,21 +108,32 @@ public final class CsvStatementParser {
         return new ParsedStatement(Format.CSV, false, rows, skipped);
     }
 
-    private static Optional<Long> signedCents(List<String> cells, ColumnMapping mapping) {
+    private enum CentsState { INVALID, ABSENT, VALUE }
+
+    private record SignedCents(CentsState state, long cents) {
+
+        static final SignedCents INVALID = new SignedCents(CentsState.INVALID, 0L);
+        static final SignedCents ABSENT = new SignedCents(CentsState.ABSENT, 0L);
+
+        static SignedCents of(long cents) {
+            return new SignedCents(CentsState.VALUE, cents);
+        }
+    }
+
+    private static SignedCents signedCents(List<String> cells, ColumnMapping mapping) {
         if (mapping.amount() != null) {
             String raw = cell(cells, mapping.amount());
             if (raw.isBlank()) {
-                return Optional.empty();
+                return SignedCents.ABSENT;
             }
-            Optional<Long> value = AmountParser.parseCents(raw);
-            return value.isEmpty() ? null : value;
+            return AmountParser.parseCents(raw).map(SignedCents::of).orElse(SignedCents.INVALID);
         }
         long total = 0;
         boolean any = false;
         if (mapping.debit() != null && !cell(cells, mapping.debit()).isBlank()) {
             Optional<Long> debit = AmountParser.parseCents(cell(cells, mapping.debit()));
             if (debit.isEmpty()) {
-                return null;
+                return SignedCents.INVALID;
             }
             total -= Math.abs(debit.get());
             any = true;
@@ -130,12 +141,12 @@ public final class CsvStatementParser {
         if (mapping.credit() != null && !cell(cells, mapping.credit()).isBlank()) {
             Optional<Long> credit = AmountParser.parseCents(cell(cells, mapping.credit()));
             if (credit.isEmpty()) {
-                return null;
+                return SignedCents.INVALID;
             }
             total += Math.abs(credit.get());
             any = true;
         }
-        return any ? Optional.of(total) : Optional.empty();
+        return any ? SignedCents.of(total) : SignedCents.ABSENT;
     }
 
     private static String cell(List<String> cells, int index) {
@@ -245,7 +256,11 @@ public final class CsvStatementParser {
             return false;
         }
         return first.stream().noneMatch(c -> DateParser.parse(c).isPresent())
-                && first.stream().noneMatch(c -> AmountParser.parseCents(c).isPresent() && c.matches(".*\\d.*"));
+                && first.stream().noneMatch(c -> AmountParser.parseCents(c).isPresent() && hasAsciiDigit(c));
+    }
+
+    private static boolean hasAsciiDigit(String text) {
+        return text.chars().anyMatch(ch -> ch >= '0' && ch <= '9');
     }
 
     private static String normalizeLabel(String text) {
@@ -280,7 +295,7 @@ public final class CsvStatementParser {
                 String cell = sample.get(i);
                 if (date < 0 && DateParser.parse(cell).isPresent()) {
                     date = i;
-                } else if (amount < 0 && AmountParser.parseCents(cell).isPresent() && cell.matches(".*\\d.*") && !cell.matches("\\d{1,2}[/.\\-]\\d{1,2}.*")) {
+                } else if (amount < 0 && AmountParser.parseCents(cell).isPresent() && hasAsciiDigit(cell) && !cell.matches("\\d{1,2}[/.\\-]\\d{1,2}.*")) {
                     amount = i;
                 } else if (description < 0 && !cell.isBlank()) {
                     description = i;

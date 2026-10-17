@@ -102,6 +102,31 @@ class CsvStatementParserTest {
     }
 
     @Test
+    @DisplayName("valor em branco e 0,00 são 'valor zero'; valor não numérico é 'valor inválido' (coluna única e débito/crédito)")
+    void valorEmBrancoZeroEInvalido() {
+        String unico = """
+                Data,Descrição,Valor
+                01/10/2026,Sem valor,
+                02/10/2026,Zerado,0.00
+                03/10/2026,Ilegível,abc
+                04/10/2026,Normal,-1.00
+                """;
+        ParsedStatement parsed = CsvStatementParser.parse(utf8(unico), new ColumnMapping(0, 1, 2, null, null, false, true, ','));
+        assertThat(parsed.rows()).extracting(Row::lineNumber).containsExactly(5);
+        assertThat(parsed.skipped()).extracting(ParsedStatement.Skipped::lineNumber, ParsedStatement.Skipped::reason).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(2, "valor zero"), org.assertj.core.groups.Tuple.tuple(3, "valor zero"),
+                org.assertj.core.groups.Tuple.tuple(4, "valor inválido"));
+
+        String duplo = "Data;Descrição;Débito;Crédito\n01/10/2026;Sem valor;;\n02/10/2026;Zerado;0,00;\n03/10/2026;Ilegível;x;\n04/10/2026;Ilegível;;y\n"
+                + "05/10/2026;Normal;;2,00\n";
+        ParsedStatement dual = CsvStatementParser.parse(utf8(duplo), new ColumnMapping(0, 1, null, 2, 3, false, true, ';'));
+        assertThat(dual.rows()).extracting(Row::lineNumber).containsExactly(6);
+        assertThat(dual.skipped()).extracting(ParsedStatement.Skipped::lineNumber, ParsedStatement.Skipped::reason).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(2, "valor zero"), org.assertj.core.groups.Tuple.tuple(3, "valor zero"),
+                org.assertj.core.groups.Tuple.tuple(4, "valor inválido"), org.assertj.core.groups.Tuple.tuple(5, "valor inválido"));
+    }
+
+    @Test
     @DisplayName("aspas com vírgula e quebra de linha dentro do campo; aspas dobradas")
     void aspas() {
         String text = "Data,Descrição,Valor\n01/10/2026,\"Loja \"\"X\"\", filial\nCentro\",-10.00\n";
