@@ -13,6 +13,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.sun.net.httpserver.HttpServer;
 
@@ -32,6 +34,7 @@ class AnthropicLlmClientTest {
     private final AtomicReference<String> body = new AtomicReference<>();
     private final AtomicReference<String> keyHeader = new AtomicReference<>();
     private final AtomicReference<String> versionHeader = new AtomicReference<>();
+    private final AtomicReference<String> path = new AtomicReference<>();
     private volatile int status = 200;
     private volatile String reply = "{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"text\\\":\\\"oi\\\"}\"}],\"usage\":{\"input_tokens\":12,\"output_tokens\":5}}";
 
@@ -42,6 +45,7 @@ class AnthropicLlmClientTest {
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             keyHeader.set(exchange.getRequestHeaders().getFirst("x-api-key"));
             versionHeader.set(exchange.getRequestHeaders().getFirst("anthropic-version"));
+            path.set(exchange.getRequestURI().getPath());
             byte[] out = reply.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("content-type", "application/json");
             exchange.sendResponseHeaders(status, out.length);
@@ -77,6 +81,19 @@ class AnthropicLlmClientTest {
         assertThat(response.text()).isEqualTo("{\"text\":\"oi\"}");
         assertThat(response.inputTokens()).isEqualTo(12);
         assertThat(response.outputTokens()).isEqualTo(5);
+    }
+
+    @ParameterizedTest(name = "[{index}] baseUrl terminando em \"{0}\"")
+    @ValueSource(strings = {"", "/", "///"})
+    @DisplayName("barras no fim da baseUrl não mudam o endpoint: sempre /v1/messages")
+    void deveNormalizarAsBarrasDaBaseUrl(String suffix) throws Exception {
+        AnthropicLlmClient client = new AnthropicLlmClient(mapper, "http://127.0.0.1:" + server.getAddress().getPort() + suffix, SENTINEL_KEY, "m",
+                Duration.ofSeconds(5));
+
+        LlmResponse response = client.complete(new LlmRequest("s", "u", 10));
+
+        assertThat(path.get()).isEqualTo("/v1/messages");
+        assertThat(response.text()).isEqualTo("{\"text\":\"oi\"}");
     }
 
     @Test

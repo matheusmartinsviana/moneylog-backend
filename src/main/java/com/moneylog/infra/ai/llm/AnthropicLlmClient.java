@@ -29,12 +29,20 @@ public class AnthropicLlmClient implements LlmClient {
 
     public AnthropicLlmClient(ObjectMapper mapper, String baseUrl, String apiKey, String model, Duration timeout) {
         this.mapper = mapper;
-        String base = baseUrl == null || baseUrl.isBlank() ? DEFAULT_BASE_URL : baseUrl.strip().replaceAll("/+$", "");
+        String base = baseUrl == null || baseUrl.isBlank() ? DEFAULT_BASE_URL : trimTrailingSlashes(baseUrl.strip());
         this.endpoint = URI.create(base + "/v1/messages");
         this.apiKey = apiKey;
         this.model = model;
         this.timeout = timeout;
         this.http = HttpClient.newBuilder().connectTimeout(timeout).build();
+    }
+
+    private static String trimTrailingSlashes(String text) {
+        int end = text.length();
+        while (end > 0 && text.charAt(end - 1) == '/') {
+            end--;
+        }
+        return text.substring(0, end);
     }
 
     @Override

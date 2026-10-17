@@ -293,8 +293,7 @@ public class NoteGatewayImpl implements NoteGateway {
             where.append(" AND EXISTS (SELECT 1 FROM note_tags t WHERE t.note_id = n.id AND t.user_id = n.user_id AND t.tag = :tag)");
         }
         if (q.folder() != null && !q.folder().isBlank()) {
-            String folder = java.text.Normalizer.normalize(q.folder().strip().replaceAll("^/+|/+$", ""), java.text.Normalizer.Form.NFC)
-                    .toLowerCase(Locale.ROOT);
+            String folder = java.text.Normalizer.normalize(trimSlashes(q.folder().strip()), java.text.Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
             params.addValue("folder", escapeLike(folder) + "/%");
             where.append(" AND n.path_key LIKE :folder");
         }
@@ -348,6 +347,18 @@ public class NoteGatewayImpl implements NoteGateway {
         };
         params.addValue("linked", q.linkedType().usesKey() ? q.linkedKey() : q.linkedId());
         return " AND EXISTS (SELECT 1 FROM note_links lk WHERE lk.note_id = n.id AND lk.user_id = n.user_id AND lk." + column + " = :linked)";
+    }
+
+    static String trimSlashes(String text) {
+        int start = 0;
+        int end = text.length();
+        while (start < end && text.charAt(start) == '/') {
+            start++;
+        }
+        while (end > start && text.charAt(end - 1) == '/') {
+            end--;
+        }
+        return text.substring(start, end);
     }
 
     static String escapeLike(String text) {
