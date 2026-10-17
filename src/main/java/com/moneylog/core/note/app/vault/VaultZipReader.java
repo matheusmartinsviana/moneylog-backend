@@ -25,6 +25,7 @@ import com.moneylog.core.note.exception.NoteExceptions.NotePathInvalidException;
 import com.moneylog.core.note.exception.NoteExceptions.PathProblem;
 import com.moneylog.core.note.exception.NoteExceptions.VaultImportInvalidException;
 import com.moneylog.core.note.exception.NoteExceptions.VaultImportTooLargeException;
+import com.moneylog.core.sk.io.PrivateTempDirectories;
 
 public final class VaultZipReader {
 
@@ -112,11 +113,7 @@ public final class VaultZipReader {
     }
 
     private static Path createPrivateDirectory() throws IOException {
-        try {
-            return Files.createTempDirectory("moneylog-import-", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-        } catch (UnsupportedOperationException notPosix) {
-            return Files.createTempDirectory("moneylog-import-");
-        }
+        return PrivateTempDirectories.create("moneylog-import-");
     }
 
     private static void restrict(Path file, String permissions) {
