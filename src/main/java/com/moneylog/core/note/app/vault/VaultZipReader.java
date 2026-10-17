@@ -9,8 +9,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
@@ -29,6 +31,22 @@ public final class VaultZipReader {
     public enum IgnoreReason { NOT_MARKDOWN, HIDDEN, PATH_UNSUPPORTED, NOTE_TOO_LARGE }
 
     public record NoteEntry(int index, String name, NotePath path, byte[] data, boolean nameGuessed) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof NoteEntry that && index == that.index && nameGuessed == that.nameGuessed && Objects.equals(name, that.name)
+                    && Objects.equals(path, that.path) && Arrays.equals(data, that.data);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(index, name, path, Arrays.hashCode(data), nameGuessed);
+        }
+
+        @Override
+        public String toString() {
+            return "NoteEntry[index=" + index + ", name=" + name + ", path=" + path + ", bytes=" + (data == null ? 0 : data.length) + ", nameGuessed="
+                    + nameGuessed + "]";
+        }
     }
 
     public record IgnoredEntry(String name, IgnoreReason reason, boolean nameGuessed) {
@@ -277,6 +295,20 @@ public final class VaultZipReader {
     }
 
     private record Read(byte[] data, long total, boolean overflow) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Read that && total == that.total && overflow == that.overflow && Arrays.equals(data, that.data);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(Arrays.hashCode(data), total, overflow);
+        }
+
+        @Override
+        public String toString() {
+            return "Read[bytes=" + (data == null ? 0 : data.length) + ", total=" + total + ", overflow=" + overflow + "]";
+        }
     }
 
     private static Read readBounded(InputStream in, ZipEntry entry, int keep, long budget) throws IOException {

@@ -2,7 +2,9 @@ package com.moneylog.infra.security;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -51,6 +53,21 @@ public class ClientIpResolver {
             } catch (UnknownHostException | IllegalArgumentException e) {
                 throw new IllegalStateException("moneylog.security.trusted-proxies tem um CIDR inválido: " + text, e);
             }
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Cidr that && prefix == that.prefix && Arrays.equals(network, that.network);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(Arrays.hashCode(network), prefix);
+        }
+
+        @Override
+        public String toString() {
+            return "Cidr[bytes=" + network.length + ", prefix=" + prefix + "]";
         }
 
         boolean contains(String ip) {
