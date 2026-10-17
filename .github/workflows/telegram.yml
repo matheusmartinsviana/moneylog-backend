@@ -1,0 +1,41 @@
+name: telegram
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  avisa:
+    if: (github.event_name == 'pull_request' && github.event.pull_request.draft == false) || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          EVENTO: ${{ github.event_name }}
+          REPO: ${{ github.event.repository.name }}
+          PR_NUMERO: ${{ github.event.pull_request.number }}
+          PR_TITULO: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          if [[ "$EVENTO" == "pull_request" ]]; then
+            TEXTO="🔔 $REPO: PR #$PR_NUMERO aguardando você
+          $PR_TITULO
+          $PR_URL"
+          else
+            TEXTO="❌ $REPO: a CI quebrou na main
+          $RUN_URL"
+          fi
+          curl -fsS --max-time 15 --config - -o /dev/null \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" --data-urlencode "text=$TEXTO" \
+            --data-urlencode "disable_web_page_preview=true" <<CFG || echo "não consegui avisar no Telegram"
+          url = "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage"
+          CFG
