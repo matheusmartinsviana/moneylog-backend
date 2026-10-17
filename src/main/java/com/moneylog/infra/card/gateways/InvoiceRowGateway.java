@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.moneylog.core.card.app.gateways.InvoiceLookupGateway;
 import com.moneylog.core.card.domain.CreditCard;
@@ -24,10 +26,12 @@ public class InvoiceRowGateway implements InvoiceLookupGateway {
     }
 
     private final JdbcTemplate jdbc;
+    private final NamedParameterJdbcTemplate named;
     private final TimeProvider time;
 
     public InvoiceRowGateway(JdbcTemplate jdbc, TimeProvider time) {
         this.jdbc = jdbc;
+        this.named = new NamedParameterJdbcTemplate(jdbc);
         this.time = time;
     }
 
@@ -52,12 +56,9 @@ public class InvoiceRowGateway implements InvoiceLookupGateway {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
-        List<Object> args = new java.util.ArrayList<>();
-        args.add(userId);
-        args.addAll(ids);
-        return index(jdbc.query("SELECT id, card_id, closing_date FROM credit_card_invoices WHERE user_id = ? AND id IN ("
-                + placeholders + ")", (rs, row) -> toRow(rs), args.toArray()));
+        MapSqlParameterSource params = new MapSqlParameterSource("uid", userId).addValue("ids", ids);
+        return index(named.query("SELECT id, card_id, closing_date FROM credit_card_invoices WHERE user_id = :uid AND id IN (:ids)", params,
+                (rs, row) -> toRow(rs)));
     }
 
     public Map<UUID, InvoiceRow> rowsOfUser(UUID userId) {
