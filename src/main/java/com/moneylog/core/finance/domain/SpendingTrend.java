@@ -19,11 +19,11 @@ import com.moneylog.core.transaction.domain.TransactionType;
 public record SpendingTrend(boolean available, String reason, Money average, List<Competence> months) {
 
     public static final String INSUFFICIENT_HISTORY = "INSUFFICIENT_HISTORY";
-    public static final int MONTHS = 3;
+    public static final int WINDOW_MONTHS = 3;
 
     public static SpendingTrend of(FinancialRecords records, Ledger ledger, LocalDate today) {
         Competence current = Competence.from(today);
-        Competence oldest = current.minusMonths(MONTHS);
+        Competence oldest = current.minusMonths(WINDOW_MONTHS);
         LocalDate earliest = records.transactions().stream().filter(Transaction::isActive).map(Transaction::date)
                 .min(LocalDate::compareTo).orElse(null);
         if (earliest == null || earliest.isAfter(oldest.firstDay())) {
@@ -45,7 +45,7 @@ public record SpendingTrend(boolean available, String reason, Money average, Lis
                 return new SpendingTrend(false, INSUFFICIENT_HISTORY, null, List.of());
             }
         }
-        long cents = BigDecimal.valueOf(total.cents()).divide(BigDecimal.valueOf(MONTHS), 0, RoundingMode.HALF_UP).longValueExact();
+        long cents = BigDecimal.valueOf(total.cents()).divide(BigDecimal.valueOf(WINDOW_MONTHS), 0, RoundingMode.HALF_UP).longValueExact();
         return new SpendingTrend(true, null, Money.ofCents(cents, CurrencyCode.BRL), months);
     }
 

@@ -13,7 +13,7 @@ import com.moneylog.core.sk.money.Money;
 
 public record DailyMessage(String key, Map<String, String> params) {
 
-    public static final String KEY = "daily.summary";
+    public static final String SUMMARY_KEY = "daily.summary";
 
     public DailyMessage {
         params = Map.copyOf(params);
@@ -32,6 +32,6 @@ public record DailyMessage(String key, Map<String, String> params) {
             params.put("goalName", g.name());
             params.put("goalProgress", g.progress(today).ratioText());
         });
-        return new DailyMessage(KEY, params);
+        return new DailyMessage(SUMMARY_KEY, params);
     }
 }

@@ -16,7 +16,7 @@ import com.moneylog.core.sk.time.Competence;
 public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, Money startingBalance, List<Point> series,
                          List<String> assumptions, Goals goals, Trend trend) {
 
-    public static final List<String> ASSUMPTIONS = List.of("ACTIVE_RECURRENCES", "REGISTERED_INVOICES_AND_INSTALLMENTS",
+    public static final List<String> STANDARD_ASSUMPTIONS = List.of("ACTIVE_RECURRENCES", "REGISTERED_INVOICES_AND_INSTALLMENTS",
             "DEBTS_WITH_EXPECTED_DATE", "NO_NEW_SPENDING_TREND");
 
     public static final List<Horizon> HORIZONS = DashboardSummary.PROJECTION_HORIZONS;
@@ -81,7 +81,7 @@ public record Projection(Horizon horizon, LocalDate asOf, boolean isProjection, 
             running = running.add(in).subtract(out);
             series.add(new Point(month, to, in, out, running));
         }
-        return new Projection(horizon, today, true, cash.inAccounts(), series, ASSUMPTIONS, goals(records, cash, today),
+        return new Projection(horizon, today, true, cash.inAccounts(), series, STANDARD_ASSUMPTIONS, goals(records, cash, today),
                 includeTrend ? trend(records, ledger, today, series) : null);
     }
 
