@@ -100,7 +100,7 @@ class ExportUseCasesTest {
 
         assertThat(export.fileName()).isEqualTo("moneylog-transactions-2026-10-01_2026-10-31.csv");
         assertThat(lines.getFirst()).isEqualTo("Data;Tipo;Descrição;Categoria;Conta/Cartão;Método;Valor;Status;Direção;Competência da renda");
-        assertThat(lines).hasSize(5).as("cabeçalho + 4 movimentações de outubro (a de setembro fica fora)");
+        assertThat(lines).as("cabeçalho + 4 movimentações de outubro (a de setembro fica fora)").hasSize(5);
         assertThat(lines).contains("2026-10-10;Despesa;Restaurante;Alimentação;Nubank;Pix;100,00;Ativa;;");
         assertThat(lines).contains("2026-10-10;Compra no cartão;Notebook;Alimentação;Roxinho;;1200,00;Ativa;;");
         assertThat(lines).contains("2026-10-05;Receita;Salário;Salário;Nubank;Pix;1234,50;Ativa;;");

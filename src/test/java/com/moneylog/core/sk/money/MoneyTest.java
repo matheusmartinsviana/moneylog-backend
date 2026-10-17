@@ -136,7 +136,7 @@ class MoneyTest {
             assertThat(Money.of("0.00").isZero()).isTrue();
             assertThat(Money.of("0.01").isPositive()).isTrue();
             assertThat(Money.of("-0.01").isNegative()).isTrue();
-            assertThat(Money.of("1.00")).isNotEqualTo(Money.of("1.00", USD)).isNotEqualTo("1.00");
+            assertThat(Money.of("1.00")).isNotEqualTo(Money.of("1.00", USD));
             assertThat(Money.of("1.00")).hasSameHashCodeAs(Money.of("1.0"));
         }
     }

@@ -404,7 +404,7 @@ class RecorrenciasUseCasesTest {
         }
         assertThat(all).hasSize(506);
         assertThat(all.stream().filter(OccurrenceView::overdue)).hasSize(500);
-        assertThat(all.get(0).date()).isEqualTo(TODAY.minusDays(500)).as("a mais antiga mantida: as 500 mais recentes");
+        assertThat(all.get(0).date()).as("a mais antiga mantida: as 500 mais recentes").isEqualTo(TODAY.minusDays(500));
         assertThat(all).isSortedAccordingTo(java.util.Comparator.comparing(OccurrenceView::date));
         var window = occurrences.handle(new ListOccurrencesQuery(USER_ID, TODAY.minusDays(499), TODAY, OccurrenceStatus.PENDING, new PageQuery(1, 50)));
         assertThat(window.overdueTruncated()).isFalse();
