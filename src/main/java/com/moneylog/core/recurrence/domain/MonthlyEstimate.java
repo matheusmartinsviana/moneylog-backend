@@ -10,13 +10,28 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
 
-public record MonthlyEstimate(Money fixedCosts, Money recurringIncome, boolean estimate) {
+public record MonthlyEstimate(Money fixedCosts, Money recurringIncome, boolean estimate, boolean gross) {
 
-    public static MonthlyEstimate of(Collection<RecurringTransaction> recurrences, LocalDate today) {
-        return new MonthlyEstimate(sum(recurrences, FlowDirection.OUT, today), sum(recurrences, FlowDirection.IN, today), true);
+    public MonthlyEstimate(Money fixedCosts, Money recurringIncome, boolean estimate) {
+        this(fixedCosts, recurringIncome, estimate, false);
     }
 
-    private static Money sum(Collection<RecurringTransaction> recurrences, FlowDirection direction, LocalDate today) {
+    public static MonthlyEstimate of(Collection<RecurringTransaction> recurrences, LocalDate today) {
+        return of(recurrences, today, false);
+    }
+
+    public static MonthlyEstimate of(Collection<RecurringTransaction> recurrences, LocalDate today, boolean gross) {
+        return new MonthlyEstimate(sum(recurrences, FlowDirection.OUT, today, gross), sum(recurrences, FlowDirection.IN, today, gross), true, gross);
+    }
+
+    private static Money installmentOf(RecurringTransaction r, boolean gross) {
+        if (gross || r.purchaseShares() == null) {
+            return r.amount();
+        }
+        return r.purchaseShares().split(r.amount()).mine();
+    }
+
+    private static Money sum(Collection<RecurringTransaction> recurrences, FlowDirection direction, LocalDate today, boolean gross) {
         BigInteger numerator = BigInteger.ZERO;
         BigInteger denominator = BigInteger.ONE;
         for (RecurringTransaction r : recurrences) {
@@ -24,7 +39,7 @@ public record MonthlyEstimate(Money fixedCosts, Money recurringIncome, boolean e
                 continue;
             }
             BigInteger[] factor = r.schedule().monthlyFactor();
-            BigInteger n = BigInteger.valueOf(r.amount().cents()).multiply(factor[0]);
+            BigInteger n = BigInteger.valueOf(installmentOf(r, gross).cents()).multiply(factor[0]);
             numerator = numerator.multiply(factor[1]).add(n.multiply(denominator));
             denominator = denominator.multiply(factor[1]);
         }

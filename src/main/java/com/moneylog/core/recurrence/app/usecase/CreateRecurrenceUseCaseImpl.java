@@ -1,11 +1,17 @@
 package com.moneylog.core.recurrence.app.usecase;
 
+import java.util.List;
 import java.util.UUID;
 
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.recurrence.app.RecurrenceShares;
+import com.moneylog.core.recurrence.app.SubscriptionInput;
+import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 import com.moneylog.core.recurrence.app.RecurrenceView;
 import com.moneylog.core.recurrence.app.RecurrenceViews;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
@@ -23,6 +29,7 @@ import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.core.transaction.domain.TransactionType;
+import com.moneylog.core.transaction.exception.TransactionExceptions.SharesInvalidException;
 
 public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
 
@@ -32,10 +39,19 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
     private final IdempotencyGateway idempotency;
     private final IdGenerator ids;
     private final TimeProvider time;
+    private final PersonGateway persons;
 
     @SuppressWarnings("java:S107")
     public CreateRecurrenceUseCaseImpl(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
                                        CardGateway cards, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time) {
+        this(recurrences, categories, accounts, cards, idempotency, ids, time, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public CreateRecurrenceUseCaseImpl(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
+                                       CardGateway cards, IdempotencyGateway idempotency, IdGenerator ids, TimeProvider time,
+                                       PersonGateway persons) {
+        this.persons = persons;
         this.idempotency = idempotency;
         this.recurrences = recurrences;
         this.references = new RecurrenceReferences(categories, accounts, cards);
@@ -68,24 +84,33 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
                 c.maxOccurrences());
         Category category = references.category(c.userId(), c.categoryId(), c.type());
         UUID categoryId = category.id();
+        ForeignCharge basis = c.foreign().toBasis();
+        Money amount = basis == null ? c.amount() : basis.brl();
         RecurringTransaction recurrence;
         if (c.type() == TransactionType.CARD_PURCHASE) {
             if (c.accountId() != null || c.method() != null) {
                 throw new InvalidRecurrenceException("compra no cartão exige só o cartão.");
             }
-            recurrence = RecurringTransaction.ofCard(recurrenceId, c.userId(), c.amount(), c.description(), categoryId, c.cardId(),
-                    schedule);
+            RecurrenceShares.requireUsable(persons, c.userId(), c.shares());
+            recurrence = RecurringTransaction.ofCard(recurrenceId, c.userId(), amount, c.description(), categoryId, c.cardId(),
+                    schedule, c.splitMode(), c.shares() == null ? List.of() : c.shares());
         } else {
             if (c.cardId() != null) {
                 throw new InvalidRecurrenceException("despesa e receita exigem conta e meio de pagamento, não cartão.");
             }
+            if (c.shares() != null && !c.shares().isEmpty()) {
+                throw new SharesInvalidException("o rateio existe só na recorrência de cartão.");
+            }
             if (c.accountId() == null && c.method() != null) {
                 throw new InvalidRecurrenceException("o meio de pagamento exige a conta (ou deixe os dois para definir ao confirmar).");
             }
-            recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), c.amount(), c.description(), categoryId,
+            recurrence = RecurringTransaction.ofAccount(recurrenceId, c.userId(), c.type(), amount, c.description(), categoryId,
                     c.accountId(), c.accountId() == null ? null : (c.method() == null ? PaymentMethod.OTHER : c.method()), schedule,
-                    c.incomeCompetenceOffsetMonths() == null ? 0 : c.incomeCompetenceOffsetMonths());
+                    c.incomeCompetenceOffsetMonths() == null ? 0 : c.incomeCompetenceOffsetMonths(), c.nature());
         }
+        recurrence.defineForeignBasis(basis);
+        recurrence.defineSubscriptionTraits(c.subscription().forCreation());
+        recurrence.defineProvenance(c.provenance());
         if (recurrence.accountId() != null) {
             references.account(c.userId(), recurrence.accountId(), c.type());
         } else if (recurrence.cardId() != null) {
@@ -101,7 +126,13 @@ public class CreateRecurrenceUseCaseImpl implements CreateRecurrenceUseCase {
                 + ";frequency=" + c.frequency() + ";interval=" + nz(c.interval()) + ";unit=" + nz(c.unit()) + ";startDate=" + nz(c.startDate())
                 + ";endDate=" + nz(c.endDate()) + ";max=" + nz(c.maxOccurrences()) + ";"
                 + (c.incomeCompetenceOffsetMonths() == null || c.incomeCompetenceOffsetMonths() == 0 ? ""
-                        : "incomeCompetenceOffsetMonths=" + c.incomeCompetenceOffsetMonths() + ";"));
+                        : "incomeCompetenceOffsetMonths=" + c.incomeCompetenceOffsetMonths() + ";")
+                + (c.nature() == null ? "" : "nature=" + c.nature() + ";") + c.foreign().canonical()
+                + (c.subscription() == SubscriptionInput.NONE ? "" : c.subscription().canonical())
+                + (c.provenance() == null ? "" : "provenance=" + c.provenance().origin() + "/" + c.provenance().confidence() + ";")
+                + (c.shares() == null || c.shares().isEmpty() ? "" : "split=" + c.splitMode() + ":" + c.shares().stream()
+                        .map(s -> nz(s.personId()) + "/" + nz(s.bps()) + "/" + (s.amount() == null ? "-" : s.amount().toPlainString()))
+                        .collect(java.util.stream.Collectors.joining(",")) + ";"));
     }
 
     private static String nz(Object value) {

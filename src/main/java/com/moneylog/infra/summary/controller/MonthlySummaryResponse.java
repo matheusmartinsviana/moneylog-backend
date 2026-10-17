@@ -7,10 +7,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.finance.app.summary.MonthlySummaryView;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.MonthlySummary;
 import com.moneylog.core.sk.money.Money;
 
-public record MonthlySummaryResponse(String competence, boolean partial, @JsonProperty("isProjection") boolean isProjection, Money income,
+public record MonthlySummaryResponse(ConsumptionView view, String competence, boolean partial, @JsonProperty("isProjection") boolean isProjection, Money income,
                                      Money expenses, Money investments, Money net, String savingsRate, LargestCategory largestCategory,
                                      LargestExpense largestExpense, CardSummary card, Money futureInstallments, Comparison comparison) {
 
@@ -37,7 +38,7 @@ public record MonthlySummaryResponse(String competence, boolean partial, @JsonPr
                              String savingsRateDelta) {
     }
 
-    public static MonthlySummaryResponse of(MonthlySummaryView view) {
+    public static MonthlySummaryResponse of(MonthlySummaryView view, ConsumptionView consumptionView) {
         MonthlySummary s = view.summary();
         LargestCategory largestCategory = s.largestCategory() == null ? null
                 : new LargestCategory(ref(s.largestCategory().categoryId(), view.largestCategory()), s.largestCategory().amount());
@@ -50,7 +51,7 @@ public record MonthlySummaryResponse(String competence, boolean partial, @JsonPr
         Comparison comparison = new Comparison(
                 new Totals(c.previous().toString(), p.income(), p.expenses(), p.investments(), p.net(), ratio(p.savingsRate())),
                 delta(c.income()), delta(c.expenses()), delta(c.investments()), delta(c.net()), ratio(c.savingsRateDelta()));
-        return new MonthlySummaryResponse(s.competence().toString(), s.partial(), s.isProjection(), s.income(), s.expenses(),
+        return new MonthlySummaryResponse(consumptionView, s.competence().toString(), s.partial(), s.isProjection(), s.income(), s.expenses(),
                 s.investments(), s.net(), s.savingsRate() == null ? null : s.savingsRate().toPlainString(), largestCategory, largestExpense,
                 new CardSummary(s.card().consumption(), s.card().outstanding()), s.futureInstallments(), comparison);
     }

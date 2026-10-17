@@ -1,11 +1,8 @@
-package com.moneylog.core.finance.app.gateways;
+package com.moneylog.core.sk.ledger;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-
-import com.moneylog.core.sk.ledger.LedgerEntry;
-import com.moneylog.core.sk.ledger.PostingSourceType;
 
 public interface LedgerWriteGateway {
 

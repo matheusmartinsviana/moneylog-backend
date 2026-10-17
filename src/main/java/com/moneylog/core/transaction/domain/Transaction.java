@@ -25,6 +25,7 @@ import com.moneylog.core.transaction.exception.TransactionExceptions.IncomeCompe
 import com.moneylog.core.transaction.exception.TransactionExceptions.NonPositiveAmountException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionAlreadyVoidedException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionFieldRequiredException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNatureInvalidException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionStateInconsistentException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionVoidRefusedException;
@@ -56,6 +57,10 @@ public final class Transaction {
     private LocalDate invoiceClosingDate;
     private final boolean lateEntry;
     private final Competence incomeCompetence;
+    private final PurchaseShares purchaseShares;
+    private final TransactionNature nature;
+    private ForeignCharge foreignCharge;
+    private String lastDigits;
     private final List<TransactionInstallment> installments;
     private List<LedgerEntry> entries;
     private TransactionStatus status;
@@ -90,6 +95,14 @@ public final class Transaction {
             throw new IncomeCompetenceInvalidException("só a receita pode pertencer a outro mês.");
         }
         this.incomeCompetence = b.incomeCompetence;
+        if (b.purchaseShares != null && b.type != TransactionType.CARD_PURCHASE) {
+            throw new TransactionStateInconsistentException("só a compra no cartão tem rateio.");
+        }
+        this.purchaseShares = b.purchaseShares;
+        if (b.nature != null && b.type != TransactionType.EXPENSE) {
+            throw new TransactionNatureInvalidException("só a despesa tem natureza.");
+        }
+        this.nature = b.type == TransactionType.EXPENSE ? TransactionNature.forExpense(b.nature) : null;
         this.installments = new ArrayList<>(b.installments);
         this.entries = List.copyOf(b.entries);
         if (entries.isEmpty()) {
@@ -123,7 +136,7 @@ public final class Transaction {
                     .debt(state.debtId()).refundOf(state.refundOfId()).investmentDirection(state.investmentDirection())
                     .adjustment(state.adjustmentDirection(), state.adjustmentKind(), state.reason())
                     .invoice(state.invoiceClosingDate(), state.lateEntry()).installments(state.installments())
-                    .incomeCompetence(state.incomeCompetence())
+                    .incomeCompetence(state.incomeCompetence()).purchaseShares(state.purchaseShares()).nature(state.nature())
                     .entries(entries);
             transaction = new Transaction(builder);
         } catch (DomainException e) {
@@ -141,7 +154,7 @@ public final class Transaction {
         return new TransactionState(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId,
                 counterpartAccountId, cardId, categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection,
                 adjustmentKind, reason, invoiceClosingDate, lateEntry, List.copyOf(installments), status, voidReason, voidedAt,
-                version, incomeCompetence);
+                version, incomeCompetence, purchaseShares, nature);
     }
 
     private void ensureConsistentState() {
@@ -295,6 +308,11 @@ public final class Transaction {
         return postingsOf(entries.stream().filter(LedgerEntry::active).toList());
     }
 
+    public boolean isCardCashOut() {
+        return type == TransactionType.CARD_PURCHASE && categoryId != null
+                && entries.stream().anyMatch(entry -> entry.posting().bookType() == BookType.EQUITY);
+    }
+
     public boolean isActive() {
         return status == TransactionStatus.ACTIVE;
     }
@@ -387,6 +405,36 @@ public final class Transaction {
         return incomeCompetence;
     }
 
+    public PurchaseShares purchaseShares() {
+        return purchaseShares;
+    }
+
+    public TransactionNature nature() {
+        return nature;
+    }
+
+    public ForeignCharge foreignCharge() {
+        return foreignCharge;
+    }
+
+    public void attachForeignCharge(ForeignCharge charge) {
+        if (charge != null && !charge.brl().equals(amount)) {
+            throw new com.moneylog.core.transaction.exception.FxExceptions.FxInvalidException("o valor em BRL diverge do câmbio informado.");
+        }
+        this.foreignCharge = charge;
+    }
+
+    public String lastDigits() {
+        return lastDigits;
+    }
+
+    public void attachLastDigits(String digits) {
+        if (digits != null && type != TransactionType.CARD_PURCHASE) {
+            throw new com.moneylog.core.card.exception.CardExceptions.PurchaseLastDigitsNotFromCardException(digits);
+        }
+        this.lastDigits = digits == null || digits.isBlank() ? null : digits.strip();
+    }
+
     public Competence effectiveIncomeCompetence() {
         return type != TransactionType.INCOME ? null : incomeCompetence == null ? Competence.from(date) : incomeCompetence;
     }
@@ -459,6 +507,8 @@ public final class Transaction {
         private LocalDate invoiceClosingDate;
         private boolean lateEntry;
         private Competence incomeCompetence;
+        private PurchaseShares purchaseShares;
+        private TransactionNature nature;
         private List<TransactionInstallment> installments = List.of();
         private List<LedgerEntry> entries = List.of();
 
@@ -484,6 +534,8 @@ public final class Transaction {
         }
         Builder invoice(LocalDate closingDate, boolean late) { this.invoiceClosingDate = closingDate; this.lateEntry = late; return this; }
         Builder incomeCompetence(Competence value) { this.incomeCompetence = value; return this; }
+        Builder purchaseShares(PurchaseShares value) { this.purchaseShares = value; return this; }
+        Builder nature(TransactionNature value) { this.nature = value; return this; }
         Builder installments(List<TransactionInstallment> value) { this.installments = value; return this; }
         Builder entries(List<LedgerEntry> value) { this.entries = value; return this; }
 

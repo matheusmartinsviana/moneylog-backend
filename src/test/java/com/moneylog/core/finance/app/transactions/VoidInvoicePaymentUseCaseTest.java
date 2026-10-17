@@ -31,7 +31,7 @@ import com.moneylog.core.account.util.factory.AccountTestFactory;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCase.VoidTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCaseImpl;
 import com.moneylog.core.finance.util.FinanceScenarioFactory;

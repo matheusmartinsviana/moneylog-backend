@@ -19,6 +19,7 @@ import com.moneylog.core.finance.domain.DebtOverviewCalculator;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.goal.domain.GoalProgress;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.recurrence.domain.MonthlyEstimate;
 import com.moneylog.core.recurrence.domain.RecurringTransaction;
 import com.moneylog.core.sk.time.Competence;
@@ -57,7 +58,7 @@ public class GetDebtOverviewUseCaseImpl implements GetDebtOverviewUseCase {
                 .filter(Objects::nonNull).distinct().toList());
         Map<UUID, String> names = new java.util.HashMap<>();
         persons.forEach((id, person) -> names.put(id, person.name()));
-        DebtOverview overview = DebtOverviewCalculator.overview(loaded, names, MonthlyEstimate.of(recurrences, today), lastFullMonth,
+        DebtOverview overview = DebtOverviewCalculator.overview(loaded, names, MonthlyEstimate.of(recurrences, today, true), lastFullMonth,
                 dashboard.balances().inAccounts(), dashboard.balances().available(), today, query.months());
         return new DebtOverviewView(overview, payoffGoal(loaded, overview),
                 commitments == null ? java.util.List.of() : commitments.findAll(query.userId()));

@@ -331,9 +331,9 @@ class CardsIT {
                 "SELECT column_name FROM information_schema.columns WHERE table_name = 'credit_cards' ORDER BY column_name", String.class);
 
         assertThat(columns).containsExactlyInAnyOrder("id", "user_id", "name", "institution", "limit_cents", "currency",
-                "default_payment_account_id", "status", "created_at", "updated_at", "version", "closing_confirmed");
-        assertThat(columns.stream().map(String::toLowerCase).collect(Collectors.joining(","))).doesNotContain("number", "cvv", "brand",
-                "digits", "pan");
+                "default_payment_account_id", "status", "created_at", "updated_at", "version", "closing_confirmed", "auto_debit", "brand",
+                "best_purchase_day", "last_digits");
+        assertThat(columns.stream().map(String::toLowerCase).collect(Collectors.joining(","))).doesNotContain("number", "cvv", "pan", "holder", "expir");
     }
 
     @Test

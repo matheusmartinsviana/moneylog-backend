@@ -15,6 +15,7 @@ import com.moneylog.core.finance.app.dashboard.usecase.GetUpcomingUseCase;
 import com.moneylog.core.finance.app.dashboard.usecase.GetUpcomingUseCase.GetUpcomingQuery;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.web.QueryDates;
+import com.moneylog.infra.web.QueryViews;
 import com.moneylog.infra.security.CurrentUser;
 
 @RestController
@@ -33,8 +34,9 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public DashboardResponse summary(@CurrentUser UUID userId,
-                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf) {
-        return DashboardResponse.of(summary.handle(new GetDashboardSummaryQuery(userId, QueryDates.inWindow(asOf, "asOf"))));
+                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+                                     @RequestParam(required = false) String view) {
+        return DashboardResponse.of(summary.handle(new GetDashboardSummaryQuery(userId, QueryDates.inWindow(asOf, "asOf"), QueryViews.parse(view))));
     }
 
     @GetMapping("/upcoming")

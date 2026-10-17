@@ -6,10 +6,11 @@ import java.util.UUID;
 
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCase.SpendingByCategoryView;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.SpendingByCategory;
 import com.moneylog.core.sk.money.Money;
 
-public record SpendingByCategoryResponse(String basis, LocalDate from, LocalDate to, Money total, Money base, List<Item> items, Other other) {
+public record SpendingByCategoryResponse(ConsumptionView view, String basis, LocalDate from, LocalDate to, Money total, Money base, List<Item> items, Other other) {
 
     public record CategoryRef(UUID id, String name) {
     }
@@ -20,13 +21,13 @@ public record SpendingByCategoryResponse(String basis, LocalDate from, LocalDate
     public record Other(Money amount, String share, int categories) {
     }
 
-    public static SpendingByCategoryResponse of(SpendingByCategoryView view) {
+    public static SpendingByCategoryResponse of(SpendingByCategoryView view, ConsumptionView consumptionView) {
         SpendingByCategory s = view.spending();
         List<Item> items = s.items().stream()
                 .map(i -> new Item(ref(i.categoryId(), view), i.amount(), i.share() == null ? null : i.share().toPlainString())).toList();
         Other other = s.other() == null ? null
                 : new Other(s.other().amount(), s.other().share() == null ? null : s.other().share().toPlainString(), s.other().categories());
-        return new SpendingByCategoryResponse("COMPETENCE", s.competence().firstDay(), s.competence().lastDay(), s.total(), s.base(), items, other);
+        return new SpendingByCategoryResponse(consumptionView, "COMPETENCE", s.competence().firstDay(), s.competence().lastDay(), s.total(), s.base(), items, other);
     }
 
     private static CategoryRef ref(UUID id, SpendingByCategoryView view) {

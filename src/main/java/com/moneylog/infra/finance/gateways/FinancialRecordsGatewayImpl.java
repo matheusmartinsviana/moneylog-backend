@@ -1,6 +1,7 @@
 package com.moneylog.infra.finance.gateways;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.ledger.LedgerEntry;
+import com.moneylog.core.sk.ledger.PostingSourceType;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.infra.account.gateways.AccountRepositoryMapper;
 import com.moneylog.infra.card.gateways.CardRepositoryMapper;
@@ -114,11 +116,20 @@ public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
             loadedTransactions.add(hydrator.toDomain(entity, entriesByTransaction.getOrDefault(entity.getId(), List.of()), extras));
         }
         return new FinancialRecords(loadedAccounts, loadCards(userId), loadedTransactions,
-                debtHydrator.loadAll(userId, debts.findByUserId(userId)), loadGoals(userId));
+                debtHydrator.loadAll(userId, debts.findByUserId(userId)), loadGoals(userId), loadReceiptEntries(userId));
+    }
+
+    private List<LedgerEntry> loadReceiptEntries(UUID userId) {
+        return postings.findAllOfSourceTypes(userId, List.of(PostingSourceType.THIRD_PARTY_RECEIPT,
+                PostingSourceType.THIRD_PARTY_RECEIPT_IN_BALANCE, PostingSourceType.THIRD_PARTY_REFUND_ADJUSTMENT,
+                PostingSourceType.SHARE_PAYABLE)).stream()
+                .filter(LedgerPostingEntity::isActive).map(LedgerRepositoryMapper::toDomain).toList();
     }
 
     private List<Goal> loadGoals(UUID userId) {
-        List<GoalEntity> entities = goals.findByUserId(userId);
+        List<GoalEntity> entities = goals.findByUserId(userId).stream()
+                .sorted(Comparator.comparing(GoalEntity::getCreatedAt).thenComparing(GoalEntity::getId))
+                .toList();
         if (entities.isEmpty()) {
             return List.of();
         }
@@ -126,6 +137,7 @@ public class FinancialRecordsGatewayImpl implements FinancialRecordsGateway {
         for (GoalReservationEntity reservation : goalReservations.findByUserId(userId)) {
             byGoal.computeIfAbsent(reservation.getGoalId(), id -> new ArrayList<>()).add(reservation);
         }
+        byGoal.values().forEach(list -> list.sort(Comparator.comparing(GoalReservationEntity::getId)));
         return entities.stream().map(e -> GoalRepositoryMapper.toDomain(e, byGoal.getOrDefault(e.getId(), List.of()))).toList();
     }
 

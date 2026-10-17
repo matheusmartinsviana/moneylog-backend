@@ -16,6 +16,8 @@ import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.debt.exception.DebtExceptions.DebtNotFoundException;
 import com.moneylog.core.sk.exception.VersionConflictException;
+import com.moneylog.core.sk.money.CurrencyCode;
+import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
@@ -25,6 +27,8 @@ import com.moneylog.infra.debt.persistence.DebtRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
 public class DebtGatewayImpl implements DebtGateway {
+
+    private static final String NOT_CARRIED_OTHERWISE = " AND NOT (d.direction = 'PAYABLE' AND d.kind IN ('PAYROLL', 'CARD_CASH_OUT'))";
 
     private final DebtRepositoryJpa repository;
     private final TransactionRepositoryJpa transactions;
@@ -55,6 +59,7 @@ public class DebtGatewayImpl implements DebtGateway {
             throw new VersionConflictException(expectedVersion, entity.getVersion());
         }
         entity.apply(debt.description(), debt.expectedDate(), debt.closure(), debt.closureDate(), debt.closureReason(), time.now());
+        entity.defineKindAndChannel(debt.kind(), debt.channel());
         DebtEntity saved = repository.saveAndFlush(entity);
         return new Versioned<>(debt, saved.getVersion(), saved.getCreatedAt(), saved.getUpdatedAt());
     }
@@ -95,7 +100,8 @@ public class DebtGatewayImpl implements DebtGateway {
         StringBuilder sql = new StringBuilder("""
                 SELECT d.id FROM debts d
                 LEFT JOIN LATERAL (
-                    SELECT COALESCE(SUM(t.amount_cents), 0) AS settled FROM transactions t
+                    SELECT COALESCE(SUM(COALESCE(a.principal_cents, t.amount_cents)), 0) AS settled FROM transactions t
+                    LEFT JOIN payroll_loan_applications a ON a.transaction_id = t.id
                     WHERE t.debt_id = d.id AND t.status = 'ACTIVE' AND t.id IS DISTINCT FROM d.origin_transaction_id) s ON TRUE
                 WHERE d.user_id = ?""");
         List<Object> args = new ArrayList<>();
@@ -118,10 +124,11 @@ public class DebtGatewayImpl implements DebtGateway {
             });
         }
         if (Boolean.TRUE.equals(filter.overdue())) {
-            sql.append(" AND d.closure IS NULL AND d.expected_date < ? AND s.settled < d.principal_cents");
+            sql.append(" AND d.closure IS NULL AND d.expected_date < ? AND s.settled < d.principal_cents").append(NOT_CARRIED_OTHERWISE);
             args.add(Date.valueOf(today));
         } else if (Boolean.FALSE.equals(filter.overdue())) {
-            sql.append(" AND NOT (d.closure IS NULL AND d.expected_date < ? AND s.settled < d.principal_cents)");
+            sql.append(" AND NOT (d.closure IS NULL AND d.expected_date < ? AND s.settled < d.principal_cents").append(NOT_CARRIED_OTHERWISE)
+                    .append(')');
             args.add(Date.valueOf(today));
         }
         sql.append(" ORDER BY d.debt_date DESC, d.id DESC LIMIT ? OFFSET ?");
@@ -141,6 +148,24 @@ public class DebtGatewayImpl implements DebtGateway {
         transactions.findAllById(transactionIds).stream().filter(t -> t.getUserId().equals(userId))
                 .forEach(t -> dates.put(t.getId(), t.getTransactionDate()));
         return dates;
+    }
+
+    @Override
+    public Map<UUID, List<Money>> installmentSchedules(UUID userId, Collection<UUID> transactionIds) {
+        Map<UUID, List<Money>> schedules = new HashMap<>();
+        if (transactionIds.isEmpty()) {
+            return schedules;
+        }
+        String placeholders = String.join(",", java.util.Collections.nCopies(transactionIds.size(), "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(userId);
+        args.addAll(transactionIds);
+        jdbc.query("SELECT transaction_id, amount_cents FROM transaction_installments WHERE user_id = ? AND transaction_id IN ("
+                + placeholders + ") AND canceled_at IS NULL ORDER BY transaction_id, number", rs -> {
+            schedules.computeIfAbsent(rs.getObject(1, UUID.class), id -> new ArrayList<>())
+                    .add(Money.ofCents(rs.getLong(2), CurrencyCode.BRL));
+        }, args.toArray());
+        return schedules;
     }
 
     private List<Versioned<Debt>> ordered(UUID userId, List<UUID> ids) {

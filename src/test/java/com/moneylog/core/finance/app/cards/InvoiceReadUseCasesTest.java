@@ -126,7 +126,7 @@ class InvoiceReadUseCasesTest {
     @DisplayName("detalhe da fatura")
     class Detalhe {
 
-        private final GetInvoiceUseCaseImpl useCase = new GetInvoiceUseCaseImpl(lookup, records, time);
+        private final GetInvoiceUseCaseImpl useCase = new GetInvoiceUseCaseImpl(lookup, records, time, documentsStub());
 
         @Test
         @DisplayName("em 30/10 a fatura de 25/10 está CLOSED com a parcela 1/6 'Notebook' e a compra à vista, sem pagamentos")
@@ -257,5 +257,12 @@ class InvoiceReadUseCasesTest {
             assertThatThrownBy(() -> useCase.handle(new GetFutureInstallmentsQuery(USER_ID, UUID.randomUUID())))
                     .isInstanceOf(CardNotFoundException.class);
         }
+    }
+
+    private static com.moneylog.core.card.app.gateways.InvoiceDocumentGateway documentsStub() {
+        var documents = mock(com.moneylog.core.card.app.gateways.InvoiceDocumentGateway.class);
+        when(documents.find(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new com.moneylog.core.card.app.gateways.InvoiceDocumentGateway.Stored(null, 0));
+        return documents;
     }
 }

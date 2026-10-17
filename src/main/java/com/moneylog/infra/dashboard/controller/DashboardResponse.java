@@ -9,13 +9,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import com.moneylog.core.finance.app.dashboard.DashboardView;
 import com.moneylog.core.finance.domain.ConsumptionReport;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.DashboardSummary;
 import com.moneylog.core.finance.domain.Horizon;
 import com.moneylog.core.finance.domain.NetWorth;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 
-public record DashboardResponse(LocalDate asOf, @JsonProperty("isProjection") boolean isProjection, boolean hasAccounts,
+public record DashboardResponse(ConsumptionView view, LocalDate asOf, @JsonProperty("isProjection") boolean isProjection, boolean hasAccounts,
                                 Balances balances, Committed committed, Projected projected, Month month, NetWorthResponse netWorth) {
 
     public record Balances(Money inAccounts, Money investments, Money available, Money reserved, Money committed30d,
@@ -56,7 +57,7 @@ public record DashboardResponse(LocalDate asOf, @JsonProperty("isProjection") bo
             byMethod.put(method.name(), m.expensesByMethod().get(method));
         }
         NetWorth n = s.netWorth();
-        return new DashboardResponse(s.asOf(), s.isProjection(), view.hasAccounts(),
+        return new DashboardResponse(s.view(), s.asOf(), s.isProjection(), view.hasAccounts(),
                 new Balances(b.inAccounts(), b.investments(), b.available(), b.reserved(), b.committed30d(), change(b.inAccountsChange())),
                 new Committed(c.get(Horizon.D7), c.get(Horizon.D30), c.get(Horizon.D60), c.get(Horizon.D90), c.get(Horizon.M6), c.get(Horizon.M12)),
                 new Projected(p.get(Horizon.D30), p.get(Horizon.D90), p.get(Horizon.M6), p.get(Horizon.M12)),

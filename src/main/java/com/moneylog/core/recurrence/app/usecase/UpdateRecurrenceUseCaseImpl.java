@@ -5,6 +5,8 @@ import java.util.Objects;
 import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.recurrence.app.RecurrenceShares;
 import com.moneylog.core.recurrence.app.RecurrenceView;
 import com.moneylog.core.recurrence.app.RecurrenceViews;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
@@ -13,8 +15,10 @@ import com.moneylog.core.recurrence.exception.RecurrenceExceptions.InvalidRecurr
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.RecurrenceNotFoundException;
 import com.moneylog.core.sk.exception.VersionConflictException;
 import com.moneylog.core.sk.persistence.Versioned;
+import com.moneylog.core.sk.provenance.Provenance;
 import com.moneylog.core.sk.time.FinancialDates;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 
 public class UpdateRecurrenceUseCaseImpl implements UpdateRecurrenceUseCase {
 
@@ -22,9 +26,16 @@ public class UpdateRecurrenceUseCaseImpl implements UpdateRecurrenceUseCase {
     private final RecurrenceReferences references;
     private final RecurrenceViews views;
     private final TimeProvider time;
+    private final PersonGateway persons;
 
     public UpdateRecurrenceUseCaseImpl(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
                                        CardGateway cards, TimeProvider time) {
+        this(recurrences, categories, accounts, cards, time, null);
+    }
+
+    public UpdateRecurrenceUseCaseImpl(RecurrenceGateway recurrences, CategoryGateway categories, AccountGateway accounts,
+                                       CardGateway cards, TimeProvider time, PersonGateway persons) {
+        this.persons = persons;
         this.recurrences = recurrences;
         this.references = new RecurrenceReferences(categories, accounts, cards);
         this.views = new RecurrenceViews(categories, accounts, cards);
@@ -56,8 +67,17 @@ public class UpdateRecurrenceUseCaseImpl implements UpdateRecurrenceUseCase {
         if (c.endDate() == null) {
             recurrence.ensureEndRemovalDoesNotReopen(time.today());
         }
-        recurrence.updateDetails(c.amount(), c.description(), c.categoryId(), c.accountId(), c.method(), c.cardId(),
-                c.incomeCompetenceOffsetMonths() == null ? recurrence.incomeCompetenceOffsetMonths() : c.incomeCompetenceOffsetMonths());
+        ForeignCharge basis = c.foreign().toBasis();
+        recurrence.updateDetails(basis == null ? c.amount() : basis.brl(), c.description(), c.categoryId(), c.accountId(), c.method(), c.cardId(),
+                c.incomeCompetenceOffsetMonths() == null ? recurrence.incomeCompetenceOffsetMonths() : c.incomeCompetenceOffsetMonths(),
+                c.nature());
+        if (c.shares() != null) {
+            RecurrenceShares.requireUsable(persons, c.userId(), c.shares());
+            recurrence.changeShares(c.splitMode(), c.shares());
+        }
+        recurrence.defineForeignBasis(basis);
+        recurrence.defineSubscriptionTraits(c.subscription().forUpdate(recurrence.traits()));
+        recurrence.defineProvenance(Provenance.orCurrent(c.provenance(), recurrence.provenance()));
         recurrence.changeEnd(c.endDate());
         return views.one(c.userId(), recurrences.save(recurrence), time.today());
     }

@@ -68,7 +68,7 @@ public class CardController {
     @PostMapping
     public ResponseEntity<CardResponse> create(@CurrentUser UUID userId, @Valid @RequestBody CardInput body) {
         CardDetails created = create.handle(new CreateCardCommand(userId, body.name(), body.institution(), body.limit(),
-                body.closingDay(), body.dueDay(), body.defaultPaymentAccountId()));
+                body.closingDay(), body.dueDay(), body.defaultPaymentAccountId(), body.profile()));
         return ResponseEntity.created(URI.create("/v1/cards/" + created.card().id())).body(CardResponse.of(created));
     }
 
@@ -80,7 +80,8 @@ public class CardController {
     @PutMapping("/{id}")
     public CardResponse update(@CurrentUser UUID userId, @PathVariable UUID id, @Valid @RequestBody CardUpdate body) {
         return CardResponse.of(update.handle(new UpdateCardDetailsCommand(userId, id, body.name(), body.institution(),
-                body.limit(), body.closingDay(), body.dueDay(), body.defaultPaymentAccountId(), body.confirmedEffectiveFrom(), body.version())));
+                body.limit(), body.closingDay(), body.dueDay(), body.defaultPaymentAccountId(), body.confirmedEffectiveFrom(), body.version(),
+                body.profile())));
     }
 
     public record ClosingConfirmationInput(@jakarta.validation.constraints.NotNull Boolean confirmed,

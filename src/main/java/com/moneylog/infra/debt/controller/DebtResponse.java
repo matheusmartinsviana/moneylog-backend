@@ -8,6 +8,8 @@ import java.util.UUID;
 import com.moneylog.core.debt.app.DebtView;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.debt.domain.DebtDirection;
+import com.moneylog.core.debt.domain.DebtKind;
+import com.moneylog.core.debt.domain.EffectiveRate;
 import com.moneylog.core.debt.domain.DebtOrigin;
 import com.moneylog.core.debt.domain.DebtStatus;
 import com.moneylog.core.sk.money.Money;
@@ -16,7 +18,11 @@ public record DebtResponse(UUID id, PersonRefResponse person, String creditorNam
                            Money principal, Money settled, Money outstanding, DebtStatus status, LocalDate date, LocalDate expectedDate,
                            boolean overdue, String description, CategoryRef category, LocalDate closureDate, String closureReason,
                            List<Settlement> settlements, boolean cancelable, boolean voidable, DebtView.VoidBlockedBy voidBlockedBy,
-                           long version, Instant createdAt, Instant updatedAt) {
+                           long version, Instant createdAt, Instant updatedAt, DebtKind kind, String channel,
+                           EffectiveRateResponse effectiveRate) {
+
+    public record EffectiveRateResponse(long monthlyBps, long annualBps, String method) {
+    }
 
     public record CategoryRef(UUID id, String name) {
     }
@@ -32,6 +38,8 @@ public record DebtResponse(UUID id, PersonRefResponse person, String creditorNam
                 view.overdue(), d.description(), d.categoryId() == null ? null : new CategoryRef(d.categoryId(), view.categoryName()),
                 d.closureDate(), d.closureReason(),
                 view.settlements().stream().map(s -> new Settlement(s.transactionId(), s.amount(), s.date(), s.active())).toList(),
-                view.cancelable(), view.voidable(), view.voidBlockedBy(), view.stored().version(), view.createdAt(), view.updatedAt());
+                view.cancelable(), view.voidable(), view.voidBlockedBy(), view.stored().version(), view.createdAt(), view.updatedAt(),
+                d.kind(), d.channel(), view.effectiveRate() == null ? null
+                        : new EffectiveRateResponse(view.effectiveRate().monthlyBps(), view.effectiveRate().annualBps(), EffectiveRate.METHOD));
     }
 }

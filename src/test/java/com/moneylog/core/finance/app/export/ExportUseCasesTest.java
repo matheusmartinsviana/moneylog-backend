@@ -51,6 +51,7 @@ class ExportUseCasesTest {
     private final FinancialRecordsGateway records = mock(FinancialRecordsGateway.class);
     private final CategoryGateway categories = mock(CategoryGateway.class);
     private final PersonGateway people = mock(PersonGateway.class);
+    private final BackupExtrasReader extras = mock(BackupExtrasReader.class);
     private final RecurrenceGateway recurrences = mock(RecurrenceGateway.class);
     private final TimeProvider time = mock(TimeProvider.class);
     private final FinanceScenarioFactory s = umCenarioBase();
@@ -60,6 +61,7 @@ class ExportUseCasesTest {
     void setUp() {
         when(categories.list(USER_ID, null, true)).thenReturn(List.of(s.alimentacao, s.salario));
         when(time.now()).thenReturn(NOW);
+        when(extras.read(USER_ID)).thenReturn(BackupExtras.EMPTY);
     }
 
     private void load() {
@@ -232,9 +234,9 @@ class ExportUseCasesTest {
         when(recurrences.findAll(USER_ID)).thenReturn(List.of());
         when(categories.list(USER_ID, null, true)).thenReturn(List.of());
 
-        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ExportBackupUseCaseImpl(records, categories, people, recurrences, time, 1)
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new ExportBackupUseCaseImpl(records, categories, people, recurrences, extras, time, 1)
                 .handle(new ExportBackupQuery(USER_ID))).isInstanceOf(ExportTooLargeException.class);
-        assertThat(new ExportBackupUseCaseImpl(records, categories, people, recurrences, time, 2).handle(new ExportBackupQuery(USER_ID)).transactions())
+        assertThat(new ExportBackupUseCaseImpl(records, categories, people, recurrences, extras, time, 2).handle(new ExportBackupQuery(USER_ID)).transactions())
                 .hasSize(2);
     }
 
@@ -253,9 +255,9 @@ class ExportUseCasesTest {
         when(people.list(USER_ID, null, null, new PageQuery(2, 50))).thenReturn(new Slice<>(List.of(new Versioned<>(pedro, 1, NOW, NOW)), false));
         when(recurrences.findAll(USER_ID)).thenReturn(List.of());
 
-        BackupSnapshot snapshot = new ExportBackupUseCaseImpl(records, categories, people, recurrences, time).handle(new ExportBackupQuery(USER_ID));
+        BackupSnapshot snapshot = new ExportBackupUseCaseImpl(records, categories, people, recurrences, extras, time).handle(new ExportBackupQuery(USER_ID));
 
-        assertThat(snapshot.schemaVersion()).isEqualTo(BackupSnapshot.SCHEMA_VERSION).isEqualTo(1);
+        assertThat(snapshot.schemaVersion()).isEqualTo(BackupSnapshot.SCHEMA_VERSION).isEqualTo(2);
         assertThat(snapshot.generatedAt()).isEqualTo(NOW);
         assertThat(snapshot.accounts()).hasSize(3);
         assertThat(snapshot.categories()).hasSize(2);

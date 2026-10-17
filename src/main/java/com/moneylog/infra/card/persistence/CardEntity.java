@@ -57,6 +57,18 @@ public class CardEntity {
     @Column(name = "closing_confirmed", nullable = false)
     private boolean closingConfirmed = true;
 
+    @Column(name = "auto_debit")
+    private Boolean autoDebit;
+
+    @Column(length = 40)
+    private String brand;
+
+    @Column(name = "best_purchase_day")
+    private Short bestPurchaseDay;
+
+    @Column(name = "last_digits", nullable = false, length = 24)
+    private String lastDigits = "";
+
     @Version
     private Long version;
 
@@ -85,6 +97,29 @@ public class CardEntity {
         this.defaultPaymentAccountId = newDefaultPaymentAccountId;
         this.status = Objects.requireNonNull(newStatus, "status");
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+    }
+
+    public void applyProfile(Boolean newAutoDebit, String newBrand, Integer newBestPurchaseDay, String newLastDigits) {
+        this.autoDebit = newAutoDebit;
+        this.brand = newBrand;
+        this.bestPurchaseDay = newBestPurchaseDay == null ? null : newBestPurchaseDay.shortValue();
+        this.lastDigits = newLastDigits == null ? "" : newLastDigits;
+    }
+
+    public Boolean getAutoDebit() {
+        return autoDebit;
+    }
+
+    public String getBrand() {
+        return brand;
+    }
+
+    public Integer getBestPurchaseDay() {
+        return bestPurchaseDay == null ? null : bestPurchaseDay.intValue();
+    }
+
+    public String getLastDigits() {
+        return lastDigits;
     }
 
     public boolean isClosingConfirmed() {

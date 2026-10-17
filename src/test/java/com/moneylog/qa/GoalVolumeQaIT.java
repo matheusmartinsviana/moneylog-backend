@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -34,6 +35,7 @@ import com.moneylog.util.MutableClockConfig;
 
 @IntegrationTest
 @Import(MutableClockConfig.class)
+@Tag("slow")
 @DisplayName("QA T98: volume de 10.000 e 50.000 movimentações")
 class GoalVolumeQaIT {
 

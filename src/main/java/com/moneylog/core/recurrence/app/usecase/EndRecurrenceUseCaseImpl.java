@@ -6,6 +6,7 @@ import com.moneylog.core.recurrence.app.RecurrenceView;
 import com.moneylog.core.recurrence.app.RecurrenceViews;
 import com.moneylog.core.recurrence.app.gateways.RecurrenceGateway;
 import com.moneylog.core.recurrence.domain.RecurringTransaction;
+import com.moneylog.core.recurrence.exception.RecurrenceExceptions.InvalidRecurrenceException;
 import com.moneylog.core.recurrence.exception.RecurrenceExceptions.RecurrenceNotFoundException;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.FinancialDates;
@@ -29,7 +30,11 @@ public class EndRecurrenceUseCaseImpl implements EndRecurrenceUseCase {
         Versioned<RecurringTransaction> current = recurrences.findVersioned(command.userId(), command.recurrenceId())
                 .orElseThrow(() -> new RecurrenceNotFoundException(command.recurrenceId()));
         RecurringTransaction recurrence = current.value();
-        LocalDate end = FinancialDates.requireInWindow(command.endDate() == null ? time.today() : command.endDate(), "endDate");
+        if (command.endDate() != null && command.activeUntil() != null && !command.endDate().equals(command.activeUntil())) {
+            throw new InvalidRecurrenceException("endDate e activeUntil são sinônimos e precisam coincidir.");
+        }
+        LocalDate requested = command.activeUntil() != null ? command.activeUntil() : command.endDate();
+        LocalDate end = FinancialDates.requireInWindow(requested == null ? time.today() : requested, "endDate");
         recurrence.endOn(end);
         return views.one(command.userId(), recurrences.save(recurrence), time.today());
     }

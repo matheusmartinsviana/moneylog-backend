@@ -61,6 +61,7 @@ public class ChangeCardBillingDaysUseCaseImpl implements ChangeCardBillingDaysUs
         }
         List<Transaction> ofCard = transactions.findAllOfCard(command.userId(), card.id());
         card.updateDetails(command.name(), command.institution(), command.limit(), command.defaultPaymentAccountId());
+        card.updateProfile(command.profile());
         List<Transaction> changed = CardBillingChanges.changeBillingDays(card, ofCard, command.closingDay(), command.dueDay(), today);
         Persisted<CreditCard> saved = cards.save(card);
         for (Transaction moved : changed) {

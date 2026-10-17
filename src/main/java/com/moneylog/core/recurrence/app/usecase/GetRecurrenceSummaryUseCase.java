@@ -8,6 +8,6 @@ public interface GetRecurrenceSummaryUseCase {
 
     MonthlyEstimate handle(GetRecurrenceSummaryQuery query);
 
-    record GetRecurrenceSummaryQuery(UUID userId) {
+    record GetRecurrenceSummaryQuery(UUID userId, boolean gross) {
     }
 }

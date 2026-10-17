@@ -35,7 +35,7 @@ import com.moneylog.core.card.util.factory.CreditCardTestFactory;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails.InstallmentView;
 import com.moneylog.core.finance.app.transactions.usecase.CancelInstallmentsUseCase.CancelInstallmentsCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CancelInstallmentsUseCaseImpl;

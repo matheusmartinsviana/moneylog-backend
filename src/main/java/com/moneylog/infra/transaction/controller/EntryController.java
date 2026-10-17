@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.moneylog.core.finance.app.transactions.usecase.ListEntriesUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.ListEntriesUseCase.ListEntriesQuery;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.EntryLens;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.time.Competence;
@@ -16,6 +17,7 @@ import com.moneylog.core.transaction.app.query.EntryFilter;
 import com.moneylog.core.transaction.domain.PaymentMethod;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
+import com.moneylog.infra.web.QueryViews;
 
 @RestController
 @RequestMapping("/v1/entries")
@@ -31,7 +33,8 @@ public class EntryController {
     public EntryResponse list(@CurrentUser UUID userId, @RequestParam String competence,
                               @RequestParam(required = false) EntryLens lens, @RequestParam(required = false) UUID categoryId,
                               @RequestParam(required = false) UUID accountId, @RequestParam(required = false) PaymentMethod method,
-                              PageQuery page) {
+                              PageQuery page, @RequestParam(required = false) String view) {
+        ConsumptionView parsedView = QueryViews.parse(view);
         Competence parsed;
         try {
             parsed = Competence.parse(competence);
@@ -39,6 +42,7 @@ public class EntryController {
             throw new RequestValidationException("competence", "INVALID_FORMAT", "'competence' deve ser YYYY-MM.");
         }
         EntryFilter filter = new EntryFilter(categoryId, accountId, method);
-        return EntryResponse.of(list.handle(new ListEntriesQuery(userId, parsed, lens == null ? EntryLens.CONSUMPTION : lens, filter, page)));
+        return EntryResponse.of(list.handle(new ListEntriesQuery(userId, parsed, lens == null ? EntryLens.CONSUMPTION : lens, filter, page,
+                parsedView)), parsedView);
     }
 }

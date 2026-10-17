@@ -43,7 +43,7 @@ import com.moneylog.core.finance.app.cards.usecase.PayInvoiceUseCaseImpl;
 import com.moneylog.core.finance.app.cards.usecase.PreviewInvoicePaymentUseCase.PreviewInvoicePaymentQuery;
 import com.moneylog.core.finance.app.cards.usecase.PreviewInvoicePaymentUseCaseImpl;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.util.FinanceScenarioFactory;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.id.IdGenerator;
@@ -79,6 +79,7 @@ class PayInvoiceUseCasesTest {
     private final IdempotencyGateway idempotency = mock(IdempotencyGateway.class);
     private final IdGenerator ids = mock(IdGenerator.class);
     private final TimeProvider time = mock(TimeProvider.class);
+    private final com.moneylog.core.card.app.gateways.InvoiceDocumentGateway documents = mock(com.moneylog.core.card.app.gateways.InvoiceDocumentGateway.class);
     private final UUID cardId = scenario.roxinho.id();
     private final UUID invoiceId = InvoiceIds.of(cardId, NOV_CLOSING);
 
@@ -103,7 +104,8 @@ class PayInvoiceUseCasesTest {
         });
         when(idempotency.claim(any(), any(), any(), any(), any(), any(), any())).thenReturn(true);
         when(lookup.findById(USER_ID, invoiceId)).thenReturn(Optional.empty());
-        pay = new PayInvoiceUseCaseImpl(lookup, cards, accounts, transactions, ledger, records, idempotency, ids, time);
+        when(documents.find(any(), any())).thenReturn(new com.moneylog.core.card.app.gateways.InvoiceDocumentGateway.Stored(null, 0));
+        pay = new PayInvoiceUseCaseImpl(lookup, cards, accounts, transactions, ledger, records, idempotency, ids, time, documents);
         preview = new PreviewInvoicePaymentUseCaseImpl(lookup, records, ids, time);
     }
 

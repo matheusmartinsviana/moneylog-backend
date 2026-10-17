@@ -65,7 +65,7 @@ public final class NotificationUseCasesImpl {
 
     public static final int RETENTION_DAYS = 90;
     public static final int MAX_PUSH_SUBSCRIPTIONS = 10;
-    static final Set<String> AMOUNT_PARAMS = Set.of("amount", "total", "available", "committed7d");
+    static final Set<String> AMOUNT_PARAMS = Set.of("amount", "total", "available", "committed7d", "installmentAmount", "surplus", "balance", "due", "difference");
 
     private NotificationUseCasesImpl() {
     }
@@ -233,6 +233,7 @@ public final class NotificationUseCasesImpl {
                 throw new NotificationSettingsVersionConflictException();
             }
             current.update(c.summaryEnabled(), c.summaryTime(), c.frequency(), c.kinds(), c.quietHours(), c.pushEnabled(), c.displayName());
+            current.updateAlerts(c.alerts());
             return settings.save(current, c.version()).orElseThrow(NotificationSettingsVersionConflictException::new);
         }
     }

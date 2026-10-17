@@ -53,6 +53,9 @@ public class MarkThirdPartyExpenseUseCaseImpl implements MarkThirdPartyExpenseUs
         if (!tx.isActive() || (tx.type() != TransactionType.EXPENSE && tx.type() != TransactionType.CARD_PURCHASE)) {
             throw new ThirdPartyExpenseInvalidException("só uma despesa ou compra no cartão ativa pode ser de terceiro.");
         }
+        if (tx.purchaseShares() != null) {
+            throw new ThirdPartyExpenseInvalidException("a compra já tem rateio por pessoa; a parte de terceiros já está no a receber.");
+        }
         if (c.amount() != null && (!c.amount().isPositive() || c.amount().isGreaterThan(tx.chargedAmount()))) {
             throw new ThirdPartyExpenseInvalidException("a parte reembolsável precisa estar entre 0,01 e o valor cobrado da compra.");
         }

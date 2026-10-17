@@ -7,11 +7,14 @@ import java.util.UUID;
 import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.finance.app.cards.InvoiceDetails;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.infra.transaction.controller.PersonAmountResponse;
 
 public record InvoiceDetailResponse(UUID id, UUID cardId, String referenceMonth, LocalDate periodStart, LocalDate closingDate,
                                     LocalDate dueDate, InvoiceStatus status, Money total, Money carryIn, Money paid,
                                     Money outstanding, Money creditCarry, boolean hasLateEntries, List<ItemResponse> items,
-                                    List<PaymentResponse> payments) {
+                                    List<PaymentResponse> payments, Money myShare, Money thirdPartyShare,
+                                    List<PersonAmountResponse> shareByPerson, Money documentAmount, Money documentDivergence,
+                                    long documentVersion) {
 
     public record ItemResponse(String kind, UUID transactionId, String description, Integer number, Integer totalInstallments,
                                Money amount, LocalDate date, boolean lateEntry) {
@@ -32,6 +35,8 @@ public record InvoiceDetailResponse(UUID id, UUID cardId, String referenceMonth,
         return new InvoiceDetailResponse(view.id(), view.cardId(), view.referenceMonth().toString(), view.periodStart(),
                 view.closingDate(), view.dueDate(), view.status(), view.total(), view.carryIn(), view.paid(), view.outstanding(),
                 view.creditCarry(), view.hasLateEntries(), details.items().stream().map(ItemResponse::of).toList(),
-                details.payments().stream().map(PaymentResponse::of).toList());
+                details.payments().stream().map(PaymentResponse::of).toList(), details.myShare(), details.thirdPartyShare(),
+                details.shareByPerson().stream().map(PersonAmountResponse::of).toList(), details.documentAmount(),
+                details.documentDivergence(), details.documentVersion());
     }
 }

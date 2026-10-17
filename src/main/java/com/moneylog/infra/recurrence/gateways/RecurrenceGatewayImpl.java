@@ -23,6 +23,8 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.persistence.OffsetLimit;
 import com.moneylog.infra.recurrence.persistence.RecurrenceEntity;
 import com.moneylog.infra.recurrence.persistence.RecurrenceRepositoryJpa;
+import com.moneylog.infra.recurrence.persistence.RecurrenceShareEntity;
+import com.moneylog.infra.recurrence.persistence.RecurrenceShareRepositoryJpa;
 import com.moneylog.infra.recurrence.persistence.RecurrenceSkipEntity;
 import com.moneylog.infra.recurrence.persistence.RecurrenceSkipRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
@@ -32,12 +34,15 @@ public class RecurrenceGatewayImpl implements RecurrenceGateway {
 
     private final RecurrenceRepositoryJpa repository;
     private final RecurrenceSkipRepositoryJpa skips;
+    private final RecurrenceShareRepositoryJpa shares;
     private final TransactionRepositoryJpa transactions;
     private final IdGenerator ids;
     private final TimeProvider time;
 
     public RecurrenceGatewayImpl(RecurrenceRepositoryJpa repository, RecurrenceSkipRepositoryJpa skips,
-                                 TransactionRepositoryJpa transactions, IdGenerator ids, TimeProvider time) {
+                                 RecurrenceShareRepositoryJpa shares, TransactionRepositoryJpa transactions, IdGenerator ids,
+                                 TimeProvider time) {
+        this.shares = shares;
         this.repository = repository;
         this.skips = skips;
         this.transactions = transactions;
@@ -68,9 +73,15 @@ public class RecurrenceGatewayImpl implements RecurrenceGateway {
             entity = RecurrenceRepositoryMapper.toEntity(recurrence, now);
         } else {
             entity.apply(recurrence.amount().cents(), recurrence.description(), recurrence.categoryId(), recurrence.accountId(),
-                    recurrence.cardId(), recurrence.paymentMethod(), recurrence.schedule().endDate(), recurrence.isActive(), recurrence.incomeCompetenceOffsetMonths(), now);
+                    recurrence.cardId(), recurrence.paymentMethod(), recurrence.schedule().endDate(), recurrence.isActive(), recurrence.incomeCompetenceOffsetMonths(), recurrence.nature(), now);
+            RecurrenceRepositoryMapper.copyForeignAndSubscription(recurrence, entity);
         }
         RecurrenceEntity saved = repository.saveAndFlush(entity);
+        shares.deleteByRecurrence(saved.getUserId(), saved.getId());
+        List<RecurrenceShareEntity> shareRows = RecurrenceRepositoryMapper.shareRows(recurrence, ids, now);
+        if (!shareRows.isEmpty()) {
+            shares.saveAllAndFlush(shareRows);
+        }
         Set<LocalDate> stored = new HashSet<>();
         skips.findByUserIdAndRecurrenceIdIn(saved.getUserId(), List.of(saved.getId())).forEach(s -> stored.add(s.getOccurrenceDate()));
         List<RecurrenceSkipEntity> toInsert = new ArrayList<>();
@@ -96,8 +107,15 @@ public class RecurrenceGatewayImpl implements RecurrenceGateway {
         Map<UUID, List<LocalDate>> realized = new HashMap<>();
         transactions.findAllActiveRealized(userId)
                 .forEach(r -> realized.computeIfAbsent(r.getRecurrenceId(), id -> new ArrayList<>()).add(r.getDate()));
+        Map<UUID, List<RecurrenceShareEntity>> sharesByRecurrence = new HashMap<>();
+        shares.findByUserId(userId).forEach(s -> sharesByRecurrence.computeIfAbsent(s.getRecurrenceId(), id -> new ArrayList<>()).add(s));
         return entities.stream().map(e -> RecurrenceRepositoryMapper.toDomain(e, realized.getOrDefault(e.getId(), List.of()),
-                skipped.getOrDefault(e.getId(), List.of()))).toList();
+                skipped.getOrDefault(e.getId(), List.of()), sharesByRecurrence.getOrDefault(e.getId(), List.of()))).toList();
+    }
+
+    @Override
+    public List<Versioned<RecurringTransaction>> findAllVersioned(UUID userId) {
+        return hydrate(userId, repository.findByUserId(userId));
     }
 
     @Override
@@ -134,7 +152,10 @@ public class RecurrenceGatewayImpl implements RecurrenceGateway {
         Map<UUID, List<LocalDate>> realized = new HashMap<>();
         transactions.findActiveRealized(userId, ids)
                 .forEach(r -> realized.computeIfAbsent(r.getRecurrenceId(), id -> new ArrayList<>()).add(r.getDate()));
+        Map<UUID, List<RecurrenceShareEntity>> sharesByRecurrence = new HashMap<>();
+        shares.findByUserIdAndRecurrenceIdIn(userId, ids)
+                .forEach(s -> sharesByRecurrence.computeIfAbsent(s.getRecurrenceId(), id -> new ArrayList<>()).add(s));
         return entities.stream().map(e -> RecurrenceRepositoryMapper.toVersioned(e, realized.getOrDefault(e.getId(), List.of()),
-                skipped.getOrDefault(e.getId(), List.of()))).toList();
+                skipped.getOrDefault(e.getId(), List.of()), sharesByRecurrence.getOrDefault(e.getId(), List.of()))).toList();
     }
 }

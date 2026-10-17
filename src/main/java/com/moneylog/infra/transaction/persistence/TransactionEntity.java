@@ -8,6 +8,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
@@ -113,6 +114,14 @@ public class TransactionEntity {
     @Column(name = "income_competence", length = 7, columnDefinition = "char(7)")
     private String incomeCompetence;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private TransactionNature nature;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "last_digits", length = 4, columnDefinition = "char(4)")
+    private String lastDigits;
+
     @Column(name = "recurrence_id")
     private UUID recurrenceId;
 
@@ -144,7 +153,7 @@ public class TransactionEntity {
                              UUID invoiceId, boolean lateEntry, Integer installmentCount, UUID categoryId,
                              UUID refundOfId, UUID debtId, String direction, String adjustmentKind, String reason, TransactionSource source,
                              UUID importBatchId, String dedupKey, String originalDedupKey, UUID recurrenceId,
-                             LocalDate occurrenceDate, String voidReason, Instant voidedAt, String incomeCompetence, Instant now) {
+                             LocalDate occurrenceDate, String voidReason, Instant voidedAt, String incomeCompetence, TransactionNature nature, Instant now) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -176,6 +185,7 @@ public class TransactionEntity {
         this.voidReason = voidReason;
         this.voidedAt = voidedAt;
         this.incomeCompetence = incomeCompetence;
+        this.nature = nature;
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -184,7 +194,7 @@ public class TransactionEntity {
     public void apply(TransactionStatus newStatus, long newAmountCents, LocalDate newDate, String newDescription, String newNotes,
                       PaymentMethod newPaymentMethod, UUID newAccountId, UUID newCounterpartAccountId, UUID newInvoiceId,
                       boolean newLateEntry, UUID newCategoryId, UUID newRefundOfId, String newDirection, String newAdjustmentKind, String newReason, String newVoidReason,
-                      Instant newVoidedAt, String newIncomeCompetence, Instant now) {
+                      Instant newVoidedAt, String newIncomeCompetence, TransactionNature newNature, Instant now) {
         this.status = newStatus;
         this.amountCents = newAmountCents;
         this.transactionDate = newDate;
@@ -203,7 +213,20 @@ public class TransactionEntity {
         this.voidReason = newVoidReason;
         this.voidedAt = newVoidedAt;
         this.incomeCompetence = newIncomeCompetence;
+        this.nature = newNature;
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, java.time.temporal.ChronoUnit.MICROS);
+    }
+
+    public String getLastDigits() {
+        return lastDigits == null ? null : lastDigits.strip();
+    }
+
+    public void assignLastDigits(String digits) {
+        this.lastDigits = digits;
+    }
+
+    public TransactionNature getNature() {
+        return nature;
     }
 
     public String getIncomeCompetence() {

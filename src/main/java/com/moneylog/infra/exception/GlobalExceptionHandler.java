@@ -176,6 +176,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return validationFailed(ex.issues(), request);
     }
 
+    @ExceptionHandler(com.moneylog.core.thirdparty.exception.ThirdPartyExceptions.IdempotencyKeyRequiredException.class)
+    ResponseEntity<Object> handleIdempotencyKeyRequired(
+            com.moneylog.core.thirdparty.exception.ThirdPartyExceptions.IdempotencyKeyRequiredException ex, HttpServletRequest request) {
+        return validationFailed(List.of(new FieldIssue("Idempotency-Key", "REQUIRED", ex.getMessage())), request);
+    }
+
     @ExceptionHandler(InvalidPathValueException.class)
     ResponseEntity<Object> handleInvalidPathValue(InvalidPathValueException ex, HttpServletRequest request) {
         ProblemDetail problem = problem(HttpStatus.BAD_REQUEST, ex.code(), "Dados inválidos.", request);

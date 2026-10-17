@@ -9,6 +9,7 @@ import java.util.UUID;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
 import com.moneylog.core.notification.domain.DailyMessage;
 import com.moneylog.core.notification.domain.Notification;
+import com.moneylog.core.notification.domain.NotificationAlertSettings;
 import com.moneylog.core.notification.domain.NotificationKind;
 import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.notification.domain.QuietHours;
@@ -63,7 +64,13 @@ public interface NotificationUseCases {
     }
 
     record SaveSettingsCommand(UUID userId, boolean summaryEnabled, LocalTime summaryTime, SummaryFrequency frequency,
-                               Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName, long version) {
+                               Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName, long version,
+                               NotificationAlertSettings.Patch alerts) {
+
+        public SaveSettingsCommand(UUID userId, boolean summaryEnabled, LocalTime summaryTime, SummaryFrequency frequency,
+                                   Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName, long version) {
+            this(userId, summaryEnabled, summaryTime, frequency, kinds, quietHours, pushEnabled, displayName, version, null);
+        }
     }
 
     interface SaveNotificationSettingsUseCase {

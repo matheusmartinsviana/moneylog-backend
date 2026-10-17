@@ -33,6 +33,7 @@ import com.moneylog.core.finance.app.transactions.usecase.GetTransactionUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.GetTransactionUseCase.GetTransactionQuery;
 import com.moneylog.core.finance.app.transactions.usecase.ListTransactionsUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.ListTransactionsUseCase.ListTransactionsQuery;
+import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionSharesUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionUseCase.UpdateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCase;
@@ -56,12 +57,15 @@ public class TransactionController {
     private final UpdateTransactionUseCase update;
     private final VoidTransactionUseCase voidUseCase;
     private final CancelInstallmentsUseCase cancelInstallments;
+    private final UpdateTransactionSharesUseCase updateShares;
     private final Validator validator;
 
     public TransactionController(CreateTransactionUseCase create, GetTransactionUseCase get, ListTransactionsUseCase list,
                                  UpdateTransactionUseCase update, VoidTransactionUseCase voidUseCase,
-                                 CancelInstallmentsUseCase cancelInstallments, Validator validator) {
+                                 CancelInstallmentsUseCase cancelInstallments, UpdateTransactionSharesUseCase updateShares,
+                                 Validator validator) {
         this.cancelInstallments = cancelInstallments;
+        this.updateShares = updateShares;
         this.validator = validator;
         this.create = create;
         this.get = get;
@@ -120,6 +124,12 @@ public class TransactionController {
         }
         long version = body.version() == null ? 0L : body.version();
         return TransactionResponse.of(update.handle(new UpdateTransactionCommand(id, version, body.toCommand(userId))));
+    }
+
+    @PutMapping("/{id}/shares")
+    public TransactionResponse updateShares(@CurrentUser UUID userId, @PathVariable UUID id,
+                                            @Valid @RequestBody TransactionSharesInput body) {
+        return TransactionResponse.of(updateShares.handle(body.toCommand(userId, id)));
     }
 
     @PostMapping("/{id}/void")

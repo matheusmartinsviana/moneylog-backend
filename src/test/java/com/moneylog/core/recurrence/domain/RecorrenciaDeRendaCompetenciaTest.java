@@ -73,10 +73,11 @@ class RecorrenciaDeRendaCompetenciaTest {
     }
 
     @Test
-    @DisplayName("deslocamento só 0 ou 1 e só em receita; despesa e cartão recusam (RECURRENCE_INVALID)")
+    @DisplayName("deslocamento só -1, 0 ou 1 e só em receita; despesa e cartão recusam (RECURRENCE_INVALID)")
     void deveValidarODeslocamento() {
         assertThatThrownBy(() -> adiantamento(2)).isInstanceOf(InvalidRecurrenceException.class);
-        assertThatThrownBy(() -> adiantamento(-1)).isInstanceOf(InvalidRecurrenceException.class);
+        assertThatThrownBy(() -> adiantamento(-2)).isInstanceOf(InvalidRecurrenceException.class);
+        assertThat(adiantamento(-1).incomeCompetenceOffsetMonths()).as("ADR-017 emendada: o saldo pago no mês seguinte tem deslocamento -1").isEqualTo(-1);
         assertThatThrownBy(() -> RecurringTransaction.ofAccount(REC_ID, USER_ID, TransactionType.EXPENSE, Money.of("1.00"), "x", ALIMENTACAO_ID,
                 NUBANK_ID, PaymentMethod.PIX, Schedule.of(Frequency.MONTHLY, d("2026-09-16")), 1)).isInstanceOf(InvalidRecurrenceException.class);
         RecurringTransaction despesa = RecurringTransaction.ofAccount(REC_ID, USER_ID, TransactionType.EXPENSE, Money.of("1.00"), "x", ALIMENTACAO_ID,

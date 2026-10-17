@@ -208,6 +208,18 @@ class SecurityComponentsTest {
         }
 
         @Test
+        @DisplayName("succeeded informa se o IP era novo: só o primeiro sucesso, e de novo após expirar a confiança")
+        void deveInformarIpNovo() {
+            LoginRateLimiter limiter = new LoginRateLimiter(clock, 5, Duration.ofMinutes(15));
+
+            assertThat(limiter.succeeded(limiter.reserve("1.1.1.1", "a"))).isTrue();
+            assertThat(limiter.succeeded(limiter.reserve("1.1.1.1", "a"))).isFalse();
+            assertThat(limiter.succeeded(limiter.reserve("2.2.2.2", "a"))).isTrue();
+            now.set(now.get().plus(Duration.ofDays(31)));
+            assertThat(limiter.succeeded(limiter.reserve("1.1.1.1", "a"))).isTrue();
+        }
+
+        @Test
         @DisplayName("IPv6 é limitado pelo prefixo /64: trocar o final do endereço não zera o contador")
         void deveAgruparIpv6PorPrefixo64() {
             LoginRateLimiter limiter = limiter(3, 100, 100);

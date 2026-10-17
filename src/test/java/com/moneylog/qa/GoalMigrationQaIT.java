@@ -74,9 +74,9 @@ class GoalMigrationQaIT {
             Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
-            assertThat(result.migrationsExecuted).isEqualTo(26);
+            assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("4.02"));
             assertThat(all.info().applied()).extracting(i -> i.getVersion().getVersion()).contains("5.00");
-            assertThat(all.info().current().getVersion().getVersion()).isEqualTo("8.17");
+            assertThat(all.info().current().getVersion().getVersion()).isEqualTo(com.moneylog.util.MigrationFiles.latest());
             assertThat(all.validateWithResult().validationSuccessful).isTrue();
             assertThat(all.migrate().migrationsExecuted).isZero();
 

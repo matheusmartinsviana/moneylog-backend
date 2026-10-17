@@ -1,5 +1,6 @@
 package com.moneylog.infra.recurrence.persistence;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -10,10 +11,15 @@ import org.hibernate.type.SqlTypes;
 
 import com.moneylog.core.recurrence.domain.Frequency;
 import com.moneylog.core.recurrence.domain.IntervalUnit;
+import com.moneylog.core.recurrence.domain.RecurrenceScope;
+import com.moneylog.core.sk.provenance.Provenance;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.infra.persistence.ProvenanceColumns;
+import com.moneylog.core.transaction.domain.TransactionNature;
 import com.moneylog.core.transaction.domain.TransactionType;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -84,6 +90,42 @@ public class RecurrenceEntity {
     @Column(name = "income_competence_offset_months", nullable = false)
     private int incomeCompetenceOffsetMonths;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 16)
+    private TransactionNature nature;
+
+    @Column(name = "original_amount_cents")
+    private Long originalAmountCents;
+
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "original_currency", length = 3, columnDefinition = "char(3)")
+    private String originalCurrency;
+
+    @Column(name = "reference_fx_rate", precision = 13, scale = 6)
+    private BigDecimal referenceFxRate;
+
+    @Column(name = "iof_bps")
+    private Integer iofBps;
+
+    @Column(name = "is_subscription", nullable = false)
+    private boolean subscription;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private RecurrenceScope scope = RecurrenceScope.PERSONAL;
+
+    @Embedded
+    private ProvenanceColumns provenance = ProvenanceColumns.of(null);
+
+    @Column(length = 60)
+    private String channel;
+
+    @Column(name = "overlap_group", length = 60)
+    private String overlapGroup;
+
+    @Column(name = "last_used_on")
+    private LocalDate lastUsedOn;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -100,7 +142,8 @@ public class RecurrenceEntity {
     public RecurrenceEntity(UUID id, UUID userId, TransactionType type, long amountCents, String currency, String description,
                             UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod, Frequency frequency,
                             int intervalCount, IntervalUnit intervalUnit, LocalDate startDate, LocalDate endDate,
-                            Integer maxOccurrences, boolean active, int incomeCompetenceOffsetMonths, Instant now) {
+                            Integer maxOccurrences, boolean active, int incomeCompetenceOffsetMonths, TransactionNature nature,
+                            Instant now) {
         this.id = id;
         this.userId = userId;
         this.type = type;
@@ -119,13 +162,15 @@ public class RecurrenceEntity {
         this.maxOccurrences = maxOccurrences;
         this.active = active;
         this.incomeCompetenceOffsetMonths = incomeCompetenceOffsetMonths;
+        this.nature = nature;
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @SuppressWarnings("java:S107")
     public void apply(long newAmountCents, String newDescription, UUID newCategoryId, UUID newAccountId, UUID newCardId,
-                      PaymentMethod newMethod, LocalDate newEndDate, boolean newActive, int newIncomeCompetenceOffsetMonths, Instant now) {
+                      PaymentMethod newMethod, LocalDate newEndDate, boolean newActive, int newIncomeCompetenceOffsetMonths,
+                      TransactionNature newNature, Instant now) {
         this.amountCents = newAmountCents;
         this.description = newDescription;
         this.categoryId = newCategoryId;
@@ -135,7 +180,70 @@ public class RecurrenceEntity {
         this.endDate = newEndDate;
         this.active = newActive;
         this.incomeCompetenceOffsetMonths = newIncomeCompetenceOffsetMonths;
+        this.nature = newNature;
         this.updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+    }
+
+    public void applyProvenance(Provenance newProvenance) {
+        this.provenance = ProvenanceColumns.of(newProvenance);
+    }
+
+    public Provenance provenance() {
+        return provenance.toDomain();
+    }
+
+    public void applyForeignAndSubscription(Long newOriginalAmountCents, String newOriginalCurrency, BigDecimal newReferenceFxRate,
+                                            Integer newIofBps, boolean newSubscription, RecurrenceScope newScope, String newChannel,
+                                            String newOverlapGroup, LocalDate newLastUsedOn) {
+        this.originalAmountCents = newOriginalAmountCents;
+        this.originalCurrency = newOriginalCurrency;
+        this.referenceFxRate = newReferenceFxRate;
+        this.iofBps = newIofBps;
+        this.subscription = newSubscription;
+        this.scope = newScope;
+        this.channel = newChannel;
+        this.overlapGroup = newOverlapGroup;
+        this.lastUsedOn = newLastUsedOn;
+    }
+
+    public Long getOriginalAmountCents() {
+        return originalAmountCents;
+    }
+
+    public String getOriginalCurrency() {
+        return originalCurrency;
+    }
+
+    public BigDecimal getReferenceFxRate() {
+        return referenceFxRate;
+    }
+
+    public Integer getIofBps() {
+        return iofBps;
+    }
+
+    public boolean isSubscription() {
+        return subscription;
+    }
+
+    public RecurrenceScope getScope() {
+        return scope;
+    }
+
+    public String getChannel() {
+        return channel;
+    }
+
+    public String getOverlapGroup() {
+        return overlapGroup;
+    }
+
+    public LocalDate getLastUsedOn() {
+        return lastUsedOn;
+    }
+
+    public TransactionNature getNature() {
+        return nature;
     }
 
     public int getIncomeCompetenceOffsetMonths() {

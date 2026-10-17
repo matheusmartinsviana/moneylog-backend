@@ -47,6 +47,12 @@ public final class NotificationExceptions {
         }
     }
 
+    public static class NotificationThresholdInvalidException extends BusinessRuleException {
+        public NotificationThresholdInvalidException(String reason) {
+            super("NOTIFICATION_THRESHOLD_INVALID", "Parâmetro de alerta inválido: " + reason);
+        }
+    }
+
     public static class NotificationSettingsVersionConflictException extends ConflictException {
         public NotificationSettingsVersionConflictException() {
             super("VERSION_CONFLICT", "As configurações foram alteradas por outra requisição. Recarregue e tente de novo.");

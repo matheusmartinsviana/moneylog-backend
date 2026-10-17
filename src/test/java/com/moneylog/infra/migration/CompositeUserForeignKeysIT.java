@@ -94,7 +94,8 @@ class CompositeUserForeignKeysIT {
         List<String> simples = jdbc.queryForList("""
                 SELECT conname || ' -> ' || confrelid::regclass::text FROM pg_constraint
                 WHERE contype = 'f' AND array_length(conkey, 1) = 1 AND confrelid::regclass::text <> 'users'""", String.class);
-        assertThat(simples).isEmpty();
+        assertThat(simples).as("só as tabelas fiscais globais (sem usuário) têm FK simples").containsExactlyInAnyOrder(
+                "fk_tax_table_brackets_table -> tax_tables", "fk_tax_table_sources_table -> tax_tables");
         assertThat(constraintDef("fk_credit_card_billing_rules_card"))
                 .isEqualTo("FOREIGN KEY (card_id, user_id) REFERENCES credit_cards(id, user_id)");
     }

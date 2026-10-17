@@ -16,6 +16,7 @@ import com.moneylog.core.card.exception.CardExceptions.CardNameTooLongException;
 import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
 import com.moneylog.core.card.exception.CardExceptions.InvalidBillingDayException;
 import com.moneylog.core.card.exception.CardExceptions.InvalidCardLimitException;
+import com.moneylog.core.card.exception.CardExceptions.PurchaseLastDigitsNotFromCardException;
 import com.moneylog.core.card.exception.CardExceptions.StaleBillingChangeException;
 import com.moneylog.core.sk.ledger.BookRef;
 import com.moneylog.core.sk.money.AmountLimit;
@@ -38,6 +39,7 @@ public final class CreditCard {
     private CardStatus status;
     private final long version;
     private boolean closingDayConfirmed = true;
+    private CardProfile profile = CardProfile.EMPTY;
 
     private CreditCard(UUID id, UUID userId, String name, String institution, Money limit, UUID defaultPaymentAccountId,
                        List<BillingRule> rules, CardStatus status, long version) {
@@ -72,6 +74,32 @@ public final class CreditCard {
         CreditCard card = new CreditCard(id, userId, name, institution, limit, defaultPaymentAccountId, rules, status, version);
         card.closingDayConfirmed = closingDayConfirmed;
         return card;
+    }
+
+    public static CreditCard restore(UUID id, UUID userId, String name, String institution, Money limit,
+                                     UUID defaultPaymentAccountId, List<BillingRule> rules, CardStatus status, long version,
+                                     boolean closingDayConfirmed, CardProfile profile) {
+        CreditCard card = restore(id, userId, name, institution, limit, defaultPaymentAccountId, rules, status, version, closingDayConfirmed);
+        card.profile = profile == null ? CardProfile.EMPTY : profile;
+        return card;
+    }
+
+    public void updateProfile(CardProfile newProfile) {
+        this.profile = required(newProfile, "profile");
+    }
+
+    public CardProfile profile() {
+        return profile;
+    }
+
+    public Boolean autoDebit() {
+        return profile.autoDebit();
+    }
+
+    public void ensureLastDigitsBelong(String lastDigits) {
+        if (lastDigits != null && !profile.hasLastDigits(lastDigits)) {
+            throw new PurchaseLastDigitsNotFromCardException(lastDigits);
+        }
     }
 
     public void markClosingDayConfirmed(boolean confirmed) {

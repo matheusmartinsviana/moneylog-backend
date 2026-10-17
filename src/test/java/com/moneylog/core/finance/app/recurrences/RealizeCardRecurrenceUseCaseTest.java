@@ -28,7 +28,7 @@ import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.core.card.domain.InvoiceStatus;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCase.RealizeCardRecurrenceCommand;
 import com.moneylog.core.finance.app.recurrences.usecase.RealizeCardRecurrenceUseCaseImpl;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;

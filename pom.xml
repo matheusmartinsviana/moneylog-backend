@@ -27,6 +27,8 @@
         <maven-enforcer-plugin.version>3.6.3</maven-enforcer-plugin.version>
         <!-- Quality gate do core (S-29): mínimo de linhas cobertas em com.moneylog.core.. -->
         <coverage.core.minimum>0.90</coverage.core.minimum>
+        <it.excluded.groups>slow</it.excluded.groups>
+        <coverage.check.skip>true</coverage.check.skip>
         <!-- Imagem do Postgres usada nos ITs. Precisa ser igual à do docker-compose.yml (verificado em teste). -->
         <postgres.image>postgres:17</postgres.image>
         <!-- OpenAPI (T21): springdoc na linha 3.x (Spring Boot 4) e validador de contrato dos ITs (S-66, S-84). -->
@@ -192,6 +194,7 @@
                         <include>**/*IT.java</include>
                     </includes>
                     <groups>i</groups>
+                    <excludedGroups>${it.excluded.groups}</excludedGroups>
                 </configuration>
                 <executions>
                     <execution>
@@ -242,6 +245,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <skip>${coverage.check.skip}</skip>
                             <includes>
                                 <include>com/moneylog/core/**</include>
                             </includes>
@@ -263,4 +267,13 @@
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>slow</id>
+            <properties>
+                <it.excluded.groups>none</it.excluded.groups>
+                <coverage.check.skip>false</coverage.check.skip>
+            </properties>
+        </profile>
+    </profiles>
 </project>

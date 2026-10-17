@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import com.moneylog.core.card.domain.BillingRule;
+import com.moneylog.core.card.domain.CardProfile;
 import com.moneylog.core.card.domain.CreditCard;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
@@ -25,7 +26,8 @@ public final class CardRepositoryMapper {
                 .sorted(Comparator.comparing(BillingRule::effectiveFrom)).toList();
         return CreditCard.restore(e.getId(), e.getUserId(), e.getName(), e.getInstitution(),
                 e.getLimitCents() == null ? null : Money.ofCents(e.getLimitCents(), CurrencyCode.of(e.getCurrency())), e.getDefaultPaymentAccountId(), domainRules,
-                e.getStatus(), e.getVersion(), e.isClosingConfirmed());
+                e.getStatus(), e.getVersion(), e.isClosingConfirmed(),
+                CardProfile.restore(e.getAutoDebit(), e.getBrand(), e.getBestPurchaseDay(), e.getLastDigits()));
     }
 
     public static Persisted<CreditCard> toPersisted(CardEntity e, List<BillingRuleEntity> rules) {

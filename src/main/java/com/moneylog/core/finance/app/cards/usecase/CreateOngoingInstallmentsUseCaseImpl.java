@@ -9,7 +9,7 @@ import com.moneylog.core.card.exception.CardExceptions.CardNotFoundException;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.TransactionDetails;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.sk.id.IdGenerator;

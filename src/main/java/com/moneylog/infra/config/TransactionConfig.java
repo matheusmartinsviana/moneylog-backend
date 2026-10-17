@@ -12,8 +12,10 @@ import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.app.gateways.PersonGateway;
+import com.moneylog.core.sk.ledger.LedgerReadGateway;
+import com.moneylog.core.thirdparty.app.gateways.ThirdPartyExpenseGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.AccountTransactionFactory;
 import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.finance.app.transactions.usecase.CancelInstallmentsUseCase;
@@ -25,6 +27,9 @@ import com.moneylog.core.finance.app.transactions.usecase.ListEntriesUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.ListEntriesUseCaseImpl;
 import com.moneylog.core.finance.app.transactions.usecase.ListTransactionsUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.ListTransactionsUseCaseImpl;
+import com.moneylog.core.finance.app.transactions.ShareSettlement;
+import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionSharesUseCase;
+import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionSharesUseCaseImpl;
 import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionUseCase;
 import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionUseCaseImpl;
 import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCase;
@@ -32,16 +37,20 @@ import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCase
 import com.moneylog.core.finance.app.transactions.usecase.GetTransactionUseCaseImpl;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.app.gateways.ForeignChargeGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
 import com.moneylog.core.transaction.app.gateways.TransactionRevisionGateway;
 import com.moneylog.core.card.app.gateways.CardGateway;
 import com.moneylog.infra.card.gateways.InvoiceRowGateway;
 import com.moneylog.infra.ledger.persistence.LedgerPostingRepositoryJpa;
+import com.moneylog.infra.transaction.gateways.ForeignChargeGatewayImpl;
 import com.moneylog.infra.transaction.gateways.IdempotencyGatewayImpl;
 import com.moneylog.infra.transaction.gateways.TransactionGatewayImpl;
 import com.moneylog.infra.transaction.gateways.TransactionRevisionGatewayImpl;
 import com.moneylog.infra.transaction.gateways.TransactionHydrator;
+import com.moneylog.infra.transaction.persistence.CardPurchaseShareRepositoryJpa;
+import com.moneylog.infra.transaction.persistence.ForeignChargeRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.InstallmentRepositoryJpa;
 import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 
@@ -49,23 +58,30 @@ import com.moneylog.infra.transaction.persistence.TransactionRepositoryJpa;
 public class TransactionConfig {
 
     @Bean
-    TransactionHydrator transactionHydrator(InstallmentRepositoryJpa installments, InvoiceRowGateway invoices) {
-        return new TransactionHydrator(installments, invoices);
+    TransactionHydrator transactionHydrator(InstallmentRepositoryJpa installments, InvoiceRowGateway invoices,
+                                            CardPurchaseShareRepositoryJpa shares) {
+        return new TransactionHydrator(installments, invoices, shares);
     }
 
     @Bean
     TransactionGateway transactionGateway(TransactionRepositoryJpa repository, InstallmentRepositoryJpa installments,
-                                          LedgerPostingRepositoryJpa postings, TransactionHydrator hydrator,
+                                          CardPurchaseShareRepositoryJpa shares, LedgerPostingRepositoryJpa postings, TransactionHydrator hydrator,
                                           InvoiceRowGateway invoices, CardGateway cards, TimeProvider time,
                                           EntityManager entityManager) {
-        return new TransactionGatewayImpl(repository, installments, postings, hydrator, invoices, cards, time, entityManager);
+        return new TransactionGatewayImpl(repository, installments, shares, postings, hydrator, invoices, cards, time, entityManager);
+    }
+
+    @Bean
+    ForeignChargeGateway foreignChargeGateway(ForeignChargeRepositoryJpa repository, TimeProvider time) {
+        return new ForeignChargeGatewayImpl(repository, time);
     }
 
     @Bean
     TransactionDetailsAssembler transactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts,
                                                            CategoryGateway categories, CardGateway cards, TimeProvider time,
-                                                           DebtGateway debts, PersonGateway persons) {
-        return new TransactionDetailsAssembler(transactions, accounts, categories, cards, time, debts, persons);
+                                                           DebtGateway debts, PersonGateway persons,
+                                                           ForeignChargeGateway foreignCharges) {
+        return new TransactionDetailsAssembler(transactions, accounts, categories, cards, time, debts, persons, foreignCharges);
     }
 
     @Bean
@@ -76,17 +92,20 @@ public class TransactionConfig {
     @Bean
     AccountTransactionFactory accountTransactionFactory(TransactionGateway transactions, AccountGateway accounts,
                                                         CategoryGateway categories, CardGateway cards, TimeProvider time,
-                                                        PersonGateway persons, DebtGateway debts, IdGenerator ids) {
-        return new AccountTransactionFactory(transactions, accounts, categories, cards, time, persons, debts, ids);
+                                                        PersonGateway persons, DebtGateway debts, IdGenerator ids,
+                                                        ShareSettlement shareSettlement) {
+        return new AccountTransactionFactory(transactions, accounts, categories, cards, time, persons, debts, ids, shareSettlement);
     }
 
     @Bean
     CreateTransactionUseCase createTransactionUseCase(TransactionGateway transactions, AccountTransactionFactory factory,
                                                       LedgerWriteGateway ledger, IdGenerator ids,
                                                       TransactionDetailsAssembler assembler, IdempotencyGateway idempotency,
-                                                      TimeProvider time, DebtGateway debts, PlatformTransactionManager tm) {
+                                                      TimeProvider time, DebtGateway debts, ForeignChargeGateway foreignCharges,
+                                                      PlatformTransactionManager tm) {
         return TransactionalProxies.required(CreateTransactionUseCase.class,
-                new CreateTransactionUseCaseImpl(transactions, factory, ledger, ids, assembler, idempotency, time, debts), tm);
+                new CreateTransactionUseCaseImpl(transactions, factory, ledger, ids, assembler, idempotency, time, debts,
+                        foreignCharges), tm);
     }
 
     @Bean
@@ -104,20 +123,36 @@ public class TransactionConfig {
     }
 
     @Bean
+    ShareSettlement shareSettlement(PersonGateway persons, ThirdPartyExpenseGateway receipts, LedgerReadGateway ledgerRead,
+                                    LedgerWriteGateway ledger, TransactionRevisionGateway revisions,
+                                    TransactionGateway transactions) {
+        return new ShareSettlement(persons, receipts, ledgerRead, ledger, revisions, transactions);
+    }
+
+    @Bean
+    UpdateTransactionSharesUseCase updateTransactionSharesUseCase(TransactionGateway transactions, PersonGateway persons,
+                                                                  ShareSettlement shareSettlement, TransactionRevisionGateway revisions,
+                                                                  LedgerWriteGateway ledger, TransactionDetailsAssembler assembler,
+                                                                  TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(UpdateTransactionSharesUseCase.class,
+                new UpdateTransactionSharesUseCaseImpl(transactions, persons, shareSettlement, revisions, ledger, assembler, time), tm);
+    }
+
+    @Bean
     VoidTransactionUseCase voidTransactionUseCase(TransactionGateway transactions, AccountGateway accounts, CardGateway cards,
                                                   LedgerWriteGateway ledger, TransactionDetailsAssembler assembler, TimeProvider time,
-                                                  DebtGateway debts, PlatformTransactionManager tm) {
+                                                  DebtGateway debts, ShareSettlement shareSettlement, PlatformTransactionManager tm) {
         return TransactionalProxies.required(VoidTransactionUseCase.class,
-                new VoidTransactionUseCaseImpl(transactions, accounts, cards, ledger, assembler, time, debts), tm);
+                new VoidTransactionUseCaseImpl(transactions, accounts, cards, ledger, assembler, time, debts, shareSettlement), tm);
     }
 
     @Bean
     CancelInstallmentsUseCase cancelInstallmentsUseCase(TransactionGateway transactions, CardGateway cards,
                                                         TransactionRevisionGateway revisions, LedgerWriteGateway ledger,
                                                         TransactionDetailsAssembler assembler, TimeProvider time,
-                                                        PlatformTransactionManager tm) {
+                                                        ShareSettlement shareSettlement, PlatformTransactionManager tm) {
         return TransactionalProxies.required(CancelInstallmentsUseCase.class,
-                new CancelInstallmentsUseCaseImpl(transactions, cards, revisions, ledger, assembler, time), tm);
+                new CancelInstallmentsUseCaseImpl(transactions, cards, revisions, ledger, assembler, time, shareSettlement), tm);
     }
 
     @Bean

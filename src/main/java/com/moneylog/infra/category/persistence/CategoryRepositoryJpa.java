@@ -39,6 +39,10 @@ public interface CategoryRepositoryJpa extends JpaRepository<CategoryEntity, UUI
     boolean existsActiveWithName(@Param("userId") UUID userId, @Param("kind") CategoryKind kind, @Param("name") String name,
                                  @Param("excludingId") UUID excludingId);
 
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from CategoryEntity c where c.userId = :userId")
+    void deleteAllOf(@Param("userId") UUID userId);
+
     @Query("select c.systemKey from CategoryEntity c where c.userId = :userId and c.systemKey is not null")
     Set<String> findSystemKeys(@Param("userId") UUID userId);
 }

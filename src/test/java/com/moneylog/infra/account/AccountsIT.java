@@ -31,7 +31,7 @@ import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.domain.AccountType;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.PaymentMethod;

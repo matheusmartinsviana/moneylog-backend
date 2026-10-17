@@ -17,11 +17,13 @@ import com.moneylog.core.finance.app.reports.usecase.GetIncomeExpenseSeriesUseCa
 import com.moneylog.core.finance.app.reports.usecase.GetIncomeExpenseSeriesUseCase.GetIncomeExpenseSeriesQuery;
 import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCase;
 import com.moneylog.core.finance.app.reports.usecase.GetSpendingByCategoryUseCase.GetSpendingByCategoryQuery;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.ReportPeriod;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.infra.exception.InvalidPathValueException;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryMonths;
+import com.moneylog.infra.web.QueryViews;
 
 @RestController
 @RequestMapping("/v1/reports")
@@ -42,18 +44,24 @@ public class ReportController {
 
     @GetMapping("/income-expenses")
     public ResponseEntity<IncomeExpenseSeriesResponse> incomeExpenses(@CurrentUser UUID userId,
-                                                                      @RequestParam(required = false) String period) {
+                                                                      @RequestParam(required = false) String period,
+                                                                      @RequestParam(required = false) String view) {
+        ConsumptionView parsedView = QueryViews.parse(view);
         return ResponseEntity.ok().cacheControl(NO_STORE)
-                .body(IncomeExpenseSeriesResponse.of(series.handle(new GetIncomeExpenseSeriesQuery(userId, parsePeriod(period)))));
+                .body(IncomeExpenseSeriesResponse.of(series.handle(new GetIncomeExpenseSeriesQuery(userId, parsePeriod(period), parsedView)),
+                        parsedView));
     }
 
     @GetMapping("/spending-by-category")
     public ResponseEntity<SpendingByCategoryResponse> spendingByCategory(@CurrentUser UUID userId,
                                                                          @RequestParam(required = false) String month,
-                                                                         @RequestParam(defaultValue = "5") @Min(1) @Max(10) int limit) {
+                                                                         @RequestParam(defaultValue = "5") @Min(1) @Max(10) int limit,
+                                                                         @RequestParam(required = false) String view) {
+        ConsumptionView parsedView = QueryViews.parse(view);
         Competence parsed = month == null ? null : QueryMonths.parse(month, REPORT_MONTH_INVALID, "month");
         return ResponseEntity.ok().cacheControl(NO_STORE)
-                .body(SpendingByCategoryResponse.of(spending.handle(new GetSpendingByCategoryQuery(userId, parsed, limit))));
+                .body(SpendingByCategoryResponse.of(spending.handle(new GetSpendingByCategoryQuery(userId, parsed, limit, parsedView)),
+                        parsedView));
     }
 
     static ReportPeriod parsePeriod(String period) {

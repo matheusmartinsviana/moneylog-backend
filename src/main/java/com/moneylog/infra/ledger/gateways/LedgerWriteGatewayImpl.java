@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.sk.ledger.Posting;

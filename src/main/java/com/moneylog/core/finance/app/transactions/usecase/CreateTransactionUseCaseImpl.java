@@ -6,7 +6,7 @@ import java.util.UUID;
 
 import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.domain.Debt;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.handlers.BuiltTransaction;
 import com.moneylog.core.finance.app.transactions.AccountTransactionFactory;
 import com.moneylog.core.finance.app.transactions.CanonicalCommandHash;
@@ -15,6 +15,7 @@ import com.moneylog.core.finance.app.transactions.TransactionDetailsAssembler;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.app.gateways.ForeignChargeGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway;
 import com.moneylog.core.transaction.app.gateways.IdempotencyGateway.Claim;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
@@ -35,6 +36,7 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
     private final IdempotencyGateway idempotency;
     private final TimeProvider time;
     private final DebtGateway debts;
+    private final ForeignChargeGateway foreignCharges;
 
     public CreateTransactionUseCaseImpl(TransactionGateway transactions, AccountTransactionFactory factory,
                                         LedgerWriteGateway ledger, IdGenerator ids, TransactionDetailsAssembler assembler,
@@ -46,6 +48,15 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
     public CreateTransactionUseCaseImpl(TransactionGateway transactions, AccountTransactionFactory factory,
                                         LedgerWriteGateway ledger, IdGenerator ids, TransactionDetailsAssembler assembler,
                                         IdempotencyGateway idempotency, TimeProvider time, DebtGateway debts) {
+        this(transactions, factory, ledger, ids, assembler, idempotency, time, debts, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public CreateTransactionUseCaseImpl(TransactionGateway transactions, AccountTransactionFactory factory,
+                                        LedgerWriteGateway ledger, IdGenerator ids, TransactionDetailsAssembler assembler,
+                                        IdempotencyGateway idempotency, TimeProvider time, DebtGateway debts,
+                                        ForeignChargeGateway foreignCharges) {
+        this.foreignCharges = foreignCharges;
         this.debts = debts;
         this.transactions = transactions;
         this.factory = factory;
@@ -86,7 +97,13 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
             debts.insert(debt);
         }
         Persisted<Transaction> saved = transactions.insert(transaction);
+        if (transaction.foreignCharge() != null) {
+            foreignCharges.save(command.userId(), transaction.id(), transaction.foreignCharge());
+        }
         ledger.append(command.userId(), transaction.entries());
+        if (!built.settlementEntries().isEmpty()) {
+            ledger.append(command.userId(), built.settlementEntries());
+        }
         return assembler.assemble(saved);
     }
 

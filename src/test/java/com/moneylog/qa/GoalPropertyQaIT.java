@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
@@ -37,6 +38,7 @@ import com.moneylog.util.MutableClockConfig;
 
 @IntegrationTest
 @Import(MutableClockConfig.class)
+@Tag("slow")
 @DisplayName("QA T98: propriedade das metas, reservas, resumo mensal e projeções misturadas com todas as operações")
 class GoalPropertyQaIT {
 
@@ -1002,7 +1004,7 @@ class GoalPropertyQaIT {
             }
             JsonNode t = a.getOk("/v1/projections?horizon=" + h.getKey() + "&includeTrend=true");
             if (!t.get("series").equals(series) || !t.get("startingBalance").equals(p.get("startingBalance")) || !t.get("goals").equals(p.get("goals"))) {
-                found.add(tag + ": includeTrend=true mudou a série base");
+                found.add(tag + ": includeTrend=true mudou a série base (series=" + t.get("series").equals(series) + ", startingBalance=" + t.get("startingBalance").equals(p.get("startingBalance")) + ", goals=" + t.get("goals").equals(p.get("goals")) + ")\n" + p.get("goals") + "\n" + t.get("goals"));
             }
             JsonNode trend = t.get("trend");
             if (trend == null || !trend.get("estimate").asBoolean()) {

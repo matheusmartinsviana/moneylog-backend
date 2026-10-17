@@ -1,5 +1,6 @@
 package com.moneylog.core.recurrence.domain;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.HashSet;
@@ -23,17 +24,30 @@ import com.moneylog.core.recurrence.exception.RecurrenceExceptions.RecurrenceSta
 import com.moneylog.core.sk.money.AmountLimit;
 import com.moneylog.core.sk.money.FlowDirection;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.provenance.Provenance;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.transaction.domain.AccountTransactions;
 import com.moneylog.core.transaction.domain.CardTransactions;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.PayrollLoanShare;
+import com.moneylog.core.transaction.domain.PayrollTransactions;
+import com.moneylog.core.transaction.domain.PurchaseShares;
+import com.moneylog.core.transaction.domain.ShareLine;
+import com.moneylog.core.transaction.domain.SplitMode;
+import com.moneylog.core.transaction.domain.TransactionNature;
+import com.moneylog.core.transaction.exception.FxExceptions.FxInvalidException;
+import com.moneylog.core.transaction.exception.FxExceptions.FxRateRequiredException;
+import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNatureInvalidException;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionHeader;
 import com.moneylog.core.transaction.domain.TransactionOrigin;
 import com.moneylog.core.transaction.domain.TransactionType;
+import com.moneylog.core.transaction.exception.TransactionExceptions.SharesInvalidException;
 
 public final class RecurringTransaction {
 
+    public static final int MIN_INCOME_COMPETENCE_OFFSET = -1;
     public static final int MAX_INCOME_COMPETENCE_OFFSET = 1;
 
     private static final Set<TransactionType> TYPES = Set.of(TransactionType.EXPENSE, TransactionType.INCOME, TransactionType.CARD_PURCHASE);
@@ -48,14 +62,19 @@ public final class RecurringTransaction {
     private UUID cardId;
     private PaymentMethod paymentMethod;
     private int incomeCompetenceOffsetMonths;
+    private TransactionNature nature;
     private Schedule schedule;
     private final Set<LocalDate> realized = new HashSet<>();
     private final Set<LocalDate> skipped = new HashSet<>();
     private boolean active = true;
+    private PurchaseShares shares;
+    private ForeignCharge foreignBasis;
+    private SubscriptionTraits traits = SubscriptionTraits.NONE;
+    private Provenance provenance = Provenance.DEFAULT;
 
     private RecurringTransaction(UUID id, UUID userId, TransactionType type, Money amount, String description, UUID categoryId,
                                  UUID accountId, UUID cardId, PaymentMethod paymentMethod, Schedule schedule,
-                                 int incomeCompetenceOffsetMonths) {
+                                 int incomeCompetenceOffsetMonths, TransactionNature nature, PurchaseShares shares) {
         if (id == null || userId == null || schedule == null) {
             throw new InvalidRecurrenceException("id, dono, categoria e agenda são obrigatórios.");
         }
@@ -70,12 +89,27 @@ public final class RecurringTransaction {
         this.cardId = cardId;
         this.paymentMethod = paymentMethod;
         this.incomeCompetenceOffsetMonths = incomeCompetenceOffsetMonths;
+        this.nature = natureFor(type, nature);
         this.schedule = schedule;
+        if (shares != null && type != TransactionType.CARD_PURCHASE) {
+            throw new SharesInvalidException("o rateio existe só na recorrência de cartão.");
+        }
+        this.shares = shares;
+    }
+
+    private static TransactionNature natureFor(TransactionType type, TransactionNature nature) {
+        if (type == TransactionType.EXPENSE) {
+            return nature == null ? TransactionNature.FIXED : nature;
+        }
+        if (nature != null) {
+            throw new TransactionNatureInvalidException("só a despesa tem natureza.");
+        }
+        return null;
     }
 
     private static void validateModel(TransactionType type, Money amount, String description, UUID categoryId, UUID accountId,
                                       UUID cardId, PaymentMethod paymentMethod, int incomeCompetenceOffsetMonths) {
-        if (incomeCompetenceOffsetMonths < 0 || incomeCompetenceOffsetMonths > MAX_INCOME_COMPETENCE_OFFSET) {
+        if (incomeCompetenceOffsetMonths < MIN_INCOME_COMPETENCE_OFFSET || incomeCompetenceOffsetMonths > MAX_INCOME_COMPETENCE_OFFSET) {
             throw new InvalidRecurrenceException("o deslocamento da competência da renda é 0 (mesmo mês) ou 1 (mês seguinte).");
         }
         if (incomeCompetenceOffsetMonths != 0 && type != TransactionType.INCOME) {
@@ -110,13 +144,26 @@ public final class RecurringTransaction {
     public static RecurringTransaction ofAccount(UUID id, UUID userId, TransactionType type, Money amount, String description,
                                                  UUID categoryId, UUID accountId, PaymentMethod method, Schedule schedule,
                                                  int incomeCompetenceOffsetMonths) {
+        return ofAccount(id, userId, type, amount, description, categoryId, accountId, method, schedule, incomeCompetenceOffsetMonths,
+                null);
+    }
+
+    public static RecurringTransaction ofAccount(UUID id, UUID userId, TransactionType type, Money amount, String description,
+                                                 UUID categoryId, UUID accountId, PaymentMethod method, Schedule schedule,
+                                                 int incomeCompetenceOffsetMonths, TransactionNature nature) {
         return new RecurringTransaction(id, userId, type, amount, description, categoryId, accountId, null, method, schedule,
-                incomeCompetenceOffsetMonths);
+                incomeCompetenceOffsetMonths, nature, null);
     }
 
     public static RecurringTransaction ofCard(UUID id, UUID userId, Money amount, String description, UUID categoryId,
                                               UUID cardId, Schedule schedule) {
-        return new RecurringTransaction(id, userId, TransactionType.CARD_PURCHASE, amount, description, categoryId, null, cardId, null, schedule, 0);
+        return ofCard(id, userId, amount, description, categoryId, cardId, schedule, null, List.of());
+    }
+
+    public static RecurringTransaction ofCard(UUID id, UUID userId, Money amount, String description, UUID categoryId,
+                                              UUID cardId, Schedule schedule, SplitMode splitMode, List<ShareLine> shareLines) {
+        return new RecurringTransaction(id, userId, TransactionType.CARD_PURCHASE, amount, description, categoryId, null, cardId, null,
+                schedule, 0, null, amount == null ? null : PurchaseShares.create(splitMode, shareLines, amount));
     }
 
     public static RecurringTransaction restore(UUID id, UUID userId, TransactionType type, Money amount, String description,
@@ -131,11 +178,28 @@ public final class RecurringTransaction {
                                                UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
                                                Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
                                                boolean active, int incomeCompetenceOffsetMonths) {
+        return restore(id, userId, type, amount, description, categoryId, accountId, cardId, paymentMethod, schedule, realized,
+                skipped, active, incomeCompetenceOffsetMonths, null);
+    }
+
+    public static RecurringTransaction restore(UUID id, UUID userId, TransactionType type, Money amount, String description,
+                                               UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
+                                               Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
+                                               boolean active, int incomeCompetenceOffsetMonths, TransactionNature nature) {
+        return restore(id, userId, type, amount, description, categoryId, accountId, cardId, paymentMethod, schedule, realized,
+                skipped, active, incomeCompetenceOffsetMonths, nature, null);
+    }
+
+    public static RecurringTransaction restore(UUID id, UUID userId, TransactionType type, Money amount, String description,
+                                               UUID categoryId, UUID accountId, UUID cardId, PaymentMethod paymentMethod,
+                                               Schedule schedule, Collection<LocalDate> realized, Collection<LocalDate> skipped,
+                                               boolean active, int incomeCompetenceOffsetMonths, TransactionNature nature,
+                                               PurchaseShares shares) {
         RecurringTransaction recurrence;
         try {
             recurrence = new RecurringTransaction(id, userId, type, amount, description, categoryId, accountId, cardId,
-                    paymentMethod, schedule, incomeCompetenceOffsetMonths);
-        } catch (InvalidRecurrenceException e) {
+                    paymentMethod, schedule, incomeCompetenceOffsetMonths, nature, shares);
+        } catch (InvalidRecurrenceException | SharesInvalidException e) {
             throw new RecurrenceStateInconsistentException(e.getMessage(), e);
         }
         for (LocalDate date : realized) {
@@ -182,6 +246,11 @@ public final class RecurringTransaction {
 
     public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category,
                                PaymentMethod method) {
+        return realize(occurrenceDate, transactionId, actualAmount, account, category, method, null);
+    }
+
+    public Transaction realize(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account, Category category,
+                               PaymentMethod method, ForeignCharge charge) {
         ensureActive();
         ensurePending(occurrenceDate);
         if (type == TransactionType.CARD_PURCHASE) {
@@ -199,16 +268,48 @@ public final class RecurringTransaction {
         } else {
             validAccount = requireAccount(account);
         }
-        Money value = actualAmount == null ? amount : actualAmount;
+        Money value = chargeValue(actualAmount, charge);
         Transaction transaction = type == TransactionType.EXPENSE
-                ? AccountTransactions.expense(header, value, validAccount, category, usedMethod)
+                ? AccountTransactions.expense(header, value, validAccount, category, usedMethod, nature)
                 : AccountTransactions.income(header, value, validAccount, category, usedMethod, incomeCompetenceOf(occurrenceDate));
+        transaction.attachForeignCharge(charge);
+        realized.add(occurrenceDate);
+        return transaction;
+    }
+
+    public Transaction realizeWithPayrollLoan(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, Account account,
+                                              Category category, PaymentMethod method, PayrollLoanShare loan) {
+        ensureActive();
+        ensurePending(occurrenceDate);
+        if (type != TransactionType.INCOME) {
+            throw new RecurrenceReferenceMismatchException("receita");
+        }
+        TransactionHeader header = header(occurrenceDate, transactionId, category);
+        PaymentMethod usedMethod = paymentMethod;
+        Account validAccount;
+        if (accountId == null) {
+            if (account == null || method == null) {
+                throw new RecurrenceExceptions.AccountRequiredException();
+            }
+            validAccount = account;
+            usedMethod = method;
+        } else {
+            validAccount = requireAccount(account);
+        }
+        Money value = actualAmount == null ? amount : actualAmount;
+        Transaction transaction = PayrollTransactions.incomeWithLoan(header, value, validAccount, category, usedMethod,
+                incomeCompetenceOf(occurrenceDate), loan);
         realized.add(occurrenceDate);
         return transaction;
     }
 
     public Transaction realizeOnCard(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, CreditCard card,
                                      InvoiceChain chain, LocalDate today, Category category) {
+        return realizeOnCard(occurrenceDate, transactionId, actualAmount, card, chain, today, category, null);
+    }
+
+    public Transaction realizeOnCard(LocalDate occurrenceDate, UUID transactionId, Money actualAmount, CreditCard card,
+                                     InvoiceChain chain, LocalDate today, Category category, ForeignCharge charge) {
         ensureActive();
         ensurePending(occurrenceDate);
         if (type != TransactionType.CARD_PURCHASE) {
@@ -216,10 +317,61 @@ public final class RecurringTransaction {
         }
         TransactionHeader header = header(occurrenceDate, transactionId, category);
         CreditCard validCard = requireCard(card);
-        Money value = actualAmount == null ? amount : actualAmount;
-        Transaction transaction = CardTransactions.purchase(header, value, validCard, category, 1, chain, today);
+        Money value = chargeValue(actualAmount, charge);
+        Transaction transaction = CardTransactions.purchase(header, value, validCard, category, 1, chain, today,
+                shares == null ? null : shares.mode(), shares == null ? List.of() : shares.lines());
+        transaction.attachForeignCharge(charge);
         realized.add(occurrenceDate);
         return transaction;
+    }
+
+    private Money chargeValue(Money actualAmount, ForeignCharge charge) {
+        if (foreignBasis != null && charge == null) {
+            throw new FxRateRequiredException();
+        }
+        if (charge != null) {
+            return charge.brl();
+        }
+        return actualAmount == null ? amount : actualAmount;
+    }
+
+    public ForeignCharge chargeFor(Money originalAmount, BigDecimal fxRate, Integer iofBps) {
+        if (foreignBasis == null) {
+            if (originalAmount != null || fxRate != null || iofBps != null) {
+                throw new FxInvalidException("a recorrência está em BRL; câmbio e IOF não se aplicam.");
+            }
+            return null;
+        }
+        if (fxRate == null) {
+            throw new FxRateRequiredException();
+        }
+        if (originalAmount != null && !originalAmount.currency().equals(foreignBasis.original().currency())) {
+            throw new FxInvalidException("a moeda da cobrança difere da moeda da recorrência.");
+        }
+        return ForeignCharge.of(originalAmount == null ? foreignBasis.original() : originalAmount, fxRate,
+                iofBps == null ? foreignBasis.iofBps() : iofBps);
+    }
+
+    public void defineForeignBasis(ForeignCharge basis) {
+        if (basis != null && !basis.brl().equals(amount)) {
+            throw new FxInvalidException("o valor em BRL diverge do câmbio de referência.");
+        }
+        if (basis != null && type == TransactionType.INCOME) {
+            throw new FxInvalidException("moeda estrangeira não existe na recorrência de receita.");
+        }
+        this.foreignBasis = basis;
+    }
+
+    public void defineProvenance(Provenance newProvenance) {
+        this.provenance = Provenance.orDefault(newProvenance);
+    }
+
+    public void defineSubscriptionTraits(SubscriptionTraits newTraits) {
+        SubscriptionTraits valid = newTraits == null ? SubscriptionTraits.NONE : newTraits;
+        if (type == TransactionType.INCOME && (valid.subscription() || valid.scope() != RecurrenceScope.PERSONAL)) {
+            throw new InvalidRecurrenceException("assinatura e escopo existem só na recorrência de despesa.");
+        }
+        this.traits = valid;
     }
 
     private Competence incomeCompetenceOf(LocalDate occurrenceDate) {
@@ -256,14 +408,33 @@ public final class RecurringTransaction {
 
     public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
                               UUID newCardId, int newIncomeCompetenceOffsetMonths) {
+        updateDetails(newAmount, newDescription, newCategoryId, newAccountId, newMethod, newCardId, newIncomeCompetenceOffsetMonths,
+                nature);
+    }
+
+    public void updateDetails(Money newAmount, String newDescription, UUID newCategoryId, UUID newAccountId, PaymentMethod newMethod,
+                              UUID newCardId, int newIncomeCompetenceOffsetMonths, TransactionNature newNature) {
+        TransactionNature validNature = natureFor(type, newNature == null ? nature : newNature);
         validateModel(type, newAmount, newDescription, newCategoryId, newAccountId, newCardId, newMethod, newIncomeCompetenceOffsetMonths);
         this.incomeCompetenceOffsetMonths = newIncomeCompetenceOffsetMonths;
+        this.nature = validNature;
         this.amount = newAmount;
         this.description = newDescription;
         this.categoryId = newCategoryId;
         this.accountId = newAccountId;
         this.cardId = newCardId;
         this.paymentMethod = newMethod;
+        if (shares != null) {
+            this.shares = PurchaseShares.create(shares.mode(), shares.lines(), newAmount);
+        }
+    }
+
+    public void changeShares(SplitMode splitMode, List<ShareLine> shareLines) {
+        PurchaseShares updated = PurchaseShares.create(splitMode, shareLines, amount);
+        if (updated != null && type != TransactionType.CARD_PURCHASE) {
+            throw new SharesInvalidException("o rateio existe só na recorrência de cartão.");
+        }
+        this.shares = updated;
     }
 
     public void endOn(LocalDate end) {
@@ -378,8 +549,32 @@ public final class RecurringTransaction {
         return paymentMethod;
     }
 
+    public TransactionNature nature() {
+        return nature;
+    }
+
     public Schedule schedule() {
         return schedule;
+    }
+
+    public PurchaseShares purchaseShares() {
+        return shares;
+    }
+
+    public ForeignCharge foreignBasis() {
+        return foreignBasis;
+    }
+
+    public Provenance provenance() {
+        return provenance;
+    }
+
+    public SubscriptionTraits traits() {
+        return traits;
+    }
+
+    public boolean isSubscription() {
+        return traits.subscription();
     }
 
     public boolean isActive() {

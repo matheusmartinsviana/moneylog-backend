@@ -1,6 +1,8 @@
 package com.moneylog.core.finance.app.transactions.handlers;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
 
 import com.moneylog.core.account.app.gateways.AccountGateway;
@@ -20,12 +22,17 @@ import com.moneylog.core.debt.exception.DebtExceptions.DebtNotFoundException;
 import com.moneylog.core.debt.exception.DebtExceptions.PersonNotFoundException;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.NewDebtSpec;
+import com.moneylog.core.finance.app.transactions.ShareSettlement;
 import com.moneylog.core.sk.id.IdGenerator;
+import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.transaction.domain.NewDebt;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Refund;
 import com.moneylog.core.sk.money.Money;
+import com.moneylog.core.sk.ledger.LedgerEntry;
 import com.moneylog.core.transaction.domain.RefundOrigin;
+import com.moneylog.core.transaction.domain.SharePayables;
+import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotEditableException;
 import com.moneylog.core.transaction.exception.TransactionExceptions.TransactionNotFoundException;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
@@ -41,6 +48,8 @@ public class HandlerSupport {
     private final PersonGateway persons;
     private final DebtGateway debts;
     private final IdGenerator ids;
+    private final ShareSettlement shareSettlement;
+    private final TimeProvider time;
 
     public HandlerSupport(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories) {
         this(transactions, accounts, categories, null, null, null);
@@ -48,6 +57,14 @@ public class HandlerSupport {
 
     public HandlerSupport(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories, PersonGateway persons,
                           DebtGateway debts, IdGenerator ids) {
+        this(transactions, accounts, categories, persons, debts, ids, null, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public HandlerSupport(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories, PersonGateway persons,
+                          DebtGateway debts, IdGenerator ids, ShareSettlement shareSettlement, TimeProvider time) {
+        this.shareSettlement = shareSettlement;
+        this.time = time;
         this.transactions = transactions;
         this.accounts = accounts;
         this.categories = categories;
@@ -75,6 +92,14 @@ public class HandlerSupport {
 
     List<Debt> debtsOriginatedBy(UUID userId, UUID transactionId) {
         return debts == null ? List.of() : debts.findByOriginTransaction(userId, transactionId).stream().map(Versioned::value).toList();
+    }
+
+    ShareSettlement shareSettlement() {
+        return shareSettlement;
+    }
+
+    TimeProvider time() {
+        return time;
     }
 
     IdGenerator ids() {
@@ -112,6 +137,42 @@ public class HandlerSupport {
             return category(c.userId(), origin.original().categoryId(), editing, CategoryKind.EXPENSE);
         }
         return category(c.userId(), c.categoryId(), editing, CategoryKind.EXPENSE);
+    }
+
+    Map<UUID, Money> refundedThirds(Refund refund, RefundOrigin origin, Transaction editing) {
+        if (origin == null || origin.original().purchaseShares() == null) {
+            return Map.of();
+        }
+        if (editing != null) {
+            throw new TransactionNotEditableException("o estorno de uma compra rateada não é editável; estorne e lance de novo.");
+        }
+        Map<UUID, Money> refunded = new TreeMap<>(SharePayables.refundedByPerson(origin.original().id(),
+                transactions.findActiveRefundsOf(refund.userId(), origin.original().id())));
+        if (shareSettlement != null) {
+            shareSettlement.migratedRefundsOn(refund.userId(), origin.original().id()).forEach((personId, amount) -> refunded.merge(personId, amount, Money::add));
+        }
+        return refunded;
+    }
+
+    List<LedgerEntry> refundSettlement(Transaction refund, RefundOrigin origin) {
+        if (origin == null || origin.original().purchaseShares() == null || shareSettlement == null) {
+            return List.of();
+        }
+        Transaction original = origin.original();
+        Map<UUID, Money> owed = new TreeMap<>(shareSettlement.owedNet(original.userId(), original));
+        SharePayables.refundedByPerson(original.id(), List.of(refund))
+                .forEach((personId, amount) -> owed.computeIfPresent(personId, (id, value) -> value.subtract(amount)));
+        return shareSettlement.planConversion(original.userId(), original, owed, refund.date()).entries();
+    }
+
+    List<UUID> sharedPersonsOf(UUID userId, UUID transactionId) {
+        if (transactionId == null) {
+            return List.of();
+        }
+        return transactions.findById(userId, transactionId).map(Persisted::value)
+                .map(original -> original.purchaseShares() == null ? List.<UUID>of()
+                        : original.purchaseShares().personIds().stream().distinct().sorted().toList())
+                .orElse(List.of());
     }
 
     RefundOrigin refundOrigin(Refund refund, Transaction editing) {

@@ -22,11 +22,12 @@ public final class NotificationSettings {
     private QuietHours quietHours;
     private boolean pushEnabled;
     private String displayName;
+    private NotificationAlertSettings alerts;
     private final long version;
 
     private NotificationSettings(UUID userId, boolean summaryEnabled, LocalTime summaryTime, SummaryFrequency summaryFrequency,
                                  Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName,
-                                 long version) {
+                                 NotificationAlertSettings alerts, long version) {
         this.userId = Objects.requireNonNull(userId, "userId");
         this.summaryEnabled = summaryEnabled;
         this.summaryTime = Objects.requireNonNull(summaryTime, "summaryTime");
@@ -39,17 +40,26 @@ public final class NotificationSettings {
         this.quietHours = Objects.requireNonNull(quietHours, "quietHours");
         this.pushEnabled = pushEnabled;
         this.displayName = cleanName(displayName);
+        this.alerts = alerts == null ? NotificationAlertSettings.DEFAULTS : alerts;
         this.version = version;
     }
 
     public static NotificationSettings defaults(UUID userId) {
-        return new NotificationSettings(userId, true, DEFAULT_SUMMARY_TIME, SummaryFrequency.DAILY, Map.of(), QuietHours.DEFAULT, false, null, 0);
+        return new NotificationSettings(userId, true, DEFAULT_SUMMARY_TIME, SummaryFrequency.DAILY, Map.of(), QuietHours.DEFAULT, false, null,
+                NotificationAlertSettings.DEFAULTS, 0);
     }
 
     public static NotificationSettings restore(UUID userId, boolean summaryEnabled, LocalTime summaryTime, SummaryFrequency frequency,
                                                Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName,
                                                long version) {
-        return new NotificationSettings(userId, summaryEnabled, summaryTime, frequency, kinds, quietHours, pushEnabled, displayName, version);
+        return restore(userId, summaryEnabled, summaryTime, frequency, kinds, quietHours, pushEnabled, displayName,
+                NotificationAlertSettings.DEFAULTS, version);
+    }
+
+    public static NotificationSettings restore(UUID userId, boolean summaryEnabled, LocalTime summaryTime, SummaryFrequency frequency,
+                                               Map<NotificationKind, Boolean> kinds, QuietHours quietHours, boolean pushEnabled, String displayName,
+                                               NotificationAlertSettings alerts, long version) {
+        return new NotificationSettings(userId, summaryEnabled, summaryTime, frequency, kinds, quietHours, pushEnabled, displayName, alerts, version);
     }
 
     public void update(boolean newSummaryEnabled, LocalTime newSummaryTime, SummaryFrequency newFrequency, Map<NotificationKind, Boolean> newKinds,
@@ -65,6 +75,10 @@ public final class NotificationSettings {
         this.quietHours = Objects.requireNonNull(newQuietHours, "quietHours");
         this.pushEnabled = newPushEnabled;
         this.displayName = cleanName(newDisplayName);
+    }
+
+    public void updateAlerts(NotificationAlertSettings.Patch patch) {
+        this.alerts = alerts.merge(patch);
     }
 
     private static String cleanName(String name) {
@@ -115,6 +129,10 @@ public final class NotificationSettings {
 
     public String displayName() {
         return displayName;
+    }
+
+    public NotificationAlertSettings alerts() {
+        return alerts;
     }
 
     public long version() {

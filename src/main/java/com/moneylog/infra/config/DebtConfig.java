@@ -32,7 +32,7 @@ import com.moneylog.core.finance.app.debts.usecase.UpdateDebtUseCase;
 import com.moneylog.core.finance.app.debts.usecase.UpdateDebtUseCaseImpl;
 import com.moneylog.core.finance.app.debts.usecase.VoidDebtRecordUseCase;
 import com.moneylog.core.finance.app.debts.usecase.VoidDebtRecordUseCaseImpl;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.people.IdempotentCreatePersonUseCase;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;

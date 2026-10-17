@@ -1,6 +1,7 @@
 package com.moneylog.core.category.app.gateways;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -23,4 +24,8 @@ public interface CategoryGateway {
     Optional<Category> findBySystemKey(UUID userId, String systemKey);
 
     Set<String> systemKeysOf(UUID userId);
+
+    Map<UUID, String> systemKeysById(UUID userId);
+
+    void deleteAllOf(UUID userId);
 }

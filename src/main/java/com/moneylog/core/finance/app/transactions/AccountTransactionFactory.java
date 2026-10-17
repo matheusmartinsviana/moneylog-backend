@@ -52,12 +52,19 @@ public class AccountTransactionFactory {
     @SuppressWarnings("java:S107")
     public AccountTransactionFactory(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
                                      CardGateway cards, TimeProvider time, PersonGateway persons, DebtGateway debts, IdGenerator ids) {
+        this(transactions, accounts, categories, cards, time, persons, debts, ids, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public AccountTransactionFactory(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
+                                     CardGateway cards, TimeProvider time, PersonGateway persons, DebtGateway debts, IdGenerator ids,
+                                     ShareSettlement shareSettlement) {
         this.transactions = transactions;
         this.accounts = accounts;
         this.cards = cards;
         this.debts = debts;
         this.persons = persons;
-        HandlerSupport support = new HandlerSupport(transactions, accounts, categories, persons, debts, ids);
+        HandlerSupport support = new HandlerSupport(transactions, accounts, categories, persons, debts, ids, shareSettlement, time);
         List<TransactionTypeHandler<?>> all = new ArrayList<>(
                 AccountTypeHandlers.all(support, cards == null ? null : new CardRefundHandler(support, cards, time)));
         if (support.hasDebts()) {

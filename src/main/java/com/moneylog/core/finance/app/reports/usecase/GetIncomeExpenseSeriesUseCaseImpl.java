@@ -18,6 +18,6 @@ public class GetIncomeExpenseSeriesUseCaseImpl implements GetIncomeExpenseSeries
     @Override
     public IncomeExpenseSeries handle(GetIncomeExpenseSeriesQuery query) {
         FinancialRecords loaded = records.load(query.userId());
-        return IncomeExpenseSeries.of(loaded.ledger(), query.period(), time.today());
+        return IncomeExpenseSeries.of(query.view().ledgerOf(loaded), query.period(), time.today());
     }
 }

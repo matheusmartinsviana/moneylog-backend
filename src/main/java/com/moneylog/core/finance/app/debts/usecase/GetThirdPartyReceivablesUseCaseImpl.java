@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.moneylog.core.debt.app.gateways.PersonGateway;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
+import com.moneylog.core.finance.domain.CardShareReceivables;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.finance.domain.ThirdPartyReceivables;
 import com.moneylog.core.sk.time.Competence;
@@ -40,12 +41,18 @@ public class GetThirdPartyReceivablesUseCaseImpl implements GetThirdPartyReceiva
             }
         });
         expenses.forEach(e -> ids.add(e.personId()));
+        loaded.transactions().forEach(t -> {
+            if (t.purchaseShares() != null) {
+                ids.addAll(t.purchaseShares().personIds());
+            }
+        });
         Map<UUID, String> names = new HashMap<>();
         people.findByIds(query.userId(), ids).forEach((id, person) -> names.put(id, person.name()));
         Competence competence = query.competence() == null ? Competence.from(time.today()) : query.competence();
         List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts = marks.findAllReceipts(query.userId());
         receipts.forEach(r -> ids.add(r.personId()));
         people.findByIds(query.userId(), ids).forEach((id, person) -> names.put(id, person.name()));
-        return ThirdPartyReceivables.of(loaded, expenses, receipts, names, time.today(), competence);
+        return ThirdPartyReceivables.of(loaded, expenses, receipts, CardShareReceivables.expectedMonthsOf(marks.findExpectedMonths(query.userId())),
+                names, time.today(), competence);
     }
 }

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.insights.app.usecase.InsightUseCases.DailyQuery;
 import com.moneylog.core.insights.app.usecase.InsightUseCases.DismissCommand;
 import com.moneylog.core.insights.app.usecase.InsightUseCases.DismissInsightUseCase;
@@ -41,6 +42,7 @@ import com.moneylog.infra.insights.controller.InsightDtos.InsightResponse;
 import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.infra.web.QueryDates;
 import com.moneylog.infra.web.QueryMonths;
+import com.moneylog.infra.web.QueryViews;
 import com.moneylog.infra.web.SliceResponse;
 
 @RestController
@@ -75,9 +77,10 @@ public class InsightsController {
 
     @GetMapping("/v1/insights")
     public ResponseEntity<SliceResponse<InsightDtos.LegacyInsightResponse>> insights(@CurrentUser UUID userId,
-                                                                                    @RequestParam(required = false) String month, PageQuery page) {
+                                                                                    @RequestParam(required = false) String month,
+                                                                                    @RequestParam(required = false) String view, PageQuery page) {
         Competence competence = month == null ? null : QueryMonths.parse(month, INSIGHTS_MONTH_INVALID, "month");
-        List<InsightItem> legacy = monthly.handle(new MonthlyQuery(userId, competence, false, 0, Integer.MAX_VALUE)).items().stream()
+        List<InsightItem> legacy = monthly.handle(new MonthlyQuery(userId, competence, false, 0, Integer.MAX_VALUE, QueryViews.parse(view))).items().stream()
                 .filter(i -> InsightDtos.LEGACY_TYPES.contains(i.insight().type())).toList();
         int from = (int) Math.min(page.offset(), legacy.size());
         int to = Math.min(legacy.size(), from + page.pageSize());
@@ -87,27 +90,33 @@ public class InsightsController {
     @GetMapping("/v1/insights/monthly")
     public ResponseEntity<InsightListResponse> monthly(@CurrentUser UUID userId, @RequestParam(required = false) String month,
                                                        @RequestParam(required = false) String limit,
-                                                       @RequestParam(defaultValue = "false") boolean includeDismissed) {
+                                                       @RequestParam(defaultValue = "false") boolean includeDismissed,
+                                                       @RequestParam(required = false) String view) {
         Competence competence = month == null ? null : QueryMonths.parse(month, INSIGHTS_MONTH_INVALID, "month");
-        return ok(InsightListResponse.of(monthly.handle(new MonthlyQuery(userId, competence, includeDismissed, 0, limit(limit)))));
+        ConsumptionView parsed = QueryViews.parse(view);
+        return ok(InsightListResponse.of(monthly.handle(new MonthlyQuery(userId, competence, includeDismissed, 0, limit(limit), parsed)), parsed));
     }
 
     @GetMapping("/v1/insights/daily")
     public ResponseEntity<InsightListResponse> daily(@CurrentUser UUID userId,
                                                      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                                                      @RequestParam(required = false) String limit,
-                                                     @RequestParam(defaultValue = "false") boolean includeDismissed) {
+                                                     @RequestParam(defaultValue = "false") boolean includeDismissed,
+                                                     @RequestParam(required = false) String view) {
+        ConsumptionView parsed = QueryViews.parse(view);
         if (date != null) {
             QueryDates.inWindow(date, "date");
             if (date.isAfter(time.today())) {
                 throw new InvalidPathValueException(INSIGHTS_DATE_INVALID, "date", "A data não pode ser depois de hoje.");
             }
         }
-        return ok(InsightListResponse.of(daily.handle(new DailyQuery(userId, date, includeDismissed, 0, limit(limit)))));
+        return ok(InsightListResponse.of(daily.handle(new DailyQuery(userId, date, includeDismissed, 0, limit(limit), parsed)), parsed));
     }
 
     @GetMapping("/v1/insights/history")
-    public ResponseEntity<HistoryResponse> history(@CurrentUser UUID userId, @RequestParam String from, @RequestParam String to) {
+    public ResponseEntity<HistoryResponse> history(@CurrentUser UUID userId, @RequestParam String from, @RequestParam String to,
+                                                  @RequestParam(required = false) String view) {
+        ConsumptionView parsed = QueryViews.parse(view);
         Competence start = QueryMonths.parse(from, INSIGHTS_MONTH_INVALID, "from");
         Competence end = QueryMonths.parse(to, INSIGHTS_MONTH_INVALID, "to");
         if (start.isAfter(end)) {
@@ -117,7 +126,7 @@ public class InsightsController {
             throw new InvalidPathValueException(INSIGHTS_RANGE_INVALID, "to", "O histórico cobre no máximo " + MAX_HISTORY_MONTHS + " meses.");
         }
         return ResponseEntity.ok().cacheControl(NO_STORE)
-                .body(HistoryResponse.of(history.handle(new HistoryQuery(userId, start, end, HISTORY_LIMIT_PER_MONTH))));
+                .body(HistoryResponse.of(history.handle(new HistoryQuery(userId, start, end, HISTORY_LIMIT_PER_MONTH, parsed)), parsed));
     }
 
     @PostMapping("/v1/insights/{id}/dismissals")

@@ -27,7 +27,7 @@ public class GetMonthlySummaryUseCaseImpl implements GetMonthlySummaryUseCase {
     @Override
     public MonthlySummaryView handle(GetMonthlySummaryQuery query) {
         FinancialRecords loaded = records.load(query.userId());
-        MonthlySummary summary = MonthlySummary.of(loaded, loaded.ledger(), query.month(), time.today());
+        MonthlySummary summary = MonthlySummary.of(loaded, query.view().ledgerOf(loaded), query.month(), time.today());
         Map<UUID, Category> byId = categories.list(query.userId(), null, true).stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));
         Category largest = summary.largestCategory() == null ? null : byId.get(summary.largestCategory().categoryId());

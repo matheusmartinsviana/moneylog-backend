@@ -7,7 +7,7 @@ import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.app.gateways.PersonGateway;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.debt.exception.DebtExceptions.DebtNotFoundException;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.ledger.PostingSourceType;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;

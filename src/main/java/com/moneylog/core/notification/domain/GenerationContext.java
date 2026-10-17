@@ -11,11 +11,17 @@ import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.sk.money.Money;
 
 public record GenerationContext(UUID userId, LocalDate today, LocalTime localTime, NotificationSettings settings, CommitmentSchedule schedule,
-                                List<Goal> goals, List<Reminder> openReminders, Money available, Money committed7d) {
+                                List<Goal> goals, List<Reminder> openReminders, Money available, Money committed7d, AlertInputs alerts) {
 
     public GenerationContext {
         goals = List.copyOf(goals);
         openReminders = List.copyOf(openReminders);
+        alerts = alerts == null ? AlertInputs.EMPTY : alerts;
+    }
+
+    public GenerationContext(UUID userId, LocalDate today, LocalTime localTime, NotificationSettings settings, CommitmentSchedule schedule,
+                             List<Goal> goals, List<Reminder> openReminders, Money available, Money committed7d) {
+        this(userId, today, localTime, settings, schedule, goals, openReminders, available, committed7d, AlertInputs.EMPTY);
     }
 
     public static Set<String> noIdentities() {

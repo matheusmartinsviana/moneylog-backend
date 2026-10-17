@@ -30,6 +30,10 @@ public record BookRef(BookType type, UUID id) {
         return new BookRef(BookType.RECEIVABLE, debtId);
     }
 
+    public static BookRef personReceivable(UUID personId) {
+        return new BookRef(BookType.RECEIVABLE, personId);
+    }
+
     public static BookRef payable(UUID debtId) {
         return new BookRef(BookType.PAYABLE, debtId);
     }

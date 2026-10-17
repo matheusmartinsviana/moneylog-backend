@@ -41,6 +41,22 @@ public record PostingSource(PostingSourceType type, UUID sourceId, UUID installm
         return new PostingSource(PostingSourceType.DEBT_CANCELLATION, debtId, null);
     }
 
+    public static PostingSource thirdPartyReceipt(UUID receiptId) {
+        return new PostingSource(PostingSourceType.THIRD_PARTY_RECEIPT, receiptId, null);
+    }
+
+    public static PostingSource thirdPartyReceiptInBalance(UUID receiptId) {
+        return new PostingSource(PostingSourceType.THIRD_PARTY_RECEIPT_IN_BALANCE, receiptId, null);
+    }
+
+    public static PostingSource thirdPartyRefundAdjustment(UUID receiptId) {
+        return new PostingSource(PostingSourceType.THIRD_PARTY_REFUND_ADJUSTMENT, receiptId, null);
+    }
+
+    public static PostingSource sharePayable(UUID transactionId) {
+        return new PostingSource(PostingSourceType.SHARE_PAYABLE, transactionId, null);
+    }
+
     public UUID transactionId() {
         return type == PostingSourceType.TRANSACTION ? sourceId : null;
     }

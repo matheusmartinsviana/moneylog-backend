@@ -8,7 +8,19 @@ import com.moneylog.core.sk.money.Money;
 public record DebtState(UUID id, UUID userId, UUID personId, DebtDirection direction, DebtOrigin origin, Money principal,
                         String description, LocalDate date, LocalDate expectedDate, UUID originTransactionId,
                         DebtClosure closure, LocalDate closureDate, String closureReason, UUID categoryId,
-                        String creditorName) {
+                        String creditorName, DebtKind kind, String channel) {
+
+    public DebtState {
+        kind = kind == null ? DebtKind.PERSONAL : kind;
+    }
+
+    public DebtState(UUID id, UUID userId, UUID personId, DebtDirection direction, DebtOrigin origin, Money principal,
+                     String description, LocalDate date, LocalDate expectedDate, UUID originTransactionId,
+                     DebtClosure closure, LocalDate closureDate, String closureReason, UUID categoryId,
+                     String creditorName) {
+        this(id, userId, personId, direction, origin, principal, description, date, expectedDate, originTransactionId, closure,
+                closureDate, closureReason, categoryId, creditorName, DebtKind.PERSONAL, null);
+    }
 
     public DebtState(UUID id, UUID userId, UUID personId, DebtDirection direction, DebtOrigin origin, Money principal,
                      String description, LocalDate date, LocalDate expectedDate, UUID originTransactionId,

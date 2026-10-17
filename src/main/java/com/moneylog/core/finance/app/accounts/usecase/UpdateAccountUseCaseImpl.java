@@ -9,7 +9,7 @@ import com.moneylog.core.account.app.gateways.AccountGateway;
 import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.exception.AccountExceptions.AccountNotFoundException;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.exception.VersionConflictException;
 import com.moneylog.core.sk.ledger.LedgerEntry;

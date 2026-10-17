@@ -40,7 +40,9 @@ import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
 import com.moneylog.core.sk.time.TimeProvider;
+import com.moneylog.core.transaction.app.gateways.ForeignChargeGateway;
 import com.moneylog.core.transaction.app.gateways.TransactionGateway;
+import com.moneylog.core.transaction.domain.ForeignCharge;
 import com.moneylog.core.transaction.domain.CardInvoices;
 import com.moneylog.core.transaction.domain.Transaction;
 import com.moneylog.core.transaction.domain.TransactionType;
@@ -54,6 +56,7 @@ public class TransactionDetailsAssembler {
     private final TimeProvider time;
     private final DebtGateway debts;
     private final PersonGateway persons;
+    private final ForeignChargeGateway foreignCharges;
 
     public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories) {
         this(transactions, accounts, categories, null, null);
@@ -67,6 +70,14 @@ public class TransactionDetailsAssembler {
     @SuppressWarnings("java:S107")
     public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
                                        CardGateway cards, TimeProvider time, DebtGateway debts, PersonGateway persons) {
+        this(transactions, accounts, categories, cards, time, debts, persons, null);
+    }
+
+    @SuppressWarnings("java:S107")
+    public TransactionDetailsAssembler(TransactionGateway transactions, AccountGateway accounts, CategoryGateway categories,
+                                       CardGateway cards, TimeProvider time, DebtGateway debts, PersonGateway persons,
+                                       ForeignChargeGateway foreignCharges) {
+        this.foreignCharges = foreignCharges;
         this.debts = debts;
         this.persons = persons;
         this.transactions = transactions;
@@ -79,6 +90,7 @@ public class TransactionDetailsAssembler {
     public TransactionDetails assemble(Persisted<Transaction> persisted) {
         Transaction transaction = persisted.value();
         UUID userId = transaction.userId();
+        attachForeignCharge(transaction);
         Map<UUID, Account> touched = new HashMap<>();
         Account account = load(userId, transaction.accountId(), touched);
         Account counterpart = load(userId, transaction.counterpartAccountId(), touched);
@@ -110,6 +122,29 @@ public class TransactionDetailsAssembler {
         return new TransactionDetails(transaction, persisted.createdAt(), persisted.updatedAt(), account, counterpart, category,
                 refundOfDescription, TransactionImpactCalculator.of(transaction, touched, today(), commitment),
                 flags != null ? flags : TransactionFlags.of(transaction, touched.values(), hasActiveRefunds), cardInfo, summaries);
+    }
+
+    private void attachForeignCharge(Transaction transaction) {
+        if (foreignCharges == null || transaction.foreignCharge() != null) {
+            return;
+        }
+        ForeignCharge charge = foreignCharges.findByTransactions(transaction.userId(), List.of(transaction.id())).get(transaction.id());
+        if (charge != null) {
+            transaction.attachForeignCharge(charge);
+        }
+    }
+
+    private void attachForeignCharges(UUID userId, List<Persisted<Transaction>> items) {
+        if (foreignCharges == null || items.isEmpty()) {
+            return;
+        }
+        Map<UUID, ForeignCharge> found = foreignCharges.findByTransactions(userId, items.stream().map(i -> i.value().id()).toList());
+        for (Persisted<Transaction> item : items) {
+            ForeignCharge charge = found.get(item.value().id());
+            if (charge != null && item.value().foreignCharge() == null) {
+                item.value().attachForeignCharge(charge);
+            }
+        }
     }
 
     private List<Debt> linkedDebts(UUID userId, Transaction transaction) {
@@ -163,6 +198,7 @@ public class TransactionDetailsAssembler {
         }
         Map<UUID, Person> people = persons == null || records.debts().isEmpty() ? Map.of()
                 : persons.findByIds(userId, records.debts().stream().map(Debt::personId).filter(java.util.Objects::nonNull).distinct().toList());
+        attachForeignCharges(userId, items);
         List<TransactionDetails> details = new ArrayList<>();
         for (Persisted<Transaction> persisted : items) {
             Transaction transaction = persisted.value();

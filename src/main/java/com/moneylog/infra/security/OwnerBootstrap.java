@@ -19,6 +19,7 @@ import com.moneylog.core.auth.app.usecase.EnsureOwnerUseCase.OwnerEnsured;
 import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase;
 import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase.FirstAccessPrepared;
 import com.moneylog.core.auth.app.usecase.PrepareFirstAccessUseCase.PrepareFirstAccessCommand;
+import com.moneylog.core.notification.domain.SecurityEvent;
 
 public class OwnerBootstrap implements ApplicationRunner, Ordered {
 
@@ -29,14 +30,22 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
     private final MoneylogOwnerProperties owner;
     private final ApplicationEventPublisher publisher;
     private final boolean devProfile;
+    private final SecurityAlerts alerts;
 
     public OwnerBootstrap(EnsureOwnerUseCase ensureOwner, PrepareFirstAccessUseCase prepareFirstAccess,
                           MoneylogOwnerProperties owner, ApplicationEventPublisher publisher, boolean devProfile) {
+        this(ensureOwner, prepareFirstAccess, owner, publisher, devProfile, SecurityAlerts.disabled());
+    }
+
+    public OwnerBootstrap(EnsureOwnerUseCase ensureOwner, PrepareFirstAccessUseCase prepareFirstAccess,
+                          MoneylogOwnerProperties owner, ApplicationEventPublisher publisher, boolean devProfile,
+                          SecurityAlerts alerts) {
         this.ensureOwner = ensureOwner;
         this.prepareFirstAccess = prepareFirstAccess;
         this.owner = owner;
         this.publisher = publisher;
         this.devProfile = devProfile;
+        this.alerts = alerts;
     }
 
     @Override
@@ -51,6 +60,7 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
         }
         if (result.passwordReset()) {
             SecurityEventLog.ownerPasswordReset(result.owner().email());
+            alerts.raise(SecurityEvent.PASSWORD_RESET, null, null);
             log.warn("Senha do dono redefinida (MONEYLOG_OWNER_RESET_PASSWORD): sessões revogadas e primeiro acesso pendente. "
                     + "Remova a variável para não repetir.");
         } else if (owner.resetPassword()) {

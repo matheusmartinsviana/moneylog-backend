@@ -38,6 +38,7 @@ public final class Debt {
     public static final int TEXT_MAX_LENGTH = 500;
     public static final int DESCRIPTION_MAX_LENGTH = 200;
     public static final int CREDITOR_NAME_MAX_LENGTH = 100;
+    public static final int CHANNEL_MAX_LENGTH = 60;
 
     private final UUID id;
     private final UUID userId;
@@ -56,6 +57,8 @@ public final class Debt {
     private DebtClosure closure;
     private LocalDate closureDate;
     private String closureReason;
+    private DebtKind kind = DebtKind.PERSONAL;
+    private String channel;
 
     private Debt(UUID id, UUID userId, Person person, String creditorName, DebtDirection direction, DebtOrigin origin, Money principal,
                  String description, LocalDate date, LocalDate expectedDate, UUID originTransactionId, UUID categoryId) {
@@ -113,6 +116,8 @@ public final class Debt {
         this.closure = s.closure();
         this.closureDate = s.closureDate();
         this.closureReason = s.closureReason();
+        this.kind = s.kind();
+        this.channel = s.channel();
     }
 
     public static Debt withMovement(UUID id, UUID userId, Person person, DebtDirection direction, Money principal,
@@ -125,6 +130,24 @@ public final class Debt {
                                        LocalDate date, LocalDate expectedDate, String description) {
         return new Debt(id, userId, person, null, direction, DebtOrigin.WITHOUT_MOVEMENT, principal, description, date, expectedDate,
                 null, null);
+    }
+
+    public static Debt cardCashOutForMe(UUID id, UUID userId, String cardName, Money principal, LocalDate date, String description,
+                                        UUID originTransactionId, String channel) {
+        Debt debt = new Debt(id, userId, null, cardName, DebtDirection.PAYABLE, DebtOrigin.WITH_MOVEMENT, principal, description, date,
+                null, required(originTransactionId, "originTransactionId"), null);
+        debt.kind = DebtKind.CARD_CASH_OUT;
+        debt.channel = requireChannel(channel);
+        return debt;
+    }
+
+    public static Debt cardCashOutForPerson(UUID id, UUID userId, Person person, Money principal, LocalDate date, String description,
+                                            UUID originTransactionId, String channel) {
+        Debt debt = new Debt(id, userId, required(person, "person"), null, DebtDirection.RECEIVABLE, DebtOrigin.WITH_MOVEMENT,
+                principal, description, date, null, required(originTransactionId, "originTransactionId"), null);
+        debt.kind = DebtKind.CARD_CASH_OUT;
+        debt.channel = requireChannel(channel);
+        return debt;
     }
 
     public static Debt withoutMovementToCreditor(UUID id, UUID userId, String creditorName, Money principal, LocalDate date,
@@ -160,7 +183,7 @@ public final class Debt {
 
     public DebtState state() {
         return new DebtState(id, userId, personId, direction, origin, principal, description, date, expectedDate,
-                originTransactionId, closure, closureDate, closureReason, categoryId, creditorName);
+                originTransactionId, closure, closureDate, closureReason, categoryId, creditorName, kind, channel);
     }
 
     private static Debt validated(DebtState s, List<DebtSettlement> settlements, List<LedgerEntry> entries) {
@@ -178,6 +201,9 @@ public final class Debt {
         }
         if (s.principal() == null || !s.principal().isPositive() || !CurrencyCode.BRL.equals(s.principal().currency())) {
             throw inconsistent("principal inválido: " + s.principal() + ".");
+        }
+        if (s.kind() == DebtKind.CARD_CASH_OUT && s.origin() != DebtOrigin.WITH_MOVEMENT) {
+            throw inconsistent("o Pix no crédito nasce de uma movimentação.");
         }
         AmountLimit.ensureWithinLimit(s.principal(), "principal");
         if ((s.origin() == DebtOrigin.WITH_MOVEMENT) != (s.originTransactionId() != null)) {
@@ -260,12 +286,41 @@ public final class Debt {
         return Money.sum(settlements.stream().filter(DebtSettlement::active).map(DebtSettlement::amount).toList(), principal.currency());
     }
 
+    public boolean carriedByCard() {
+        return kind == DebtKind.CARD_CASH_OUT && direction == DebtDirection.PAYABLE;
+    }
+
+    public boolean deductedInPayroll() {
+        return kind == DebtKind.PAYROLL && direction == DebtDirection.PAYABLE;
+    }
+
     public Money outstanding() {
-        return closure != null ? Money.zero(principal.currency()) : principal.subtract(settled());
+        return closure != null || carriedByCard() ? Money.zero(principal.currency()) : principal.subtract(settled());
     }
 
     public boolean isOverdue(LocalDate today) {
-        return expectedDate != null && expectedDate.isBefore(today) && outstanding().isPositive();
+        return !deductedInPayroll() && !carriedByCard() && expectedDate != null && expectedDate.isBefore(today) && outstanding().isPositive();
+    }
+
+    public boolean unmarkPayroll() {
+        if (kind != DebtKind.PAYROLL) {
+            return false;
+        }
+        kind = DebtKind.PERSONAL;
+        return true;
+    }
+
+    public boolean markPayroll() {
+        ensureDirection(DebtDirection.PAYABLE);
+        ensureNotClosed();
+        if (kind == DebtKind.PAYROLL) {
+            return false;
+        }
+        if (kind == DebtKind.CARD_CASH_OUT) {
+            throw new DebtOperationRefusedException("DEBT_KIND_NOT_PAYROLL", "o Pix no crédito não é consignado em folha.");
+        }
+        kind = DebtKind.PAYROLL;
+        return true;
     }
 
     public void ensureDirection(DebtDirection expected) {
@@ -316,6 +371,10 @@ public final class Debt {
     }
 
     public void cancel(String reason, LocalDate today) {
+        if (carriedByCard()) {
+            throw new DebtOperationRefusedException("DEBT_HAS_ORIGIN_TRANSACTION",
+                    "a dívida do Pix no crédito vive na fatura do cartão; estorne a movimentação de origem.");
+        }
         String validReason = requireReason(reason);
         required(today, "today");
         ensureNotClosed();
@@ -428,6 +487,25 @@ public final class Debt {
 
     public String closureReason() {
         return closureReason;
+    }
+
+    public DebtKind kind() {
+        return kind;
+    }
+
+    public String channel() {
+        return channel;
+    }
+
+    private static String requireChannel(String channel) {
+        if (channel == null || channel.isBlank()) {
+            return null;
+        }
+        String trimmed = channel.strip();
+        if (trimmed.length() > CHANNEL_MAX_LENGTH) {
+            throw new DebtDescriptionTooLongException(CHANNEL_MAX_LENGTH);
+        }
+        return trimmed;
     }
 
     private List<LedgerEntry> recognitionEntries() {

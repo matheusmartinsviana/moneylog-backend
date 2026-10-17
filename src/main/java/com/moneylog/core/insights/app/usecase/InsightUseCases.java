@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.insights.domain.Dismissal;
 import com.moneylog.core.insights.domain.InsightItem;
 import com.moneylog.core.insights.domain.InsufficientData;
@@ -30,13 +31,37 @@ public final class InsightUseCases {
         }
     }
 
-    public record MonthlyQuery(UUID userId, Competence month, boolean includeDismissed, int offset, int limit) {
+    public record MonthlyQuery(UUID userId, Competence month, boolean includeDismissed, int offset, int limit, ConsumptionView view) {
+
+        public MonthlyQuery {
+            view = ConsumptionView.orDefault(view);
+        }
+
+        public MonthlyQuery(UUID userId, Competence month, boolean includeDismissed, int offset, int limit) {
+            this(userId, month, includeDismissed, offset, limit, ConsumptionView.MINE);
+        }
     }
 
-    public record DailyQuery(UUID userId, LocalDate date, boolean includeDismissed, int offset, int limit) {
+    public record DailyQuery(UUID userId, LocalDate date, boolean includeDismissed, int offset, int limit, ConsumptionView view) {
+
+        public DailyQuery {
+            view = ConsumptionView.orDefault(view);
+        }
+
+        public DailyQuery(UUID userId, LocalDate date, boolean includeDismissed, int offset, int limit) {
+            this(userId, date, includeDismissed, offset, limit, ConsumptionView.MINE);
+        }
     }
 
-    public record HistoryQuery(UUID userId, Competence from, Competence to, int limitPerMonth) {
+    public record HistoryQuery(UUID userId, Competence from, Competence to, int limitPerMonth, ConsumptionView view) {
+
+        public HistoryQuery {
+            view = ConsumptionView.orDefault(view);
+        }
+
+        public HistoryQuery(UUID userId, Competence from, Competence to, int limitPerMonth) {
+            this(userId, from, to, limitPerMonth, ConsumptionView.MINE);
+        }
     }
 
     public record DismissCommand(UUID userId, String insightId, Dismissal.Scope scope) {

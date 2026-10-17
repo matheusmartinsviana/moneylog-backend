@@ -36,7 +36,7 @@ import com.moneylog.core.category.app.gateways.CategoryGateway;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.exception.CategoryExceptions.CategoryNotFoundException;
 import com.moneylog.core.category.util.factory.CategoryTestFactory;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionUseCaseImpl;

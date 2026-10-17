@@ -24,6 +24,12 @@ public final class CardExceptions {
         }
     }
 
+    public static class InvoiceDocumentAmountInvalidException extends BusinessRuleException {
+        public InvoiceDocumentAmountInvalidException(String reason) {
+            super("INVOICE_DOCUMENT_AMOUNT_INVALID", "Valor do documento da fatura inválido: " + reason);
+        }
+    }
+
     public static class CardFieldRequiredException extends BusinessRuleException {
         public CardFieldRequiredException(String field) {
             super("CARD_FIELD_REQUIRED", "Campo obrigatório do cartão ausente: " + field + ".");
@@ -45,6 +51,24 @@ public final class CardExceptions {
     public static class CardInstitutionTooLongException extends BusinessRuleException {
         public CardInstitutionTooLongException(int max) {
             super("CARD_INSTITUTION_TOO_LONG", "A instituição do cartão pode ter no máximo " + max + " caracteres.");
+        }
+    }
+
+    public static class CardBrandTooLongException extends BusinessRuleException {
+        public CardBrandTooLongException(int max) {
+            super("CARD_BRAND_TOO_LONG", "A bandeira do cartão pode ter no máximo " + max + " caracteres.");
+        }
+    }
+
+    public static class CardLastDigitsInvalidException extends BusinessRuleException {
+        public CardLastDigitsInvalidException(String reason) {
+            super("CARD_LAST_DIGITS_INVALID", "Finais do cartão inválidos: " + reason);
+        }
+    }
+
+    public static class PurchaseLastDigitsNotFromCardException extends BusinessRuleException {
+        public PurchaseLastDigitsNotFromCardException(String lastDigits) {
+            super("PURCHASE_LAST_DIGITS_NOT_FROM_CARD", "O final " + lastDigits + " não pertence a este cartão.");
         }
     }
 

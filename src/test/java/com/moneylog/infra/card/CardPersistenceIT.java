@@ -37,7 +37,7 @@ import com.moneylog.core.card.domain.TransactionInstallment;
 import com.moneylog.core.category.domain.Category;
 import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.ledger.PostingSourceType;

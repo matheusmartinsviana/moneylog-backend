@@ -47,9 +47,12 @@ public class InMemoryRecurrenceGateway implements RecurrenceGateway {
                 .filter(t -> t.isActive() && t.origin().source() == TransactionSource.RECURRENCE
                         && recurrenceId.equals(t.origin().recurrenceId()))
                 .map(t -> t.origin().occurrenceDate()).toList();
-        return Optional.of(RecurringTransaction.restore(model.id(), model.userId(), model.type(), model.amount(), model.description(),
-                model.categoryId(), model.accountId(), model.cardId(), model.paymentMethod(), model.schedule(), realized,
-                model.skippedDates(), model.isActive()));
+        RecurringTransaction restored = RecurringTransaction.restore(model.id(), model.userId(), model.type(), model.amount(),
+                model.description(), model.categoryId(), model.accountId(), model.cardId(), model.paymentMethod(), model.schedule(),
+                realized, model.skippedDates(), model.isActive());
+        restored.defineForeignBasis(model.foreignBasis());
+        restored.defineSubscriptionTraits(model.traits());
+        return Optional.of(restored);
     }
 
     @Override
@@ -64,6 +67,11 @@ public class InMemoryRecurrenceGateway implements RecurrenceGateway {
         long version = versions.containsKey(recurrence.id()) ? versions.get(recurrence.id()) + 1 : 0L;
         versions.put(recurrence.id(), version);
         return new Versioned<>(recurrence, version, java.time.Instant.EPOCH, java.time.Instant.EPOCH);
+    }
+
+    @Override
+    public List<Versioned<RecurringTransaction>> findAllVersioned(UUID userId) {
+        return findAll(userId).stream().map(r -> findVersioned(userId, r.id()).orElseThrow()).toList();
     }
 
     @Override

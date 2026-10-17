@@ -10,6 +10,7 @@ import java.util.UUID;
 import com.moneylog.core.debt.domain.Debt;
 import com.moneylog.core.debt.domain.DebtDirection;
 import com.moneylog.core.debt.domain.DebtStatus;
+import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.sk.page.Slice;
 import com.moneylog.core.sk.persistence.Versioned;
@@ -33,6 +34,8 @@ public interface DebtGateway {
     Slice<Versioned<Debt>> list(UUID userId, DebtFilter filter, LocalDate today, PageQuery page);
 
     Map<UUID, LocalDate> settlementDates(UUID userId, Collection<UUID> transactionIds);
+
+    Map<UUID, List<Money>> installmentSchedules(UUID userId, Collection<UUID> transactionIds);
 
     record DebtFilter(DebtDirection direction, DebtStatus status, UUID personId, Boolean overdue) {
         public static DebtFilter all() {

@@ -21,6 +21,8 @@ import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.time.Competence;
 import com.moneylog.core.thirdparty.app.MarkThirdPartyExpenseUseCase;
 import com.moneylog.core.thirdparty.app.MarkThirdPartyExpenseUseCase.MarkThirdPartyExpenseCommand;
+import com.moneylog.core.thirdparty.domain.ReceiptLedgerEffect;
+import com.moneylog.core.thirdparty.domain.ReceiptSettlement;
 import com.moneylog.core.thirdparty.domain.ThirdPartyExpense;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.CurrentUser;
@@ -37,10 +39,13 @@ public class ThirdPartyController {
     private final GetThirdPartyReceivablesUseCase overview;
     private final com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase unmark;
     private final com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase receipt;
+    private final com.moneylog.core.finance.app.debts.usecase.SetReceivableExpectedMonthUseCase setExpectedMonth;
 
     public ThirdPartyController(MarkThirdPartyExpenseUseCase mark, GetThirdPartyReceivablesUseCase overview,
                                 com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase unmark,
-                                com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase receipt) {
+                                com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase receipt,
+                                com.moneylog.core.finance.app.debts.usecase.SetReceivableExpectedMonthUseCase setExpectedMonth) {
+        this.setExpectedMonth = setExpectedMonth;
         this.receipt = receipt;
         this.unmark = unmark;
         this.mark = mark;
@@ -56,17 +61,38 @@ public class ThirdPartyController {
 
     public record ReceiptInput(@NotNull UUID personId, UUID transactionId,
                                @NotNull @jakarta.validation.constraints.Pattern(regexp = "^\\d{1,13}(\\.\\d{1,2})?$") String amount,
-                               @com.moneylog.infra.web.validation.DateInWindow LocalDate receivedOn, @Size(max = 200) @NoControlChars String note) {
+                               @com.moneylog.infra.web.validation.DateInWindow LocalDate receivedOn, @Size(max = 200) @NoControlChars String note,
+                               UUID accountId) {
     }
 
-    public record ReceiptResponse(UUID id, UUID personId, UUID transactionId, Money amount, LocalDate receivedOn, String note) {
+    public record ReceiptResponse(UUID id, UUID personId, UUID transactionId, Money amount, LocalDate receivedOn, String note,
+                                  ReceiptSettlement settlement, ReceiptLedgerEffect ledgerEffect) {
+    }
+
+    public record InstallmentResponse(UUID installmentId, int number, int total, String consumptionMonth, String dueMonth,
+                                      String expectedMonth, boolean overridden, Money owed, Money received, Money pending) {
+
+        static InstallmentResponse of(com.moneylog.core.finance.domain.CardShareReceivables.Part p) {
+            return new InstallmentResponse(p.installmentId(), p.number(), p.total(), p.consumption().toString(), p.dueMonth() == null ? null : p.dueMonth().toString(),
+                    p.expectedMonth().toString(), p.overridden(), p.owed(), p.received(), p.pending());
+        }
     }
 
     public record ItemResponse(ThirdPartyReceivables.Source source, UUID refId, String description, LocalDate date, LocalDate expectedDate,
-                               Money owed, Money received, Money pending, String status) {
+                               Money owed, Money received, Money pending, String status, List<InstallmentResponse> installments) {
     }
 
-    public record PersonResponse(UUID personId, String name, Money owed, Money received, Money pending, List<ItemResponse> items) {
+    public record ExpectedMonthInput(@jakarta.validation.constraints.Pattern(regexp = "^\\d{4}-\\d{2}$") String expectedMonth, Long version) {
+    }
+
+    public record ExpectedMonthResponse(UUID transactionId, UUID personId, InstallmentResponse installment, long version) {
+    }
+
+    public record PersonMonthResponse(String competence, Money owed, Money received, Money pending) {
+    }
+
+    public record PersonResponse(UUID personId, String name, Money owed, Money received, Money pending, List<ItemResponse> items,
+                                 List<PersonMonthResponse> months) {
     }
 
     public record MonthResponse(String competence, Money grossConsumption, Money refunds, Money personalNet, Money thirdPartyConsumption,
@@ -93,9 +119,9 @@ public class ThirdPartyController {
                                                    @Valid @RequestBody ReceiptInput body) {
         var created = receipt.handle(new com.moneylog.core.thirdparty.app.RecordThirdPartyReceiptUseCase.RecordThirdPartyReceiptCommand(userId,
                 body.personId(), body.transactionId(), Money.of(body.amount(), com.moneylog.core.sk.money.CurrencyCode.BRL), body.receivedOn(),
-                body.note(), idempotencyKey));
+                body.note(), body.accountId(), idempotencyKey));
         return ResponseEntity.created(URI.create("/v1/debts/third-party-receivables"))
-                .body(new ReceiptResponse(created.id(), created.personId(), created.transactionId(), created.amount(), created.receivedOn(), created.note()));
+                .body(new ReceiptResponse(created.id(), created.personId(), created.transactionId(), created.amount(), created.receivedOn(), created.note(), created.settlement(), created.ledgerEffect()));
     }
 
     @org.springframework.web.bind.annotation.DeleteMapping("/v1/third-party-receipts/{id}")
@@ -108,6 +134,22 @@ public class ThirdPartyController {
     public ResponseEntity<Void> unmark(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID id) {
         unmark.handle(new com.moneylog.core.thirdparty.app.UnmarkThirdPartyExpenseUseCase.UnmarkThirdPartyExpenseCommand(userId, id));
         return ResponseEntity.noContent().build();
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/v1/third-party-receivables/{transactionId}/installments/{installmentId}/people/{personId}/expected-month")
+    public ExpectedMonthResponse setExpectedMonth(@CurrentUser UUID userId, @org.springframework.web.bind.annotation.PathVariable UUID transactionId,
+                                                  @org.springframework.web.bind.annotation.PathVariable UUID installmentId,
+                                                  @org.springframework.web.bind.annotation.PathVariable UUID personId,
+                                                  @Valid @RequestBody ExpectedMonthInput body) {
+        Competence month;
+        try {
+            month = body.expectedMonth() == null ? null : Competence.parse(body.expectedMonth());
+        } catch (RuntimeException e) {
+            throw new RequestValidationException("expectedMonth", "INVALID_FORMAT", "'expectedMonth' deve estar no formato AAAA-MM.");
+        }
+        var result = setExpectedMonth.handle(new com.moneylog.core.finance.app.debts.usecase.SetReceivableExpectedMonthUseCase
+                .SetReceivableExpectedMonthCommand(userId, transactionId, installmentId, personId, month, body.version()));
+        return new ExpectedMonthResponse(result.transactionId(), result.personId(), InstallmentResponse.of(result.installment()), result.version());
     }
 
     @GetMapping("/v1/debts/third-party-receivables")
@@ -123,7 +165,9 @@ public class ThirdPartyController {
         return new OverviewResponse(o.asOf(), o.owed(), o.received(), o.pending(), o.people().stream()
                 .map(p -> new PersonResponse(p.personId(), p.name(), p.owed(), p.received(), p.pending(), p.items().stream()
                         .map(i -> new ItemResponse(i.source(), i.refId(), i.description(), i.date(), i.expectedDate(), i.owed(),
-                                i.received(), i.pending(), i.status())).toList())).toList(),
+                                i.received(), i.pending(), i.status(),
+                                i.installments().stream().map(InstallmentResponse::of).toList())).toList(),
+                        p.months().stream().map(pm -> new PersonMonthResponse(pm.competence().toString(), pm.owed(), pm.received(), pm.pending())).toList())).toList(),
                 new MonthResponse(m.competence().toString(), m.grossConsumption(), m.refunds(), m.personalNet(), m.thirdPartyConsumption(),
                         m.thirdPartyReimbursed(), m.thirdPartyPending()));
     }

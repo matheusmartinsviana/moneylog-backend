@@ -21,6 +21,7 @@ import com.moneylog.core.finance.domain.CashPosition;
 import com.moneylog.core.finance.domain.Commitment;
 import com.moneylog.core.finance.domain.CommitmentKind;
 import com.moneylog.core.finance.domain.CommitmentSchedule;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.DebtOverviewCalculator;
 import com.moneylog.core.finance.domain.EntryLens;
 import com.moneylog.core.finance.domain.EntryReport;
@@ -86,10 +87,16 @@ public final class InsightContext {
 
     public InsightContext(UUID userId, LocalDate today, FinancialRecords records, Collection<RecurringTransaction> recurrences,
                           Map<UUID, String> categoryNames, Supplier<List<GoalDetails>> goalDetails) {
+        this(userId, today, records, ConsumptionView.MINE, recurrences, categoryNames, goalDetails);
+    }
+
+    public InsightContext(UUID userId, LocalDate today, FinancialRecords records, ConsumptionView view,
+                          Collection<RecurringTransaction> recurrences, Map<UUID, String> categoryNames,
+                          Supplier<List<GoalDetails>> goalDetails) {
         this.userId = userId;
         this.today = today;
         this.records = records;
-        this.ledger = records.ledger();
+        this.ledger = ConsumptionView.orDefault(view).ledgerOf(records);
         this.recurrences = List.copyOf(recurrences);
         this.categoryNames = Map.copyOf(categoryNames);
         this.goalDetails = goalDetails;

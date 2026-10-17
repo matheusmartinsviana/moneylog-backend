@@ -28,14 +28,27 @@ public final class ThirdPartyReceivables {
     }
 
     public enum Source {
-        DEBT, EXPENSE, RECEIPT
+        DEBT, EXPENSE, RECEIPT, CARD_SHARE
     }
 
     public record Item(Source source, UUID refId, String description, LocalDate date, LocalDate expectedDate, Money owed, Money received,
-                       Money pending, String status) {
+                       Money pending, String status, List<CardShareReceivables.Part> installments) {
+
+        public Item(Source source, UUID refId, String description, LocalDate date, LocalDate expectedDate, Money owed, Money received,
+                    Money pending, String status) {
+            this(source, refId, description, date, expectedDate, owed, received, pending, status, List.of());
+        }
     }
 
-    public record PersonLine(UUID personId, String name, Money owed, Money received, Money pending, List<Item> items) {
+    public record PersonMonth(Competence competence, Money owed, Money received, Money pending) {
+    }
+
+    public record PersonLine(UUID personId, String name, Money owed, Money received, Money pending, List<Item> items,
+                             List<PersonMonth> months) {
+
+        public PersonLine(UUID personId, String name, Money owed, Money received, Money pending, List<Item> items) {
+            this(personId, name, owed, received, pending, items, List.of());
+        }
     }
 
     public record MonthView(Competence competence, Money grossConsumption, Money refunds, Money personalNet,
@@ -52,6 +65,12 @@ public final class ThirdPartyReceivables {
 
     public static Overview of(FinancialRecords records, List<ThirdPartyExpense> marks, List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts,
                               Map<UUID, String> personNames, LocalDate today, Competence competence) {
+        return of(records, marks, receipts, Map.of(), personNames, today, competence);
+    }
+
+    public static Overview of(FinancialRecords records, List<ThirdPartyExpense> marks, List<com.moneylog.core.thirdparty.domain.ThirdPartyReceipt> receipts,
+                              Map<CardShareReceivables.ShareKey, Competence> expectedMonths, Map<UUID, String> personNames, LocalDate today,
+                              Competence competence) {
         Money zero = Money.zero(CurrencyCode.BRL);
         Map<UUID, Transaction> txs = records.transactionsById();
         Map<UUID, List<Item>> byPerson = new LinkedHashMap<>();
@@ -76,6 +95,21 @@ public final class ThirdPartyReceivables {
             byPerson.computeIfAbsent(mark.personId(), k -> new ArrayList<>()).add(new Item(Source.EXPENSE, tx.id(), tx.description(),
                     tx.date(), null, owed, received, pending, pending.isZero() ? "RECEIVED" : received.isZero() ? "PENDING" : "PARTIAL"));
         }
+        List<CardShareReceivables.PurchaseLine> shareLines = CardShareReceivables.lines(records, receipts, expectedMonths);
+        Map<UUID, Map<Competence, Money[]>> monthsByPerson = new LinkedHashMap<>();
+        for (CardShareReceivables.PurchaseLine line : shareLines) {
+            Transaction tx = txs.get(line.transactionId());
+            byPerson.computeIfAbsent(line.personId(), k -> new ArrayList<>()).add(new Item(Source.CARD_SHARE, tx.id(), tx.description(),
+                    tx.date(), null, line.owed(), line.received(), line.pending(),
+                    line.pending().isZero() ? "RECEIVED" : line.received().isZero() ? "PENDING" : "PARTIAL",
+                    line.parts().stream().filter(CardShareReceivables.Part::editable).toList()));
+            Map<Competence, Money[]> months = monthsByPerson.computeIfAbsent(line.personId(), k -> new java.util.TreeMap<>());
+            line.months().forEach((competenceKey, amounts) -> {
+                Money[] acc = months.computeIfAbsent(competenceKey, k -> new Money[] {zero, zero});
+                acc[0] = acc[0].add(amounts.owed());
+                acc[1] = acc[1].add(amounts.received());
+            });
+        }
         for (com.moneylog.core.thirdparty.domain.ThirdPartyReceipt r : receipts) {
             if (r.transactionId() == null) {
                 byPerson.computeIfAbsent(r.personId(), k -> new ArrayList<>()).add(new Item(Source.RECEIPT, r.id(), r.note(),
@@ -96,13 +130,16 @@ public final class ThirdPartyReceivables {
                 r = r.add(i.received());
                 p = p.add(i.pending());
             }
-            lines.add(new PersonLine(e.getKey(), personNames.getOrDefault(e.getKey(), ""), o, r, p, items));
+            List<PersonMonth> months = monthsByPerson.getOrDefault(e.getKey(), Map.of()).entrySet().stream()
+                    .map(m -> new PersonMonth(m.getKey(), m.getValue()[0], m.getValue()[1],
+                            m.getValue()[0].subtract(m.getValue()[1]))).toList();
+            lines.add(new PersonLine(e.getKey(), personNames.getOrDefault(e.getKey(), ""), o, r, p, items, months));
             owedT = owedT.add(o);
             receivedT = receivedT.add(r);
             pendingT = pendingT.add(p);
         }
         lines.sort(Comparator.comparing(PersonLine::name));
-        return new Overview(today, owedT, receivedT, pendingT, List.copyOf(lines), month(records, markedIds, competence));
+        return new Overview(today, owedT, receivedT, pendingT, List.copyOf(lines), month(records, markedIds, competence, shareLines));
     }
 
     private static Money refundsOf(FinancialRecords records, UUID originalId) {
@@ -111,10 +148,20 @@ public final class ThirdPartyReceivables {
                 .map(Transaction::amount).toList(), CurrencyCode.BRL);
     }
 
-    private static MonthView month(FinancialRecords records, Set<UUID> markedIds, Competence competence) {
+    private static MonthView month(FinancialRecords records, Set<UUID> markedIds, Competence competence,
+                                   List<CardShareReceivables.PurchaseLine> shareLines) {
         Money zero = Money.zero(CurrencyCode.BRL);
         ConsumptionReport report = ConsumptionReport.of(records, records.ledger(), competence);
-        Money gross = report.expensesPaid().add(report.credit()).add(report.debtConsumption());
+        Money shareOwed = zero;
+        Money shareReceived = zero;
+        for (CardShareReceivables.PurchaseLine line : shareLines) {
+            CardShareReceivables.MonthAmounts amounts = line.months().get(competence);
+            if (amounts != null) {
+                shareOwed = shareOwed.add(amounts.owed());
+                shareReceived = shareReceived.add(amounts.received());
+            }
+        }
+        Money gross = report.expensesPaid().add(report.credit()).add(report.debtConsumption()).add(shareOwed);
         Money thirdConsumption = zero;
         for (LedgerEntry e : records.ledger().inCompetence(BookType.EXPENSE, competence)) {
             if (e.source().transactionId() != null && markedIds.contains(e.source().transactionId())) {
@@ -128,7 +175,10 @@ public final class ThirdPartyReceivables {
                 reimbursed = reimbursed.add(t.amount());
             }
         }
-        Money pending = reimbursed.isLessThan(thirdConsumption) ? thirdConsumption.subtract(reimbursed) : zero;
+        Money shareMonthPending = shareOwed.subtract(shareReceived);
+        Money pending = (reimbursed.isLessThan(thirdConsumption) ? thirdConsumption.subtract(reimbursed) : zero).add(shareMonthPending);
+        thirdConsumption = thirdConsumption.add(shareOwed);
+        reimbursed = reimbursed.add(shareReceived);
         return new MonthView(competence, gross, report.refunds(), report.consumption(), thirdConsumption, reimbursed, pending);
     }
 }

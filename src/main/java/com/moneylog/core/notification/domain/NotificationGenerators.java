@@ -53,6 +53,7 @@ public final class NotificationGenerators {
         if (settings.isEnabled(NotificationKind.COMMITTED_NEXT_MONTH)) {
             committedNextMonth(ctx).ifPresent(drafts::add);
         }
+        drafts.addAll(AlertGenerators.generate(ctx));
         return drafts;
     }
 

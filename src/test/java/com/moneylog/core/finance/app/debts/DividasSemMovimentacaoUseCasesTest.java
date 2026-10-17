@@ -46,7 +46,7 @@ import com.moneylog.core.finance.app.debts.usecase.UpdateDebtUseCase.UpdateDebtC
 import com.moneylog.core.finance.app.debts.usecase.UpdateDebtUseCaseImpl;
 import com.moneylog.core.finance.app.debts.usecase.VoidDebtRecordUseCase.VoidDebtRecordCommand;
 import com.moneylog.core.finance.app.debts.usecase.VoidDebtRecordUseCaseImpl;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.sk.exception.VersionConflictException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.ledger.BookType;

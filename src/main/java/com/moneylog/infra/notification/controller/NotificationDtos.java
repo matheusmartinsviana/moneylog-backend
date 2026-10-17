@@ -10,13 +10,21 @@ import java.util.UUID;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
 import com.moneylog.core.notification.app.usecase.NotificationUseCases.DailyMessageView;
 import com.moneylog.core.notification.domain.Notification;
+import com.moneylog.core.notification.domain.NotificationAlertSettings;
 import com.moneylog.core.notification.domain.NotificationKind;
 import com.moneylog.core.notification.domain.NotificationSettings;
+import com.moneylog.core.profile.app.usecase.ProfilePhotoUseCases.ProfilePhotoInfo;
 import com.moneylog.core.notification.domain.QuietHours;
 import com.moneylog.core.notification.domain.Reminder;
 import com.moneylog.core.notification.domain.SummaryFrequency;
 import com.moneylog.core.notification.exception.NotificationExceptions.InvalidNotificationSettingsException;
+import com.moneylog.core.notification.exception.NotificationExceptions.NotificationThresholdInvalidException;
+import com.moneylog.core.sk.money.Money;
 import com.moneylog.infra.web.validation.NoControlChars;
+
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.IntNode;
+import tools.jackson.databind.node.NullNode;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -100,8 +108,37 @@ public final class NotificationDtos {
     public record PushDto(boolean enabled) {
     }
 
+    public record AlertsDto(JsonNode subscriptionUnusedDays, Integer invoiceDueLeadDays, Money documentDivergenceTolerance) {
+
+        static AlertsDto of(NotificationAlertSettings a) {
+            JsonNode days = a.subscriptionUnusedDays() == null ? NullNode.getInstance() : IntNode.valueOf(a.subscriptionUnusedDays());
+            return new AlertsDto(days, a.invoiceDueLeadDays(), a.documentDivergenceTolerance());
+        }
+
+        NotificationAlertSettings.Patch patch() {
+            boolean given = subscriptionUnusedDays != null;
+            Integer days = null;
+            if (given && !subscriptionUnusedDays.isNull()) {
+                if (!subscriptionUnusedDays.isIntegralNumber() || !subscriptionUnusedDays.canConvertToInt()) {
+                    throw new NotificationThresholdInvalidException("subscriptionUnusedDays deve ser um número inteiro ou null.");
+                }
+                days = subscriptionUnusedDays.intValue();
+            }
+            return new NotificationAlertSettings.Patch(given, days, invoiceDueLeadDays, documentDivergenceTolerance);
+        }
+    }
+
     public record SettingsDto(@NotNull @Valid DailySummaryDto dailySummary, Map<NotificationKind, Boolean> kinds, @NotNull @Valid QuietHoursDto quietHours,
-                              @NotNull @Valid PushDto push, @Size(max = 60) @NoControlChars String displayName, @NotNull Long version) {
+                              @NotNull @Valid PushDto push, @Size(max = 60) @NoControlChars String displayName, AlertsDto alerts,
+                              @NotNull Long version, Boolean hasPhoto, Long photoVersion) {
+
+        SettingsDto withPhoto(ProfilePhotoInfo photo) {
+            return new SettingsDto(dailySummary, kinds, quietHours, push, displayName, alerts, version, photo.hasPhoto(), photo.photoVersion());
+        }
+
+        NotificationAlertSettings.Patch alertsPatch() {
+            return alerts == null ? null : alerts.patch();
+        }
 
         static SettingsDto of(NotificationSettings s) {
             Map<NotificationKind, Boolean> kinds = new EnumMap<>(NotificationKind.class);
@@ -112,7 +149,7 @@ public final class NotificationDtos {
             }
             return new SettingsDto(new DailySummaryDto(s.summaryEnabled(), s.summaryTime().toString(), s.summaryFrequency()), kinds,
                     new QuietHoursDto(s.quietHours().from().toString(), s.quietHours().to().toString()), new PushDto(s.pushEnabled()),
-                    s.displayName(), s.version());
+                    s.displayName(), AlertsDto.of(s.alerts()), s.version(), false, 0L);
         }
 
         QuietHours quiet() {

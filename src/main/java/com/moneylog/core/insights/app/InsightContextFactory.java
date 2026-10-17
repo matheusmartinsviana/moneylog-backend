@@ -14,6 +14,7 @@ import com.moneylog.core.finance.app.gateways.FinancialRecordsGateway;
 import com.moneylog.core.finance.app.goals.GoalDetails;
 import com.moneylog.core.finance.app.goals.GoalReadModel;
 import com.moneylog.core.finance.app.goals.GoalViews;
+import com.moneylog.core.finance.domain.ConsumptionView;
 import com.moneylog.core.finance.domain.FinancialRecords;
 import com.moneylog.core.goal.app.gateways.GoalSnapshotGateway;
 import com.moneylog.core.goal.domain.Goal;
@@ -39,11 +40,15 @@ public final class InsightContextFactory {
     }
 
     public InsightContext create(UUID userId) {
+        return create(userId, ConsumptionView.MINE);
+    }
+
+    public InsightContext create(UUID userId, ConsumptionView view) {
         FinancialRecords loaded = records.load(userId);
         Collection<RecurringTransaction> recurrences = sources.recurrences(userId);
         Map<UUID, String> names = categories.list(userId, null, true).stream().collect(Collectors.toMap(Category::id, Category::name));
         GoalReadModel model = new GoalReadModel(u -> recurrences, snapshots, time);
-        return new InsightContext(userId, time.today(), loaded, recurrences, names, () -> goalDetails(userId, loaded, model));
+        return new InsightContext(userId, time.today(), loaded, view, recurrences, names, () -> goalDetails(userId, loaded, model));
     }
 
     private static List<GoalDetails> goalDetails(UUID userId, FinancialRecords loaded, GoalReadModel model) {

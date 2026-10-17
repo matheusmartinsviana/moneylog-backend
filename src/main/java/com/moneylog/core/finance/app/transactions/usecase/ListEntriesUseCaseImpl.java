@@ -34,7 +34,7 @@ public class ListEntriesUseCaseImpl implements ListEntriesUseCase {
     @Override
     public EntryListing handle(ListEntriesQuery query) {
         FinancialRecords loaded = records.load(query.userId());
-        EntryReport report = EntryReport.of(loaded, loaded.ledger(), query.lens(), query.competence(), query.filter().predicate(),
+        EntryReport report = EntryReport.of(loaded, query.view().ledgerOf(loaded), query.lens(), query.competence(), query.filter().predicate(),
                 query.filter().debtCategoryPredicate());
         Map<UUID, Category> categoriesById = categories.list(query.userId(), null, true).stream()
                 .collect(Collectors.toMap(Category::id, Function.identity()));

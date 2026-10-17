@@ -34,7 +34,7 @@ import com.moneylog.core.account.domain.Account;
 import com.moneylog.core.account.domain.AccountStatus;
 import com.moneylog.core.account.domain.AccountType;
 import com.moneylog.core.category.app.gateways.CategoryGateway;
-import com.moneylog.core.finance.app.gateways.LedgerWriteGateway;
+import com.moneylog.core.sk.ledger.LedgerWriteGateway;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand;
 import com.moneylog.core.finance.app.transactions.usecase.CreateTransactionCommand.Common;
 import com.moneylog.core.finance.app.transactions.usecase.UpdateTransactionUseCase.UpdateTransactionCommand;

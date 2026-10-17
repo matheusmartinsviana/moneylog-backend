@@ -15,7 +15,8 @@ public record TransactionState(UUID id, UUID userId, TransactionType type, Money
                                InvestmentDirection investmentDirection, AdjustmentDirection adjustmentDirection,
                                AdjustmentKind adjustmentKind, String reason, LocalDate invoiceClosingDate, boolean lateEntry,
                                List<TransactionInstallment> installments, TransactionStatus status, String voidReason,
-                               Instant voidedAt, long version, Competence incomeCompetence) {
+                               Instant voidedAt, long version, Competence incomeCompetence,
+                               PurchaseShares purchaseShares, TransactionNature nature) {
 
     public TransactionState {
         installments = installments == null ? List.of() : List.copyOf(installments);
@@ -27,9 +28,34 @@ public record TransactionState(UUID id, UUID userId, TransactionType type, Money
                             InvestmentDirection investmentDirection, AdjustmentDirection adjustmentDirection,
                             AdjustmentKind adjustmentKind, String reason, LocalDate invoiceClosingDate, boolean lateEntry,
                             List<TransactionInstallment> installments, TransactionStatus status, String voidReason,
+                            Instant voidedAt, long version, Competence incomeCompetence, PurchaseShares purchaseShares) {
+        this(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId, counterpartAccountId, cardId,
+                categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection, adjustmentKind, reason,
+                invoiceClosingDate, lateEntry, installments, status, voidReason, voidedAt, version, incomeCompetence,
+                purchaseShares, null);
+    }
+
+    public TransactionState(UUID id, UUID userId, TransactionType type, Money amount, LocalDate date, String description,
+                            String notes, TransactionOrigin origin, PaymentMethod paymentMethod, UUID accountId,
+                            UUID counterpartAccountId, UUID cardId, UUID categoryId, UUID debtId, UUID refundOfId,
+                            InvestmentDirection investmentDirection, AdjustmentDirection adjustmentDirection,
+                            AdjustmentKind adjustmentKind, String reason, LocalDate invoiceClosingDate, boolean lateEntry,
+                            List<TransactionInstallment> installments, TransactionStatus status, String voidReason,
+                            Instant voidedAt, long version, Competence incomeCompetence) {
+        this(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId, counterpartAccountId, cardId,
+                categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection, adjustmentKind, reason,
+                invoiceClosingDate, lateEntry, installments, status, voidReason, voidedAt, version, incomeCompetence, null, null);
+    }
+
+    public TransactionState(UUID id, UUID userId, TransactionType type, Money amount, LocalDate date, String description,
+                            String notes, TransactionOrigin origin, PaymentMethod paymentMethod, UUID accountId,
+                            UUID counterpartAccountId, UUID cardId, UUID categoryId, UUID debtId, UUID refundOfId,
+                            InvestmentDirection investmentDirection, AdjustmentDirection adjustmentDirection,
+                            AdjustmentKind adjustmentKind, String reason, LocalDate invoiceClosingDate, boolean lateEntry,
+                            List<TransactionInstallment> installments, TransactionStatus status, String voidReason,
                             Instant voidedAt, long version) {
         this(id, userId, type, amount, date, description, notes, origin, paymentMethod, accountId, counterpartAccountId, cardId,
                 categoryId, debtId, refundOfId, investmentDirection, adjustmentDirection, adjustmentKind, reason,
-                invoiceClosingDate, lateEntry, installments, status, voidReason, voidedAt, version, null);
+                invoiceClosingDate, lateEntry, installments, status, voidReason, voidedAt, version, null, null, null);
     }
 }

@@ -50,6 +50,18 @@ public final class TransactionExceptions {
         }
     }
 
+    public static class PayrollLoanInvalidException extends BusinessRuleException {
+        public PayrollLoanInvalidException(String reason) {
+            super("PAYROLL_LOAN_INVALID", "Consignado em folha inválido: " + reason);
+        }
+    }
+
+    public static class TransactionNatureInvalidException extends BusinessRuleException {
+        public TransactionNatureInvalidException(String reason) {
+            super("TRANSACTION_NATURE_INVALID", "Natureza inválida: " + reason);
+        }
+    }
+
     public static class PaymentMethodRequiredException extends BusinessRuleException {
         public PaymentMethodRequiredException(TransactionType type) {
             super("TRANSACTION_PAYMENT_METHOD_REQUIRED", "O meio de pagamento é obrigatório em " + type + ".");
@@ -160,6 +172,18 @@ public final class TransactionExceptions {
         public SharesExceedAmountException() {
             super("SHARES_EXCEED_AMOUNT", "As partes devem ser maiores que zero e somar menos que o valor da despesa; "
                     + "se a pessoa deve o valor inteiro, registre um empréstimo.");
+        }
+    }
+
+    public static class SharesInvalidException extends BusinessRuleException {
+        public SharesInvalidException(String reason) {
+            super("SHARES_INVALID", "O rateio da compra é inválido: " + reason);
+        }
+    }
+
+    public static class SharesBelowReceivedException extends BusinessRuleException {
+        public SharesBelowReceivedException() {
+            super("SHARES_BELOW_RECEIVED", "O novo valor devido por uma das pessoas ficaria abaixo do que ela já pagou; nada foi alterado.");
         }
     }
 

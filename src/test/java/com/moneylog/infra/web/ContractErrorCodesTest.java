@@ -25,6 +25,8 @@ class ContractErrorCodesTest {
 
     private static final Set<String> INTERNAL = Set.of("INVOICE_CHAIN_INCONSISTENT", "CARD_INVALID_INSTALLMENT");
 
+    private static final Set<String> ENUM_WORDS_IN_TABLE = Set.of("AMOUNT", "FGTS", "FIXED", "LOAN", "RESERVED", "VARIABLE");
+
     private static final Set<String> NOT_CODES = Set.of("CARD_PURCHASE", "CARD_COMMITTED", "CARD_LIMIT_USAGE", "CARD_CLOSING_SOON");
 
     @Test
@@ -33,6 +35,9 @@ class ContractErrorCodesTest {
         String source = allMainSources();
         Set<String> missing = new TreeSet<>();
         for (String code : contractCodes()) {
+            if (ENUM_WORDS_IN_TABLE.contains(code)) {
+                continue;
+            }
             if (!source.contains("\"" + code + "\"")) {
                 missing.add(code);
             }

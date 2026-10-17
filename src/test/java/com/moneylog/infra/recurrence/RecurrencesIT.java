@@ -188,6 +188,25 @@ class RecurrencesIT extends E4ItBase {
     }
 
     @Test
+    @DisplayName("summary com recorrência de cartão rateada 70/30: padrão e MINE somam 70,00, GROSS soma 100,00, devolvem view; view inválida é 400")
+    void deveResumirNasDuasVisoes() throws Exception {
+        String shares = "\"splitMode\":\"BPS\",\"shares\":[{\"personId\":null,\"bps\":7000},{\"personId\":\"" + joao + "\",\"bps\":3000}]";
+        createdBody(post("/v1/recurrences", body("CARD_PURCHASE", "100.00", "Streaming", subscriptions, "\"cardId\":\"" + card + "\"", "MONTHLY", "2026-10-10", shares)));
+
+        JsonNode padrao = okBody(get("/v1/recurrences/summary"));
+        JsonNode mine = okBody(get("/v1/recurrences/summary?view=MINE"));
+        JsonNode gross = okBody(get("/v1/recurrences/summary?view=GROSS"));
+
+        assertThat(padrao.get("view").asString()).isEqualTo("MINE");
+        assertThat(money(padrao, "fixedCosts")).isEqualTo("70.00");
+        assertThat(mine.get("view").asString()).isEqualTo("MINE");
+        assertThat(money(mine, "fixedCosts")).isEqualTo("70.00");
+        assertThat(gross.get("view").asString()).isEqualTo("GROSS");
+        assertThat(money(gross, "fixedCosts")).isEqualTo("100.00");
+        mockMvc.perform(get("/v1/recurrences/summary?view=INVALID")).andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("CA5: summary traz custo fixo e receita recorrente com estimate true (semanal × 52/12); desativada não entra")
     void deveResumirOCustoFixo() throws Exception {
         internet("2026-10-10");

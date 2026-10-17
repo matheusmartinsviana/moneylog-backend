@@ -6,6 +6,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,6 +17,8 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
+import com.moneylog.core.finance.app.cards.usecase.ChangeInvoiceDocumentAmountUseCase;
+import com.moneylog.core.finance.app.cards.usecase.ChangeInvoiceDocumentAmountUseCase.ChangeInvoiceDocumentAmountCommand;
 import com.moneylog.core.finance.app.cards.usecase.GetInvoiceUseCase;
 import com.moneylog.core.finance.app.cards.usecase.GetInvoiceUseCase.GetInvoiceQuery;
 import com.moneylog.core.finance.app.cards.usecase.PayInvoiceUseCase;
@@ -34,8 +37,11 @@ public class InvoiceController {
     private final GetInvoiceUseCase get;
     private final PreviewInvoicePaymentUseCase previewPayment;
     private final PayInvoiceUseCase pay;
+    private final ChangeInvoiceDocumentAmountUseCase changeDocumentAmount;
 
-    public InvoiceController(GetInvoiceUseCase get, PreviewInvoicePaymentUseCase previewPayment, PayInvoiceUseCase pay) {
+    public InvoiceController(GetInvoiceUseCase get, PreviewInvoicePaymentUseCase previewPayment, PayInvoiceUseCase pay,
+                             ChangeInvoiceDocumentAmountUseCase changeDocumentAmount) {
+        this.changeDocumentAmount = changeDocumentAmount;
         this.get = get;
         this.previewPayment = previewPayment;
         this.pay = pay;
@@ -44,6 +50,13 @@ public class InvoiceController {
     @GetMapping("/{id}")
     public InvoiceDetailResponse get(@CurrentUser UUID userId, @PathVariable UUID id) {
         return InvoiceDetailResponse.of(get.handle(new GetInvoiceQuery(userId, id)));
+    }
+
+    @PutMapping("/{id}/document-amount")
+    public InvoiceDetailResponse changeDocumentAmount(@CurrentUser UUID userId, @PathVariable UUID id,
+                                                      @Valid @RequestBody InvoiceDocumentAmountInput body) {
+        Money amount = body.documentAmount() == null ? null : Money.of(body.documentAmount(), CurrencyCode.BRL);
+        return InvoiceDetailResponse.of(changeDocumentAmount.handle(new ChangeInvoiceDocumentAmountCommand(userId, id, amount, body.version())));
     }
 
     @GetMapping("/{id}/payment-preview")

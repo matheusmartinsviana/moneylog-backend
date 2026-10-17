@@ -11,7 +11,7 @@ public interface RecordThirdPartyReceiptUseCase {
     ThirdPartyReceipt handle(RecordThirdPartyReceiptCommand command);
 
     record RecordThirdPartyReceiptCommand(UUID userId, UUID personId, UUID transactionId, Money amount, LocalDate receivedOn, String note,
-                                          UUID idempotencyKey) {
+                                          UUID accountId, UUID idempotencyKey) {
     }
 
     String IDEMPOTENCY_SCOPE = "POST /v1/third-party-receipts";

@@ -14,6 +14,7 @@ import com.moneylog.core.goal.app.gateways.GoalGateway;
 import com.moneylog.core.goal.domain.Goal;
 import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
 import com.moneylog.core.notification.app.gateways.ReminderGateway;
+import com.moneylog.core.notification.domain.AlertInputs;
 import com.moneylog.core.notification.domain.GenerationContext;
 import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.sk.persistence.Versioned;
@@ -27,9 +28,16 @@ public class GenerationContextLoader {
     private final ReminderGateway reminders;
     private final NotificationSettingsGateway settings;
     private final TimeProvider time;
+    private final AlertInputsLoader alertInputs;
 
     public GenerationContextLoader(FinancialRecordsGateway records, CommitmentSourcesGateway sources, GoalGateway goals, ReminderGateway reminders,
                                    NotificationSettingsGateway settings, TimeProvider time) {
+        this(records, sources, goals, reminders, settings, time, null);
+    }
+
+    public GenerationContextLoader(FinancialRecordsGateway records, CommitmentSourcesGateway sources, GoalGateway goals, ReminderGateway reminders,
+                                   NotificationSettingsGateway settings, TimeProvider time, AlertInputsLoader alertInputs) {
+        this.alertInputs = alertInputs;
         this.records = records;
         this.sources = sources;
         this.goals = goals;
@@ -46,7 +54,8 @@ public class GenerationContextLoader {
         var recurrences = sources.recurrences(userId);
         CommitmentSchedule schedule = CommitmentSchedule.of(loaded, recurrences, today);
         DashboardSummary summary = DashboardSummary.of(loaded, recurrences, today, today);
+        AlertInputs alerts = alertInputs == null ? AlertInputs.EMPTY : alertInputs.load(userId, today, time.zone(), loaded, recurrences);
         return new GenerationContext(userId, today, localTime, prefs, schedule, goals.findAll(userId).stream().map(Versioned::value).toList(),
-                reminders.openUntil(userId, today), summary.balances().available(), schedule.committed(Horizon.D7));
+                reminders.openUntil(userId, today), summary.balances().available(), schedule.committed(Horizon.D7), alerts);
     }
 }

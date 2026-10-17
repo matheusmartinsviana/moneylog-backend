@@ -9,6 +9,10 @@ public interface EndRecurrenceUseCase {
 
     RecurrenceView handle(EndRecurrenceCommand command);
 
-    record EndRecurrenceCommand(UUID userId, UUID recurrenceId, LocalDate endDate) {
+    record EndRecurrenceCommand(UUID userId, UUID recurrenceId, LocalDate endDate, LocalDate activeUntil) {
+
+        public EndRecurrenceCommand(UUID userId, UUID recurrenceId, LocalDate endDate) {
+            this(userId, recurrenceId, endDate, null);
+        }
     }
 }

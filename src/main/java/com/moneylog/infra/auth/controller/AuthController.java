@@ -26,11 +26,13 @@ import com.moneylog.core.auth.app.usecase.SetupPasswordUseCase.SetupPasswordComm
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidCredentialsException;
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidSetupCodeException;
 import com.moneylog.core.auth.exception.AuthExceptions.RefreshInvalidException;
+import com.moneylog.core.notification.domain.SecurityEvent;
 import com.moneylog.infra.security.ClientIpResolver;
 import com.moneylog.infra.security.LoginRateLimiter;
 import com.moneylog.infra.security.MoneylogAuthProperties;
 import com.moneylog.infra.security.OriginCheck;
 import com.moneylog.infra.security.RefreshCookies;
+import com.moneylog.infra.security.SecurityAlerts;
 import com.moneylog.infra.security.SecurityEventLog;
 import com.moneylog.infra.security.TooManyAttemptsException;
 
@@ -48,11 +50,12 @@ public class AuthController {
     private final OriginCheck originCheck;
     private final RefreshCookies cookies;
     private final MoneylogAuthProperties auth;
+    private final SecurityAlerts alerts;
 
     public AuthController(LoginUseCase login, RefreshSessionUseCase refresh, LogoutUseCase logout,
                           SetupPasswordUseCase setupPassword, AuthStatusUseCase status,
                           LoginRateLimiter rateLimiter, ClientIpResolver clientIp, OriginCheck originCheck,
-                          RefreshCookies cookies, MoneylogAuthProperties auth) {
+                          RefreshCookies cookies, MoneylogAuthProperties auth, SecurityAlerts alerts) {
         this.login = login;
         this.refresh = refresh;
         this.logout = logout;
@@ -63,6 +66,7 @@ public class AuthController {
         this.originCheck = originCheck;
         this.cookies = cookies;
         this.auth = auth;
+        this.alerts = alerts;
     }
 
     @PostMapping("/login")
@@ -76,8 +80,11 @@ public class AuthController {
             SecurityEventLog.loginFailed(ip, body.email());
             throw e;
         }
-        rateLimiter.succeeded(attempt);
+        boolean newIp = rateLimiter.succeeded(attempt);
         SecurityEventLog.loginSucceeded(ip, body.email());
+        if (newIp) {
+            alerts.raise(SecurityEvent.NEW_LOGIN, ip, null);
+        }
         return sessionResponse(session);
     }
 
@@ -95,6 +102,7 @@ public class AuthController {
         }
         rateLimiter.succeeded(attempt);
         SecurityEventLog.setupSucceeded(ip, body.email());
+        alerts.raise(SecurityEvent.SETUP_COMPLETED, ip, null);
         return sessionResponse(session);
     }
 
@@ -103,6 +111,7 @@ public class AuthController {
             return rateLimiter.reserve(ip, scope + ":" + (email == null ? "" : email.strip()));
         } catch (TooManyAttemptsException e) {
             SecurityEventLog.blocked(e.scope(), ip, email);
+            alerts.raise(SecurityEvent.LOGIN_BLOCKED, ip, e.scope().name().toLowerCase(java.util.Locale.ROOT));
             throw e;
         }
     }
