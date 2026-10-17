@@ -1,6 +1,19 @@
-# moneylog — backend
+# moneylog: backend
 
-Spring Boot 4.1 (Java 21) com Clean Architecture por feature: `core` (domínio puro, sem framework) e `infra` (Spring, JPA, web). Decisões: [ADR-001](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-001-plataforma-dados-stack.md), [ADR-002](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-002-razao-e-dinheiro.md), [ADR-004](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-004-idioma-do-codigo.md). Modelo de domínio: [D1](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/dominio-financeiro.md). Arquitetura: [D2](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/arquitetura.md).
+[![ci](https://github.com/matheusmartinsviana/moneylog-backend/actions/workflows/ci.yml/badge.svg)](https://github.com/matheusmartinsviana/moneylog-backend/actions/workflows/ci.yml)
+![Java 21](https://img.shields.io/badge/Java-21-007396?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?logo=springboot&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
+![Flyway](https://img.shields.io/badge/Flyway-migrations-CC0200?logo=flyway&logoColor=white)
+![OpenAPI](https://img.shields.io/badge/OpenAPI-contract--first-6BA539?logo=openapiinitiative&logoColor=white)
+
+API do **moneylog**, controle financeiro pessoal. Spring Boot 4.1 (Java 21) com Clean Architecture por feature:
+`core` (domínio puro, sem framework) e `infra` (Spring, JPA, web). O razão sempre fecha em zero, e todo cálculo
+financeiro mora aqui; o frontend só exibe o que a API devolve.
+
+- **Contrato primeiro:** `contracts/openapi.yaml` é a fonte da verdade; o frontend mantém uma cópia sincronizada.
+- **Banco:** PostgreSQL 17, schema só por migrações Flyway (`ddl-auto: validate`), sem H2 nos testes.
+- **Decisões:** [ADR-001](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-001-plataforma-dados-stack.md), [ADR-002](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-002-razao-e-dinheiro.md), [ADR-004](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/adrs/ADR-004-idioma-do-codigo.md). Modelo de domínio: [D1](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/dominio-financeiro.md). Arquitetura: [D2](https://github.com/matheusmartinsviana/moneylog/blob/main/docs/arquitetura/arquitetura.md).
 
 ## Pré-requisitos
 - **JDK 21**. O `java` padrão do PATH não serve (o Maven do brew usaria o JDK 26 e o `maven-enforcer-plugin` falha):
@@ -63,30 +76,45 @@ Só o `health` fica exposto no actuator. O schema é criado **só** pelas migra�
 | Comando | O que roda |
 |---|---|
 | `./mvnw test` | só os unitários (`*Test`, surefire): domínio do `core`, ArchUnit e consistência da configuração. Não precisa de Docker. |
-| `./mvnw verify` | unitários + integração (`*IT`, tag `i`, failsafe) com Testcontainers (`postgres:17`, a mesma imagem do compose) + quality gate do JaCoCo. Precisa do Docker. |
+| `./mvnw verify` | unitários + integração (`*IT`, tag `i`, failsafe) com Testcontainers (`postgres:17`, a mesma imagem do compose). Os ITs pesados (tag `slow`) ficam de fora e o gate de cobertura é pulado. Precisa do Docker. |
+| `./mvnw verify -Pslow` | tudo: inclui os ITs `slow` e liga o quality gate do JaCoCo. É a rodada completa (dezenas de minutos). |
 
-- **Quality gate**: `jacoco:check` exige ≥ 90% de linhas cobertas em `com.moneylog.core..` (S-29), medido pelos unitários. Relatório em `target/site/jacoco/index.html`.
+- **Quality gate** (perfil `slow`): `jacoco:check` exige ≥ 90% de linhas cobertas em `com.moneylog.core..` (S-29), medido pelos unitários. Relatório em `target/site/jacoco/index.html`.
 - **ArchUnit** (`ArchitectureTest`): o `core` não pode depender de `com.moneylog.infra..`, `org.springframework..`, `jakarta.persistence..`, `org.hibernate..`, `com.fasterxml..`, `tools.jackson..` (Jackson 3) nem `lombok..`, e não pode usar `double`/`float` (campos, assinaturas ou chamadas). Também: features do core sem ciclos, `*UseCaseImpl` só em `core.<feature>.app`, `*Entity` só em `infra.<feature>.persistence`.
 - Testes de integração usam a meta-anotação `@IntegrationTest` (`com.moneylog.util`). Sem H2.
 - Testes de domínio: JUnit puro, `@DisplayName` em português, factories `umX()`/`umaX()` com UUIDs e datas fixos, e relógio fixo (`ClockTimeProvider` com `Clock.fixed`).
+- Fixtures de cenário (`infra/resumao`) são sintéticas; dado financeiro real nunca entra no repositório.
 
 ## Pacotes
 ```
 com.moneylog
 ├── core/              Java puro
-│   ├── sk/            shared kernel: money, time, ledger (Posting, PostingSource, LedgerEntry, VoidDecision), exception, page
-│   ├── account/       conta (domain, exception)
-│   ├── category/      categoria (domain, exception)
-│   ├── transaction/   movimentação: agregado, 11 tipos, fábricas por grupo, guardas de estorno (TransactionVoidPolicy)
-│   ├── card/          cartão, calendário, parcelas, fatura (status derivado), crédito transportado, limite, guardas
+│   ├── sk/            shared kernel: money, time, ledger, exception, page
+│   ├── account/       conta
+│   ├── category/      categoria
+│   ├── transaction/   movimentação: agregado, tipos, fábricas por grupo, guardas de estorno
+│   ├── card/          cartão, calendário, parcelas, fatura (status derivado, valor do documento), limite
 │   ├── debt/          pessoas e dívidas (status derivado, perdão, guardas)
+│   ├── thirdparty/    recebíveis de terceiros por parcela e pessoa, com mês previsto editável
+│   ├── purchasegroup/ compra agrupada
+│   ├── commitment/    compromissos acompanhados
 │   ├── recurrence/    recorrência (agenda, ocorrências previstas, estimativa mensal)
-│   ├── finance/       lentes: razão, caixa, fluxo, consumo, lançamentos, patrimônio, compromissos, dashboard
-│   ├── importing/     importação de extrato: parsers CSV/OFX puros, lote, revisão, deduplicação, sugestão por histórico (Etapa 7)
-│   └── notification/  central, lembretes, configurações, geradores, resumo diário e porta de push (Etapa 7)
-└── infra/             Spring (vazio na Etapa 1)
+│   ├── income/        renda detalhada, tabelas fiscais e consignado
+│   ├── asset/         ativos não disponíveis e reserva
+│   ├── goal/          metas de sonho, com fotos
+│   ├── finance/       lentes: razão, caixa, fluxo, consumo, patrimônio, resultado do mês do dono, simulador
+│   ├── insights/      insights e alertas
+│   ├── importing/     importação de extrato: parsers CSV/OFX, lote, revisão, deduplicação
+│   ├── notification/  central, lembretes, configurações, geradores, resumo diário e porta de push
+│   ├── note/          vault de notas
+│   ├── search/        busca global
+│   ├── profile/       foto de perfil e apelido
+│   ├── ai/            AIService com redação de dados pessoais
+│   ├── backup/        exportação e restauração
+│   └── auth/          sessão, refresh rotativo, primeiro acesso
+└── infra/             Spring: controllers, JPA, gateways, configuração
 ```
-Schema: `src/main/resources/db/migration/V1.00`–`V1.08` (editáveis até o primeiro banco fora do dev, plano T11).
+Schema: migrações em `src/main/resources/db/migration`. As séries `V1.xx` e `V9.xx` são aplicadas em ordem; migração já aplicada não se edita (o Flyway valida o checksum).
 
 ## Importação de extrato e notificações (Etapa 7)
 - `POST /v1/imports` (CSV/OFX, até 5 MB e 5.000 linhas) só **prepara** o lote; nada vira movimentação até `POST /v1/imports/{id}/apply`, que usa os mesmos handlers da criação manual. O arquivo bruto não é guardado. Amostras de teste ficam nos próprios testes (`CsvStatementParserTest`, `OfxStatementParserTest`).
