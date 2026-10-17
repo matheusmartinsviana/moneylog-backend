@@ -37,6 +37,8 @@ import com.moneylog.util.MutableClockConfig;
 @DisplayName("QA T43: códigos de erro × contrato")
 class ErrorCodeConformanceQaIT {
 
+    private static final Pattern CODE = Pattern.compile("\"code\":\"([A-Z_]*)\"");
+
     @Autowired
     private MockMvc mvc;
     @Autowired
@@ -208,7 +210,7 @@ class ErrorCodeConformanceQaIT {
         MvcResult media = mvc.perform(a.req(HttpMethod.POST, "/v1/accounts", "x=1").contentType("application/x-www-form-urlencoded")).andReturn();
         seen.put("Content-Type form", media.getResponse().getStatus() + " " + om.readTree(media.getResponse().getContentAsString()).path("code").asString());
         MvcResult notAcceptable = mvc.perform(a.req(HttpMethod.GET, "/v1/accounts", null).accept("application/xml")).andReturn();
-        seen.put("Accept xml", notAcceptable.getResponse().getStatus() + " " + notAcceptable.getResponse().getContentAsString().replaceAll(".*\"code\":\"([A-Z_]*)\".*", "$1"));
+        seen.put("Accept xml", notAcceptable.getResponse().getStatus() + " " + QaWorld.firstGroup(notAcceptable.getResponse().getContentAsString(), CODE));
 
         Set<String> documented = documentedCodes();
         Set<String> undocumented = new TreeSet<>();

@@ -148,12 +148,13 @@ class RedesignFase0SearchQaIT {
 
     private static final List<String> PAYLOADS = List.of("%%", "_%_", "\\", "\\\\", "\\%", "100%", "a_b", "'", "''", "' OR '1'='1", "\" OR \"1\"=\"1", "; DROP TABLE transactions;--",
             "--", "/* */", "'; select pg_sleep(5);--", "$1", "${jndi:ldap://x/a}", "{{7*7}}", "<script>alert(1)</script>", "<img src=x onerror=alert(1)>",
-            "%25", "%00", "&#0;", "ǅ", "ß", "İ", "ı", "ﬃ", "Å", "Å", "é", "é", "é", "‮abc", "‭xyz‬", "‍zwj", "👨‍👩‍👧", "🙂🙂", "日本語",
+            "%25", "%00", "&#0;", "ǅ", "ß", "İ", "ı", "ﬃ", "Å", "Å", "é", "é", "é", "\u202Eabc", "\u202Dxyz\u202C", "\u200Dzwj", "👨‍👩‍👧", "🙂🙂", "日本語",
             "ＡＢＣ", "ａｂｃ", "﻿bom", "a b", "a b", "a\u0085b", "\uD83D", "x\uD800y", "ǈ", "ŉ");
 
     @Test
     @DisplayName("cargas úteis plantadas como descrição, conta, categoria, cartão e nota: nunca 5xx, resposta fiel ao contrato, só dados do dono e achado literal (oráculo position() em SQL)")
     void cargasUteis() throws Exception {
+        assertThat(PAYLOADS).hasSize(49);
         List<String> failures = new ArrayList<>();
         int planted = 0;
         for (String payload : PAYLOADS) {

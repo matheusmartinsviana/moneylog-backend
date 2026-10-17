@@ -6,8 +6,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -40,6 +42,8 @@ import com.moneylog.util.MutableClockConfig;
 @Import(MutableClockConfig.class)
 @DisplayName("QA T113: importação do vault com zips hostis")
 class VaultZipQaIT {
+
+    private static final Pattern RESERVED_WINDOWS_NAME = Pattern.compile("con|aux|nul|com[1-9]|lpt[1-9]");
 
     @Autowired
     private MockMvc mvc;
@@ -116,9 +120,18 @@ class VaultZipQaIT {
             }
         }
         assertThat(paths()).doesNotContain("x.md");
-        assertThat(paths()).noneMatch(p -> p.toLowerCase().matches("(.*/)?(con|aux|nul|com[1-9]|lpt[1-9])(\\..*)?\\.md"));
-        assertThat(paths()).noneMatch(p -> p.matches(".*[:*?<>|\"].*"));
+        assertThat(paths()).noneMatch(VaultZipQaIT::hasReservedWindowsName);
+        assertThat(paths()).noneMatch(p -> p.chars().anyMatch(ch -> ":*?<>|\"".indexOf(ch) >= 0));
         assertThat(r.node().get("ignoredFiles").size()).isGreaterThan(10);
+    }
+
+    private static boolean hasReservedWindowsName(String path) {
+        String file = path.substring(path.lastIndexOf('/') + 1).toLowerCase(Locale.ROOT);
+        if (!file.endsWith(".md")) {
+            return false;
+        }
+        String stem = file.substring(0, file.indexOf('.'));
+        return RESERVED_WINDOWS_NAME.matcher(stem).matches();
     }
 
     @Test
