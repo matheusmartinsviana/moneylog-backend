@@ -1,12 +1,29 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.37.0
+  version: 2.38.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
+
+    ## Multiusuário por convite (2.38.0, só acréscimos compatíveis, ADR-032)
+    O dono (`OWNER`, exatamente um) convida pessoas por e-mail; cada convidado (`MEMBER`) tem conta própria, com dados totalmente isolados dos demais, inclusive do dono. Não há cadastro público.
+    - **Convite**: `POST /v1/invitations` (só `OWNER`), token aleatório de 256 bits guardado só como hash, validade de 7 dias, uso único, reenvio (`resend`, novo token) e revogação (`DELETE`).
+      O token em claro nunca aparece em resposta de gestão nem em log; viaja só no **fragmento** da URL do e-mail (`https://moneylog.mviana.tech/convite#<token>`) e **nenhum endpoint o recebe em caminho ou query**:
+      o front o lê do fragmento e o envia no corpo de `POST /v1/invitations/preview` e `POST /v1/invitations/accept` (públicos, sem JWT, `Cache-Control: no-store`, sob limite de tentativas).
+    - **Ciclo de vida** (`Invitation.status`): `PENDING`, `ACCEPTED`, `EXPIRED`, `REVOKED`. Um `PENDING` vencido é tratado como `EXPIRED`. Reenviar vale em `PENDING` e `EXPIRED` (em `EXPIRED` reavalia as regras de criação:
+      `409 EMAIL_ALREADY_REGISTERED`, `409 INVITATION_PENDING`, `409 USER_LIMIT_REACHED`); em `ACCEPTED` e `REVOKED` é `409 INVITATION_NOT_RESENDABLE`. Revogar `ACCEPTED` é `409 INVITATION_NOT_REVOCABLE`; revogar `REVOKED` é idempotente.
+      Token expirado, usado, revogado ou inexistente: `404 INVALID_INVITATION`, idêntico nos quatro casos. Senha fraca no aceite: `422 WEAK_PASSWORD` e o token continua válido.
+    - **Falha de envio**: `502 EMAIL_DELIVERY_FAILED` significa que o convite **foi criado** com `deliveryStatus = FAILED`; o `problem+json` traz `invitationId` (o convite criado) para o cliente oferecer `resend` sem duplicar.
+      O mesmo `invitationId` acompanha `409 INVITATION_PENDING` (o convite pendente existente).
+    - **Usuários**: `GET /v1/users`, `POST /v1/users/{id}/disable` e `POST /v1/users/{id}/enable` (só `OWNER`). `ManagedUser` não traz nenhum dado financeiro. Desativar bloqueia login e refresh, revoga as sessões e não apaga dados;
+      o dono não se desativa (`409 CANNOT_DISABLE_OWNER`). O papel e o status valem do **banco** a cada requisição; a claim `role` do JWT é só dica para a interface e nunca autoriza nada.
+    - **Papéis**: `MEMBER` em rota de gestão (`/v1/users/**`, `/v1/invitations/**` exceto `preview` e `accept`) ou nos endpoints de IA recebe `403 FORBIDDEN` (`application/problem+json`).
+    - **Sessão**: `AuthToken` ganha `user = { id, email, role }`, aditivo (cliente antigo ignora).
+    - **Chave de desligamento** `moneylog.invitations.enabled`: desligada, `POST /v1/invitations`, `resend`, `preview` e `accept` respondem `404`; a gestão de usuários continua.
+    - Teto de usuários (`moneylog.users.max`): conta usuários (`ACTIVE` e `DISABLED`) e convites `PENDING` não expirados; acima, `409 USER_LIMIT_REACHED`.
 
     ## Valor do documento da fatura e alerta de divergência (2.37.0, só acréscimos compatíveis, ADR-028)
     O dono informa o valor que consta no **documento da fatura** do cartão (`PUT /v1/invoices/{id}/document-amount`, `documentAmount = null` limpa). Serve só de comparação: o `total`
@@ -246,13 +263,14 @@ info:
     |---|---|
     | 400 | `VALIDATION_FAILED` (com `errors[]`; inclui `months` de `GET /v1/debts/overview` fora de 1..36), `SUMMARY_MONTH_INVALID` (mês do resumo fora do formato `AAAA-MM` ou da janela 2000-01 a 2100-12), `REPORT_PERIOD_INVALID` (`period` ausente ou fora de `D7`, `D30`, `M3`, `M12`), `REPORT_MONTH_INVALID` (`month` dos relatórios fora do formato `AAAA-MM` ou da janela), `PURCHASE_GROUP_UNTIL_INVALID` (2.32.2: `until` de `GET /v1/purchase-groups/commitments` fora do formato `AAAA-MM` ou da janela), `NET_WORTH_MONTH_INVALID` (2.32.2: `month` de `GET /v1/net-worth/overview` fora do formato `AAAA-MM` ou da janela), `OWNER_STATEMENT_PERIOD_INVALID` (2.25.0: `from` fora de 2000-01 a 2100-12, `months` fora de 1..12 ou `asOf` fora da janela), `SEARCH_QUERY_INVALID` (`q` fora de 2 a 100 caracteres ou com caractere de controle) |
     | 401 | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `REFRESH_INVALID`, `INVALID_SETUP_CODE` (2.15.0: e-mail, código ou estado do primeiro acesso inválidos, expirados ou já usados; mesma resposta para qualquer causa) |
-    | 403 | `ORIGIN_NOT_ALLOWED` |
-    | 404 | `ASSET_NOT_FOUND` (2.30.0), `INCOME_PROFILE_NOT_FOUND` (2.29.0), `PURCHASE_GROUP_NOT_FOUND` (2.26.0), `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND` |
-    | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `SHARE_MIGRATION_REPORT_MISMATCH` (2.32.2: o relatório aprovado não corresponde mais aos dados atuais; gere o dry-run de novo), `RESTORE_TARGET_NOT_EMPTY` (2.33.0: a restauração só roda em conta sem dados financeiros), `RESTORE_CONFLICT` (2.33.0: o backup tem ids que já existem; nada foi restaurado), `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro) |
-    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `BACKUP_INVALID` (2.33.0: backup ilegível, com referência para algo que não está no arquivo, razão que não fecha ou campo inválido), `BACKUP_SCHEMA_UNSUPPORTED` (2.33.0: `schemaVersion` diferente de 1 e 2), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, `INCOME_COMPETENCE_INVALID` (2.18.0: `incomeCompetence` fora de 2000-01 a 2100-12), e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_BRAND_TOO_LONG` (bandeira acima do limite), `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_DOCUMENT_AMOUNT_INVALID` (2.37.0: valor do documento da fatura negativo ou fora de BRL), `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `SHARES_INVALID` (2.24.0: soma que não fecha, `personId` repetido, `AMOUNT` que não soma a parcela, ou rateio em recorrência que não é de cartão), `SHARES_BELOW_RECEIVED` (2.24.0: o novo devido de uma pessoa ficaria abaixo do que ela já pagou), `PURCHASE_GROUP_INVALID` (2.26.0: grupo sem membro, `remainingInstallments` acima de `totalInstallments`, nome vazio), `PURCHASE_GROUP_MEMBER_INVALID` (2.26.0: a compra não é parcelada de cartão, está estornada ou já pertence a outro grupo), `FX_RATE_REQUIRED` (2.27.0: moeda estrangeira sem `fxRate` ao confirmar a cobrança ou lançar a compra), `FX_INVALID` (2.27.0: câmbio zero ou negativo, `fxRate` ou `iofBps` com moeda `BRL`, `originalAmount` com `amount` divergente do calculado), `TAX_TABLE_UNAVAILABLE` (2.29.0: sem tabela de INSS ou IRRF vigente para a competência ou a data de pagamento; o cálculo não é feito), `INCOME_PROFILE_INVALID` (2.29.0: bruto não positivo, dia fora de 1..28, percentual fora de 0..10000, rubrica sem `amount` nem `percentBps` (ou com os dois), `debtId` fora de rubrica `LOAN`, período invertido), `INCOME_PROFILE_ARCHIVED` (2.29.0), `CARD_CASH_OUT_INVALID` (2.29.0: nem `totalWithInterest` nem `rateBps` (ou os dois), total abaixo do principal, `accountId` ausente sem beneficiário ou presente com beneficiário), `ASSET_INVALID` (2.30.0: saldo negativo, `FGTS` com `availability = AVAILABLE`, `countsAsReserve` com ativo `RESERVED`, data fora da janela), `ASSET_ARCHIVED` (2.30.0), `COMMITMENT_SHARES_INVALID` (2.31.0: Σ das cotas diferente do valor do item, pessoa repetida, `coBuyerPersonId` fora das cotas, pessoa de outro usuário, cota não positiva), `SIMULATION_INVALID` (2.28.0: `installments` fora de 1..36, `interestRatePerMonthBps` fora de 0..10000, `firstInstallmentMonth` fora de 2000-01..2100-12 ou `cancelSubscriptionIds` com assinatura que não está ativa), `CARD_LAST_DIGITS_INVALID` (2.32.0: final de cartão fora de 4 dígitos, repetido ou mais de 5 por cartão), `PURCHASE_LAST_DIGITS_NOT_FROM_CARD` (2.32.0: `lastDigits` da compra que não pertence ao cartão), `PROVENANCE_INVALID` (2.32.0: `origin` ou `confidence` fora do enum), `NOTIFICATION_THRESHOLD_INVALID` (2.32.0: `subscriptionUnusedDays` fora de 1..3650, `invoiceDueLeadDays` fora de 1..30 ou `documentDivergenceTolerance` negativa), `RECURRENCE_INVALID`, `RECURRENCE_ACCOUNT_REQUIRED` (2.14.0), `SHARE_MIGRATION_BACKUP_REQUIRED` (2.32.2: `backupConfirmed` diferente de `true`), `SHARE_MIGRATION_NOTHING_TO_APPLY` (2.32.2: nenhuma compra elegível para migrar), `PAYROLL_LOAN_INVALID` (2.32.2: parcela do consignado não positiva, juros fora de zero até a parcela ou juros sem categoria de despesa), `TRANSACTION_NATURE_INVALID` (2.25.0: `nature` fora de `FIXED`/`VARIABLE`, ou `nature` em movimentação que não é despesa), `HISTORICAL_INVOICE_NOT_CLOSED` (2.16.0), `COMMITMENT_INVALID` (inclui cláusulas com percentual fora de 0..10000 e cotas ou cláusulas em compromisso que não é projeto), `COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`, `THIRD_PARTY_EXPENSE_INVALID`, `THIRD_PARTY_EXPENSE_ALREADY_MARKED`, `THIRD_PARTY_EXPENSE_NOT_FOUND`, `RECEIVABLE_ALREADY_RECEIVED` (2.36.0), `RECEIVABLE_EXPECTED_MONTH_INVALID` (2.36.0), `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`, `WEAK_PASSWORD` (2.15.0: senha do primeiro acesso com menos de 12 caracteres, mais de 72 bytes ou igual ao e-mail; o código de setup não é consumido); **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
+    | 403 | `ORIGIN_NOT_ALLOWED`, `FORBIDDEN` (2.38.0: papel sem permissão, ex.: `MEMBER` em `/v1/users/**`, `/v1/invitations/**` ou IA) |
+    | 404 | `ASSET_NOT_FOUND` (2.30.0), `INCOME_PROFILE_NOT_FOUND` (2.29.0), `PURCHASE_GROUP_NOT_FOUND` (2.26.0), `ACCOUNT_NOT_FOUND`, `CATEGORY_NOT_FOUND`, `TRANSACTION_NOT_FOUND`, `CARD_NOT_FOUND`, `INVOICE_NOT_FOUND`, `PERSON_NOT_FOUND`, `DEBT_NOT_FOUND`, `RECURRENCE_NOT_FOUND`, `GOAL_NOT_FOUND`, `NOTE_NOT_FOUND`, `IMPORT_BATCH_NOT_FOUND`, `IMPORT_LINE_NOT_FOUND`, `IMPORT_MAPPING_NOT_FOUND`, `CATEGORIZATION_RULE_NOT_FOUND`, `NOTIFICATION_NOT_FOUND`, `REMINDER_NOT_FOUND`, `PUSH_SUBSCRIPTION_NOT_FOUND`, `INVALID_INVITATION` (2.38.0: token de convite expirado, usado, revogado ou inexistente, ou convites desligados; mesma resposta para qualquer causa), `INVITATION_NOT_FOUND` (2.38.0: id de convite inexistente em `resend` e `DELETE`), `USER_NOT_FOUND` (2.38.0: id de usuário inexistente em `disable` e `enable`), `INVITATIONS_DISABLED` (2.38.0: `POST /v1/invitations` e `resend` com os convites desligados no servidor) |
+    | 409 | `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE`, `SHARE_MIGRATION_REPORT_MISMATCH` (2.32.2: o relatório aprovado não corresponde mais aos dados atuais; gere o dry-run de novo), `RESTORE_TARGET_NOT_EMPTY` (2.33.0: a restauração só roda em conta sem dados financeiros), `RESTORE_CONFLICT` (2.33.0: o backup tem ids que já existem; nada foi restaurado), `CONFLICT` (colisão de trava/deadlock entre duas requisições simultâneas, com `Retry-After`; nada foi gravado e repetir é seguro), `EMAIL_ALREADY_REGISTERED` (2.38.0: o e-mail já é de um usuário, ativo ou desativado), `INVITATION_PENDING` (2.38.0: já há convite pendente e não expirado para o e-mail; traz `invitationId`), `USER_LIMIT_REACHED` (2.38.0: teto de usuários atingido), `INVITATION_NOT_RESENDABLE` (2.38.0: reenviar convite `ACCEPTED` ou `REVOKED`), `INVITATION_NOT_REVOCABLE` (2.38.0: revogar convite `ACCEPTED`), `CANNOT_DISABLE_OWNER` (2.38.0: o dono não pode ser desativado) |
+    | 422 | o `code` da exceção de domínio: `DEFAULT_CATEGORY_UNAVAILABLE` (2.11.0: `categoryId` ausente e a categoria de sistema padrão não existe ou está arquivada), `ACCOUNT_WITH_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_WITH_FUTURE_BALANCE_CANNOT_BE_ARCHIVED`, `ACCOUNT_HAS_RESERVATIONS` (conta com reserva ativa de meta), `NOTE_SEARCH_TIMEOUT` (busca de notas acima de 10 s), `BACKUP_INVALID` (2.33.0: backup ilegível, com referência para algo que não está no arquivo, razão que não fecha ou campo inválido), `BACKUP_SCHEMA_UNSUPPORTED` (2.33.0: `schemaVersion` diferente de 1 e 2), `EXPORT_TOO_LARGE` (exportação acima de 200.000 movimentações, ou vault que a importação não aceitaria: 5.500 entradas, 300 MB de texto ou 20 MB de zip), `ACCOUNT_ARCHIVED`, `ACCOUNT_ALREADY_ARCHIVED`, `ACCOUNT_NOT_ARCHIVED`, `ACCOUNT_OPENING_LOCKED`, `CATEGORY_ARCHIVED`, `CATEGORY_ALREADY_ARCHIVED`, `CATEGORY_NOT_ARCHIVED`, `CATEGORY_KIND_MISMATCH`, `TRANSFER_SAME_ACCOUNT`, `TRANSFER_ACROSS_LIQUIDITY`, `INVESTMENT_ACCOUNTS_MISMATCH`, `TRANSACTION_ACCOUNT_NOT_CASH`, `TRANSACTION_PAYMENT_METHOD_REQUIRED`, `TRANSACTION_AMOUNT_NOT_POSITIVE`, `ADJUSTMENT_REASON_REQUIRED`, `ADJUSTMENT_YIELD_REQUIRES_INVESTMENT_ACCOUNT`, `REFUND_EXCEEDS_ORIGINAL`, `REFUND_INVALID_ORIGINAL`, `REFUND_CATEGORY_LOCKED`, `TRANSACTION_ALREADY_VOIDED`, `TRANSACTION_VOID_REASON_REQUIRED`, `TRANSACTION_HAS_ACTIVE_REFUNDS`, `TRANSACTION_NOT_EDITABLE`, `TRANSACTION_TYPE_NOT_AVAILABLE`, `INCOME_COMPETENCE_INVALID` (2.18.0: `incomeCompetence` fora de 2000-01 a 2100-12), e os de limite de texto/valor e de campo obrigatório: `ACCOUNT_NAME_TOO_LONG`, `ACCOUNT_INSTITUTION_TOO_LONG`, `CATEGORY_NAME_TOO_LONG`, `TRANSACTION_TEXT_TOO_LONG`, `ACCOUNT_NAME_REQUIRED`, `ACCOUNT_FIELD_REQUIRED`, `CATEGORY_NAME_REQUIRED`, `CATEGORY_FIELD_REQUIRED`, `TRANSACTION_FIELD_REQUIRED`, `AMOUNT_ABOVE_LIMIT`, `ACCOUNT_CURRENCY_NOT_SUPPORTED`; **cartões e faturas (Etapa 3)**: `CARD_ARCHIVED`, `CARD_ALREADY_ARCHIVED`, `CARD_NOT_ARCHIVED`, `CARD_HAS_PENDING_BALANCE`, `CARD_INVALID_BILLING_DAY`, `CARD_INVALID_LIMIT`, `CARD_INVALID_INSTALLMENT_COUNT`, `CARD_NO_INSTALLMENTS_TO_CANCEL`, `CARD_NAME_REQUIRED`, `CARD_NAME_TOO_LONG`, `CARD_INSTITUTION_TOO_LONG`, `CARD_BRAND_TOO_LONG` (bandeira acima do limite), `CARD_FIELD_REQUIRED`, `CARD_BILLING_CHANGE_NOT_CONFIRMED`, `INVOICE_NOT_PAYABLE`, `INVOICE_PAID`, `INVOICE_DOCUMENT_AMOUNT_INVALID` (2.37.0: valor do documento da fatura negativo ou fora de BRL), `INVOICE_CLOSED_REQUIRES_LATE_ENTRY`, `TRANSACTION_IN_CLOSED_INVOICE`, `TRANSACTION_NOT_CANCELABLE`, `MONEY_INVALID_ALLOCATION` (valor menor que o número de parcelas em centavos); **pessoas, dívidas e recorrências (Etapa 4)**: `PERSON_NAME_REQUIRED`, `PERSON_ARCHIVED`, `PERSON_ALREADY_ARCHIVED`, `PERSON_NOT_ARCHIVED`, `DEBT_FIELD_REQUIRED`, `DEBT_DESCRIPTION_TOO_LONG`, `DEBT_INVALID_PRINCIPAL`, `DEBT_DIRECTION_MISMATCH`, `DEBT_SETTLEMENT_EXCEEDS_OUTSTANDING`, `DEBT_CLOSED`, `DEBT_HAS_SETTLEMENTS`, `DEBT_ALREADY_HAS_ORIGIN`, `DEBT_ALREADY_SETTLED`, `DEBT_HAS_ORIGIN_TRANSACTION`, `DEBT_REASON_REQUIRED`, `DEBT_REASON_TOO_LONG`, `DEBT_CATEGORY_NOT_ALLOWED`, `SHARES_EXCEED_AMOUNT`, `SHARE_PERSON_ARCHIVED`, `SHARES_INVALID` (2.24.0: soma que não fecha, `personId` repetido, `AMOUNT` que não soma a parcela, ou rateio em recorrência que não é de cartão), `SHARES_BELOW_RECEIVED` (2.24.0: o novo devido de uma pessoa ficaria abaixo do que ela já pagou), `PURCHASE_GROUP_INVALID` (2.26.0: grupo sem membro, `remainingInstallments` acima de `totalInstallments`, nome vazio), `PURCHASE_GROUP_MEMBER_INVALID` (2.26.0: a compra não é parcelada de cartão, está estornada ou já pertence a outro grupo), `FX_RATE_REQUIRED` (2.27.0: moeda estrangeira sem `fxRate` ao confirmar a cobrança ou lançar a compra), `FX_INVALID` (2.27.0: câmbio zero ou negativo, `fxRate` ou `iofBps` com moeda `BRL`, `originalAmount` com `amount` divergente do calculado), `TAX_TABLE_UNAVAILABLE` (2.29.0: sem tabela de INSS ou IRRF vigente para a competência ou a data de pagamento; o cálculo não é feito), `INCOME_PROFILE_INVALID` (2.29.0: bruto não positivo, dia fora de 1..28, percentual fora de 0..10000, rubrica sem `amount` nem `percentBps` (ou com os dois), `debtId` fora de rubrica `LOAN`, período invertido), `INCOME_PROFILE_ARCHIVED` (2.29.0), `CARD_CASH_OUT_INVALID` (2.29.0: nem `totalWithInterest` nem `rateBps` (ou os dois), total abaixo do principal, `accountId` ausente sem beneficiário ou presente com beneficiário), `ASSET_INVALID` (2.30.0: saldo negativo, `FGTS` com `availability = AVAILABLE`, `countsAsReserve` com ativo `RESERVED`, data fora da janela), `ASSET_ARCHIVED` (2.30.0), `COMMITMENT_SHARES_INVALID` (2.31.0: Σ das cotas diferente do valor do item, pessoa repetida, `coBuyerPersonId` fora das cotas, pessoa de outro usuário, cota não positiva), `SIMULATION_INVALID` (2.28.0: `installments` fora de 1..36, `interestRatePerMonthBps` fora de 0..10000, `firstInstallmentMonth` fora de 2000-01..2100-12 ou `cancelSubscriptionIds` com assinatura que não está ativa), `CARD_LAST_DIGITS_INVALID` (2.32.0: final de cartão fora de 4 dígitos, repetido ou mais de 5 por cartão), `PURCHASE_LAST_DIGITS_NOT_FROM_CARD` (2.32.0: `lastDigits` da compra que não pertence ao cartão), `PROVENANCE_INVALID` (2.32.0: `origin` ou `confidence` fora do enum), `NOTIFICATION_THRESHOLD_INVALID` (2.32.0: `subscriptionUnusedDays` fora de 1..3650, `invoiceDueLeadDays` fora de 1..30 ou `documentDivergenceTolerance` negativa), `RECURRENCE_INVALID`, `RECURRENCE_ACCOUNT_REQUIRED` (2.14.0), `SHARE_MIGRATION_BACKUP_REQUIRED` (2.32.2: `backupConfirmed` diferente de `true`), `SHARE_MIGRATION_NOTHING_TO_APPLY` (2.32.2: nenhuma compra elegível para migrar), `PAYROLL_LOAN_INVALID` (2.32.2: parcela do consignado não positiva, juros fora de zero até a parcela ou juros sem categoria de despesa), `TRANSACTION_NATURE_INVALID` (2.25.0: `nature` fora de `FIXED`/`VARIABLE`, ou `nature` em movimentação que não é despesa), `HISTORICAL_INVOICE_NOT_CLOSED` (2.16.0), `COMMITMENT_INVALID` (inclui cláusulas com percentual fora de 0..10000 e cotas ou cláusulas em compromisso que não é projeto), `COMMITMENT_SCHEDULE_ITEM_ALREADY_PAID`, `THIRD_PARTY_EXPENSE_INVALID`, `THIRD_PARTY_EXPENSE_ALREADY_MARKED`, `THIRD_PARTY_EXPENSE_NOT_FOUND`, `RECEIVABLE_ALREADY_RECEIVED` (2.36.0), `RECEIVABLE_EXPECTED_MONTH_INVALID` (2.36.0), `RECURRENCE_OCCURRENCE_ALREADY_REALIZED`, `RECURRENCE_OCCURRENCE_SKIPPED`, `RECURRENCE_NOT_AN_OCCURRENCE`, `RECURRENCE_REFERENCE_MISMATCH`, `RECURRENCE_INACTIVE`, `RECURRENCE_ENDED`, `DATE_OUT_OF_RANGE`, `WEAK_PASSWORD` (2.15.0: senha do primeiro acesso com menos de 12 caracteres, mais de 72 bytes ou igual ao e-mail; o código de setup não é consumido; 2.38.0: vale também no aceite de convite, sem consumir o token); **metas (Etapa 5)**: `GOAL_ARCHIVED`, `GOAL_ALREADY_ARCHIVED`, `GOAL_NOT_ARCHIVED`, `GOAL_RESERVATION_ACCOUNT_NOT_ELIGIBLE`, `GOAL_RELEASE_EXCEEDS_RESERVED`, `GOAL_RESERVATION_AMOUNT_ZERO`, `GOAL_TARGET_NOT_POSITIVE`, `GOAL_FIELD_REQUIRED`, `GOAL_NAME_REQUIRED`, `GOAL_NAME_TOO_LONG`, `GOAL_TEXT_TOO_LONG`; **visão de dívidas (2.13.0)**: `ONGOING_INVALID_COUNT` (faltam mais parcelas que o total), `ONGOING_FIRST_INVOICE_NOT_PAYABLE` (a fatura da próxima parcela já está paga), `ONGOING_CATEGORY_RETROACTIVE` (com categoria, a próxima parcela não pode cair em mês anterior ao atual), `DEBT_PAYOFF_GOAL_EXISTS` (já há meta de quitar dívidas ativa), `DEBT_PAYOFF_NOTHING_TO_BASELINE` (total de dívidas zero ao ancorar), `GOAL_KIND_NOT_RESERVABLE` (reserva em meta de quitar dívidas), `GOAL_KIND_MISMATCH` (baseline em meta de guardar dinheiro), `DEBT_CREDITOR_INVALID` (pessoa e credor livre juntos, nenhum dos dois, credor em dívida a receber ou categoria no credor livre); **notas e vault (Etapa 6)**: `NOTE_PATH_INVALID`, `NOTE_PATH_TAKEN`, `NOTE_TOO_LARGE` (acima de 200 KB), `NOTE_LIMIT_REACHED` (5.000 notas), `NOTE_LINK_TARGET_NOT_FOUND`, `NOTE_LINK_INVALID`, `NOTE_LINK_LIMIT_REACHED`, `NOTE_TRASHED`, `NOTE_ALREADY_TRASHED`, `NOTE_NOT_TRASHED`, `NOTE_FRONTMATTER_INVALID`, `NOTE_FRONTMATTER_RESERVED`, `TEXT_INVALID_CHARACTERS` (controle no texto da nota que passou do `400`), `VAULT_IMPORT_INVALID` (zip hostil, corrompido ou que não é zip), `VAULT_IMPORT_TOO_LARGE` (acima de 20 MB, 2.000 entradas ou 100 MB descomprimidos); **importação e notificações (Etapa 7)**: `IMPORT_TOO_LARGE` (acima de 5 MB ou 5.000 linhas), `IMPORT_FORMAT_UNSUPPORTED` (XLSX, PDF, moeda diferente de BRL), `IMPORT_PARSE_FAILED` (arquivo ilegível ou truncado, OFX com DOCTYPE/ENTITY), `IMPORT_MAPPING_INVALID`, `IMPORT_SOURCE_INVALID`, `IMPORT_BATCH_NOT_PENDING`, `IMPORT_BATCH_NOT_UNDOABLE`, `IMPORT_LINES_REQUIRE_DECISION`, `IMPORT_NOTHING_TO_APPLY`, `IMPORT_APPLY_FAILED` (uma linha falhou; nada foi gravado), `IMPORT_LINE_INVALID`, `IMPORT_LINE_INVALID_TRANSITION`, `REMINDER_INVALID`, `REMINDER_ALREADY_DONE`, `NOTIFICATION_SETTINGS_INVALID`, `PUSH_SUBSCRIPTION_LIMIT`, `PUSH_SUBSCRIPTION_INVALID`, `PUSH_NOT_ENABLED` (push desligado neste servidor) |
     | 404, 405, 406, 415 (rota ou mídia que o servidor não atende) | `NOT_FOUND`, `METHOD_NOT_ALLOWED`, `NOT_ACCEPTABLE`, `UNSUPPORTED_MEDIA_TYPE` |
-    | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`): login, o primeiro acesso (`setup-password`, mesmo limite por IP do login), as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
+    | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`; 2.38.0: o login também por e-mail normalizado, e `preview` e `accept` de convite por IP e hash do token apresentado, com resposta idêntica exista ou não o e-mail ou o token): login, o primeiro acesso (`setup-password`, mesmo limite por IP do login), as rotas de exportação (6 pedidos por minuto por usuário) e a busca global (120 pedidos por minuto por usuário) |
     | 500 | `INTERNAL_ERROR` |
+    | 502 | `EMAIL_DELIVERY_FAILED` (2.38.0: o provedor de e-mail recusou o envio; o convite foi criado e traz `invitationId`) |
 
     `INVOICE_CHAIN_INCONSISTENT` (cadeia de faturas quebrada) e `CARD_INVALID_INSTALLMENT` (parcela inválida) são invariantes internas: respondem `500 INTERNAL_ERROR`, nunca aparecem como `code`.
 
@@ -267,7 +285,11 @@ security:
   - bearerAuth: []
 tags:
   - name: Auth
-    description: Login do dono, refresh rotativo em cookie e logout (ADR-003).
+    description: Login, refresh rotativo em cookie e logout (ADR-003, ADR-032).
+  - name: Invitations
+    description: 'Convites por e-mail (2.38.0, ADR-032): criar, listar, reenviar, revogar (só o dono) e a prévia e o aceite públicos, com o token sempre no corpo.'
+  - name: Users
+    description: 'Gestão de usuários pelo dono (2.38.0, ADR-032): listar, desativar e reativar, sem nenhum dado financeiro.'
   - name: Accounts
     description: Contas (corrente, poupança, carteira, investimento).
   - name: Categories
@@ -340,11 +362,12 @@ paths:
     post:
       tags: [Auth]
       operationId: login
-      summary: Entra com e-mail e senha do dono
+      summary: Entra com e-mail e senha
       description: |
         Devolve o access token (JWT de 15 min, guardado só em memória no front) e grava o refresh token em cookie
         `ml_refresh` (`HttpOnly; Secure; SameSite=Strict; Path=/v1/auth; Max-Age=2592000`). A mesma resposta
-        (`401 INVALID_CREDENTIALS`) vale para e-mail ou senha errados. Limite: 5 falhas por IP em 15 min → `429`.
+        (`401 INVALID_CREDENTIALS`) vale para e-mail inexistente, senha errada e usuário `DISABLED`, com corpo, cabeçalhos e tempo equivalentes (2.38.0). Limite: 5 falhas por IP ou por e-mail normalizado em 15 min → `429`, idêntico exista ou não o e-mail.
+        A resposta traz `user` (`id`, `email`, `role`).
       security: []
       requestBody:
         required: true
@@ -437,6 +460,7 @@ paths:
       description: |
         Rotativo: o cookie é substituído. O `Origin` precisa estar em `MONEYLOG_ALLOWED_ORIGINS` (proteção CSRF).
         Um refresh já rotacionado, reapresentado em até 30 s, gera um novo par da mesma família sem revogar nada (S-83).
+        Usuário `DISABLED` recebe `401 REFRESH_INVALID` e nenhum token novo (2.38.0).
       security: []
       responses:
         '200':
@@ -469,6 +493,319 @@ paths:
               $ref: '#/components/headers/RefreshCookie'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------- Invitations
+  /v1/invitations:
+    post:
+      tags: [Invitations]
+      operationId: createInvitation
+      summary: Convida uma pessoa por e-mail (só o dono)
+      description: |
+        Cria o convite `PENDING` (validade de 7 dias, token aleatório de 256 bits guardado só como hash) e envia o e-mail com o link
+        `https://moneylog.mviana.tech/convite#<token>`. O token em claro nunca aparece na resposta. Convite `PENDING` vencido do mesmo e-mail vira `EXPIRED` na mesma transação.
+        Erros: `409 EMAIL_ALREADY_REGISTERED` (e-mail já é usuário, ativo ou desativado, em qualquer caixa), `409 INVITATION_PENDING` (já há pendente não expirado; `invitationId` aponta o existente e o
+        caminho é `resend`), `409 USER_LIMIT_REACHED`, `404 INVITATIONS_DISABLED` com os convites desligados, `403 FORBIDDEN` para `MEMBER`.
+        `502 EMAIL_DELIVERY_FAILED`: o convite foi criado com `deliveryStatus = FAILED` e o `problem+json` traz `invitationId`; `POST /v1/invitations/{id}/resend` o reenvia.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationInput'
+      responses:
+        '201':
+          description: Convite criado e e-mail enviado.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/EmailDeliveryFailed'
+    get:
+      tags: [Invitations]
+      operationId: listInvitations
+      summary: Lista os convites (só o dono; lista curta, sem paginação, mais novos primeiro)
+      description: Sem `status`, devolve todos. Um `PENDING` vencido sai como `EXPIRED`. Convites em estado final são apagados após `moneylog.invitations.retention-days` (90).
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/InvitationStatus'
+      responses:
+        '200':
+          description: Convites.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/invitations/{id}/resend:
+    post:
+      tags: [Invitations]
+      operationId: resendInvitation
+      summary: Reenvia o convite com novo token (só o dono)
+      description: |
+        Vale em `PENDING` e `EXPIRED`: o convite fica `PENDING` com novo token e novo `expiresAt` (7 dias); o token anterior passa a dar `404 INVALID_INVITATION`. Sem corpo.
+        `ACCEPTED` ou `REVOKED` → `409 INVITATION_NOT_RESENDABLE`. Em `EXPIRED` reavalia as regras de `POST /v1/invitations`:
+        `409 EMAIL_ALREADY_REGISTERED`, `409 INVITATION_PENDING` (há outro pendente não expirado para o e-mail; `invitationId` aponta o outro) e `409 USER_LIMIT_REACHED`
+        (o convite continua `EXPIRED`). `502 EMAIL_DELIVERY_FAILED` traz `invitationId` deste convite. `404 INVITATIONS_DISABLED` com os convites desligados; id desconhecido: `404 INVITATION_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Convite atualizado e e-mail reenviado.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '502':
+          $ref: '#/components/responses/EmailDeliveryFailed'
+
+  /v1/invitations/{id}:
+    delete:
+      tags: [Invitations]
+      operationId: revokeInvitation
+      summary: Revoga o convite (só o dono)
+      description: |
+        `PENDING` e `EXPIRED` viram `REVOKED`; repetir em `REVOKED` é idempotente e devolve o mesmo recurso. `ACCEPTED` → `409 INVITATION_NOT_REVOCABLE`.
+        Devolve o convite atualizado (`200`), não `204`. Id desconhecido: `404 INVITATION_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Convite com `status = REVOKED`.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invitation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/invitations/preview:
+    post:
+      tags: [Invitations]
+      operationId: previewInvitation
+      summary: Mostra o e-mail e a validade de um convite (público)
+      description: |
+        Público, sem JWT. O token vai **no corpo** (lido do fragmento da URL pelo front), nunca em caminho nem query. Token expirado, usado, revogado ou inexistente:
+        `404 INVALID_INVITATION`, idêntico (corpo, cabeçalhos e tempo) nos quatro casos. Com os convites desligados também responde `404`. Limite de tentativas por IP e hash do token
+        apresentado: `429 TOO_MANY_ATTEMPTS` com `Retry-After`, idêntico exista ou não o token. Sempre `Cache-Control: no-store`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationPreviewRequest'
+      responses:
+        '200':
+          description: O convite é válido.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvitationPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/invitations/accept:
+    post:
+      tags: [Invitations]
+      operationId: acceptInvitation
+      summary: Aceita o convite, cria a conta e abre a sessão (público)
+      description: |
+        Público, sem JWT e sem cookie de autenticação prévio (não é alvo de CSRF). O token vai **no corpo**, nunca em caminho nem query. Consome o convite de forma atômica, cria o usuário
+        `MEMBER`/`ACTIVE`, semeia as categorias do sistema e devolve o mesmo par do login (cookie `ml_refresh` + `AuthToken`), tudo na mesma transação; falha em qualquer parte desfaz tudo e o token continua válido.
+        Senha: mesma política do primeiro acesso (12 a 72 bytes e diferente do e-mail); fraca → `422 WEAK_PASSWORD`, sem consumir o token. Token expirado, usado, revogado, inexistente, convites
+        desligados, ou e-mail que passou a existir como usuário desde o convite (o convite vira `REVOKED`): `404 INVALID_INVITATION`, idêntico. Limite de tentativas: `429` com `Retry-After`.
+        Sempre `Cache-Control: no-store`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvitationAcceptRequest'
+      responses:
+        '200':
+          description: Conta criada e sessão aberta.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/RefreshCookie'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ---------------------------------------------------------------- Users
+  /v1/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: Lista os usuários (só o dono; lista curta, sem paginação)
+      description: Traz e-mail, papel, status e datas. Nunca traz dado financeiro de ninguém. O total é limitado por `moneylog.users.max`.
+      responses:
+        '200':
+          description: Usuários, o dono primeiro.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ManagedUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/users/{id}/disable:
+    post:
+      tags: [Users]
+      operationId: disableUser
+      summary: Desativa um usuário (só o dono)
+      description: |
+        Bloqueia o login e o refresh, revoga as sessões na mesma transação e **não apaga dados**; o access token em uso recebe `401` na chamada seguinte. Sem corpo.
+        Repetir em usuário já `DISABLED` devolve o mesmo recurso. O dono não se desativa: `409 CANNOT_DISABLE_OWNER`. Usuário inexistente: `404 USER_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Usuário com `status = DISABLED`.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/users/{id}/enable:
+    post:
+      tags: [Users]
+      operationId: enableUser
+      summary: Reativa um usuário (só o dono)
+      description: |
+        O usuário volta a entrar com a mesma senha e vê os mesmos dados. Sem corpo. Repetir em usuário já `ACTIVE` devolve o mesmo recurso. Usuário inexistente: `404 USER_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Usuário com `status = ACTIVE`.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ManagedUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -5587,7 +5924,7 @@ paths:
       tags: [AI]
       operationId: getAiStatus
       summary: Estado da IA (ligada ou não, restos de limite e disjuntor)
-      description: 'Nunca devolve a chave nem a URL base. `enabled: false` = nenhum provedor configurado; o app segue normal.'
+      description: 'Nunca devolve a chave nem a URL base. `enabled: false` = nenhum provedor configurado; o app segue normal. Para `MEMBER` (2.38.0) responde `200` com `enabled: false`, nunca `403`: é a sonda de capacidade do front.'
       responses:
         '200':
           description: O estado.
@@ -5634,6 +5971,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
@@ -5657,6 +5996,8 @@ paths:
                 $ref: '#/components/schemas/AiPreview'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -5698,6 +6039,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -5758,6 +6101,8 @@ paths:
                 $ref: '#/components/schemas/AiAnalysis'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '404':
           $ref: '#/components/responses/NotFound'
         '500':
@@ -5989,6 +6334,8 @@ paths:
                 $ref: '#/components/schemas/AiSettings'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '500':
           $ref: '#/components/responses/InternalServerError'
     put:
@@ -6016,6 +6363,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '500':
@@ -7278,15 +7627,32 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+    ForbiddenRole:
+      description: |
+        `FORBIDDEN` (2.38.0): o usuário autenticado não tem o papel exigido (`MEMBER` em gestão de usuários, de convites ou em IA). O papel e o status vêm do banco a cada requisição;
+        a claim `role` do JWT não autoriza nada. Distinto de `ORIGIN_NOT_ALLOWED`.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    EmailDeliveryFailed:
+      description: |
+        `EMAIL_DELIVERY_FAILED` (2.38.0): o provedor de e-mail recusou o envio. O convite **foi gravado** com `deliveryStatus = FAILED`; `invitationId` no corpo identifica o convite para `resend`.
+        Mensagem genérica, sem credencial nem corpo do e-mail.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
     NotFound:
-      description: '`<FEATURE>_NOT_FOUND`: o recurso não existe **ou é de outro usuário**.'
+      description: '`<FEATURE>_NOT_FOUND`: o recurso não existe **ou é de outro usuário**. Em `preview` e `accept` de convite: `INVALID_INVITATION`, também com os convites desligados. Na gestão: `INVITATION_NOT_FOUND`, `USER_NOT_FOUND` e, com os convites desligados, `INVITATIONS_DISABLED` em criar e reenviar.'
       content:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
     Conflict:
       description: |
-        `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE` ou `CONFLICT`.
+        `VERSION_CONFLICT`, `CATEGORY_NAME_TAKEN`, `IDEMPOTENCY_KEY_REUSED`, `CARD_BILLING_CHANGE_STALE` ou `CONFLICT`. Em convites e usuários (2.38.0): `EMAIL_ALREADY_REGISTERED`,
+        `INVITATION_PENDING` (com `invitationId`), `USER_LIMIT_REACHED`, `INVITATION_NOT_RESENDABLE`, `INVITATION_NOT_REVOCABLE` e `CANNOT_DISABLE_OWNER`.
         `CONFLICT` vale para qualquer rota de escrita: duas requisições simultâneas colidiram numa trava (deadlock); o
         servidor desfez a que perdeu, nada foi gravado e o cliente repete a mesma requisição. Vem com o header
         `Retry-After` (segundos) e mensagem genérica.
@@ -7370,6 +7736,10 @@ components:
         position:
           type: integer
           description: 'Só em `IMPORT_APPLY_FAILED` (2.10.0): posição (1 = primeira) da linha do lote que falhou.'
+        invitationId:
+          type: string
+          format: uuid
+          description: 'Só em `INVITATION_PENDING` (2.38.0: o convite pendente existente) e `EMAIL_DELIVERY_FAILED` (o convite criado ou reenviado, com `deliveryStatus = FAILED`).'
         cause:
           type: string
           pattern: '^[A-Z][A-Z0-9_]*$'
@@ -7566,7 +7936,7 @@ components:
           type: boolean
     AuthToken:
       type: object
-      required: [accessToken, expiresAt]
+      required: [accessToken, expiresAt, user]
       additionalProperties: false
       properties:
         accessToken:
@@ -7575,6 +7945,131 @@ components:
         expiresAt:
           type: string
           format: date-time
+        user:
+          $ref: '#/components/schemas/AuthUser'
+    AuthUser:
+      type: object
+      description: 'Quem abriu a sessão (2.38.0, aditivo). `role` é só dica para a interface; a autorização vem do papel no banco.'
+      required: [id, email, role]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+    UserRole:
+      type: string
+      enum: [OWNER, MEMBER]
+    UserStatus:
+      type: string
+      enum: [ACTIVE, DISABLED]
+    ManagedUser:
+      type: object
+      description: 'Usuário na visão do dono (2.38.0). Nenhum dado financeiro.'
+      required: [id, email, role, status, createdAt]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        createdAt:
+          type: string
+          format: date-time
+        lastLoginAt:
+          type: [string, 'null']
+          format: date-time
+          description: Instante do último login; ausente ou nulo se nunca entrou.
+    InvitationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, EXPIRED, REVOKED]
+    InvitationDeliveryStatus:
+      type: string
+      enum: [SENT, FAILED]
+    Invitation:
+      type: object
+      description: 'Convite na visão do dono (2.38.0). Nunca traz o token em claro.'
+      required: [id, email, status, createdAt, expiresAt, lastSentAt, deliveryStatus]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        status:
+          $ref: '#/components/schemas/InvitationStatus'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        acceptedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Só em `ACCEPTED`.
+        lastSentAt:
+          type: string
+          format: date-time
+        deliveryStatus:
+          $ref: '#/components/schemas/InvitationDeliveryStatus'
+    InvitationInput:
+      type: object
+      required: [email]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+    InvitationPreviewRequest:
+      type: object
+      required: [token]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Token lido do fragmento da URL do e-mail; nunca em caminho nem query.
+    InvitationPreview:
+      type: object
+      required: [email, expiresAt]
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+        expiresAt:
+          type: string
+          format: date-time
+    InvitationAcceptRequest:
+      type: object
+      required: [token, password]
+      additionalProperties: false
+      properties:
+        token:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Token lido do fragmento da URL do e-mail; nunca em caminho nem query.
+        password:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 12 a 72 bytes e diferente do e-mail; fraca → `422 WEAK_PASSWORD`, sem consumir o token.
 
     # ---- Contas
     Account:
