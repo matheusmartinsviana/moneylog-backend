@@ -320,10 +320,11 @@ class NotificationUseCasesTest {
     @DisplayName("assinar: push desligado = PUSH_NOT_ENABLED; endpoint http e chaves vazias inválidos; no 11º dispositivo, limite; endpoint repetido não conta")
     void assinar() {
         PushSubscriptionGateway gateway = mock(PushSubscriptionGateway.class);
+        NotificationSettingsGateway settings = mock(NotificationSettingsGateway.class);
         when(gateway.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
-        assertThatThrownBy(() -> new NotificationUseCasesImpl.SubscribePush(gateway, new FakeSender(false), ids, time)
+        assertThatThrownBy(() -> new NotificationUseCasesImpl.SubscribePush(gateway, settings, new FakeSender(false), ids, time)
                 .handle(new SubscribeCommand(USER, "https://fcm.googleapis.com/1", "p", "a", null))).isInstanceOf(PushNotEnabledException.class);
-        NotificationUseCasesImpl.SubscribePush subscribe = new NotificationUseCasesImpl.SubscribePush(gateway, new FakeSender(true), ids, time);
+        NotificationUseCasesImpl.SubscribePush subscribe = new NotificationUseCasesImpl.SubscribePush(gateway, settings, new FakeSender(true), ids, time);
         assertThatThrownBy(() -> subscribe.handle(new SubscribeCommand(USER, "http://inseguro", "p", "a", null)))
                 .isInstanceOf(InvalidPushSubscriptionException.class);
         assertThatThrownBy(() -> subscribe.handle(new SubscribeCommand(USER, "https://fcm.googleapis.com/1", " ", "a", null)))
@@ -334,6 +335,36 @@ class NotificationUseCasesTest {
                 .isEqualTo("https://fcm.googleapis.com/known");
         assertThatThrownBy(() -> subscribe.handle(new SubscribeCommand(USER, "https://fcm.googleapis.com/new", "p", "a", null)))
                 .isInstanceOf(PushSubscriptionLimitException.class);
+        verify(settings, org.mockito.Mockito.times(1)).setPushEnabled(any(), org.mockito.ArgumentMatchers.anyBoolean());
+    }
+
+    @Test
+    @DisplayName("assinar um endpoint novo liga o push da conta")
+    void assinarLigaPush() {
+        PushSubscriptionGateway gateway = mock(PushSubscriptionGateway.class);
+        NotificationSettingsGateway settings = mock(NotificationSettingsGateway.class);
+        when(gateway.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        new NotificationUseCasesImpl.SubscribePush(gateway, settings, new FakeSender(true), ids, time)
+                .handle(new SubscribeCommand(USER, "https://fcm.googleapis.com/novo", "p", "a", null));
+
+        verify(settings).setPushEnabled(USER, true);
+    }
+
+    @Test
+    @DisplayName("reassinar um endpoint conhecido atualiza as chaves, não aumenta o número de aparelhos e liga o push")
+    void reassinarLigaPush() {
+        PushSubscriptionGateway gateway = mock(PushSubscriptionGateway.class);
+        NotificationSettingsGateway settings = mock(NotificationSettingsGateway.class);
+        when(gateway.upsert(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(gateway.listByUser(USER)).thenReturn(List.of(subscription(new UUID(4, 1), "https://fcm.googleapis.com/known")));
+        when(gateway.count(USER)).thenReturn(10);
+
+        new NotificationUseCasesImpl.SubscribePush(gateway, settings, new FakeSender(true), ids, time)
+                .handle(new SubscribeCommand(USER, "https://fcm.googleapis.com/known", "novas", "a", null));
+
+        verify(gateway).upsert(any());
+        verify(settings).setPushEnabled(USER, true);
     }
 
     @Test

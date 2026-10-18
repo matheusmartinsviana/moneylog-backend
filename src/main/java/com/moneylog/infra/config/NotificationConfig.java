@@ -224,9 +224,10 @@ public class NotificationConfig {
     }
 
     @Bean
-    SubscribePushUseCase subscribePushUseCase(PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids, TimeProvider time,
-                                              PlatformTransactionManager tm) {
-        return TransactionalProxies.required(SubscribePushUseCase.class, new NotificationUseCasesImpl.SubscribePush(subscriptions, sender, ids, time), tm);
+    SubscribePushUseCase subscribePushUseCase(PushSubscriptionGateway subscriptions, NotificationSettingsGateway settings, PushSender sender,
+                                              IdGenerator ids, TimeProvider time, PlatformTransactionManager tm) {
+        return TransactionalProxies.required(SubscribePushUseCase.class,
+                new NotificationUseCasesImpl.SubscribePush(subscriptions, settings, sender, ids, time), tm);
     }
 
     @Bean

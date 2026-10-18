@@ -69,6 +69,20 @@ public class NotificationSettingsGatewayImpl implements NotificationSettingsGate
         return changed == 0 ? Optional.empty() : find(s.userId());
     }
 
+    @Override
+    public boolean setPushEnabled(UUID userId, boolean enabled) {
+        if (enabled) {
+            return jdbc.update("""
+                    INSERT INTO notification_settings (user_id, push_enabled, version, updated_at)
+                    VALUES (?, TRUE, 1, now())
+                    ON CONFLICT (user_id) DO UPDATE SET push_enabled = TRUE, version = notification_settings.version + 1, updated_at = now()
+                    WHERE notification_settings.push_enabled = FALSE""", userId) > 0;
+        }
+        return jdbc.update("""
+                UPDATE notification_settings SET push_enabled = FALSE, version = version + 1, updated_at = now()
+                WHERE user_id = ? AND push_enabled = TRUE""", userId) > 0;
+    }
+
     private static LocalTime time(LocalTime time) {
         return time;
     }
