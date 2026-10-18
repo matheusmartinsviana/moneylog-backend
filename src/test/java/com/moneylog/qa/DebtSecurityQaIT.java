@@ -384,17 +384,19 @@ class DebtSecurityQaIT {
     }
 
     @Test
-    @DisplayName("sonda: classifica os 5xx de datas extremas por rota e parâmetro")
+    @DisplayName("sonda: nenhuma rota de data responde 5xx para datas extremas, por rota e parâmetro")
     void sondaDeDatas() throws Exception {
-        List<String> out = new ArrayList<>();
+        List<String> failures = new ArrayList<>();
         for (String d : List.of("1999-12-31", "0000-01-01", "2101-01-01", "+999999999-12-31", "9999-12-31")) {
             for (String q : List.of("/v1/dashboard/upcoming?from=" + d, "/v1/dashboard/upcoming?to=" + d, "/v1/dashboard/upcoming?from=" + d + "&to=" + d,
                     "/v1/recurrences/occurrences?from=" + d, "/v1/recurrences/occurrences?to=" + d, "/v1/recurrences/occurrences?from=" + d + "&to=" + d,
                     "/v1/dashboard/summary?asOf=" + d, "/v1/entries?competence=" + d.substring(0, 7))) {
                 Res r = a.raw(HttpMethod.GET, q, null, null);
-                out.add(r.status() + " " + q + " " + r.code());
+                if (r.status() >= 500) {
+                    failures.add(r.status() + " " + q + " " + r.code());
+                }
             }
         }
-        out.forEach(l -> System.out.println("QA-E4-PROBE " + l));
+        assertThat(failures).as("rotas de data com 5xx").isEmpty();
     }
 }

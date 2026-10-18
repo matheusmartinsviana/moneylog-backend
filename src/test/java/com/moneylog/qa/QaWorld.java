@@ -1,6 +1,8 @@
 package com.moneylog.qa;
 
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -102,6 +104,11 @@ final class QaWorld {
     JsonNode body(MvcResult result) throws Exception {
         String content = result.getResponse().getContentAsString();
         return content.isEmpty() ? json.createObjectNode() : json.readTree(content);
+    }
+
+    static String firstGroup(String text, Pattern pattern) {
+        Matcher m = pattern.matcher(text);
+        return m.find() ? m.group(1) : text;
     }
 
     static String expense(String account, String category, String amount, String date, String description) {

@@ -13,6 +13,9 @@ import com.moneylog.core.profile.app.gateways.ProfilePhotoGateway;
 
 public class ProfilePhotoGatewayImpl implements ProfilePhotoGateway {
 
+    private static final String SELECT_DISPLAY = "SELECT display FROM user_profile_photos WHERE user_id = ?";
+    private static final String SELECT_THUMBNAIL = "SELECT thumbnail FROM user_profile_photos WHERE user_id = ?";
+
     private final JdbcTemplate jdbc;
 
     public ProfilePhotoGatewayImpl(JdbcTemplate jdbc) {
@@ -29,8 +32,8 @@ public class ProfilePhotoGatewayImpl implements ProfilePhotoGateway {
 
     @Override
     public Optional<byte[]> content(UUID userId, Variant variant) {
-        String column = variant == Variant.THUMBNAIL ? "thumbnail" : "display";
-        return jdbc.query("SELECT " + column + " FROM user_profile_photos WHERE user_id = ?", (rs, row) -> rs.getBytes(1), userId).stream().findFirst();
+        String sql = variant == Variant.THUMBNAIL ? SELECT_THUMBNAIL : SELECT_DISPLAY;
+        return jdbc.query(sql, (rs, row) -> rs.getBytes(1), userId).stream().findFirst();
     }
 
     @Override

@@ -9,6 +9,11 @@ import com.moneylog.core.goal.app.gateways.PhotoStorage;
 
 public class DbPhotoStorage implements PhotoStorage {
 
+    private static final String SELECT_DISPLAY = "SELECT b.display FROM goal_photo_blobs b JOIN goal_photos p ON p.id = b.photo_id AND p.user_id = b.user_id"
+            + " WHERE p.id = ? AND p.user_id = ? AND p.goal_id = ?";
+    private static final String SELECT_THUMBNAIL = "SELECT b.thumbnail FROM goal_photo_blobs b JOIN goal_photos p ON p.id = b.photo_id AND p.user_id = b.user_id"
+            + " WHERE p.id = ? AND p.user_id = ? AND p.goal_id = ?";
+
     private final JdbcTemplate jdbc;
 
     public DbPhotoStorage(JdbcTemplate jdbc) {
@@ -26,10 +31,8 @@ public class DbPhotoStorage implements PhotoStorage {
 
     @Override
     public Optional<byte[]> get(UUID userId, UUID goalId, UUID photoId, Variant variant) {
-        String column = variant == Variant.THUMBNAIL ? "b.thumbnail" : "b.display";
-        return jdbc.query("SELECT " + column + " FROM goal_photo_blobs b JOIN goal_photos p ON p.id = b.photo_id AND p.user_id = b.user_id"
-                + " WHERE p.id = ? AND p.user_id = ? AND p.goal_id = ?", (rs, row) -> rs.getBytes(1), photoId, userId, goalId)
-                .stream().findFirst();
+        String sql = variant == Variant.THUMBNAIL ? SELECT_THUMBNAIL : SELECT_DISPLAY;
+        return jdbc.query(sql, (rs, row) -> rs.getBytes(1), photoId, userId, goalId).stream().findFirst();
     }
 
     @Override

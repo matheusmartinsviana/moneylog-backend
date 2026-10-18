@@ -57,6 +57,9 @@ logging:
     # string ("Securing GET /v1/search?q=...", "GET \"/v1/search?q=...\""), então ficam em INFO mesmo que alguém suba o nível da raiz.
     org.springframework.security.web.FilterChainProxy: INFO
     org.springframework.web.servlet.DispatcherServlet: INFO
+    # O Tomcat em DEBUG registra "Invalid character found in the request target [/v1/search?q=...]" com o termo (BUG-QA-06).
+    org.apache.coyote.http11: INFO
+    org.apache.tomcat.util.http.parser: INFO
 
 management:
   endpoints:

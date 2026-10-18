@@ -29,6 +29,19 @@ import com.moneylog.infra.goal.persistence.GoalReservationRepositoryJpa;
 
 public class GoalGatewayImpl implements GoalGateway {
 
+    private static final String SELECT_CHECKINS_OF_USER = "SELECT c.action_id, c.period FROM goal_action_checkins c"
+            + " JOIN goal_actions a ON a.id = c.action_id AND a.user_id = c.user_id WHERE c.user_id = ?";
+    private static final String SELECT_CHECKINS_OF_GOAL = "SELECT c.action_id, c.period FROM goal_action_checkins c"
+            + " JOIN goal_actions a ON a.id = c.action_id AND a.user_id = c.user_id WHERE c.user_id = ? AND a.goal_id = ?";
+    private static final String SELECT_ACTIONS_OF_USER = "SELECT id, goal_id, title, frequency, created_at FROM goal_actions WHERE user_id = ?"
+            + " ORDER BY goal_id, position";
+    private static final String SELECT_ACTIONS_OF_GOAL = "SELECT id, goal_id, title, frequency, created_at FROM goal_actions WHERE user_id = ?"
+            + " AND goal_id = ? ORDER BY goal_id, position";
+    private static final String SELECT_PHOTOS_OF_USER = "SELECT id, goal_id, width, height, size_bytes, created_at FROM goal_photos WHERE user_id = ?"
+            + " ORDER BY goal_id, position";
+    private static final String SELECT_PHOTOS_OF_GOAL = "SELECT id, goal_id, width, height, size_bytes, created_at FROM goal_photos WHERE user_id = ?"
+            + " AND goal_id = ? ORDER BY goal_id, position";
+
     private final GoalRepositoryJpa goals;
     private final GoalReservationRepositoryJpa reservations;
     private final TimeProvider time;
@@ -111,13 +124,11 @@ public class GoalGatewayImpl implements GoalGateway {
 
     private Map<UUID, List<GoalAction>> loadActions(UUID userId, UUID goalId) {
         Map<UUID, Set<String>> done = new java.util.HashMap<>();
-        jdbc.query("SELECT c.action_id, c.period FROM goal_action_checkins c JOIN goal_actions a ON a.id = c.action_id AND a.user_id = c.user_id"
-                + " WHERE c.user_id = ?" + (goalId == null ? "" : " AND a.goal_id = ?"), rs -> {
+        jdbc.query(goalId == null ? SELECT_CHECKINS_OF_USER : SELECT_CHECKINS_OF_GOAL, rs -> {
             done.computeIfAbsent(rs.getObject(1, UUID.class), k -> new TreeSet<>()).add(rs.getString(2));
         }, goalId == null ? new Object[] {userId} : new Object[] {userId, goalId});
         Map<UUID, List<GoalAction>> byGoal = new java.util.HashMap<>();
-        jdbc.query("SELECT id, goal_id, title, frequency, created_at FROM goal_actions WHERE user_id = ?" + (goalId == null ? "" : " AND goal_id = ?")
-                + " ORDER BY goal_id, position", rs -> {
+        jdbc.query(goalId == null ? SELECT_ACTIONS_OF_USER : SELECT_ACTIONS_OF_GOAL, rs -> {
             UUID id = rs.getObject(1, UUID.class);
             byGoal.computeIfAbsent(rs.getObject(2, UUID.class), k -> new ArrayList<>()).add(new GoalAction(id, rs.getString(3),
                     GoalActionFrequency.valueOf(rs.getString(4)), rs.getObject(5, OffsetDateTime.class).toInstant(),
@@ -149,8 +160,7 @@ public class GoalGatewayImpl implements GoalGateway {
 
     private Map<UUID, List<GoalPhoto>> loadPhotos(UUID userId, UUID goalId) {
         Map<UUID, List<GoalPhoto>> byGoal = new java.util.HashMap<>();
-        jdbc.query("SELECT id, goal_id, width, height, size_bytes, created_at FROM goal_photos WHERE user_id = ?"
-                + (goalId == null ? "" : " AND goal_id = ?") + " ORDER BY goal_id, position", rs -> {
+        jdbc.query(goalId == null ? SELECT_PHOTOS_OF_USER : SELECT_PHOTOS_OF_GOAL, rs -> {
             byGoal.computeIfAbsent(rs.getObject(2, UUID.class), k -> new ArrayList<>()).add(new GoalPhoto(rs.getObject(1, UUID.class),
                     rs.getInt(3), rs.getInt(4), rs.getLong(5), rs.getObject(6, OffsetDateTime.class).toInstant()));
         }, goalId == null ? new Object[] {userId} : new Object[] {userId, goalId});

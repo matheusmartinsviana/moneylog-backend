@@ -206,7 +206,11 @@ class PayrollLoanIT extends ResumaoItBase {
         JsonNode profile = okBody(get("/v1/income-profiles/" + ids.get("perfilRenda")));
         String body = "{\"source\":\"Empresa Exemplo\",\"gross\":\"8000.00\",\"dependents\":1,\"advance\":null,\"balanceDayOfMonth\":1,\"deductions\":[],"
                 + "\"thirteenth\":{\"enabled\":false,\"firstInstallmentMonth\":11},\"version\":" + profile.get("version").asLong() + "}";
-        okBody(put("/v1/income-profiles/" + ids.get("perfilRenda"), body));
+        JsonNode updated = okBody(put("/v1/income-profiles/" + ids.get("perfilRenda"), body));
+
+        assertThat(updated.get("source").asString()).isEqualTo("Empresa Exemplo");
+        assertThat(updated.get("gross").get("amount").asString()).isEqualTo("8000.00");
+        assertThat(updated.get("version").asLong()).isGreaterThan(profile.get("version").asLong());
     }
 
     @Test

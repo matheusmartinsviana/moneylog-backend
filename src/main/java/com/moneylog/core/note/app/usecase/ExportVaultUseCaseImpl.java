@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +17,7 @@ import com.moneylog.core.note.domain.Note;
 import com.moneylog.core.note.domain.NoteLimits;
 import com.moneylog.core.note.domain.WikilinkResolver;
 import com.moneylog.core.note.exception.NoteExceptions.VaultExportTooLargeException;
+import com.moneylog.core.sk.io.PrivateTempDirectories;
 import com.moneylog.core.sk.persistence.Versioned;
 import com.moneylog.core.sk.time.TimeProvider;
 
@@ -90,11 +90,7 @@ public class ExportVaultUseCaseImpl implements ExportVaultUseCase {
     }
 
     private static Path privateDirectory() throws IOException {
-        try {
-            return Files.createTempDirectory("moneylog-export-", PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")));
-        } catch (UnsupportedOperationException notPosix) {
-            return Files.createTempDirectory("moneylog-export-");
-        }
+        return PrivateTempDirectories.create("moneylog-export-");
     }
 
     private static void delete(Path path) {

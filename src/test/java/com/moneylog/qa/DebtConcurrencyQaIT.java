@@ -14,6 +14,7 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,6 +40,8 @@ import com.moneylog.util.MutableClockConfig;
 @Import(MutableClockConfig.class)
 @DisplayName("QA T82: concorrência de dívidas, divisão e recorrências")
 class DebtConcurrencyQaIT {
+
+    private static final Pattern INSTANCE = Pattern.compile("\"instance\":\"([^\"]*)\"");
 
     @Autowired
     private MockMvc mvc;
@@ -491,7 +494,7 @@ class DebtConcurrencyQaIT {
         }
         List<Res> all = new ArrayList<>();
         race(tasks).forEach(all::addAll);
-        System.out.println("QA-E4-READS " + histogram(all) + " 5xx em: " + all.stream().filter(r -> r.status() >= 500).map(r -> r.text().replaceAll(".*\"instance\":\"([^\"]*)\".*", "$1")).distinct().toList());
+        System.out.println("QA-E4-READS " + histogram(all) + " 5xx em: " + all.stream().filter(r -> r.status() >= 500).map(r -> QaWorld.firstGroup(r.text(), INSTANCE)).distinct().toList());
         assertNoServerError("leituras x escritas", all);
     }
 

@@ -9,6 +9,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
+import com.moneylog.core.sk.io.PrivateTempDirectories;
+
 public class BackupService {
 
     private static final DateTimeFormatter DAY_PATH = DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneOffset.UTC);
@@ -92,7 +94,7 @@ public class BackupService {
 
     private static Path tempDir() {
         try {
-            return Files.createTempDirectory("moneylog-backup-");
+            return PrivateTempDirectories.create("moneylog-backup-");
         } catch (IOException e) {
             throw new BackupException("não foi possível criar a pasta temporária do backup", e);
         }

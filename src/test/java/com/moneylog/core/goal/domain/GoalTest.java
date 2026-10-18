@@ -260,6 +260,12 @@ class GoalTest {
         assertThatThrownBy(() -> Goal.create(GOAL_ID, USER_ID, null, target, null, GoalPriority.LOW, null)).isInstanceOf(GoalNameRequiredException.class);
         assertThatThrownBy(() -> Goal.create(GOAL_ID, USER_ID, "x".repeat(101), target, null, GoalPriority.LOW, null))
                 .isInstanceOf(GoalNameTooLongException.class);
+        assertThatThrownBy(() -> Goal.create(GOAL_ID, USER_ID, "a\u0000" + "x".repeat(101), target, null, GoalPriority.LOW, null))
+                .isInstanceOf(BusinessRuleException.class).extracting(e -> ((DomainException) e).code()).isEqualTo("TEXT_INVALID_CHARACTERS");
+        assertThatThrownBy(() -> GoalAction.create(UUID.randomUUID(), "a\u0000" + "x".repeat(101), GoalActionFrequency.MONTHLY, NOW))
+                .isInstanceOf(BusinessRuleException.class).extracting(e -> ((DomainException) e).code()).isEqualTo("TEXT_INVALID_CHARACTERS");
+        assertThatThrownBy(() -> GoalAction.create(UUID.randomUUID(), "x".repeat(101), GoalActionFrequency.MONTHLY, NOW))
+                .isInstanceOf(GoalTextTooLongException.class);
         assertThat(Goal.create(GOAL_ID, USER_ID, "x".repeat(100), target, null, GoalPriority.LOW, null).name()).hasSize(100);
         assertThatThrownBy(() -> Goal.create(GOAL_ID, USER_ID, "a", target, null, GoalPriority.LOW, "d".repeat(501)))
                 .isInstanceOf(GoalTextTooLongException.class);

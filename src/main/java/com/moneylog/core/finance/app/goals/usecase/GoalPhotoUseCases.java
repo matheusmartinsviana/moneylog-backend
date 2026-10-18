@@ -1,6 +1,8 @@
 package com.moneylog.core.finance.app.goals.usecase;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import com.moneylog.core.finance.app.goals.GoalDetails;
@@ -13,6 +15,17 @@ public interface GoalPhotoUseCases {
         UploadedPhoto handle(UploadGoalPhotoCommand command);
 
         record UploadGoalPhotoCommand(UUID userId, UUID goalId, byte[] content, UUID idempotencyKey) {
+            @Override
+            public boolean equals(Object other) {
+                return other instanceof UploadGoalPhotoCommand that && Objects.equals(userId, that.userId) && Objects.equals(goalId, that.goalId)
+                        && Arrays.equals(content, that.content) && Objects.equals(idempotencyKey, that.idempotencyKey);
+            }
+
+            @Override
+            public int hashCode() {
+                return Objects.hash(userId, goalId, Arrays.hashCode(content), idempotencyKey);
+            }
+
             @Override
             public String toString() {
                 return "UploadGoalPhotoCommand[goalId=" + goalId + ", bytes=" + (content == null ? 0 : content.length) + "]";

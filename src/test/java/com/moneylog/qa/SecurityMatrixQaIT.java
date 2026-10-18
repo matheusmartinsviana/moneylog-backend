@@ -248,7 +248,7 @@ class SecurityMatrixQaIT {
     @DisplayName("esquema 'bearer' em minúsculas (RFC 7235 diz que o esquema não diferencia caixa)")
     void esquemaEmMinusculas() throws Exception {
         MvcResult r = mvc.perform(MockMvcRequestBuilders.get("/v1/accounts").header(HttpHeaders.AUTHORIZATION, "bearer " + a.bearer.substring(7))).andReturn();
-        System.out.println("QA-LOWERCASE-BEARER status=" + r.getResponse().getStatus());
+        assertThat(r.getResponse().getStatus()).as("esquema bearer em minúsculas (RFC 7235)").isEqualTo(200);
     }
 
     @Test

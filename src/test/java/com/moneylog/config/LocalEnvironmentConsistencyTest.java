@@ -23,7 +23,7 @@ class LocalEnvironmentConsistencyTest {
 
     private static final Path BACKEND = Path.of("").toAbsolutePath();
     private static final Path ROOT = BACKEND;
-    private static final Pattern PLACEHOLDER = Pattern.compile("(?<!\\$)\\$\\{([A-Z][A-Z0-9_]*)[^}]*}");
+    private static final Pattern PLACEHOLDER = Pattern.compile("(?<!\\$)\\$\\{([A-Z][A-Z0-9_]*)(?::[^}]*)?}");
     private static final Pattern ENV_LINE = Pattern.compile("^([A-Z][A-Z0-9_]*)=(.*)$");
 
     @Test
@@ -43,6 +43,12 @@ class LocalEnvironmentConsistencyTest {
         assertThat(declaradas).containsAll(usadas).contains(
                 "DB_URL", "DB_USER", "DB_PASSWORD", "JWT_SECRET", "AI_PROVIDER", "AI_API_KEY", "AI_MODEL",
                 "MONEYLOG_OWNER_EMAIL", "MONEYLOG_OWNER_PASSWORD_HASH");
+    }
+
+    @Test
+    @DisplayName("placeholders: ${A} e ${A:x} contam; $${NAO} (escapado) e nome fora do padrão não")
+    void deveReconhecerPlaceholdersDoSpring() {
+        assertThat(placeholders("a: ${A}\nb: ${A:x}\nc: $${NAO}\nd: ${minuscula}\ne: ${B_2:${C}}")).containsExactly("A", "B_2");
     }
 
     @Test

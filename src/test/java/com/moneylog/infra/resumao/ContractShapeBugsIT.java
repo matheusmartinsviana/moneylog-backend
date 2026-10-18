@@ -51,8 +51,13 @@ class ContractShapeBugsIT extends ResumaoItBase {
         Map<String, String> ids = loadFixture("novembro-2026");
         JsonNode profile = okBody(get("/v1/income-profiles/" + ids.get("perfilRenda")));
 
-        okBody(put("/v1/income-profiles/" + ids.get("perfilRenda"), "{\"source\":\"Empresa Exemplo\",\"gross\":\"8000.00\",\"dependents\":1,\"advance\":null,"
-                + "\"balanceDayOfMonth\":1,\"deductions\":[],\"thirteenth\":{\"enabled\":false,\"firstInstallmentMonth\":11},\"version\":" + profile.get("version").asLong() + "}"));
+        JsonNode updated = okBody(put("/v1/income-profiles/" + ids.get("perfilRenda"), "{\"source\":\"Empresa Exemplo\",\"gross\":\"8000.00\",\"dependents\":1,"
+                + "\"advance\":null,\"balanceDayOfMonth\":1,\"deductions\":[],\"thirteenth\":{\"enabled\":false,\"firstInstallmentMonth\":11},\"version\":"
+                + profile.get("version").asLong() + "}"));
+
+        assertThat(updated.get("source").asString()).isEqualTo("Empresa Exemplo");
+        assertThat(updated.get("gross").get("amount").asString()).isEqualTo("8000.00");
+        assertThat(updated.get("version").asLong()).isGreaterThan(profile.get("version").asLong());
     }
 
     @Test

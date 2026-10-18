@@ -81,8 +81,9 @@ public record GoalAction(UUID id, String title, GoalActionFrequency frequency, I
             throw new GoalFieldRequiredException("title");
         }
         String stripped = value.strip();
+        int length = stripped.length();
         PlainText.requireClean(stripped, "title", false);
-        if (stripped.length() > TITLE_MAX_LENGTH) {
+        if (length > TITLE_MAX_LENGTH) {
             throw new GoalTextTooLongException("title", TITLE_MAX_LENGTH);
         }
         return stripped;

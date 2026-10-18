@@ -126,6 +126,8 @@ class RedesignFase0HttpQaIT {
                 logs.toString().lines().filter(l -> l.contains(SECRET)).limit(10).forEach(l -> System.out.println("   " + l.substring(0, Math.min(300, l.length()))));
             }
             System.out.println("QA-F0-HTTP linhas de log com o termo: " + leaks + " (BUG-QA-06 se > 0)");
+            assertThat(leaks).as("linhas de log com o termo").isZero();
+            assertThat(report.toString()).as("respostas cruas").doesNotContain("HTTP/1.1 500");
         } finally {
             root.detachAppender(appender);
             root.setLevel(previous);

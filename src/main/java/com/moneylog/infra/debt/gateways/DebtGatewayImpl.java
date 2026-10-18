@@ -11,6 +11,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import com.moneylog.core.debt.app.gateways.DebtGateway;
 import com.moneylog.core.debt.domain.Debt;
@@ -34,6 +36,7 @@ public class DebtGatewayImpl implements DebtGateway {
     private final TransactionRepositoryJpa transactions;
     private final DebtHydrator hydrator;
     private final JdbcTemplate jdbc;
+    private final NamedParameterJdbcTemplate named;
     private final TimeProvider time;
 
     public DebtGatewayImpl(DebtRepositoryJpa repository, TransactionRepositoryJpa transactions, DebtHydrator hydrator,
@@ -42,6 +45,7 @@ public class DebtGatewayImpl implements DebtGateway {
         this.transactions = transactions;
         this.hydrator = hydrator;
         this.jdbc = jdbc;
+        this.named = new NamedParameterJdbcTemplate(jdbc);
         this.time = time;
     }
 
@@ -156,15 +160,12 @@ public class DebtGatewayImpl implements DebtGateway {
         if (transactionIds.isEmpty()) {
             return schedules;
         }
-        String placeholders = String.join(",", java.util.Collections.nCopies(transactionIds.size(), "?"));
-        List<Object> args = new ArrayList<>();
-        args.add(userId);
-        args.addAll(transactionIds);
-        jdbc.query("SELECT transaction_id, amount_cents FROM transaction_installments WHERE user_id = ? AND transaction_id IN ("
-                + placeholders + ") AND canceled_at IS NULL ORDER BY transaction_id, number", rs -> {
+        MapSqlParameterSource params = new MapSqlParameterSource("uid", userId).addValue("ids", transactionIds);
+        named.query("SELECT transaction_id, amount_cents FROM transaction_installments WHERE user_id = :uid AND transaction_id IN (:ids) "
+                + "AND canceled_at IS NULL ORDER BY transaction_id, number", params, rs -> {
             schedules.computeIfAbsent(rs.getObject(1, UUID.class), id -> new ArrayList<>())
                     .add(Money.ofCents(rs.getLong(2), CurrencyCode.BRL));
-        }, args.toArray());
+        });
         return schedules;
     }
 
