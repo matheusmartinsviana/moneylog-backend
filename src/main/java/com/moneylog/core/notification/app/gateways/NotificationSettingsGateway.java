@@ -10,4 +10,6 @@ public interface NotificationSettingsGateway {
     Optional<NotificationSettings> find(UUID userId);
 
     Optional<NotificationSettings> save(NotificationSettings settings, long expectedVersion);
+
+    boolean setPushEnabled(UUID userId, boolean enabled);
 }
