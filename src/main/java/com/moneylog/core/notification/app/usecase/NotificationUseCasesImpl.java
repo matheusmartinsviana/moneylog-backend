@@ -357,12 +357,15 @@ public final class NotificationUseCasesImpl {
 
     public static final class SubscribePush implements SubscribePushUseCase {
         private final PushSubscriptionGateway subscriptions;
+        private final NotificationSettingsGateway settings;
         private final PushSender sender;
         private final IdGenerator ids;
         private final TimeProvider time;
 
-        public SubscribePush(PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids, TimeProvider time) {
+        public SubscribePush(PushSubscriptionGateway subscriptions, NotificationSettingsGateway settings, PushSender sender, IdGenerator ids,
+                             TimeProvider time) {
             this.subscriptions = subscriptions;
+            this.settings = settings;
             this.sender = sender;
             this.ids = ids;
             this.time = time;
@@ -384,7 +387,9 @@ public final class NotificationUseCasesImpl {
                 throw new PushSubscriptionLimitException(MAX_PUSH_SUBSCRIPTIONS);
             }
             String agent = c.userAgent() == null ? null : c.userAgent().length() > 200 ? c.userAgent().substring(0, 200) : c.userAgent();
-            return subscriptions.upsert(new PushSubscription(ids.next(), c.userId(), c.endpoint(), c.p256dh(), c.auth(), agent, time.now()));
+            PushSubscription saved = subscriptions.upsert(new PushSubscription(ids.next(), c.userId(), c.endpoint(), c.p256dh(), c.auth(), agent, time.now()));
+            settings.setPushEnabled(c.userId(), true);
+            return saved;
         }
 
         private static boolean blank(String s) {
