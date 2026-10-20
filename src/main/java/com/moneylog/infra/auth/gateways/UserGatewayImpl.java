@@ -1,13 +1,17 @@
 package com.moneylog.infra.auth.gateways;
 
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.ManagedUser;
 import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.domain.UserStatus;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.auth.persistence.UserEntity;
 import com.moneylog.infra.auth.persistence.UserRepositoryJpa;
@@ -55,6 +59,28 @@ public class UserGatewayImpl implements UserGateway {
     }
 
     @Override
+    public List<ManagedUser> listManaged() {
+        return repository.findAll().stream().map(UserGatewayImpl::toManaged)
+                .sorted(Comparator.comparing((ManagedUser u) -> u.role() == UserRole.OWNER ? 0 : 1)
+                        .thenComparing(ManagedUser::createdAt).thenComparing(ManagedUser::id))
+                .toList();
+    }
+
+    @Override
+    public Optional<ManagedUser> findManagedById(UUID id) {
+        return repository.findById(id).map(UserGatewayImpl::toManaged);
+    }
+
+    @Override
+    public void updateStatus(UUID id, UserStatus status, Instant now) {
+        if (status == UserStatus.DISABLED) {
+            repository.disable(id, now);
+        } else {
+            repository.enable(id, now);
+        }
+    }
+
+    @Override
     public void markLogin(UUID id, Instant now) {
         repository.markLogin(id, now);
     }
@@ -82,6 +108,11 @@ public class UserGatewayImpl implements UserGateway {
     @Override
     public boolean completeSetup(UUID id, String expectedCodeHash, String passwordHash, Instant now) {
         return repository.completeSetup(id, expectedCodeHash, passwordHash, now) == 1;
+    }
+
+    private static ManagedUser toManaged(UserEntity entity) {
+        return new ManagedUser(entity.getId(), entity.getEmail(), entity.getRole(), entity.getStatus(), entity.getCreatedAt(),
+                entity.getLastLoginAt());
     }
 
     private static User toDomain(UserEntity entity) {
