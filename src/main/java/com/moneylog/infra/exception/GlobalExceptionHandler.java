@@ -89,6 +89,12 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.CONFLICT, ex.code(), ex.getMessage(), request);
     }
 
+    @ExceptionHandler(com.moneylog.core.card.exception.CardExceptions.InvoiceResolutionCollidedException.class)
+    ResponseEntity<Object> handleInvoiceResolutionCollided(
+            com.moneylog.core.card.exception.CardExceptions.InvoiceResolutionCollidedException ex, HttpServletRequest request) {
+        return lockFailure(ex, request);
+    }
+
     @ExceptionHandler(AiRateLimitedException.class)
     ResponseEntity<Object> handleAiRateLimited(AiRateLimitedException ex, HttpServletRequest request) {
         return respond(HttpStatus.TOO_MANY_REQUESTS, ex.code(), ex.getMessage(), request);

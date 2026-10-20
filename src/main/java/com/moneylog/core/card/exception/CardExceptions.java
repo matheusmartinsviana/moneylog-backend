@@ -152,6 +152,13 @@ public final class CardExceptions {
         }
     }
 
+    public static class InvoiceResolutionCollidedException extends ConflictException {
+        public InvoiceResolutionCollidedException(UUID invoiceId, Throwable cause) {
+            super("CONFLICT", "A fatura " + invoiceId + " colidiu com uma alteração concorrente do cartão.");
+            initCause(cause);
+        }
+    }
+
     public static class StaleBillingChangeException extends DomainException {
         public StaleBillingChangeException(UUID cardId) {
             super("CARD_BILLING_CHANGE_STALE", "A mudança de fechamento/vencimento não corresponde às regras atuais do cartão " + cardId + ".");

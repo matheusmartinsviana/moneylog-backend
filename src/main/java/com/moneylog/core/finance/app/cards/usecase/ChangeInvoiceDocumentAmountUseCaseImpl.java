@@ -34,9 +34,9 @@ public class ChangeInvoiceDocumentAmountUseCaseImpl implements ChangeInvoiceDocu
     @Override
     public InvoiceDetails handle(ChangeInvoiceDocumentAmountCommand command) {
         Money amount = command.documentAmount() == null ? null : InvoiceDocument.validated(command.documentAmount());
-        FinancialRecords loaded = records.load(command.userId());
-        InvoiceResolver.Resolved resolved = InvoiceResolver.resolve(command.userId(), command.invoiceId(), lookup, loaded, time.today());
-        cards.lockForUpdate(command.userId(), resolved.card().id());
+        InvoiceResolver.Locked locked = InvoiceResolver.resolveLocked(command.userId(), command.invoiceId(), lookup, cards, records, time.today());
+        InvoiceResolver.Resolved resolved = locked.resolved();
+        FinancialRecords loaded = locked.records();
         InvoiceChain chain = CardViews.chainOf(resolved.card(), loaded);
         InvoiceDetails details = InvoiceViews.details(resolved.card().id(), chain.invoice(resolved.closingDate()), InvoiceViews.index(loaded),
                 time.today());
