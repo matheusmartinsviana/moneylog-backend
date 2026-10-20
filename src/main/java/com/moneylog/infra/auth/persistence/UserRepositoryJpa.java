@@ -36,4 +36,20 @@ public interface UserRepositoryJpa extends JpaRepository<UserEntity, UUID> {
              where u.id = :id and u.passwordHash is null and u.setupCodeHash = :code
             """)
     int completeSetup(@Param("id") UUID id, @Param("code") String code, @Param("hash") String hash, @Param("now") Instant now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update UserEntity u set u.status = com.moneylog.core.auth.domain.UserStatus.DISABLED,
+                   u.disabledAt = coalesce(u.disabledAt, :now), u.updatedAt = :now, u.version = u.version + 1
+             where u.id = :id and u.status <> com.moneylog.core.auth.domain.UserStatus.DISABLED
+            """)
+    int disable(@Param("id") UUID id, @Param("now") Instant now);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update UserEntity u set u.status = com.moneylog.core.auth.domain.UserStatus.ACTIVE,
+                   u.disabledAt = null, u.updatedAt = :now, u.version = u.version + 1
+             where u.id = :id and u.status <> com.moneylog.core.auth.domain.UserStatus.ACTIVE
+            """)
+    int enable(@Param("id") UUID id, @Param("now") Instant now);
 }

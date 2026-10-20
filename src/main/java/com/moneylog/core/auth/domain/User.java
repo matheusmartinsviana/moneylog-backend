@@ -4,6 +4,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.moneylog.core.auth.exception.UserManagementExceptions.CannotDisableOwnerException;
+
 public record User(UUID id, String email, UserRole role, UserStatus status) {
 
     public User {
@@ -34,6 +36,17 @@ public record User(UUID id, String email, UserRole role, UserStatus status) {
 
     public boolean isActive() {
         return status == UserStatus.ACTIVE;
+    }
+
+    public User disabled() {
+        if (isOwner()) {
+            throw new CannotDisableOwnerException();
+        }
+        return new User(id, email, role, UserStatus.DISABLED);
+    }
+
+    public User enabled() {
+        return new User(id, email, role, UserStatus.ACTIVE);
     }
 
     public User withEmail(String newEmail) {

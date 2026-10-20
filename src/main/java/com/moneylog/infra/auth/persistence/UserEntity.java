@@ -94,6 +94,10 @@ public class UserEntity {
         return status;
     }
 
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
     public Instant getLastLoginAt() {
         return lastLoginAt;
     }
