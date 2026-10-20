@@ -155,6 +155,31 @@ class PayInvoiceUseCasesTest {
         }
 
         @Test
+        @DisplayName("fatura já materializada: trava o cartão antes de ler os registros, para não ler cartão e parcelas em estados diferentes")
+        void deveTravarOCartaoAntesDeLerOsRegistros() {
+            when(lookup.findById(USER_ID, invoiceId)).thenReturn(Optional.of(new InvoiceLookupGateway.InvoiceKey(cardId, NOV_CLOSING)));
+
+            pay.handle(command("1283.00"), KEY);
+
+            InOrder order = inOrder(cards, records);
+            order.verify(cards).lockForUpdate(USER_ID, cardId);
+            order.verify(cards).discardReadState();
+            order.verify(records).load(USER_ID);
+        }
+
+        @Test
+        @DisplayName("fatura ainda não materializada: relê os registros depois da trava do cartão")
+        void deveRelerOsRegistrosDepoisDaTrava() {
+            pay.handle(command("1283.00"), KEY);
+
+            InOrder order = inOrder(cards, records);
+            order.verify(records).load(USER_ID);
+            order.verify(cards).lockForUpdate(USER_ID, cardId);
+            order.verify(cards).discardReadState();
+            order.verify(records).load(USER_ID);
+        }
+
+        @Test
         @DisplayName("500,00 e depois 783,00 em duas chamadas: OVERDUE com 783,00 em aberto, depois PAID")
         void devePagarEmDuasVezes() {
             when(time.today()).thenReturn(NOV_05.plusDays(1));

@@ -77,9 +77,8 @@ public class PayInvoiceUseCaseImpl implements PayInvoiceUseCase {
             }
         }
         UserDay day = new UserDay(command.userId(), time.today());
-        InvoiceResolver.Resolved resolved = InvoiceResolver.resolve(command.userId(), command.invoiceId(), lookup,
-                records.load(command.userId()), day.today());
-        cards.lockForUpdate(command.userId(), resolved.card().id());
+        InvoiceResolver.Resolved resolved = InvoiceResolver.resolveLocked(command.userId(), command.invoiceId(), lookup, cards, records,
+                day.today()).resolved();
         accounts.lockForUpdate(command.userId(), command.accountId());
         cards.discardReadState();
         CreditCard card = cards.findById(command.userId(), resolved.card().id()).map(Persisted::value)
