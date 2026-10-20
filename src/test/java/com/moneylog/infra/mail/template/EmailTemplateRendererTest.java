@@ -108,11 +108,71 @@ class EmailTemplateRendererTest {
         RenderedEmail email = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com"));
         String html = email.html().toLowerCase();
 
-        assertThat(html).doesNotContain("<script").doesNotContain("<link").doesNotContain("<style").doesNotContain("@import")
+        assertThat(html).doesNotContain("<script").doesNotContain("<link").doesNotContain("@import")
                 .doesNotContain("position:").doesNotContain("display:flex").doesNotContain("display:grid").doesNotContain("javascript:")
                 .doesNotContain("<img").doesNotContain("cdn.").contains("<table").contains("lang=\"pt-br\"").contains("charset=\"utf-8\"");
         assertThat(email.text()).doesNotContain("<").doesNotContain("&amp;");
-        assertThat(email.html().replaceAll("(?s)<head>.*?</head>", "")).doesNotContain("class=");
+        assertThat(email.html().replaceAll("(?s)<style>.*?</style>", "")).doesNotContain("position:").doesNotContain("flex").doesNotContain("grid");
+        assertThat(email.html()).containsOnlyOnce("<style>");
+    }
+
+    @Test
+    @DisplayName("ghost table do Outlook, largura máxima de 600 px e botão com fundo em tabela")
+    void deveTerEstruturaParaOutlook() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("<!--[if mso]>").contains("<![endif]-->").contains("width=\"600\"").contains("max-width:600px")
+                .contains("role=\"presentation\"").contains("bgcolor=\"#1f4d3a\"").contains("mso-padding-alt");
+        assertThat(count(html, "<!--[if mso]>")).isEqualTo(count(html, "<![endif]-->"));
+        assertThat(html.indexOf("<!--[if mso]>\n<table")).isLessThan(html.indexOf("max-width:600px"));
+        assertThat(html.lastIndexOf("</td></tr></table>\n<![endif]-->")).isGreaterThan(html.indexOf("Criar minha conta"));
+    }
+
+    @Test
+    @DisplayName("modo escuro: color-scheme, media query e cores do tema escuro do app")
+    void deveTratarModoEscuro() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("name=\"color-scheme\" content=\"light dark\"").contains("@media (prefers-color-scheme: dark)")
+                .contains("[data-ogsc]").contains("#0b1d15").contains("#111b15").contains("#f2f3ea").contains("#a9cdb5").contains("#0a1a12");
+    }
+
+    @Test
+    @DisplayName("preheader oculto traz quem convidou e a validade, e o texto alternativo da página existe")
+    void devePossuirPreheaderOculto() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).containsPattern("<div style=\"display:none;[^\"]*mso-hide:all;[^\"]*\">c@mviana.tech convidou você para o Monelog\\. O convite vale por 7 dias\\.");
+        assertThat(html).contains("<title>Você foi convidado para o Monelog</title>").contains("aria-label=\"Você foi convidado para o Monelog\"");
+    }
+
+    @Test
+    @DisplayName("marca e assunto vêm de um único ponto e aparecem em HTML, texto e assunto")
+    void deveCentralizarMarcaEAssunto() {
+        RenderedEmail email = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com"));
+
+        assertThat(EmailTemplateRenderer.INVITATION_SUBJECT).isEqualTo("Você foi convidado para o " + EmailTemplateRenderer.BRAND_NAME);
+        assertThat(email.subject()).isEqualTo(EmailTemplateRenderer.INVITATION_SUBJECT);
+        assertThat(email.html()).doesNotContain("{{brand}}").contains(">" + EmailTemplateRenderer.BRAND_NAME + "</td>");
+        assertThat(email.text()).endsWith(EmailTemplateRenderer.BRAND_NAME + "\n");
+    }
+
+    @Test
+    @DisplayName("texto plano tem o mesmo link, validade, aviso e destinatário que o HTML")
+    void textoPlanoDeveSerEquivalente() {
+        RenderedEmail email = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com"));
+        Matcher html = Pattern.compile("https://[^\"<\\s]+").matcher(email.html());
+        Matcher text = Pattern.compile("https://\\S+").matcher(email.text());
+
+        assertThat(text.find()).isTrue();
+        assertThat(email.html()).contains(text.group());
+        assertThat(html.find()).isTrue();
+        assertThat(email.text().replaceAll("[\\r\\n]+", " ")).contains("O convite vale por 7 dias, até 25 de outubro de 2026 às 14:30 (horário de Brasília), e só pode ser usado uma vez.")
+                .contains("Se você não esperava este convite, ignore esta mensagem. Nada será criado.").contains("ana@example.com");
+    }
+
+    private static int count(String text, String part) {
+        return text.split(Pattern.quote(part), -1).length - 1;
     }
 
     @Test

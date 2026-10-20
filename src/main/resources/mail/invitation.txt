@@ -1,6 +1,6 @@
 Oi,
 
-{{inviterEmail}} convidou você para o Monelog, um espaço privado para organizar suas finanças com calma.
+{{inviterEmail}} convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.
 
 Para criar sua conta, abra o link abaixo e escolha uma senha:
 {{link}}
@@ -11,4 +11,4 @@ Se você não esperava este convite, ignore esta mensagem. Nada será criado.
 
 Este convite foi enviado para {{inviteeEmail}}.
 
-Monelog
+{{brand}}
