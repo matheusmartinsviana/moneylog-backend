@@ -185,4 +185,30 @@ abstract class InvitationITSupport {
     protected void advance(Duration duration) {
         clock.advance(duration);
     }
+
+    protected <T> List<T> runTogether(List<java.util.concurrent.Callable<T>> tasks) throws Exception {
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(tasks.size());
+        java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+        try {
+            List<java.util.concurrent.Future<T>> futures = new ArrayList<>();
+            for (java.util.concurrent.Callable<T> task : tasks) {
+                futures.add(pool.submit(() -> {
+                    start.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                    return task.call();
+                }));
+            }
+            start.countDown();
+            List<T> results = new ArrayList<>();
+            for (java.util.concurrent.Future<T> future : futures) {
+                results.add(future.get(60, java.util.concurrent.TimeUnit.SECONDS));
+            }
+            return results;
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    protected int statusOf(MockHttpServletRequestBuilder request) throws Exception {
+        return mockMvc.perform(request).andReturn().getResponse().getStatus();
+    }
 }

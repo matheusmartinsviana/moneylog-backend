@@ -73,8 +73,11 @@ public class InvitationIssuerImpl implements InvitationIssuer {
     }
 
     @Override
-    public Invitation recordDelivery(UUID invitationId, boolean delivered, Instant at) {
+    public Invitation recordDelivery(UUID invitationId, String tokenHash, boolean delivered, Instant at) {
         Invitation current = invitations.findByIdForUpdate(invitationId).orElseThrow(InvitationNotFoundException::new);
+        if (!current.tokenHash().equals(tokenHash)) {
+            return current;
+        }
         Invitation updated = delivered ? current.delivered(at) : current.deliveryFailed();
         invitations.update(updated);
         return updated;

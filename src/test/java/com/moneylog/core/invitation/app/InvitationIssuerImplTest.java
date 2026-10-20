@@ -236,12 +236,22 @@ class InvitationIssuerImplTest {
     void recordsDelivery() {
         Invitation pending = stored(InvitationStatus.PENDING, NOW.plusSeconds(60));
         when(invitations.findByIdForUpdate(pending.id())).thenReturn(Optional.of(pending));
-        Invitation sent = issuer.recordDelivery(pending.id(), true, NOW);
+        Invitation sent = issuer.recordDelivery(pending.id(), "old-hash", true, NOW);
         assertThat(sent.deliveryStatus()).isEqualTo(DeliveryStatus.SENT);
         assertThat(sent.lastSentAt()).isEqualTo(NOW);
-        Invitation failed = issuer.recordDelivery(pending.id(), false, NOW);
+        Invitation failed = issuer.recordDelivery(pending.id(), "old-hash", false, NOW);
         assertThat(failed.deliveryStatus()).isEqualTo(DeliveryStatus.FAILED);
         verify(invitations).update(sent);
         verify(invitations).update(failed);
+    }
+
+    @Test
+    @DisplayName("entrega de token já substituído não altera o convite")
+    void ignoresDeliveryOfSupersededToken() {
+        Invitation pending = stored(InvitationStatus.PENDING, NOW.plusSeconds(60));
+        when(invitations.findByIdForUpdate(pending.id())).thenReturn(Optional.of(pending));
+        Invitation result = issuer.recordDelivery(pending.id(), "outro-hash", true, NOW);
+        assertThat(result).isSameAs(pending);
+        verify(invitations, never()).update(any());
     }
 }

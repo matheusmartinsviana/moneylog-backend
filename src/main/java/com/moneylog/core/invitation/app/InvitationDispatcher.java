@@ -3,6 +3,9 @@ package com.moneylog.core.invitation.app;
 import java.time.Instant;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.moneylog.core.invitation.domain.Invitation;
 import com.moneylog.core.invitation.exception.InvitationExceptions.InvitationDeliveryFailedException;
 import com.moneylog.core.mail.app.EmailMessage;
@@ -13,6 +16,8 @@ import com.moneylog.core.mail.app.gateways.EmailSender;
 import com.moneylog.core.sk.time.TimeProvider;
 
 public class InvitationDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(InvitationDispatcher.class);
 
     private final InvitationIssuer issuer;
     private final EmailSender sender;
@@ -34,7 +39,7 @@ public class InvitationDispatcher {
         UUID id = invitation.id();
         boolean delivered = send(issued);
         Instant now = time.now();
-        Invitation recorded = issuer.recordDelivery(id, delivered, now);
+        Invitation recorded = issuer.recordDelivery(id, invitation.tokenHash(), delivered, now);
         if (!delivered) {
             throw new InvitationDeliveryFailedException(id);
         }
@@ -50,6 +55,7 @@ public class InvitationDispatcher {
             sender.send(new EmailMessage(invitation.email(), rendered.subject(), rendered.html(), rendered.text(), null));
             return true;
         } catch (RuntimeException e) {
+            log.warn("Falha ao enviar o e-mail do convite {}: {}", invitation.id(), e.getClass().getSimpleName());
             return false;
         }
     }

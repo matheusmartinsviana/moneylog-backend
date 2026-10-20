@@ -11,5 +11,5 @@ public interface InvitationIssuer {
 
     IssuedInvitation reissue(UUID inviterId, UUID invitationId);
 
-    Invitation recordDelivery(UUID invitationId, boolean delivered, Instant at);
+    Invitation recordDelivery(UUID invitationId, String tokenHash, boolean delivered, Instant at);
 }

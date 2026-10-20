@@ -70,4 +70,22 @@ class InvitationUserLimitIT extends InvitationITSupport {
         mockMvc.perform(ownerPost("/v1/invitations/" + id + "/resend", "")).andExpect(status().isOk());
         assertThat(fake().sent()).hasSize(2);
     }
+
+    @Test
+    @DisplayName("convites simultâneos nunca passam do teto")
+    void concurrentInvitesNeverExceedLimit() throws Exception {
+        existingUser(newEmail(), "DISABLED");
+        java.util.List<java.util.concurrent.Callable<Integer>> tasks = new java.util.ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            String email = newEmail();
+            tasks.add(() -> statusOf(ownerPost("/v1/invitations", "{\"email\":\"" + email + "\"}")));
+        }
+
+        java.util.List<Integer> statuses = runTogether(tasks);
+
+        assertThat(statuses.stream().filter(s -> s == 201)).hasSize(2);
+        assertThat(statuses.stream().filter(s -> s == 409)).hasSize(3);
+        assertThat(jdbc.queryForObject("select count(*) from user_invitations where status = 'PENDING'", Integer.class)).isEqualTo(2);
+        assertThat(fake().sent()).hasSize(2);
+    }
 }

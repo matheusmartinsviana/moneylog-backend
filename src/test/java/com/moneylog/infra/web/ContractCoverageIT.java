@@ -24,8 +24,7 @@ import com.moneylog.util.IntegrationTest;
 @DisplayName("Cobertura do contrato: operações do arquivo × handlers mapeados")
 class ContractCoverageIT {
 
-    private static final Set<String> PENDING = new TreeSet<>(Set.of(
-            "GET /v1/users", "POST /v1/users/{}/disable", "POST /v1/users/{}/enable"));
+    private static final Set<String> PENDING = new TreeSet<>(Set.<String>of());
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")

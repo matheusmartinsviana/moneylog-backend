@@ -68,7 +68,7 @@ class InvitationDispatcherTest {
     void sendsAndRecords() {
         when(template.renderInvitation(any())).thenReturn(new RenderedEmail("assunto", "<p>oi</p>", "oi"));
         when(sender.send(any())).thenReturn(new EmailDelivery("id-1"));
-        when(issuer.recordDelivery(eq(issued.invitation().id()), eq(true), eq(NOW))).thenReturn(issued.invitation().delivered(NOW));
+        when(issuer.recordDelivery(eq(issued.invitation().id()), eq(issued.invitation().tokenHash()), eq(true), eq(NOW))).thenReturn(issued.invitation().delivered(NOW));
 
         InvitationView view = dispatcher.deliver(issued);
 
@@ -76,7 +76,7 @@ class InvitationDispatcherTest {
         InOrder order = inOrder(template, sender, issuer);
         order.verify(template).renderInvitation(model.capture());
         order.verify(sender).send(any(EmailMessage.class));
-        order.verify(issuer).recordDelivery(issued.invitation().id(), true, NOW);
+        order.verify(issuer).recordDelivery(issued.invitation().id(), issued.invitation().tokenHash(), true, NOW);
         assertThat(model.getValue().validityDays()).isEqualTo(7);
         assertThat(model.getValue().expiresAt()).isEqualTo(NOW.plus(Duration.ofDays(model.getValue().validityDays())));
         assertThat(model.getValue().token()).isEqualTo(issued.token());
@@ -94,7 +94,7 @@ class InvitationDispatcherTest {
             assertThat(e.code()).isEqualTo("EMAIL_DELIVERY_FAILED");
             assertThat(e.getMessage()).doesNotContain(issued.token());
         });
-        verify(issuer).recordDelivery(issued.invitation().id(), false, NOW);
+        verify(issuer).recordDelivery(issued.invitation().id(), issued.invitation().tokenHash(), false, NOW);
     }
 
     @Test
@@ -102,8 +102,8 @@ class InvitationDispatcherTest {
     void treatsRenderFailureAsDeliveryFailure() {
         when(template.renderInvitation(any())).thenThrow(new IllegalStateException("template"));
         assertThatThrownBy(() -> dispatcher.deliver(issued)).isInstanceOf(InvitationDeliveryFailedException.class);
-        verify(issuer).recordDelivery(eq(issued.invitation().id()), eq(false), any());
+        verify(issuer).recordDelivery(eq(issued.invitation().id()), eq(issued.invitation().tokenHash()), eq(false), any());
         org.mockito.Mockito.verifyNoInteractions(sender);
-        org.mockito.Mockito.verify(issuer, org.mockito.Mockito.never()).recordDelivery(any(), eq(true), any());
+        org.mockito.Mockito.verify(issuer, org.mockito.Mockito.never()).recordDelivery(any(), any(), eq(true), any());
     }
 }
