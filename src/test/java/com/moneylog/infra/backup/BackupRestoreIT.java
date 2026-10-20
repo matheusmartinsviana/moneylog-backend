@@ -131,7 +131,7 @@ class BackupRestoreIT {
              PostgreSQLContainer target = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             source.start();
             target.start();
-            Flyway.configure().dataSource(source.getJdbcUrl(), source.getUsername(), source.getPassword()).locations("classpath:db/migration")
+            Flyway.configure().dataSource(source.getJdbcUrl(), source.getUsername(), source.getPassword()).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", ""))
                     .load().migrate();
             JdbcTemplate src = jdbc(source);
             seed(src);

@@ -83,7 +83,7 @@ public class AuthController {
         boolean newIp = rateLimiter.succeeded(attempt);
         SecurityEventLog.loginSucceeded(ip, body.email());
         if (newIp) {
-            alerts.raise(SecurityEvent.NEW_LOGIN, ip, null);
+            alerts.raiseForUser(session.userId(), SecurityEvent.NEW_LOGIN, ip, null);
         }
         return sessionResponse(session);
     }
@@ -102,7 +102,7 @@ public class AuthController {
         }
         rateLimiter.succeeded(attempt);
         SecurityEventLog.setupSucceeded(ip, body.email());
-        alerts.raise(SecurityEvent.SETUP_COMPLETED, ip, null);
+        alerts.raiseForUser(session.userId(), SecurityEvent.SETUP_COMPLETED, ip, null);
         return sessionResponse(session);
     }
 
@@ -111,7 +111,7 @@ public class AuthController {
             return rateLimiter.reserve(ip, scope + ":" + (email == null ? "" : email.strip()));
         } catch (TooManyAttemptsException e) {
             SecurityEventLog.blocked(e.scope(), ip, email);
-            alerts.raise(SecurityEvent.LOGIN_BLOCKED, ip, e.scope().name().toLowerCase(java.util.Locale.ROOT));
+            alerts.raiseForEmail(email, SecurityEvent.LOGIN_BLOCKED, ip, e.scope().name().toLowerCase(java.util.Locale.ROOT));
             throw e;
         }
     }
@@ -145,6 +145,6 @@ public class AuthController {
     private ResponseEntity<AuthTokenResponse> sessionResponse(AuthSession session) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookies.issue(session.refreshToken(), auth.refreshTtl()))
-                .body(new AuthTokenResponse(session.accessToken().value(), session.accessToken().expiresAt()));
+                .body(AuthTokenResponse.of(session));
     }
 }

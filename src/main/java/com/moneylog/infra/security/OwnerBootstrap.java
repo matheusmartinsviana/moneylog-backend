@@ -54,9 +54,8 @@ public class OwnerBootstrap implements ApplicationRunner, Ordered {
         if (result.created()) {
             log.info("Dono criado ({}).", mask(result.owner().email()));
             publisher.publishEvent(new OwnerCreated(result.owner().id(), result.owner().email()));
-        } else if (result.previousEmail() != null) {
-            log.info("E-mail do dono atualizado de {} para {} (id mantido).", mask(result.previousEmail()),
-                    mask(result.owner().email()));
+        } else if (result.promoted()) {
+            log.info("Usuário existente promovido a dono ({}).", mask(result.owner().email()));
         }
         if (result.passwordReset()) {
             SecurityEventLog.ownerPasswordReset(result.owner().email());

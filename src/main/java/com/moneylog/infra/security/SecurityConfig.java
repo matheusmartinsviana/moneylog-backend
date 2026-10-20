@@ -49,7 +49,7 @@ import com.moneylog.core.sk.time.TimeProvider;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http, JwtDecoder jwtDecoder,
+    SecurityFilterChain apiSecurity(HttpSecurity http, JwtDecoder jwtDecoder, UserGateway users,
                                     @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, exception) -> {
             response.setHeader("WWW-Authenticate", "Bearer");
@@ -66,10 +66,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/setup-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/auth/status").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/v1/invitations/preview", "/v1/invitations/accept").permitAll()
+                        .requestMatchers("/v1/users", "/v1/users/**", "/v1/invitations", "/v1/invitations/**").hasRole("OWNER")
+                        .requestMatchers("/v1/ai/previews", "/v1/ai/previews/**", "/v1/ai/analyses", "/v1/ai/analyses/**",
+                                "/v1/settings/ai").hasRole("OWNER")
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder))
+                .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(new DatabaseRoleJwtConverter(users)))
                         .authenticationEntryPoint(entryPoint).accessDeniedHandler(deniedHandler))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(entryPoint).accessDeniedHandler(deniedHandler));
         return http.build();
@@ -87,7 +91,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    JwtDecoder jwtDecoder(MoneylogSecurityProperties properties, Clock clock, UserGateway users, Environment environment) {
+    JwtDecoder jwtDecoder(MoneylogSecurityProperties properties, Clock clock, Environment environment) {
         SecretKey key = JwtSecret.toKey(properties.jwtSecret(), environment.acceptsProfiles(Profiles.of("prod")));
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
         JwtTimestampValidator timestamps = new JwtTimestampValidator(Duration.ZERO);
@@ -96,7 +100,7 @@ public class SecurityConfig {
                 new JwtClaimValidator<Object>(JwtClaimNames.EXP, Objects::nonNull),
                 new JwtClaimValidator<Object>(JwtClaimNames.SUB, Objects::nonNull),
                 new JwtClaimValidator<Object>(JwtClaimNames.IAT, Objects::nonNull),
-                timestamps, new JwtOwnerValidator(users)));
+                timestamps));
         return decoder;
     }
 

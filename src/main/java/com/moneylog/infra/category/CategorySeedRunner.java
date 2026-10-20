@@ -7,6 +7,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.category.app.usecase.SeedSystemCategoriesUseCase;
 import com.moneylog.core.category.app.usecase.SeedSystemCategoriesUseCase.SeedSystemCategoriesCommand;
 
@@ -24,7 +25,7 @@ public class CategorySeedRunner implements ApplicationRunner, Ordered {
 
     @Override
     public void run(ApplicationArguments args) {
-        users.findOwner().ifPresent(owner -> {
+        users.findByRole(UserRole.OWNER).ifPresent(owner -> {
             int created = seed.handle(new SeedSystemCategoriesCommand(owner.id()));
             if (created > 0) {
                 log.info("Categorias de sistema criadas no boot: {}.", created);

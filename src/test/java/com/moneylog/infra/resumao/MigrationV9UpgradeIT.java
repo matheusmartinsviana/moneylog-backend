@@ -38,7 +38,7 @@ class MigrationV9UpgradeIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV8 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("8.17").load();
+            Flyway upToV8 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("8.17").load();
             assertThat(upToV8.migrate().success).isTrue();
 
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -58,7 +58,7 @@ class MigrationV9UpgradeIT {
             jdbc.update("insert into recurring_transactions (id,user_id,type,amount_cents,currency,description,category_id,account_id,payment_method,frequency,interval_count,start_date,active,created_at,updated_at) "
                     + "values (?,?,'EXPENSE',9000,'BRL','Aluguel',?,?,'PIX','MONTHLY',1,'2026-10-05',true,?,?)", recurrence, user, category, account, NOW, NOW);
 
-            Flyway upToV919 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("9.19").load();
+            Flyway upToV919 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("9.19").load();
             assertThat(upToV919.migrate().success).isTrue();
             assertThat(jdbc.queryForList("select distinct nature from transactions where type = 'EXPENSE'", String.class)).containsExactly("VARIABLE");
             assertThat(jdbc.queryForObject("select nature from recurring_transactions where id = ?", String.class, recurrence)).isEqualTo("FIXED");
@@ -77,7 +77,7 @@ class MigrationV9UpgradeIT {
             long sumBefore = jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class);
             long countBefore = jdbc.queryForObject("select count(*) from ledger_postings", Long.class);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
 
             assertThat(result.success).isTrue();

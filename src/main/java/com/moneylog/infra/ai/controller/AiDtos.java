@@ -24,6 +24,10 @@ public final class AiDtos {
 
     public record StatusResponse(boolean enabled, String provider, String model, long dailyCallsRemaining, long monthlyTokensRemaining,
                                  AiGuard.Circuit circuit) {
+        static StatusResponse unavailable() {
+            return new StatusResponse(false, "none", "", 0, 0, AiGuard.Circuit.CLOSED);
+        }
+
         static StatusResponse of(StatusView v) {
             return new StatusResponse(v.enabled(), v.provider(), v.model(), v.dailyCallsRemaining(), v.monthlyTokensRemaining(), v.circuit());
         }

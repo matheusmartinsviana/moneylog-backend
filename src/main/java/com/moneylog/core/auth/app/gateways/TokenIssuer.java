@@ -1,11 +1,12 @@
 package com.moneylog.core.auth.app.gateways;
 
 import java.time.Instant;
-import java.util.UUID;
+
+import com.moneylog.core.auth.domain.User;
 
 public interface TokenIssuer {
 
-    AccessToken issueAccessToken(UUID userId);
+    AccessToken issueAccessToken(User user);
 
     String newRefreshTokenValue();
 

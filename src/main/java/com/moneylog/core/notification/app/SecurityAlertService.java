@@ -2,13 +2,15 @@ package com.moneylog.core.notification.app;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSender.PushMessage;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
@@ -28,7 +30,10 @@ public class SecurityAlertService {
     private final IdGenerator ids;
     private final TimeProvider time;
     private final Duration throttle;
-    private final Map<SecurityEvent, Instant> lastSent = new EnumMap<>(SecurityEvent.class);
+    private final Map<AlertKey, Instant> lastSent = new HashMap<>();
+
+    private record AlertKey(UUID userId, SecurityEvent event) {
+    }
 
     public SecurityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids,
                                 TimeProvider time, Duration throttle) {
@@ -44,12 +49,24 @@ public class SecurityAlertService {
         if (!sender.enabled()) {
             return 0;
         }
-        User owner = users.findOwner().orElse(null);
-        if (owner == null) {
+        User owner = users.findByRole(UserRole.OWNER).orElse(null);
+        return owner == null ? 0 : notifyUser(owner.id(), event, ip, scope);
+    }
+
+    public int notifyEmail(String email, SecurityEvent event, String ip, String scope) {
+        if (!sender.enabled()) {
             return 0;
         }
-        List<PushSubscription> targets = subscriptions.listByUser(owner.id());
-        if (targets.isEmpty() || !acquire(event)) {
+        User target = findActiveByEmail(email);
+        return target == null ? 0 : notifyUser(target.id(), event, ip, scope);
+    }
+
+    public int notifyUser(UUID userId, SecurityEvent event, String ip, String scope) {
+        if (!sender.enabled()) {
+            return 0;
+        }
+        List<PushSubscription> targets = subscriptions.listByUser(userId);
+        if (targets.isEmpty() || !acquire(userId, event)) {
             return 0;
         }
         PushMessage message = new PushMessage(ids.next(), KIND, event.titleKey(), params(ip, scope));
@@ -65,13 +82,21 @@ public class SecurityAlertService {
         return delivered;
     }
 
-    private synchronized boolean acquire(SecurityEvent event) {
+    private User findActiveByEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return users.findByEmail(User.normalize(email)).filter(User::isActive).orElse(null);
+    }
+
+    private synchronized boolean acquire(UUID userId, SecurityEvent event) {
         Instant now = time.now();
-        Instant previous = lastSent.get(event);
+        AlertKey key = new AlertKey(userId, event);
+        Instant previous = lastSent.get(key);
         if (previous != null && now.isBefore(previous.plus(throttle))) {
             return false;
         }
-        lastSent.put(event, now);
+        lastSent.put(key, now);
         return true;
     }
 

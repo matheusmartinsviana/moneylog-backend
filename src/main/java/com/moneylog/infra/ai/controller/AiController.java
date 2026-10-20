@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,8 +71,11 @@ public class AiController {
     }
 
     @GetMapping("/v1/ai/status")
-    public ResponseEntity<StatusResponse> status(@CurrentUser UUID userId) {
-        return ResponseEntity.ok().cacheControl(NO_STORE).body(StatusResponse.of(status.handle(userId)));
+    public ResponseEntity<StatusResponse> status(@CurrentUser UUID userId, Authentication authentication) {
+        boolean owner = authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_OWNER".equals(a.getAuthority()));
+        StatusResponse body = owner ? StatusResponse.of(status.handle(userId)) : StatusResponse.unavailable();
+        return ResponseEntity.ok().cacheControl(NO_STORE).body(body);
     }
 
     @PostMapping("/v1/ai/previews")

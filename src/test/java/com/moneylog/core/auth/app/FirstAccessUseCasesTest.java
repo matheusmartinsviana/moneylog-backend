@@ -44,6 +44,7 @@ import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.PasswordPolicy;
 import com.moneylog.core.auth.domain.SetupCode;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidCredentialsException;
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidSetupCodeException;
 import com.moneylog.core.auth.exception.AuthExceptions.WeakPasswordException;
@@ -130,7 +131,7 @@ class FirstAccessUseCasesTest {
     class Setup {
 
         private void donoPendente(OwnerAccess access) {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(access));
             when(verifier.hasEnvironmentHash()).thenReturn(false);
         }
@@ -143,7 +144,7 @@ class FirstAccessUseCasesTest {
             when(users.completeSetup(USER_ID, SetupCode.hash(CODE), "$hash", NOW)).thenReturn(true);
             when(ids.next()).thenReturn(FAMILY_ID, TOKEN_ID);
             when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh");
-            when(tokenIssuer.issueAccessToken(USER_ID)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+            when(tokenIssuer.issueAccessToken(any(User.class))).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
 
             AuthSession session = setup().handle(new SetupPasswordCommand(" Dono@Moneylog.test ", CODE, "uma-senha-forte-1"));
 
@@ -240,7 +241,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("sem senha e sem hash no ambiente: gera o código, grava só o hash e o devolve uma vez")
         void deveGerarCodigo() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)));
             when(verifier.hasEnvironmentHash()).thenReturn(false);
 
@@ -254,7 +255,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("código informado pelo operador: grava o hash dele e não devolve nada para imprimir")
         void deveUsarCodigoInformado() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, true, null, null)));
             when(verifier.hasEnvironmentHash()).thenReturn(true);
 
@@ -268,7 +269,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("código informado curto demais: não sobe")
         void deveRecusarCodigoCurto() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, true, null, null)));
             when(verifier.hasEnvironmentHash()).thenReturn(false);
 
@@ -279,7 +280,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("código informado com pouca variedade ou repetição: não sobe e não grava nada")
         void deveRecusarCodigoFraco() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, true, null, null)));
             when(verifier.hasEnvironmentHash()).thenReturn(false);
 
@@ -294,7 +295,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("retrocompatibilidade (hash no ambiente, sem redefinição) ou senha no banco: nenhum código é criado")
         void naoDeveCriarCodigoSeNaoPrecisa() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)));
             when(verifier.hasEnvironmentHash()).thenReturn(true);
 
@@ -311,7 +312,7 @@ class FirstAccessUseCasesTest {
         @DisplayName("true sem senha e sem hash no ambiente; true com redefinição pendente; false com hash do ambiente ou senha no banco")
         void deveRefletirOEstado() {
             var useCase = new AuthStatusUseCaseImpl(users, verifier);
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)),
                     Optional.of(new OwnerAccess(null, false, null, null)), Optional.of(new OwnerAccess(null, true, null, null)),
                     Optional.of(new OwnerAccess("$h", true, null, null)));
@@ -333,16 +334,15 @@ class FirstAccessUseCasesTest {
         }
 
         @Test
-        @DisplayName("e-mail novo + reset: renomeia mantendo o id, apaga a senha e revoga todas as sessões; sem inserir")
-        void deveRenomearEResetar() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.local")));
+        @DisplayName("reset: mantém o e-mail e o id, apaga a senha e revoga todas as sessões; sem inserir")
+        void deveResetar() {
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, "v@example.test")));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)));
 
             OwnerEnsured result = useCase().handle(new EnsureOwnerCommand("V@example.test", true));
 
-            assertThat(result.owner()).isEqualTo(new User(USER_ID, "v@example.test"));
+            assertThat(result.owner()).isEqualTo(User.owner(USER_ID, "v@example.test"));
             assertThat(result.passwordReset()).isTrue();
-            verify(users).updateEmail(USER_ID, "v@example.test");
             verify(users).resetPassword(USER_ID, NOW);
             verify(refreshTokens).revokeAllByUser(USER_ID, NOW);
             verify(users, never()).insert(any());
@@ -351,7 +351,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("sem a variável de reset: a senha atual é mantida")
         void naoDeveResetarSemPedido() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.local")));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, "v@example.test")));
 
             OwnerEnsured result = useCase().handle(new EnsureOwnerCommand("v@example.test", false));
 
@@ -363,7 +363,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("reset repetido com o primeiro acesso já pendente: idempotente (reiniciar não revoga de novo)")
         void deveSerIdempotente() {
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, true, null, null)));
 
             assertThat(useCase().handle(new EnsureOwnerCommand(EMAIL, true)).passwordReset()).isFalse();
@@ -383,14 +383,13 @@ class FirstAccessUseCasesTest {
         private void sessaoAberta() {
             when(ids.next()).thenReturn(FAMILY_ID, TOKEN_ID);
             when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh");
-            when(tokenIssuer.issueAccessToken(USER_ID)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+            when(tokenIssuer.issueAccessToken(any(User.class))).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
         }
 
         @Test
         @DisplayName("senha do banco definida: é a única que vale; o hash do ambiente nem é consultado")
         void bancoTemPrioridade() {
-            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess("$banco", false, null, null)));
             when(verifier.matches("senha-do-banco", "$banco")).thenReturn(true);
             sessaoAberta();
@@ -402,8 +401,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("senha do ambiente com senha do banco definida: recusa")
         void ambienteNaoValeComSenhaNoBanco() {
-            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess("$banco", false, null, null)));
             when(verifier.matches("senha-do-ambiente", "$banco")).thenReturn(false);
 
@@ -415,8 +413,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("sem senha no banco e sem redefinição: vale o hash do ambiente (retrocompatibilidade)")
         void retrocompatibilidade() {
-            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)));
             when(verifier.verifyOwner("senha-do-ambiente")).thenReturn(true);
             sessaoAberta();
@@ -427,8 +424,7 @@ class FirstAccessUseCasesTest {
         @Test
         @DisplayName("redefinição pendente: nem o hash do ambiente entra")
         void pendenteBloqueiaAmbiente() {
-            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
-            when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, EMAIL)));
+            when(users.findByEmail(EMAIL)).thenReturn(Optional.of(User.owner(USER_ID, EMAIL)));
             when(users.findAccess(USER_ID)).thenReturn(Optional.of(new OwnerAccess(null, true, null, null)));
 
             assertThatThrownBy(() -> useCase().handle(new LoginCommand(EMAIL, "senha-do-ambiente")))

@@ -49,7 +49,7 @@ class PushEnabledForExistingSubscribersMigrationIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            assertThat(Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("9.25").load().migrate().success).isTrue();
+            assertThat(Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("9.25").load().migrate().success).isTrue();
             JdbcTemplate jdbc = new JdbcTemplate(ds);
 
             UUID desligado = user(jdbc, "desligado");
@@ -65,7 +65,7 @@ class PushEnabledForExistingSubscribersMigrationIT {
             subscription(jdbc, jaLigado);
             settings(jdbc, jaLigado, true, 7);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             assertThat(all.migrate().success).isTrue();
 
             assertThat(row(jdbc, desligado)).containsEntry("push_enabled", true).containsEntry("version", 4L);
@@ -87,7 +87,7 @@ class PushEnabledForExistingSubscribersMigrationIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
 
             assertThat(all.migrate().success).isTrue();
 

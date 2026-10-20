@@ -10,6 +10,8 @@ public interface RefreshTokenGateway {
 
     void insert(RefreshToken token);
 
+    Optional<UUID> findUserIdByHash(String tokenHash);
+
     Optional<RefreshToken> findByHashForUpdate(String tokenHash);
 
     void markReplaced(UUID id, UUID replacedBy, Instant at);

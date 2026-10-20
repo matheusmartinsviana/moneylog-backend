@@ -8,16 +8,21 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.domain.UserStatus;
 
-@DisplayName("Validador do dono do JWT (B6) e guarda de proxies (B11)")
+@DisplayName("Conversor do JWT com papel do banco (B6) e guarda de proxies (B11)")
 class JwtOwnerETrustedProxiesTest {
 
     private static Jwt jwt(String subject) {
@@ -31,19 +36,38 @@ class JwtOwnerETrustedProxiesTest {
     }
 
     @Test
-    @DisplayName("dono existente passa; dono removido, subject ausente ou que não é UUID falham (401, não 500 de FK)")
-    void deveValidarODono() {
+    @DisplayName("usuário ativo passa com o papel do banco; removido, desativado, subject ausente ou que não é UUID falham (401, não 500 de FK)")
+    void deveValidarOUsuarioEOPapel() {
         UserGateway users = mock(UserGateway.class);
-        UUID known = UUID.randomUUID();
+        UUID owner = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        UUID disabled = UUID.randomUUID();
         UUID gone = UUID.randomUUID();
-        when(users.existsById(known)).thenReturn(true);
-        when(users.existsById(gone)).thenReturn(false);
-        JwtOwnerValidator validator = new JwtOwnerValidator(users);
+        when(users.findById(owner)).thenReturn(Optional.of(User.owner(owner, "dono@example.com")));
+        when(users.findById(member)).thenReturn(Optional.of(User.member(member, "membro@example.com")));
+        when(users.findById(disabled)).thenReturn(Optional.of(new User(disabled, "off@example.com", UserRole.MEMBER, UserStatus.DISABLED)));
+        when(users.findById(gone)).thenReturn(Optional.empty());
+        DatabaseRoleJwtConverter converter = new DatabaseRoleJwtConverter(users);
 
-        assertThat(validator.validate(jwt(known.toString())).hasErrors()).isFalse();
-        assertThat(validator.validate(jwt(gone.toString())).hasErrors()).isTrue();
-        assertThat(validator.validate(jwt(null)).hasErrors()).isTrue();
-        assertThat(validator.validate(jwt("nao-e-uuid")).hasErrors()).isTrue();
+        assertThat(converter.convert(jwt(owner.toString())).getAuthorities()).extracting(Object::toString).containsExactly("ROLE_OWNER");
+        assertThat(converter.convert(jwt(member.toString())).getAuthorities()).extracting(Object::toString).containsExactly("ROLE_MEMBER");
+        assertThatThrownBy(() -> converter.convert(jwt(disabled.toString()))).isInstanceOf(InvalidBearerTokenException.class);
+        assertThatThrownBy(() -> converter.convert(jwt(gone.toString()))).isInstanceOf(InvalidBearerTokenException.class);
+        assertThatThrownBy(() -> converter.convert(jwt(null))).isInstanceOf(InvalidBearerTokenException.class);
+        assertThatThrownBy(() -> converter.convert(jwt("nao-e-uuid"))).isInstanceOf(InvalidBearerTokenException.class);
+    }
+
+    @Test
+    @DisplayName("a claim role do token nunca vale: um token de membro com role=OWNER ganha ROLE_MEMBER")
+    void claimNaoAutoriza() {
+        UserGateway users = mock(UserGateway.class);
+        UUID member = UUID.randomUUID();
+        when(users.findById(member)).thenReturn(Optional.of(User.member(member, "membro@example.com")));
+        Jwt forged = Jwt.withTokenValue("t").header("alg", "HS256").subject(member.toString()).claim("role", "OWNER")
+                .issuedAt(Instant.now()).expiresAt(Instant.now().plusSeconds(60)).build();
+
+        assertThat(new DatabaseRoleJwtConverter(users).convert(forged).getAuthorities()).extracting(Object::toString)
+                .containsExactly("ROLE_MEMBER");
     }
 
     @Test

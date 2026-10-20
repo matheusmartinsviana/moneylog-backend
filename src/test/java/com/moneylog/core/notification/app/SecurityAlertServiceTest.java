@@ -23,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSender.PushMessage;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
@@ -64,7 +65,7 @@ class SecurityAlertServiceTest {
         service = new SecurityAlertService(users, subscriptions, sender, ids, time, Duration.ofMinutes(10));
         ownerSubscription = new PushSubscription(UUID.randomUUID(), ownerId, "https://push.example/dono", "k", "a", "ua", now);
         when(sender.enabled()).thenReturn(true);
-        when(users.findOwner()).thenReturn(Optional.of(new User(ownerId, "dono@example.com")));
+        when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(ownerId, "dono@example.com")));
         when(subscriptions.listByUser(ownerId)).thenReturn(List.of(ownerSubscription));
         when(sender.send(any(), any())).thenReturn(PushSender.Result.SENT);
     }
@@ -86,6 +87,48 @@ class SecurityAlertServiceTest {
         assertThat(message.getValue().kind()).isEqualTo("SECURITY_ALERT");
         assertThat(message.getValue().titleKey()).isEqualTo("security.login_blocked");
         assertThat(message.getValue().params()).containsOnly(java.util.Map.entry("ip", "203.0.x.x"), java.util.Map.entry("scope", "ip"));
+    }
+
+    @Test
+    @DisplayName("alerta do usuário afetado: o membro recebe no próprio aparelho e o dono não é avisado")
+    void deveAvisarSoOUsuarioAfetado() {
+        UUID memberId = UUID.randomUUID();
+        PushSubscription memberSubscription = new PushSubscription(UUID.randomUUID(), memberId, "https://push.example/membro", "k", "a", "ua", now);
+        when(subscriptions.listByUser(memberId)).thenReturn(List.of(memberSubscription));
+
+        assertThat(service.notifyUser(memberId, SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isEqualTo(1);
+
+        verify(sender).send(eq(memberSubscription), any());
+        verify(sender, never()).send(eq(ownerSubscription), any());
+        verify(subscriptions, never()).listByUser(ownerId);
+    }
+
+    @Test
+    @DisplayName("alerta por e-mail: usuário ativo é avisado; e-mail desconhecido ou desativado não envia nada")
+    void deveResolverPorEmail() {
+        UUID memberId = UUID.randomUUID();
+        PushSubscription memberSubscription = new PushSubscription(UUID.randomUUID(), memberId, "https://push.example/membro", "k", "a", "ua", now);
+        when(subscriptions.listByUser(memberId)).thenReturn(List.of(memberSubscription));
+        when(users.findByEmail("membro@example.com")).thenReturn(Optional.of(User.member(memberId, "membro@example.com")));
+        when(users.findByEmail("off@example.com")).thenReturn(Optional.of(
+                new User(UUID.randomUUID(), "off@example.com", UserRole.MEMBER, com.moneylog.core.auth.domain.UserStatus.DISABLED)));
+
+        assertThat(service.notifyEmail(" Membro@Example.com ", SecurityEvent.LOGIN_BLOCKED, "203.0.113.5", "account")).isEqualTo(1);
+        assertThat(service.notifyEmail("off@example.com", SecurityEvent.LOGIN_BLOCKED, "203.0.113.5", "account")).isZero();
+        assertThat(service.notifyEmail("ninguem@example.com", SecurityEvent.LOGIN_BLOCKED, "203.0.113.5", "account")).isZero();
+        assertThat(service.notifyEmail(null, SecurityEvent.LOGIN_BLOCKED, "203.0.113.5", "account")).isZero();
+    }
+
+    @Test
+    @DisplayName("throttle é por usuário: o alerta de um não silencia o do outro")
+    void deveLimitarPorUsuarioETipo() {
+        UUID memberId = UUID.randomUUID();
+        PushSubscription memberSubscription = new PushSubscription(UUID.randomUUID(), memberId, "https://push.example/membro", "k", "a", "ua", now);
+        when(subscriptions.listByUser(memberId)).thenReturn(List.of(memberSubscription));
+
+        assertThat(service.notifyUser(ownerId, SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isEqualTo(1);
+        assertThat(service.notifyUser(memberId, SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isEqualTo(1);
+        assertThat(service.notifyUser(memberId, SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isZero();
     }
 
     @Test
@@ -116,7 +159,7 @@ class SecurityAlertServiceTest {
 
         assertThat(service.notify(SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isZero();
 
-        verify(users, never()).findOwner();
+        verify(users, never()).findByRole(any());
         verify(sender, never()).send(any(), any());
     }
 
@@ -133,7 +176,7 @@ class SecurityAlertServiceTest {
     @Test
     @DisplayName("sem dono: não envia")
     void naoDeveEnviarSemDono() {
-        when(users.findOwner()).thenReturn(Optional.empty());
+        when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.empty());
 
         assertThat(service.notify(SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isZero();
 

@@ -1,7 +1,6 @@
 package com.moneylog.core.auth.app.usecase;
 
 import java.time.Instant;
-import java.util.Optional;
 
 import com.moneylog.core.auth.app.AuthSession;
 import com.moneylog.core.auth.app.SessionOpener;
@@ -12,6 +11,7 @@ import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.PasswordPolicy;
 import com.moneylog.core.auth.domain.SetupCode;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidSetupCodeException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -38,7 +38,7 @@ public class SetupPasswordUseCaseImpl implements SetupPasswordUseCase {
     @Override
     public AuthSession handle(SetupPasswordCommand command) {
         Instant now = time.now();
-        User owner = users.findOwner().orElseThrow(InvalidSetupCodeException::new);
+        User owner = users.findByRole(UserRole.OWNER).orElseThrow(InvalidSetupCodeException::new);
         OwnerAccess access = users.findAccess(owner.id()).orElseThrow(InvalidSetupCodeException::new);
 
         boolean emailOk = owner.email().equals(normalizeOrNull(command.email()));
@@ -56,7 +56,7 @@ public class SetupPasswordUseCaseImpl implements SetupPasswordUseCase {
             throw new InvalidSetupCodeException();
         }
         refreshTokens.revokeAllByUser(owner.id(), now);
-        return sessions.open(owner.id(), ids.next(), now);
+        return sessions.open(owner, ids.next(), now);
     }
 
     private static String normalizeOrNull(String email) {
