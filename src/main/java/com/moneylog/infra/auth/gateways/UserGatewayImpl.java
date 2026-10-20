@@ -52,6 +52,23 @@ public class UserGatewayImpl implements UserGateway {
     }
 
     @Override
+    public void insertWithPassword(User user, String passwordHash, Instant now) {
+        UserEntity entity = new UserEntity(user.id(), user.email(), user.role(), user.status(), time.zone().getId(), now);
+        entity.definePassword(passwordHash, now);
+        repository.saveAndFlush(entity);
+    }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return repository.existsByEmailIgnoreCase(email);
+    }
+
+    @Override
+    public long count() {
+        return repository.count();
+    }
+
+    @Override
     public void updateRole(UUID id, UserRole role, Instant now) {
         UserEntity entity = repository.findById(id).orElseThrow();
         entity.changeRole(role, now);

@@ -128,6 +128,13 @@ public class UserEntity {
         return setupCodeExpiresAt;
     }
 
+    public void definePassword(String hash, Instant now) {
+        this.passwordHash = hash;
+        this.passwordSetAt = now;
+        this.passwordSetupPending = false;
+        this.updatedAt = now;
+    }
+
     public void resetPassword(Instant now) {
         this.passwordHash = null;
         this.passwordSetAt = null;
