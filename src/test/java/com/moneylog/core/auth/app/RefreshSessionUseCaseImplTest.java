@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -25,6 +26,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.moneylog.core.auth.app.gateways.RefreshTokenGateway;
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
+import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.domain.UserStatus;
 import com.moneylog.core.auth.app.gateways.TokenIssuer.AccessToken;
 import com.moneylog.core.auth.app.usecase.RefreshSessionUseCase.RefreshCommand;
 import com.moneylog.core.auth.app.usecase.RefreshSessionUseCaseImpl;
@@ -50,13 +55,17 @@ class RefreshSessionUseCaseImplTest {
     private TokenIssuer tokenIssuer;
     @Mock
     private IdGenerator ids;
+    @Mock
+    private UserGateway users;
 
     private RefreshSessionUseCaseImpl useCase;
 
     @BeforeEach
     void setUp() {
+        lenient().when(refreshTokens.findUserIdByHash(HASH)).thenReturn(Optional.of(USER_ID));
+        lenient().when(users.findByIdLockingShared(USER_ID)).thenReturn(Optional.of(User.owner(USER_ID, "dono@moneylog.test")));
         SessionOpener sessions = new SessionOpener(tokenIssuer, refreshTokens, ids, Duration.ofDays(30));
-        useCase = new RefreshSessionUseCaseImpl(refreshTokens, sessions,
+        useCase = new RefreshSessionUseCaseImpl(users, refreshTokens, sessions,
                 new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC)), Duration.ofSeconds(30));
     }
 
@@ -68,7 +77,50 @@ class RefreshSessionUseCaseImplTest {
     private void stubIssuer() {
         when(ids.next()).thenReturn(NEW_ID);
         when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh-novo");
-        when(tokenIssuer.issueAccessToken(USER_ID)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+        when(tokenIssuer.issueAccessToken(any(User.class))).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+    }
+
+    @Nested
+    @DisplayName("usuário que não pode mais ter sessão")
+    class UsuarioSemAcesso {
+
+        @Test
+        @DisplayName("usuário desativado: REFRESH_INVALID, nada é rotacionado nem emitido")
+        void deveRecusarUsuarioDesativado() {
+            when(refreshTokens.findUserIdByHash(HASH)).thenReturn(Optional.of(USER_ID));
+            when(users.findByIdLockingShared(USER_ID))
+                    .thenReturn(Optional.of(new User(USER_ID, "off@moneylog.test", UserRole.MEMBER, UserStatus.DISABLED)));
+
+            assertThatThrownBy(() -> useCase.handle(new RefreshCommand(RAW))).isInstanceOf(RefreshInvalidException.class);
+
+            verify(refreshTokens, never()).insert(any());
+            verify(refreshTokens, never()).markReplaced(any(), any(), any());
+            verify(tokenIssuer, never()).issueAccessToken(any());
+        }
+
+        @Test
+        @DisplayName("usuário removido: REFRESH_INVALID")
+        void deveRecusarUsuarioRemovido() {
+            when(refreshTokens.findUserIdByHash(HASH)).thenReturn(Optional.of(USER_ID));
+            when(users.findByIdLockingShared(USER_ID)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> useCase.handle(new RefreshCommand(RAW))).isInstanceOf(RefreshInvalidException.class);
+
+            verify(refreshTokens, never()).insert(any());
+        }
+
+        @Test
+        @DisplayName("a sessão renovada leva o usuário do banco, com o papel atual")
+        void deveEmitirComOPapelDoBanco() {
+            User member = User.member(USER_ID, "membro@moneylog.test");
+            when(users.findByIdLockingShared(USER_ID)).thenReturn(Optional.of(member));
+            when(refreshTokens.findByHashForUpdate(HASH)).thenReturn(Optional.of(token(null, null, NOW.plusSeconds(1000))));
+            stubIssuer();
+
+            AuthSession session = useCase.handle(new RefreshCommand(RAW));
+
+            assertThat(session.user()).isEqualTo(member);
+        }
     }
 
     @Nested

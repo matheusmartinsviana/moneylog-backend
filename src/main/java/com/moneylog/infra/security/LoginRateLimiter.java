@@ -2,6 +2,9 @@ package com.moneylog.infra.security;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -197,7 +200,11 @@ public class LoginRateLimiter {
 
     static String accountKey(String account) {
         String value = account == null ? "" : account.strip().toLowerCase(Locale.ROOT);
-        return value.length() > MAX_KEY_LENGTH ? value.substring(0, MAX_KEY_LENGTH) : value;
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 indisponível", e);
+        }
     }
 
     static String ipKey(String ip) {

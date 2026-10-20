@@ -22,9 +22,31 @@ class AuthDomainTest {
     @Test
     @DisplayName("e-mail é normalizado (sem espaços, minúsculas) e não pode ser vazio")
     void deveNormalizarEmail() {
-        assertThat(new User(USER_ID, "  Dono@MoneyLog.Test ").email()).isEqualTo("dono@moneylog.test");
-        assertThatThrownBy(() -> new User(USER_ID, " ")).isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> new User(USER_ID, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(User.owner(USER_ID, "  Dono@MoneyLog.Test ").email()).isEqualTo("dono@moneylog.test");
+        assertThatThrownBy(() -> User.owner(USER_ID, " ")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> User.owner(USER_ID, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("papel e status são obrigatórios; dono e membro nascem ativos; promover desativado é recusado")
+    void deveExigirPapelEStatus() {
+        assertThatThrownBy(() -> new User(USER_ID, "a@b.c", null, UserStatus.ACTIVE)).isInstanceOf(NullPointerException.class);
+        assertThatThrownBy(() -> new User(USER_ID, "a@b.c", UserRole.MEMBER, null)).isInstanceOf(NullPointerException.class);
+        assertThat(User.owner(USER_ID, "a@b.c").isOwner()).isTrue();
+        assertThat(User.member(USER_ID, "a@b.c").isOwner()).isFalse();
+        assertThat(User.member(USER_ID, "a@b.c").isActive()).isTrue();
+        User disabled = new User(USER_ID, "a@b.c", UserRole.MEMBER, UserStatus.DISABLED);
+        assertThat(disabled.isActive()).isFalse();
+        assertThatThrownBy(disabled::promotedToOwner).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("promover membro ativo mantém id e e-mail e só muda o papel; trocar e-mail normaliza e mantém papel e status")
+    void devePromoverETrocarEmail() {
+        User promoted = User.member(USER_ID, "a@b.c").promotedToOwner();
+
+        assertThat(promoted).isEqualTo(User.owner(USER_ID, "a@b.c"));
+        assertThat(promoted.withEmail(" Novo@B.C ")).isEqualTo(User.owner(USER_ID, "novo@b.c"));
     }
 
     @Test

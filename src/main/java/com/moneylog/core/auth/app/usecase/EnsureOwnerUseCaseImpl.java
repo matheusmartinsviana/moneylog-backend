@@ -6,6 +6,8 @@ import com.moneylog.core.auth.app.gateways.RefreshTokenGateway;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.exception.OwnerEmailConflictException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 
@@ -26,21 +28,28 @@ public class EnsureOwnerUseCaseImpl implements EnsureOwnerUseCase {
     @Override
     public OwnerEnsured handle(EnsureOwnerCommand command) {
         String email = User.normalize(command.email());
-        Optional<User> existing = users.findOwner();
+        Optional<User> existing = users.findByRole(UserRole.OWNER);
         if (existing.isEmpty()) {
-            User owner = new User(ids.next(), email);
-            users.insert(owner);
-            return new OwnerEnsured(owner, true, null, false);
+            return withoutOwner(email);
         }
         User owner = existing.get();
-        String previousEmail = null;
         if (!owner.email().equals(email)) {
-            users.updateEmail(owner.id(), email);
-            previousEmail = owner.email();
-            owner = new User(owner.id(), email);
+            throw new OwnerEmailConflictException();
         }
         boolean reset = command.resetPassword() && resetPassword(owner);
-        return new OwnerEnsured(owner, false, previousEmail, reset);
+        return new OwnerEnsured(owner, false, reset);
+    }
+
+    private OwnerEnsured withoutOwner(String email) {
+        Optional<User> sameEmail = users.findByEmail(email);
+        if (sameEmail.isPresent()) {
+            User promoted = sameEmail.get().promotedToOwner();
+            users.updateRole(promoted.id(), promoted.role(), time.now());
+            return new OwnerEnsured(promoted, false, false, true);
+        }
+        User owner = User.owner(ids.next(), email);
+        users.insert(owner);
+        return new OwnerEnsured(owner, true, false);
     }
 
     private boolean resetPassword(User owner) {

@@ -37,7 +37,7 @@ class DebtMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV3 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("3.02").load();
+            Flyway upToV3 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("3.02").load();
             assertThat(upToV3.migrate().migrationsExecuted).isEqualTo(18);
 
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -76,7 +76,7 @@ class DebtMigrationQaIT {
             long sumBefore = jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class);
             long debtsBefore = jdbc.queryForObject("select count(*) from debts", Long.class);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
             assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("3.02"));
@@ -154,7 +154,7 @@ class DebtMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV3 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("4.01").load();
+            Flyway upToV3 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("4.01").load();
             upToV3.migrate();
             JdbcTemplate jdbc = new JdbcTemplate(ds);
             UUID user = UUID.randomUUID();
@@ -165,7 +165,7 @@ class DebtMigrationQaIT {
                     + "values (?,?,'Conta','CHECKING',100000,'BRL','2026-10-01','ACTIVE',?,?)", acc, user, NOW, NOW);
             jdbc.update("insert into categories (id,user_id,name,kind,created_at,updated_at) values (?,?,'Alim','EXPENSE',?,?)", cat, user, NOW, NOW);
             tx(jdbc, UUID.randomUUID(), user, "EXPENSE", 500, acc, cat, null, "RECURRENCE", UUID.randomUUID(), "2026-10-02");
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             assertThatThrownBy(all::migrate).hasMessageContaining("fk_transactions_recurrence_id_user");
         }
     }

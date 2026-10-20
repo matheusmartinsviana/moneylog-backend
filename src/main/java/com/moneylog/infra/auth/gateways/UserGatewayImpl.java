@@ -4,11 +4,10 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.springframework.data.domain.PageRequest;
-
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.auth.persistence.UserEntity;
 import com.moneylog.infra.auth.persistence.UserRepositoryJpa;
@@ -24,13 +23,18 @@ public class UserGatewayImpl implements UserGateway {
     }
 
     @Override
-    public Optional<User> findOwner() {
-        return repository.findOldest(PageRequest.of(0, 1)).stream().findFirst().map(UserGatewayImpl::toDomain);
+    public Optional<User> findByRole(UserRole role) {
+        return repository.findFirstByRole(role).map(UserGatewayImpl::toDomain);
     }
 
     @Override
-    public boolean existsById(UUID id) {
-        return repository.existsById(id);
+    public Optional<User> findById(UUID id) {
+        return repository.findById(id).map(UserGatewayImpl::toDomain);
+    }
+
+    @Override
+    public Optional<User> findByIdLockingShared(UUID id) {
+        return repository.findByIdLockingShared(id).map(UserGatewayImpl::toDomain);
     }
 
     @Override
@@ -40,14 +44,19 @@ public class UserGatewayImpl implements UserGateway {
 
     @Override
     public void insert(User user) {
-        repository.saveAndFlush(new UserEntity(user.id(), user.email(), time.zone().getId(), time.now()));
+        repository.saveAndFlush(new UserEntity(user.id(), user.email(), user.role(), user.status(), time.zone().getId(), time.now()));
     }
 
     @Override
-    public void updateEmail(UUID id, String email) {
+    public void updateRole(UUID id, UserRole role, Instant now) {
         UserEntity entity = repository.findById(id).orElseThrow();
-        entity.changeEmail(email, time.now());
+        entity.changeRole(role, now);
         repository.saveAndFlush(entity);
+    }
+
+    @Override
+    public void markLogin(UUID id, Instant now) {
+        repository.markLogin(id, now);
     }
 
     @Override
@@ -76,6 +85,6 @@ public class UserGatewayImpl implements UserGateway {
     }
 
     private static User toDomain(UserEntity entity) {
-        return new User(entity.getId(), entity.getEmail());
+        return new User(entity.getId(), entity.getEmail(), entity.getRole(), entity.getStatus());
     }
 }

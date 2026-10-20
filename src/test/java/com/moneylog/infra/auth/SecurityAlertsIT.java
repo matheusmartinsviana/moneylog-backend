@@ -26,6 +26,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
@@ -101,24 +102,35 @@ class SecurityAlertsIT {
     }
 
     @Test
-    @DisplayName("LOGIN_BLOCKED chega só às inscrições do dono, com IP mascarado e sem dado sensível")
+    @DisplayName("LOGIN_BLOCKED chega só às inscrições do usuário da conta visada, com IP mascarado e sem dado sensível; e-mail desconhecido não avisa ninguém")
     void deveAlertarSoODonoNoBloqueio() throws Exception {
         UUID ownerId = auth.ownerId();
         otherId = UUID.randomUUID();
-        users.insert(new User(otherId, "outro-" + otherId + "@example.com"));
+        users.insert(User.member(otherId, "outro-" + otherId + "@example.com"));
         tx.executeWithoutResult(status -> {
             jdbc.update("update users set created_at = now() + interval '1 day' where id = ?", otherId);
             subscriptions.upsert(new PushSubscription(UUID.randomUUID(), ownerId, "https://push.example/dono", "p", "a", "ua", Instant.now()));
             subscriptions.upsert(new PushSubscription(UUID.randomUUID(), otherId, "https://push.example/outro", "p", "a", "ua", Instant.now()));
         });
-        assertThat(users.findOwner().orElseThrow().id()).isEqualTo(ownerId);
+        assertThat(users.findByRole(UserRole.OWNER).orElseThrow().id()).isEqualTo(ownerId);
+        String targetEmail = users.findById(otherId).orElseThrow().email();
+
+        for (int i = 0; i < 6; i++) {
+            int expected = i < 5 ? 401 : 429;
+            mockMvc.perform(post("/v1/auth/login").contentType(MediaType.APPLICATION_JSON).with(request -> {
+                request.setRemoteAddr("203.0.113.76");
+                return request;
+            }).content("{\"email\":\"desconhecido-" + otherId + "@example.com\",\"password\":\"errada\"}")).andExpect(status().is(expected));
+        }
+        Thread.sleep(500);
+        assertThat(RecordingPush.SENT).isEmpty();
 
         for (int i = 0; i < 6; i++) {
             int expected = i < 5 ? 401 : 429;
             mockMvc.perform(post("/v1/auth/login").contentType(MediaType.APPLICATION_JSON).with(request -> {
                 request.setRemoteAddr("203.0.113.77");
                 return request;
-            }).content("{\"email\":\"alguem@example.com\",\"password\":\"errada\"}")).andExpect(status().is(expected));
+            }).content("{\"email\":\"" + targetEmail + "\",\"password\":\"errada\"}")).andExpect(status().is(expected));
         }
 
         long deadline = System.currentTimeMillis() + 5_000;
@@ -129,11 +141,11 @@ class SecurityAlertsIT {
 
         assertThat(RecordingPush.SENT).hasSize(1);
         Sent sent = RecordingPush.SENT.get(0);
-        assertThat(sent.subscription().userId()).isEqualTo(ownerId);
-        assertThat(sent.subscription().endpoint()).isEqualTo("https://push.example/dono");
+        assertThat(sent.subscription().userId()).isEqualTo(otherId);
+        assertThat(sent.subscription().endpoint()).isEqualTo("https://push.example/outro");
         assertThat(sent.message().kind()).isEqualTo("SECURITY_ALERT");
         assertThat(sent.message().titleKey()).isEqualTo("security.login_blocked");
         assertThat(sent.message().params()).containsOnly(java.util.Map.entry("ip", "203.0.x.x"), java.util.Map.entry("scope", "ip"));
-        assertThat(sent.message().params().toString()).doesNotContain("alguem@example.com", "errada");
+        assertThat(sent.message().params().toString()).doesNotContain(targetEmail, "errada");
     }
 }

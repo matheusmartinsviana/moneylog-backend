@@ -13,10 +13,14 @@ public interface EnsureOwnerUseCase {
         }
     }
 
-    record OwnerEnsured(User owner, boolean created, String previousEmail, boolean passwordReset) {
+    record OwnerEnsured(User owner, boolean created, boolean passwordReset, boolean promoted) {
 
-        public OwnerEnsured(User owner, boolean created, String previousEmail) {
-            this(owner, created, previousEmail, false);
+        public OwnerEnsured(User owner, boolean created, boolean passwordReset) {
+            this(owner, created, passwordReset, false);
+        }
+
+        public OwnerEnsured(User owner, boolean created) {
+            this(owner, created, false, false);
         }
     }
 }

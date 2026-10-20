@@ -5,9 +5,14 @@ import java.util.UUID;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+
+import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.domain.UserStatus;
 
 @Entity
 @Table(name = "users")
@@ -46,12 +51,28 @@ public class UserEntity {
     @Column(name = "setup_code_expires_at")
     private Instant setupCodeExpiresAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private UserRole role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private UserStatus status;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    @Column(name = "disabled_at")
+    private Instant disabledAt;
+
     protected UserEntity() {
     }
 
-    public UserEntity(UUID id, String email, String timeZone, Instant now) {
+    public UserEntity(UUID id, String email, UserRole role, UserStatus status, String timeZone, Instant now) {
         this.id = id;
         this.email = email;
+        this.role = role;
+        this.status = status;
         this.timeZone = timeZone;
         this.createdAt = now;
         this.updatedAt = now;
@@ -63,6 +84,23 @@ public class UserEntity {
 
     public String getEmail() {
         return email;
+    }
+
+    public UserRole getRole() {
+        return role;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public Instant getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void changeRole(UserRole newRole, Instant now) {
+        this.role = newRole;
+        this.updatedAt = now;
     }
 
     public void changeEmail(String newEmail, Instant now) {

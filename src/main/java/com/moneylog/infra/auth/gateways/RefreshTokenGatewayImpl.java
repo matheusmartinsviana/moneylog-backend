@@ -24,6 +24,11 @@ public class RefreshTokenGatewayImpl implements RefreshTokenGateway {
     }
 
     @Override
+    public Optional<UUID> findUserIdByHash(String tokenHash) {
+        return repository.findUserIdByHash(tokenHash);
+    }
+
+    @Override
     public Optional<RefreshToken> findByHashForUpdate(String tokenHash) {
         return repository.findByHashForUpdate(tokenHash).map(RefreshTokenGatewayImpl::toDomain);
     }

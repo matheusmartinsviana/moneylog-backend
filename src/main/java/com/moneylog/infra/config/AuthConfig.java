@@ -71,10 +71,10 @@ public class AuthConfig {
 
     @Bean
     @SuppressWarnings("unchecked")
-    RefreshSessionUseCase refreshSessionUseCase(RefreshTokenGateway refreshTokens, SessionOpener sessions, TimeProvider time,
+    RefreshSessionUseCase refreshSessionUseCase(UserGateway users, RefreshTokenGateway refreshTokens, SessionOpener sessions, TimeProvider time,
                                                 MoneylogAuthProperties auth, PlatformTransactionManager transactionManager) {
         return TransactionalProxies.requiredCommittingOn(RefreshSessionUseCase.class,
-                new RefreshSessionUseCaseImpl(refreshTokens, sessions, time, auth.reuseGrace()), transactionManager,
+                new RefreshSessionUseCaseImpl(users, refreshTokens, sessions, time, auth.reuseGrace()), transactionManager,
                 RefreshInvalidException.class);
     }
 

@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.moneylog.core.auth.app.gateways.RefreshTokenGateway;
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
 import com.moneylog.core.auth.domain.RefreshToken;
+import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.sk.id.IdGenerator;
 
 public final class SessionOpener {
@@ -32,11 +33,11 @@ public final class SessionOpener {
         this.refreshTtl = refreshTtl;
     }
 
-    public AuthSession open(UUID userId, UUID familyId, Instant now) {
-        return open(userId, familyId, now, now);
+    public AuthSession open(User user, UUID familyId, Instant now) {
+        return open(user, familyId, now, now);
     }
 
-    public AuthSession open(UUID userId, UUID familyId, Instant familyStartedAt, Instant now) {
+    public AuthSession open(User user, UUID familyId, Instant familyStartedAt, Instant now) {
         String rawRefresh = tokenIssuer.newRefreshTokenValue();
         Instant ceiling = familyStartedAt.plus(maxSessionAge);
         Instant refreshExpiresAt = now.plus(refreshTtl);
@@ -44,7 +45,7 @@ public final class SessionOpener {
             refreshExpiresAt = ceiling;
         }
         UUID tokenId = ids.next();
-        refreshTokens.insert(RefreshToken.issue(tokenId, userId, familyId, RefreshTokenHash.of(rawRefresh), now, refreshExpiresAt, familyStartedAt));
-        return new AuthSession(userId, tokenIssuer.issueAccessToken(userId), rawRefresh, tokenId, refreshExpiresAt);
+        refreshTokens.insert(RefreshToken.issue(tokenId, user.id(), familyId, RefreshTokenHash.of(rawRefresh), now, refreshExpiresAt, familyStartedAt));
+        return new AuthSession(user, tokenIssuer.issueAccessToken(user), rawRefresh, tokenId, refreshExpiresAt);
     }
 }

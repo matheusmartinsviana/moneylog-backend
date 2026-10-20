@@ -95,6 +95,7 @@ class FlywayMigrationIT {
         Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
         Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
         Set<String> referenceData = Set.of("tax_tables", "tax_table_brackets", "tax_table_sources");
+        Set<String> accessControl = Set.of("user_invitations");
         Set<String> v9 = Set.of("card_purchase_shares", "tax_tables", "tax_table_brackets", "tax_table_sources", "tracked_commitment_item_shares",
                 "payroll_loan_applications", "purchase_groups", "purchase_group_members", "recurrence_shares", "income_profiles", "income_profile_deductions",
                 "income_profile_occurrences", "transaction_foreign_charges", "income_occurrence_loans", "third_party_mark_migrations", "assets", "asset_balances");
@@ -109,7 +110,7 @@ class FlywayMigrationIT {
             if (!appendOnly.contains(table) && !noTimestamps.contains(table) && (!v9.contains(table) || hasColumn(table, "updated_at"))) {
                 assertThat(column(table, "updated_at")).as(table + ".updated_at").startsWith("timestamp with time zone|NO");
             }
-            if (!table.equals("users") && !referenceData.contains(table)) {
+            if (!table.equals("users") && !referenceData.contains(table) && !accessControl.contains(table)) {
                 assertThat(column(table, "user_id")).as(table + ".user_id").startsWith("uuid|NO");
             }
         }

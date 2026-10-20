@@ -509,9 +509,11 @@ class SecurityMatrixQaIT {
     }
 
     @Test
-    @DisplayName("troca do e-mail do dono mantém o id e o token antigo segue valendo (cobre S-65); sem rotas de usuário no contrato")
+    @DisplayName("troca do e-mail do dono mantém o id e o token antigo segue valendo (cobre S-65); sem cadastro público e com gestão de usuários só pelas rotas do dono")
     void contratoNaoTemRotasDeUsuario() {
-        assertThat(ContractValidation.spec().getPaths().keySet()).noneMatch(p -> p.contains("users") || p.contains("register") || p.contains("signup"));
+        assertThat(ContractValidation.spec().getPaths().keySet()).noneMatch(p -> p.contains("register") || p.contains("signup"));
+        assertThat(ContractValidation.spec().getPaths().keySet().stream().filter(p -> p.contains("users")))
+                .containsExactlyInAnyOrder("/v1/users", "/v1/users/{id}/disable", "/v1/users/{id}/enable");
     }
 
     @Test

@@ -26,6 +26,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      owner-email: ${MONEYLOG_OWNER_EMAIL:}
   jackson:
     time-zone: UTC
     deserialization:

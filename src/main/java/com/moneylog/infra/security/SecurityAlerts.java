@@ -1,5 +1,6 @@
 package com.moneylog.infra.security;
 
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -32,20 +33,32 @@ public class SecurityAlerts {
     }
 
     public void raise(SecurityEvent event, String ip, String scope) {
+        schedule(event, () -> service.notify(event, ip, scope));
+    }
+
+    public void raiseForUser(UUID userId, SecurityEvent event, String ip, String scope) {
+        schedule(event, () -> service.notifyUser(userId, event, ip, scope));
+    }
+
+    public void raiseForEmail(String email, SecurityEvent event, String ip, String scope) {
+        schedule(event, () -> service.notifyEmail(email, event, ip, scope));
+    }
+
+    private void schedule(SecurityEvent event, Runnable work) {
         if (service == null) {
             return;
         }
         try {
-            executor.execute(() -> deliver(event, ip, scope));
+            executor.execute(() -> deliver(event, work));
         } catch (RuntimeException e) {
             log.warn("security_alert event={} status=not_scheduled error={}", event.name().toLowerCase(java.util.Locale.ROOT),
                     e.getClass().getSimpleName());
         }
     }
 
-    private void deliver(SecurityEvent event, String ip, String scope) {
+    private void deliver(SecurityEvent event, Runnable work) {
         try {
-            transaction.accept(() -> service.notify(event, ip, scope));
+            transaction.accept(work);
         } catch (RuntimeException e) {
             log.warn("security_alert event={} status=failed error={}", event.name().toLowerCase(java.util.Locale.ROOT),
                     e.getClass().getSimpleName());

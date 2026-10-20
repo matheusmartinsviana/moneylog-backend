@@ -196,6 +196,17 @@ class SecurityComponentsTest {
         }
 
         @Test
+        @DisplayName("a chave da conta é o hash do e-mail normalizado: igual para variações de caixa e espaço, sem o e-mail em claro")
+        void deveChavearContaPorHashDoEmail() {
+            LoginRateLimiter limiter = new LoginRateLimiter(clock, 100, Duration.ofMinutes(15));
+
+            LoginRateLimiter.Attempt a = limiter.reserve("1.1.1.1", "login:Pessoa@Example.com ");
+            LoginRateLimiter.Attempt b = limiter.reserve("1.1.1.2", "login:pessoa@example.com");
+
+            assertThat(a.accountKey()).isEqualTo(b.accountKey()).hasSize(64).doesNotContain("pessoa").doesNotContain("example");
+        }
+
+        @Test
         @DisplayName("login bem-sucedido zera o contador do IP e da conta")
         void deveZerarNoSucesso() {
             LoginRateLimiter limiter = new LoginRateLimiter(clock, 2, Duration.ofMinutes(15));

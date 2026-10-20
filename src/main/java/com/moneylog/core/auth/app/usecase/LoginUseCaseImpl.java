@@ -33,22 +33,18 @@ public class LoginUseCaseImpl implements LoginUseCase {
 
     @Override
     public AuthSession handle(LoginCommand command) {
-        Optional<User> user = findUser(command.email()).filter(this::isOwner);
+        User user = findUser(command.email()).orElse(null);
         String password = command.password() == null ? "" : command.password();
-        if (user.isEmpty()) {
-            passwordVerifier.verifyDummy(password);
-            throw new InvalidCredentialsException();
-        }
-        if (!passwordMatches(user.get(), password)) {
+        if (user == null || !user.isActive() || !passwordMatches(user, password)) {
+            if (user == null || !user.isActive()) {
+                passwordVerifier.verifyDummy(password);
+            }
             throw new InvalidCredentialsException();
         }
         Instant now = time.now();
+        users.markLogin(user.id(), now);
         UUID familyId = ids.next();
-        return sessions.open(user.get().id(), familyId, now);
-    }
-
-    private boolean isOwner(User candidate) {
-        return users.findOwner().map(owner -> owner.id().equals(candidate.id())).orElse(false);
+        return sessions.open(user, familyId, now);
     }
 
     private boolean passwordMatches(User user, String password) {
@@ -56,7 +52,7 @@ public class LoginUseCaseImpl implements LoginUseCase {
         if (access != null && access.hasStoredPassword()) {
             return passwordVerifier.matches(password, access.passwordHash());
         }
-        if (access != null && access.passwordSetupPending()) {
+        if ((access != null && access.passwordSetupPending()) || !user.isOwner()) {
             passwordVerifier.verifyDummy(password);
             return false;
         }

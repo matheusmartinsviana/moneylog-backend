@@ -5,6 +5,7 @@ import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.SetupCode;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.sk.time.TimeProvider;
 
 public class PrepareFirstAccessUseCaseImpl implements PrepareFirstAccessUseCase {
@@ -21,7 +22,7 @@ public class PrepareFirstAccessUseCaseImpl implements PrepareFirstAccessUseCase 
 
     @Override
     public FirstAccessPrepared handle(PrepareFirstAccessCommand command) {
-        User owner = users.findOwner().orElse(null);
+        User owner = users.findByRole(UserRole.OWNER).orElse(null);
         if (owner == null) {
             return new FirstAccessPrepared(false, null);
         }

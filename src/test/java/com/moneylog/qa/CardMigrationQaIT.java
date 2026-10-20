@@ -30,7 +30,7 @@ class CardMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV2 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("2.06").load();
+            Flyway upToV2 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("2.06").load();
             assertThat(upToV2.migrate().migrationsExecuted).isEqualTo(16);
 
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -51,7 +51,7 @@ class CardMigrationQaIT {
             long txBefore = jdbc.queryForObject("select count(*) from transactions", Long.class);
             long sumBefore = jdbc.queryForObject("select sum(amount_cents) from ledger_postings", Long.class);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
             assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("2.06"));

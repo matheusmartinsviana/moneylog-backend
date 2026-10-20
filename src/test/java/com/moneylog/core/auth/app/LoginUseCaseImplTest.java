@@ -32,6 +32,9 @@ import com.moneylog.core.auth.app.usecase.LoginUseCase.LoginCommand;
 import com.moneylog.core.auth.app.usecase.LoginUseCaseImpl;
 import com.moneylog.core.auth.domain.RefreshToken;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.OwnerAccess;
+import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.auth.domain.UserStatus;
 import com.moneylog.core.auth.exception.AuthExceptions.InvalidCredentialsException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.ClockTimeProvider;
@@ -68,12 +71,11 @@ class LoginUseCaseImplTest {
     @Test
     @DisplayName("e-mail e senha certos abrem uma sessão com refresh gravado só pelo hash")
     void deveAbrirSessao() {
-        when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
-        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+        when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(User.owner(USER_ID, "dono@moneylog.test")));
         when(passwordVerifier.verifyOwner("senha")).thenReturn(true);
         when(ids.next()).thenReturn(FAMILY_ID, TOKEN_ID);
         when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh-em-claro");
-        when(tokenIssuer.issueAccessToken(USER_ID)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+        when(tokenIssuer.issueAccessToken(any(User.class))).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
 
         AuthSession session = useCase.handle(new LoginCommand("  DONO@moneylog.test ", "senha"));
 
@@ -104,8 +106,7 @@ class LoginUseCaseImplTest {
     @Test
     @DisplayName("senha errada responde com a mesma exceção e não grava nada")
     void deveRecusarSenhaErrada() {
-        when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
-        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+        when(users.findByEmail("dono@moneylog.test")).thenReturn(Optional.of(User.owner(USER_ID, "dono@moneylog.test")));
         when(passwordVerifier.verifyOwner("errada")).thenReturn(false);
 
         assertThatThrownBy(() -> useCase.handle(new LoginCommand("dono@moneylog.test", "errada")))
@@ -126,8 +127,7 @@ class LoginUseCaseImplTest {
     @DisplayName("linha de users que não é o dono nunca autentica, nem com a senha do dono")
     void deveRecusarUsuarioQueNaoEODono() {
         UUID other = UUID.fromString("00000000-0000-0000-0000-0000000000b2");
-        when(users.findByEmail("outro@moneylog.test")).thenReturn(Optional.of(new User(other, "outro@moneylog.test")));
-        when(users.findOwner()).thenReturn(Optional.of(new User(USER_ID, "dono@moneylog.test")));
+        when(users.findByEmail("outro@moneylog.test")).thenReturn(Optional.of(User.member(other, "outro@moneylog.test")));
 
         assertThatThrownBy(() -> useCase.handle(new LoginCommand("outro@moneylog.test", "senha-do-dono")))
                 .isInstanceOf(InvalidCredentialsException.class);
@@ -135,5 +135,56 @@ class LoginUseCaseImplTest {
         verify(passwordVerifier).verifyDummy("senha-do-dono");
         verify(passwordVerifier, never()).verifyOwner(anyString());
         verify(refreshTokens, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("membro ativo com senha no banco entra, a sessão leva o papel MEMBER e o último acesso é gravado")
+    void deveAbrirSessaoDeMembro() {
+        UUID memberId = UUID.fromString("00000000-0000-0000-0000-0000000000b3");
+        User member = User.member(memberId, "membro@moneylog.test");
+        when(users.findByEmail("membro@moneylog.test")).thenReturn(Optional.of(member));
+        when(users.findAccess(memberId)).thenReturn(Optional.of(new OwnerAccess("$hash", false, null, null)));
+        when(passwordVerifier.matches("senha-do-membro", "$hash")).thenReturn(true);
+        when(ids.next()).thenReturn(FAMILY_ID, TOKEN_ID);
+        when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh");
+        when(tokenIssuer.issueAccessToken(member)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+
+        AuthSession session = useCase.handle(new LoginCommand("Membro@moneylog.test", "senha-do-membro"));
+
+        assertThat(session.user()).isEqualTo(member);
+        assertThat(session.userId()).isEqualTo(memberId);
+        verify(users).markLogin(memberId, NOW);
+        verify(passwordVerifier, never()).verifyOwner(anyString());
+    }
+
+    @Test
+    @DisplayName("usuário desativado recebe a mesma exceção de senha errada, gasta o custo do hash fictício e não abre sessão")
+    void deveRecusarUsuarioDesativado() {
+        UUID memberId = UUID.fromString("00000000-0000-0000-0000-0000000000b4");
+        when(users.findByEmail("off@moneylog.test"))
+                .thenReturn(Optional.of(new User(memberId, "off@moneylog.test", UserRole.MEMBER, UserStatus.DISABLED)));
+
+        assertThatThrownBy(() -> useCase.handle(new LoginCommand("off@moneylog.test", "senha-certa-123")))
+                .isInstanceOf(InvalidCredentialsException.class).hasMessage(new InvalidCredentialsException().getMessage());
+
+        verify(passwordVerifier).verifyDummy("senha-certa-123");
+        verify(passwordVerifier, never()).matches(anyString(), anyString());
+        verify(users, never()).markLogin(any(), any());
+        verify(tokenIssuer, never()).issueAccessToken(any());
+        verify(refreshTokens, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("membro sem senha definida nunca autentica com o hash do ambiente e gasta o custo do hash fictício")
+    void deveRecusarMembroSemSenha() {
+        UUID memberId = UUID.fromString("00000000-0000-0000-0000-0000000000b5");
+        when(users.findByEmail("membro@moneylog.test")).thenReturn(Optional.of(User.member(memberId, "membro@moneylog.test")));
+        when(users.findAccess(memberId)).thenReturn(Optional.of(new OwnerAccess(null, false, null, null)));
+
+        assertThatThrownBy(() -> useCase.handle(new LoginCommand("membro@moneylog.test", "senha-do-dono")))
+                .isInstanceOf(InvalidCredentialsException.class);
+
+        verify(passwordVerifier).verifyDummy("senha-do-dono");
+        verify(passwordVerifier, never()).verifyOwner(anyString());
     }
 }

@@ -7,18 +7,24 @@ import java.time.Instant;
 
 import com.moneylog.core.auth.domain.OwnerAccess;
 import com.moneylog.core.auth.domain.User;
+import com.moneylog.core.auth.domain.UserRole;
 
 public interface UserGateway {
 
-    Optional<User> findOwner();
+    Optional<User> findByRole(UserRole role);
 
-    boolean existsById(UUID id);
+    Optional<User> findById(UUID id);
+
+    Optional<User> findByIdLockingShared(UUID id);
 
     Optional<User> findByEmail(String email);
 
     void insert(User user);
 
-    void updateEmail(UUID id, String email);
+
+    void updateRole(UUID id, UserRole role, Instant now);
+
+    void markLogin(UUID id, Instant now);
 
     Optional<OwnerAccess> findAccess(UUID id);
 

@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +19,25 @@ import com.moneylog.util.SqlFixtures;
 
 @DisplayName("IA sem chave: status, prévia, negação, AI_DISABLED, insights e preferências (Etapa 8)")
 class AiIT extends E4ItBase {
+
+    private UUID realOwner;
+
+    @BeforeEach
+    void usuarioDoCenarioViraDono() {
+        realOwner = auth.ownerId();
+        committed(() -> {
+            jdbc.update("update users set role = 'MEMBER' where id = ?", realOwner);
+            jdbc.update("update users set role = 'OWNER' where id = ?", userId);
+        });
+    }
+
+    @AfterEach
+    void devolveODono() {
+        committed(() -> {
+            jdbc.update("update users set role = 'MEMBER' where id = ?", userId);
+            jdbc.update("update users set role = 'OWNER' where id = ?", realOwner);
+        });
+    }
 
     private String expense(String amount, String date) {
         return "{\"type\":\"EXPENSE\",\"amount\":\"" + amount + "\",\"date\":\"" + date + "\",\"description\":\"Mercado\",\"accountId\":\"" + nubank
@@ -65,16 +86,16 @@ class AiIT extends E4ItBase {
     }
 
     @Test
-    @DisplayName("prévia e análise de outro usuário: 404")
+    @DisplayName("prévia e análise com outro usuário (membro): 403, só o dono usa a IA")
     void naoDeveExporDadosDeOutroUsuario() throws Exception {
         JsonNode preview = preview();
         UUID other = UUID.randomUUID();
         committed(() -> SqlFixtures.insertUser(jdbc, other, "ai-" + other + "@example.com"));
         String otherBearer = auth.bearer(other);
 
-        mockMvc.perform(getAs(otherBearer, "/v1/ai/previews/" + preview.get("previewId").asString())).andExpect(status().isNotFound());
+        mockMvc.perform(getAs(otherBearer, "/v1/ai/previews/" + preview.get("previewId").asString())).andExpect(status().isForbidden());
         mockMvc.perform(postAs(otherBearer, "/v1/ai/analyses", "{\"previewId\":\"" + preview.get("previewId").asString() + "\",\"approve\":false}")
-                .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isNotFound());
+                .header("Idempotency-Key", UUID.randomUUID().toString())).andExpect(status().isForbidden());
     }
 
     @Test

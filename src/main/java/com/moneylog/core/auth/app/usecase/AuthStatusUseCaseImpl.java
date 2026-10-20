@@ -2,6 +2,7 @@ package com.moneylog.core.auth.app.usecase;
 
 import com.moneylog.core.auth.app.gateways.PasswordVerifier;
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.UserRole;
 
 public class AuthStatusUseCaseImpl implements AuthStatusUseCase {
 
@@ -15,7 +16,7 @@ public class AuthStatusUseCaseImpl implements AuthStatusUseCase {
 
     @Override
     public AuthStatus handle() {
-        boolean required = users.findOwner()
+        boolean required = users.findByRole(UserRole.OWNER)
                 .flatMap(owner -> users.findAccess(owner.id()))
                 .map(access -> access.passwordSetupRequired(passwordVerifier.hasEnvironmentHash()))
                 .orElse(false);

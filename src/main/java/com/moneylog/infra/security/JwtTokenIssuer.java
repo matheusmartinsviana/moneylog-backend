@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
+import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.sk.time.TimeProvider;
 
 public class JwtTokenIssuer implements TokenIssuer {
@@ -28,11 +29,11 @@ public class JwtTokenIssuer implements TokenIssuer {
     }
 
     @Override
-    public AccessToken issueAccessToken(UUID userId) {
+    public AccessToken issueAccessToken(User user) {
         Instant now = time.now();
         Instant expiresAt = now.plus(properties.accessTokenTtl());
-        JwtClaimsSet claims = JwtClaimsSet.builder().subject(userId.toString()).issuedAt(now).expiresAt(expiresAt)
-                .id(UUID.randomUUID().toString()).build();
+        JwtClaimsSet claims = JwtClaimsSet.builder().subject(user.id().toString()).issuedAt(now).expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString()).claim("role", user.role().name()).build();
         String token = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
         return new AccessToken(token, expiresAt);

@@ -46,7 +46,7 @@ class NoteMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV5 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("5.00").load();
+            Flyway upToV5 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("5.00").load();
             upToV5.migrate();
             assertThat(upToV5.info().current().getVersion().getVersion()).isEqualTo("5.00");
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -102,7 +102,7 @@ class NoteMigrationQaIT {
             long txBefore = jdbc.queryForObject("select count(*) from transactions", Long.class);
             long invoicesBefore = jdbc.queryForObject("select count(*) from credit_card_invoices", Long.class);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
             assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("5.00"));
@@ -226,7 +226,7 @@ class NoteMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             assertThat(all.migrate().success).isTrue();
             JdbcTemplate jdbc = new JdbcTemplate(ds);
             assertThat(jdbc.queryForObject("select count(*) from information_schema.tables where table_name in ('notes','note_tags','note_links')", Long.class)).isEqualTo(3L);

@@ -4,6 +4,7 @@ import static com.moneylog.core.util.Ids.USER_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -21,6 +22,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.moneylog.core.auth.app.gateways.RefreshTokenGateway;
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
+import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.auth.app.gateways.TokenIssuer.AccessToken;
 import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCase.PurgeCommand;
 import com.moneylog.core.auth.app.usecase.PurgeExpiredRefreshTokensUseCaseImpl;
@@ -46,17 +49,21 @@ class SessaoComTetoAbsolutoTest {
     private TokenIssuer tokenIssuer;
     @Mock
     private IdGenerator ids;
+    @Mock
+    private UserGateway users;
 
     private RefreshSessionUseCaseImpl useCase() {
         SessionOpener sessions = new SessionOpener(tokenIssuer, refreshTokens, ids, Duration.ofDays(30), Duration.ofDays(90));
-        return new RefreshSessionUseCaseImpl(refreshTokens, sessions, new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC)),
+        return new RefreshSessionUseCaseImpl(users, refreshTokens, sessions, new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC)),
                 Duration.ofSeconds(30));
     }
 
     private void stubIssuer() {
+        lenient().when(refreshTokens.findUserIdByHash(RefreshTokenHash.of(RAW))).thenReturn(java.util.Optional.of(USER_ID));
+        lenient().when(users.findByIdLockingShared(USER_ID)).thenReturn(java.util.Optional.of(User.owner(USER_ID, "dono@moneylog.test")));
         when(ids.next()).thenReturn(NEW_ID);
         when(tokenIssuer.newRefreshTokenValue()).thenReturn("refresh-novo");
-        when(tokenIssuer.issueAccessToken(USER_ID)).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
+        when(tokenIssuer.issueAccessToken(any(User.class))).thenReturn(new AccessToken("jwt", NOW.plusSeconds(900)));
     }
 
     private RefreshToken tokenDeUmaFamiliaQueComecou(Instant familyStartedAt, Instant expiresAt) {
@@ -100,7 +107,7 @@ class SessaoComTetoAbsolutoTest {
         stubIssuer();
         SessionOpener sessions = new SessionOpener(tokenIssuer, refreshTokens, ids, Duration.ofDays(30), Duration.ofDays(90));
 
-        AuthSession session = sessions.open(USER_ID, FAMILY, NOW);
+        AuthSession session = sessions.open(User.owner(USER_ID, "dono@moneylog.test"), FAMILY, NOW);
 
         assertThat(session.refreshExpiresAt()).isEqualTo(NOW.plus(Duration.ofDays(30)));
         ArgumentCaptor<RefreshToken> inserted = ArgumentCaptor.forClass(RefreshToken.class);

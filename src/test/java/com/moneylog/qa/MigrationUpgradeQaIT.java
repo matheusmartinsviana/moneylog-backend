@@ -31,7 +31,7 @@ class MigrationUpgradeQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV1 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("1.08").load();
+            Flyway upToV1 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("1.08").load();
             assertThat(upToV1.migrate().migrationsExecuted).isEqualTo(9);
 
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -55,7 +55,7 @@ class MigrationUpgradeQaIT {
             jdbc.update("insert into ledger_postings (id,user_id,source_type,source_id,transaction_id,book_type,book_id,competence,effective_date,amount_cents,currency,active,created_at,updated_at) "
                     + "values (?,?,'TRANSACTION',?,?,'EXPENSE',?,'2026-10','2026-10-02',500,'BRL',true,?,?)", UUID.randomUUID(), ua, tx, tx, catA, NOW, NOW);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
             assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("1.08"));
             assertThat(result.success).isTrue();
@@ -119,7 +119,7 @@ class MigrationUpgradeQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upTo800 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("8.00").load();
+            Flyway upTo800 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("8.00").load();
             upTo800.migrate();
 
             JdbcTemplate jdbc = new JdbcTemplate(ds);
@@ -139,7 +139,7 @@ class MigrationUpgradeQaIT {
                     + "values (?,?,'EXPENSE','ACTIVE',500,'BRL','2026-10-02','x','PIX',?,'IMPORT',?,?,?)";
             jdbc.update(sqlTx, tx, ua, acc, batchA, NOW, NOW);
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             assertThat(all.migrate().success).isTrue();
 
             assertThat(jdbc.queryForObject("select import_batch_id from transactions where id = ?", UUID.class, tx)).isEqualTo(batchA);

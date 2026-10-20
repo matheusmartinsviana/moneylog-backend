@@ -141,23 +141,19 @@ class AuthIT {
         }
 
         @Test
-        @DisplayName("trocar o e-mail no ambiente mantém o id, não publica OwnerCreated e mascara o e-mail no log")
-        void deveTrocarOEmailMantendoOId(CapturedOutput output) throws Exception {
+        @DisplayName("e-mail do ambiente diferente do dono gravado: a subida falha, sem renomear nem criar usuário, e o login antigo segue valendo")
+        void deveFalharQuandoOEmailDivergeDoDono() throws Exception {
             UUID id = auth.ownerId();
-            String bearer = auth.ownerBearer();
 
-            bootstrap("novo@example.com").run(null);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> bootstrap("novo@example.com").run(null))
+                    .isInstanceOf(com.moneylog.core.auth.exception.OwnerEmailConflictException.class)
+                    .hasMessageContaining("MONEYLOG_OWNER_EMAIL");
 
             assertThat(jdbc.queryForObject("select count(*) from users", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("select id from users", UUID.class)).isEqualTo(id);
-            assertThat(jdbc.queryForObject("select email from users", String.class)).isEqualTo("novo@example.com");
+            assertThat(jdbc.queryForObject("select email from users", String.class)).isEqualTo("owner@example.com");
             assertThat(events.stream(OwnerCreated.class)).isEmpty();
-            assertThat(output.getAll()).contains("o***@example.com").contains("n***@example.com")
-                    .doesNotContain("novo@example.com").doesNotContain("owner@example.com");
-            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/test/me")
-                            .header("Authorization", bearer))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.userId").value(id.toString()));
-            mockMvc.perform(login("novo@example.com", PASSWORD, novoIp())).andExpect(status().isOk());
+            mockMvc.perform(login("owner@example.com", PASSWORD, novoIp())).andExpect(status().isOk());
         }
     }
 
