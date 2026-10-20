@@ -31,3 +31,6 @@ moneylog:
   auth:
     # Sempre true em produção (CookieSecurityGuard recusa o contrário fora do perfil dev).
     cookie-secure: true
+  invitations:
+    # Desligado em produção até cumprir o portão de liberação do plano de multiusuário.
+    enabled: ${MONEYLOG_INVITATIONS_ENABLED:false}

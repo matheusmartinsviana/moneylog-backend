@@ -24,6 +24,11 @@ public interface UserGateway {
 
     void insert(User user);
 
+    void insertWithPassword(User user, String passwordHash, Instant now);
+
+    boolean existsByEmail(String email);
+
+    long count();
 
     void updateRole(UUID id, UserRole role, Instant now);
 

@@ -19,6 +19,8 @@ moneylog:
     rate-limit:
       # os ITs exportam muitas vezes por usuário; o limite tem teste próprio (ExportLimitsIT), que o reduz
       max-requests: 100000
+  mail:
+    provider: fake
   owner:
     email: owner@example.com
     # BCrypt (custo 10) de "senha-forte-123".

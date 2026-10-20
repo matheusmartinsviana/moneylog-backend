@@ -41,6 +41,8 @@ import tools.jackson.databind.exc.UnrecognizedPropertyException;
 
 import com.moneylog.core.ai.exception.AiExceptions.AiProviderUnavailableException;
 import com.moneylog.core.ai.exception.AiExceptions.AiRateLimitedException;
+import com.moneylog.core.invitation.exception.HasInvitationId;
+import com.moneylog.core.mail.app.EmailDeliveryException;
 import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.DomainException;
@@ -70,6 +72,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return respond(HttpStatus.NOT_FOUND, ex.code(), ex.getMessage(), request);
     }
 
+    @ExceptionHandler(EmailDeliveryException.class)
+    ResponseEntity<Object> handleEmailDelivery(EmailDeliveryException ex, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.BAD_GATEWAY, ex.code(), ex.getMessage(), request);
+        addInvitationId(problem, ex);
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(problem);
+    }
+
     @ExceptionHandler(com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException.class)
     ResponseEntity<Object> handleImportApplyFailed(
             com.moneylog.core.importing.exception.ImportingExceptions.ImportApplyFailedException ex, HttpServletRequest request) {
@@ -86,7 +95,15 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     ResponseEntity<Object> handleConflict(ConflictException ex, HttpServletRequest request) {
-        return respond(HttpStatus.CONFLICT, ex.code(), ex.getMessage(), request);
+        ProblemDetail problem = problem(HttpStatus.CONFLICT, ex.code(), ex.getMessage(), request);
+        addInvitationId(problem, ex);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(problem);
+    }
+
+    private static void addInvitationId(ProblemDetail problem, Exception ex) {
+        if (ex instanceof HasInvitationId withId && withId.invitationId() != null) {
+            problem.setProperty("invitationId", withId.invitationId());
+        }
     }
 
     @ExceptionHandler(com.moneylog.core.card.exception.CardExceptions.InvoiceResolutionCollidedException.class)

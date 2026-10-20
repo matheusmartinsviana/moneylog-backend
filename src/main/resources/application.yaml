@@ -101,6 +101,14 @@ moneylog:
     max-session-age: P90D
     # Refresh expirado fica na tabela por este tempo e depois é apagado (B7).
     refresh-retention: P7D
+  invitations:
+    # Convites por e-mail (ADR-032). Desligado: criar, reenviar, pré-visualizar e aceitar respondem 404; a gestão de usuários segue.
+    enabled: ${MONEYLOG_INVITATIONS_ENABLED:true}
+    validity-days: 7
+    retention-days: 90
+  users:
+    # Teto de usuários (ativos e desativados) somados aos convites pendentes não expirados.
+    max: ${MONEYLOG_USERS_MAX:10}
   export:
     # Teto de movimentações do backup e do CSV (S-260): acima dele, 422 EXPORT_TOO_LARGE. Medido: 50.000 = backup de 57 MB e heap +121 MB.
     max-transactions: 200000
