@@ -7,6 +7,8 @@ regexes = [
   "senha-forte-123",
   "senha-do-membro-456",
   "senha-do-convidado-789",
+  "senha-errada-000000",
+  "senha-vazada-123456",
   "0c8a1d52-3f1e-4c0b-8a67-5d2e9b7f4a31",
   "notification\\.[a-z.0-9]+",
 ]
