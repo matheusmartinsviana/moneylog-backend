@@ -42,7 +42,7 @@ class GoalMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway upToV4 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").target("4.02").load();
+            Flyway upToV4 = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).target("4.02").load();
             upToV4.migrate();
             assertThat(upToV4.info().current().getVersion().getVersion()).isEqualTo("4.02");
 
@@ -71,7 +71,7 @@ class GoalMigrationQaIT {
             long accountsBefore = jdbc.queryForObject("select count(*) from accounts", Long.class);
             assertThatThrownBy(() -> jdbc.queryForObject("select count(*) from goals", Long.class)).hasMessageContaining("goals");
 
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             var result = all.migrate();
             assertThat(result.success).isTrue();
             assertThat(result.migrationsExecuted).isEqualTo(com.moneylog.util.MigrationFiles.countAfter("4.02"));
@@ -138,7 +138,7 @@ class GoalMigrationQaIT {
         try (PostgreSQLContainer pg = new PostgreSQLContainer(DockerImageName.parse(PostgresTestcontainer.IMAGE))) {
             pg.start();
             DriverManagerDataSource ds = new DriverManagerDataSource(pg.getJdbcUrl(), pg.getUsername(), pg.getPassword());
-            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").load();
+            Flyway all = Flyway.configure().dataSource(ds).locations("classpath:db/migration").placeholders(java.util.Map.of("owner-email", "")).load();
             assertThat(all.migrate().success).isTrue();
             JdbcTemplate jdbc = new JdbcTemplate(ds);
             assertThat(jdbc.queryForObject("select count(*) from information_schema.tables where table_name in ('goals','goal_reservations')", Long.class)).isEqualTo(2L);
