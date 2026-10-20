@@ -1,12 +1,15 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.38.0
+  version: 2.38.1
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
+
+    ## Correção 2.38.1 (só acréscimo compatível)
+    `GET /v1/ai/analyses` passa a declarar o `403` (`ForbiddenRole`) que já devolvia para `MEMBER`.
 
     ## Multiusuário por convite (2.38.0, só acréscimos compatíveis, ADR-032)
     O dono (`OWNER`, exatamente um) convida pessoas por e-mail; cada convidado (`MEMBER`) tem conta própria, com dados totalmente isolados dos demais, inclusive do dono. Não há cadastro público.
@@ -6080,6 +6083,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/ForbiddenRole'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /v1/ai/analyses/{id}:
