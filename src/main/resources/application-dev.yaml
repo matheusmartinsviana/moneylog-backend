@@ -11,6 +11,10 @@ spring:
       hibernate:
         format_sql: true
 
+moneylog:
+  mail:
+    provider: ${MAIL_PROVIDER:log}
+
 logging:
   level:
     org.flywaydb: info

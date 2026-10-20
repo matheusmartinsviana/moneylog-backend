@@ -30,7 +30,8 @@ class ArchitectureTest {
                     "org.hibernate..",
                     "com.fasterxml..",
                     "tools.jackson..",
-                    "lombok..")
+                    "lombok..",
+                    "software.amazon..")
             .because("o core é Java puro (BE 01, D2 §3.2)");
 
     @ArchTest

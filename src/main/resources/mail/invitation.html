@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Você foi convidado para o Monelog</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f2ea;">
+<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f1f2ea;">{{inviterEmail}} convidou você para o Monelog.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f1f2ea" style="background-color:#f1f2ea;">
+<tr>
+<td align="center" style="padding:32px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+<tr>
+<td style="padding:0 8px 16px 8px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:18px;font-weight:600;color:#1f4d3a;">Monelog</td>
+</tr>
+<tr>
+<td bgcolor="#fcfcf8" style="background-color:#fcfcf8;border:1px solid #dde1d3;border-radius:16px;padding:32px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#14231c;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td style="font-size:22px;line-height:30px;font-weight:600;color:#14231c;padding-bottom:16px;">Oi,</td>
+</tr>
+<tr>
+<td style="font-size:16px;line-height:24px;color:#14231c;padding-bottom:24px;"><strong>{{inviterEmail}}</strong> convidou você para o Monelog, um espaço privado para organizar suas finanças com calma.</td>
+</tr>
+<tr>
+<td style="font-size:16px;line-height:24px;color:#14231c;padding-bottom:16px;">Para criar sua conta, abra o link e escolha uma senha.</td>
+</tr>
+<tr>
+<td align="left" style="padding-bottom:24px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td align="center" bgcolor="#1f4d3a" style="background-color:#1f4d3a;border-radius:999px;"><a href="{{link}}" style="display:inline-block;padding:12px 28px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;color:#f6f7f0;text-decoration:none;">Criar minha conta</a></td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td style="font-size:14px;line-height:21px;color:#4b5b51;padding-bottom:8px;">Se o botão não abrir, copie este endereço no navegador:</td>
+</tr>
+<tr>
+<td style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;line-height:20px;color:#14231c;padding-bottom:24px;word-break:break-all;"><a href="{{link}}" style="color:#1f4d3a;text-decoration:underline;">{{link}}</a></td>
+</tr>
+<tr>
+<td style="font-size:14px;line-height:21px;color:#4b5b51;padding-bottom:8px;">O convite vale por {{validity}}, até {{expiresAt}} (horário de Brasília), e só pode ser usado uma vez.</td>
+</tr>
+<tr>
+<td style="font-size:14px;line-height:21px;color:#4b5b51;">Se você não esperava este convite, ignore esta mensagem. Nada será criado.</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td style="padding:16px 8px 0 8px;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#4b5b51;">Este convite foi enviado para {{inviteeEmail}}.</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>

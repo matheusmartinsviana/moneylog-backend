@@ -1,0 +1,14 @@
+Oi,
+
+{{inviterEmail}} convidou você para o Monelog, um espaço privado para organizar suas finanças com calma.
+
+Para criar sua conta, abra o link abaixo e escolha uma senha:
+{{link}}
+
+O convite vale por {{validity}}, até {{expiresAt}} (horário de Brasília), e só pode ser usado uma vez.
+
+Se você não esperava este convite, ignore esta mensagem. Nada será criado.
+
+Este convite foi enviado para {{inviteeEmail}}.
+
+Monelog

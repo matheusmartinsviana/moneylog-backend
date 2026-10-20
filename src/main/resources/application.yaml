@@ -183,3 +183,13 @@ moneylog:
       access-key: ${BACKUP_S3_ACCESS_KEY:}
       secret-key: ${BACKUP_S3_SECRET_KEY:}
       session-token: ${BACKUP_S3_SESSION_TOKEN:}
+  mail:
+    # E-mail transacional (convites, ADR-032). none (padrão) desliga; log só escreve no log (dev); ses envia pelo Amazon SES.
+    # No SES as credenciais vêm do papel da EC2 (cadeia padrão do SDK); nunca grave chave de acesso aqui.
+    provider: ${MAIL_PROVIDER:none}
+    from: ${MAIL_FROM:}
+    reply-to: ${MAIL_REPLY_TO:}
+    app-base-url: ${MAIL_APP_BASE_URL:https://moneylog.mviana.tech}
+    ses:
+      region: ${MAIL_SES_REGION:}
+      configuration-set: ${MAIL_SES_CONFIGURATION_SET:}
