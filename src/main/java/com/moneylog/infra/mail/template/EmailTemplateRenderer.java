@@ -18,7 +18,9 @@ import com.moneylog.core.mail.app.RenderedEmail;
 
 public class EmailTemplateRenderer implements EmailTemplate {
 
-    static final String INVITATION_SUBJECT = "Você foi convidado para o Monelog";
+    static final String BRAND_NAME = "Monelog";
+    static final String INVITATION_SUBJECT = "Você foi convidado para o " + BRAND_NAME;
+    private static final String PREHEADER_SUFFIX = " convidou você para o " + BRAND_NAME + ". O convite vale por ";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{([A-Za-z]+)}}");
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     private static final DateTimeFormatter EXPIRATION = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy 'às' HH:mm", Locale.of("pt", "BR"));
@@ -35,12 +37,16 @@ public class EmailTemplateRenderer implements EmailTemplate {
 
     @Override
     public RenderedEmail renderInvitation(InvitationEmailModel model) {
+        String validity = model.validityDays() == 1 ? "1 dia" : model.validityDays() + " dias";
         Map<String, String> values = Map.of(
+                "brand", BRAND_NAME,
+                "subject", INVITATION_SUBJECT,
+                "preheader", model.inviterEmail() + PREHEADER_SUFFIX + validity + ".",
                 "inviterEmail", model.inviterEmail(),
                 "inviteeEmail", model.inviteeEmail(),
                 "link", appBaseUrl + "/convite#" + model.token(),
                 "expiresAt", EXPIRATION.format(model.expiresAt().atZone(ZONE)),
-                "validity", model.validityDays() == 1 ? "1 dia" : model.validityDays() + " dias");
+                "validity", validity);
         return new RenderedEmail(INVITATION_SUBJECT, fill(invitationHtml, values, EmailTemplateRenderer::escapeHtml), fill(invitationText, values, v -> v));
     }
 
