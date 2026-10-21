@@ -25,7 +25,7 @@ class ContractErrorCodesTest {
 
     private static final Set<String> INTERNAL = Set.of("INVOICE_CHAIN_INCONSISTENT", "CARD_INVALID_INSTALLMENT");
 
-    private static final Set<String> ENUM_WORDS_IN_TABLE = Set.of("AMOUNT", "FGTS", "FIXED", "LOAN", "RESERVED", "VARIABLE");
+    private static final Set<String> ENUM_WORDS_IN_TABLE = Set.of("AMOUNT", "CHECKING", "FGTS", "FIXED", "LOAN", "RESERVED", "SAVINGS", "VARIABLE", "WALLET");
 
     private static final Set<String> NOT_CODES = Set.of("CARD_PURCHASE", "CARD_COMMITTED", "CARD_LIMIT_USAGE", "CARD_CLOSING_SOON");
 
