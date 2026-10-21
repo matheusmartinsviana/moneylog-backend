@@ -17,6 +17,7 @@
 @media (prefers-color-scheme: dark) {
   .bg-canvas { background-color: #0b1d15 !important; }
   .bg-surface { background-color: #111b15 !important; border-color: #243127 !important; }
+  .bg-note { background-color: #1a2a20 !important; }
   .tx { color: #f2f3ea !important; }
   .tx-muted { color: #a9b6ac !important; }
   .brand, .lnk { color: #a9cdb5 !important; }
@@ -28,10 +29,12 @@
 [data-ogsc] .brand, [data-ogsc] .lnk { color: #a9cdb5 !important; }
 [data-ogsb] .bg-canvas { background-color: #0b1d15 !important; }
 [data-ogsb] .bg-surface { background-color: #111b15 !important; }
+[data-ogsb] .bg-note { background-color: #1a2a20 !important; }
 [data-ogsb] .btn-bg { background-color: #a9cdb5 !important; }
 [data-ogsc] .btn-tx { color: #0a1a12 !important; }
 @media only screen and (max-width: 620px) {
   .px { padding-left: 20px !important; padding-right: 20px !important; }
+  .btn-cell { display: block !important; width: 100% !important; }
 }
 </style>
 </head>
@@ -46,46 +49,59 @@
 <![endif]-->
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
 <tr>
-<td class="brand" style="padding:0 8px 16px 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:18px;font-weight:600;color:#1f4d3a;">{{brand}}</td>
-</tr>
-<tr>
-<td class="bg-surface px" bgcolor="#fcfcf8" style="background-color:#fcfcf8;border:1px solid #dde1d3;border-radius:16px;padding:32px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#14231c;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-<tr>
-<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:22px;line-height:30px;font-weight:600;color:#14231c;padding-bottom:16px;">Oi,</td>
-</tr>
-<tr>
-<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#14231c;padding-bottom:24px;"><strong>{{inviterEmail}}</strong> convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.</td>
-</tr>
-<tr>
-<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#14231c;padding-bottom:16px;">Para criar sua conta, abra o link e escolha uma senha.</td>
-</tr>
-<tr>
-<td align="left" style="padding-bottom:24px;">
+<td style="padding:0 8px 20px 8px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr>
-<td align="center" bgcolor="#1f4d3a" class="btn-bg" style="background-color:#1f4d3a;border-radius:999px;mso-padding-alt:14px 28px;"><a href="{{link}}" class="btn-tx" target="_blank" style="display:inline-block;padding:14px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:600;color:#f6f7f0;text-decoration:none;">Criar minha conta</a></td>
+<td width="48" valign="middle" style="width:48px;padding-right:12px;"><img src="{{logoUrl}}" width="48" height="48" alt="{{brand}}" style="display:block;border:0;outline:none;text-decoration:none;width:48px;height:48px;border-radius:12px;"></td>
+<td class="brand" valign="middle" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:24px;line-height:48px;font-weight:700;color:#1f4d3a;">{{brand}}</td>
 </tr>
 </table>
 </td>
 </tr>
 <tr>
-<td class="tx-muted" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:21px;color:#4b5b51;padding-bottom:8px;">Se o botão não abrir, copie este endereço no navegador:</td>
+<td class="bg-surface px" bgcolor="#fcfcf8" style="background-color:#fcfcf8;border:1px solid #dde1d3;border-radius:16px;padding:40px 36px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#14231c;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="tx-muted" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:24px;color:#4b5b51;padding-bottom:8px;">Oi,</td>
 </tr>
 <tr>
-<td class="tx" style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;line-height:20px;color:#14231c;padding-bottom:24px;word-break:break-all;"><a href="{{link}}" class="lnk" target="_blank" style="color:#1f4d3a;text-decoration:underline;">{{link}}</a></td>
+<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:28px;line-height:36px;font-weight:700;color:#14231c;padding-bottom:20px;">Você foi convidado para o {{brand}}</td>
 </tr>
 <tr>
-<td class="tx-muted" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:21px;color:#4b5b51;padding-bottom:8px;">O convite vale por {{validity}}, até {{expiresAt}} (horário de Brasília), e só pode ser usado uma vez.</td>
+<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#14231c;padding-bottom:12px;"><strong>{{inviterEmail}}</strong> convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.</td>
 </tr>
 <tr>
-<td class="tx-muted" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:21px;color:#4b5b51;">Se você não esperava este convite, ignore esta mensagem. Nada será criado.</td>
+<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#14231c;padding-bottom:28px;">Para criar sua conta, abra o link e escolha uma senha.</td>
+</tr>
+<tr>
+<td align="left" style="padding-bottom:28px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td align="center" bgcolor="#1f4d3a" class="btn-bg btn-cell" style="background-color:#1f4d3a;border-radius:999px;mso-padding-alt:16px 40px;"><a href="{{link}}" class="btn-tx" target="_blank" style="display:block;padding:16px 40px;min-height:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:18px;line-height:20px;font-weight:700;color:#f6f7f0;text-decoration:none;text-align:center;">Criar minha conta</a></td>
 </tr>
 </table>
 </td>
 </tr>
 <tr>
-<td class="tx-muted" style="padding:16px 8px 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#4b5b51;">Este convite foi enviado para {{inviteeEmail}}.</td>
+<td class="bg-note" bgcolor="#e1eae2" style="background-color:#e1eae2;border-radius:12px;padding:14px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr>
+<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#14231c;">O convite vale por {{validity}}, até {{expiresAt}} (horário de Brasília), e só pode ser usado uma vez.</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td class="tx-muted" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:22px;color:#4b5b51;padding-top:28px;padding-bottom:8px;">Se o botão não abrir, copie este endereço no navegador:</td>
+</tr>
+<tr>
+<td class="tx" style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:14px;line-height:22px;color:#14231c;word-break:break-all;"><a href="{{link}}" class="lnk" target="_blank" style="color:#1f4d3a;text-decoration:underline;">{{link}}</a></td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td class="tx-muted" style="padding:20px 8px 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#4b5b51;">Se você não esperava este convite, ignore esta mensagem. Nada será criado.<br>Enviado pelo {{brand}} a pedido de {{inviterEmail}} para {{inviteeEmail}}.</td>
 </tr>
 </table>
 <!--[if mso]>

@@ -20,6 +20,7 @@ public class EmailTemplateRenderer implements EmailTemplate {
 
     static final String BRAND_NAME = "Monelog";
     static final String INVITATION_SUBJECT = "Você foi convidado para o " + BRAND_NAME;
+    private static final String LOGO_PATH = "/assets/icons/icon-192.png";
     private static final String PREHEADER_SUFFIX = " convidou você para o " + BRAND_NAME + ". O convite vale por ";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{([A-Za-z]+)}}");
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
@@ -44,6 +45,7 @@ public class EmailTemplateRenderer implements EmailTemplate {
                 "preheader", model.inviterEmail() + PREHEADER_SUFFIX + validity + ".",
                 "inviterEmail", model.inviterEmail(),
                 "inviteeEmail", model.inviteeEmail(),
+                "logoUrl", appBaseUrl + LOGO_PATH,
                 "link", appBaseUrl + "/convite#" + model.token(),
                 "expiresAt", EXPIRATION.format(model.expiresAt().atZone(ZONE)),
                 "validity", validity);

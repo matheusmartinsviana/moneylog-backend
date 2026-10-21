@@ -1,5 +1,7 @@
 Oi,
 
+Você foi convidado para o {{brand}}.
+
 {{inviterEmail}} convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.
 
 Para criar sua conta, abra o link abaixo e escolha uma senha:
@@ -8,7 +10,6 @@ Para criar sua conta, abra o link abaixo e escolha uma senha:
 O convite vale por {{validity}}, até {{expiresAt}} (horário de Brasília), e só pode ser usado uma vez.
 
 Se você não esperava este convite, ignore esta mensagem. Nada será criado.
-
-Este convite foi enviado para {{inviteeEmail}}.
+Enviado pelo {{brand}} a pedido de {{inviterEmail}} para {{inviteeEmail}}.
 
 {{brand}}
