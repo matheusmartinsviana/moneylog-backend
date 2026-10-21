@@ -22,7 +22,7 @@ info:
     | 401 | `QUICK_TOKEN_INVALID` |
     | 404 | `QUICK_TOKEN_NOT_FOUND` (token de outro usuário ou inexistente), `ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente, ao gerar o token) |
     | 409 | `QUICK_TOKEN_LIMIT_REACHED` (tokens ativos no máximo), `IDEMPOTENCY_KEY_REUSED` |
-    | 422 | `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
+    | 422 | `DEFAULT_CATEGORY_UNAVAILABLE` (existente: sem `category` e a categoria padrão indisponível), `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`: falhas de token por IP ou chamadas demais por minuto com o token válido) |
 
     ## Quem convidou (2.39.0, só acréscimo compatível)
@@ -859,7 +859,7 @@ paths:
                   expiresInDays: 30
       responses:
         '201':
-          description: Token criado. O campo `token` não volta em nenhuma outra resposta.
+          description: Token criado. O campo `token` não volta em nenhuma outra resposta. A `Location` aponta para `/v1/quick-entry-tokens/{id}`, que não tem `GET` próprio; o recurso é lido pela lista.
           headers:
             Location:
               $ref: '#/components/headers/Location'
@@ -947,7 +947,7 @@ paths:
       summary: Lista os tokens do usuário (lista curta, sem paginação)
       description: |
         Sessão JWT. Só os tokens do próprio usuário, os mais recentes primeiro, **incluindo revogados e expirados** (auditoria). Nunca traz o token em claro, só `prefix`.
-        `lastUsedIp` vem mascarado (IPv4 sem o último octeto; IPv6 sem os 80 bits finais). O total é limitado pela retenção do histórico, não por página.
+        `lastUsedIp` vem mascarado (IPv4 sem o último octeto; IPv6 sem os 80 bits finais). Sem paginação: a lista traz todos os tokens do usuário, e os revogados e expirados ficam no histórico para auditoria.
       responses:
         '200':
           description: Tokens do usuário.
@@ -1040,7 +1040,7 @@ paths:
 
         `amount` é **texto** em formato brasileiro: `R$` e espaços são ignorados; com vírgula, ela é o decimal (1 ou 2 casas) e os pontos antes dela são milhar em grupos de 3; sem vírgula, o ponto só é decimal
         com 1 ou 2 casas depois. Exemplos: `35`, `35,5`, `35,50`, `1.234,56`, `R$ 35,00`, `35.50` valem; `1.234`, `35.500` e `1.234.567` são `422 QUICK_AMOUNT_AMBIGUOUS`; `10,005`, `0`, `-5`, vazio e
-        `abc` são `422 QUICK_AMOUNT_INVALID`. `amount` numérico (não texto) é `400`. Sem `category`, vale a categoria de sistema `OTHER_EXPENSE` (gasto) ou `OTHER_INCOME` (entrada); `category` é a chave de sistema
+        `abc` são `422 QUICK_AMOUNT_INVALID`. `amount` numérico (não texto) é `400`. `category` é opcional: omitida (fluxo tipo, nome e valor), a movimentação recebe a categoria de sistema `OTHER_EXPENSE` (gasto) ou `OTHER_INCOME` (entrada), a mesma regra de `categoryId` ausente em `POST /v1/transactions` (2.11.0); nunca fica sem categoria, e a resposta traz a categoria aplicada. Se a categoria padrão não existir ou estiver arquivada, `422 DEFAULT_CATEGORY_UNAVAILABLE`. Enviada, `category` é a chave de sistema
         (`FOOD`) ou o nome sem diferenciar acento e caixa, entre as categorias ativas do próprio usuário. `method` é só do gasto e fica nulo se omitido; enviado numa entrada, é `400`. `date` omitida = hoje no fuso
         do usuário; aceita de hoje menos 366 dias até hoje; a hora não é gravada.
 
@@ -1060,6 +1060,11 @@ paths:
             schema:
               $ref: '#/components/schemas/QuickEntryInput'
             examples:
+              minimo:
+                summary: Só tipo e valor; a categoria padrão (Outros) é aplicada
+                value:
+                  kind: EXPENSE
+                  amount: '12,90'
               gasto:
                 summary: Gasto de R$ 35,50 em Alimentação
                 value:
@@ -1076,7 +1081,7 @@ paths:
                   category: Salário
       responses:
         '201':
-          description: Lançamento criado (ou replay da mesma chave, com o mesmo `id` e `message`).
+          description: Lançamento criado (ou replay da mesma chave, com o mesmo `id` e `message`). A `Location` aponta para `/v1/transactions/{id}`, rota que o token não acessa; o dono consulta o lançamento pelo app.
           headers:
             Location:
               $ref: '#/components/headers/Location'
@@ -1180,7 +1185,7 @@ paths:
         '422':
           description: |
             Regra de negócio, nada gravado: `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS`, `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia
-            ou por valor no dia) e `QUICK_ACCOUNT_NOT_ALLOWED` (a conta do token foi arquivada depois de gerado). O `detail` já vem em português para o Atalho exibir.
+            ou por valor no dia), `DEFAULT_CATEGORY_UNAVAILABLE` (sem `category` e a categoria padrão de sistema não existe ou está arquivada) e `QUICK_ACCOUNT_NOT_ALLOWED` (a conta do token foi arquivada depois de gerado). O `detail` já vem em português para o Atalho exibir.
           content:
             application/problem+json:
               schema:
@@ -17853,7 +17858,7 @@ components:
           type: string
           minLength: 8
           maxLength: 8
-          description: Primeiros caracteres do segredo, só para o usuário identificar o token. Não serve para autenticar.
+          description: Identificador de 8 caracteres para o usuário reconhecer o token na lista. Não faz parte da parte secreta e não serve para autenticar.
         scope:
           type: string
           enum: [QUICK_ENTRY]
@@ -17890,16 +17895,60 @@ components:
             - $ref: '#/components/schemas/QuickEntryTokenRevokedReason'
             - type: 'null'
     QuickEntryTokenCreated:
-      description: Resposta da criação, com o token na visão de listagem mais o segredo em claro, que existe só aqui.
-      allOf:
-        - $ref: '#/components/schemas/QuickEntryToken'
-        - type: object
-          required: [token]
-          properties:
-            token:
-              type: string
-              pattern: '^mlq_[A-Za-z0-9_-]{8}_[A-Za-z0-9_-]{43}$'
-              description: Segredo completo. Mostrado uma única vez; o servidor guarda apenas o hash.
+      type: object
+      description: Resposta da criação. Os campos de `QuickEntryToken` (repetidos de propósito, para o `additionalProperties false` valer sem depender de composição) mais o segredo em claro, que existe só aqui.
+      required: [token, id, label, prefix, scope, accountId, accountName, status, expiresAt, createdAt, lastUsedAt, lastUsedIp, lastUsedUserAgent, revokedAt, revokedReason]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        prefix:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: Identificador de 8 caracteres para o usuário reconhecer o token na lista. Não faz parte da parte secreta e não serve para autenticar.
+        scope:
+          type: string
+          enum: [QUICK_ENTRY]
+        accountId:
+          type: string
+          format: uuid
+        accountName:
+          type: string
+          description: Nome da conta vinculada, para a tela não precisar de outra chamada.
+        status:
+          $ref: '#/components/schemas/QuickEntryTokenStatus'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Atualizado no máximo uma vez por minuto.
+        lastUsedIp:
+          type: [string, 'null']
+          description: IP do último uso, mascarado (IPv4 sem o último octeto, por exemplo `187.12.34.0`; IPv6 sem os 80 bits finais).
+        lastUsedUserAgent:
+          type: [string, 'null']
+          maxLength: 120
+          description: User-Agent do último uso, truncado em 120 caracteres.
+        revokedAt:
+          type: [string, 'null']
+          format: date-time
+        revokedReason:
+          oneOf:
+            - $ref: '#/components/schemas/QuickEntryTokenRevokedReason'
+            - type: 'null'
+        token:
+          type: string
+          pattern: '^mlq_[A-Za-z0-9_-]{8}_[A-Za-z0-9_-]{43}$'
+          description: Segredo completo. Mostrado uma única vez; o servidor guarda apenas o hash.
     QuickEntryInput:
       type: object
       required: [kind, amount]
@@ -17948,9 +17997,8 @@ components:
         description:
           type: [string, 'null']
         category:
-          oneOf:
-            - $ref: '#/components/schemas/CategoryRef'
-            - type: 'null'
+          $ref: '#/components/schemas/CategoryRef'
+          description: Categoria aplicada. Nunca nula; sem `category` no pedido, é a categoria padrão de sistema.
         account:
           $ref: '#/components/schemas/AccountRef'
         method:
