@@ -108,7 +108,6 @@ class QuickEntryTokenManagementIT {
     void deveCriar(CapturedOutput output) throws Exception {
         MvcResult result = createToken(bearer, walletId, 30);
 
-        mockMvc.perform(MockMvcRequestBuilders.get("/v1/quick-entry-tokens").header(HttpHeaders.AUTHORIZATION, bearer)).andReturn();
         assertThat(result.getResponse().getStatus()).isEqualTo(201);
         JsonNode body = read(result);
         String secret = body.get("token").asString();
@@ -207,7 +206,7 @@ class QuickEntryTokenManagementIT {
     }
 
     @Test
-    @DisplayName("duas criações simultâneas com 2 ativos resultam em no máximo 3 ativos")
+    @DisplayName("seis criações simultâneas com 2 ativos resultam em exatamente 3 ativos")
     void deveSerializarCriacoesConcorrentes() throws Exception {
         createOk();
         createOk();
@@ -251,6 +250,52 @@ class QuickEntryTokenManagementIT {
 
         assertThat(second.get("revokedAt")).isEqualTo(first.get("revokedAt"));
         assertThat(output.getAll()).contains("event=quick_token_revoked").doesNotContain(created.get("token").asString());
+    }
+
+    @Test
+    @DisplayName("duas revogações simultâneas respondem 200 e o mesmo revokedAt")
+    void deveRevogarEmParalelo() throws Exception {
+        String id = createOk().get("id").asString();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<MvcResult>> futures = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+                Callable<MvcResult> call = () -> mockMvc.perform(withBearer(MockMvcRequestBuilders.post("/v1/quick-entry-tokens/" + id + "/revoke"), bearer)).andReturn();
+                futures.add(pool.submit(call));
+            }
+            MvcResult a = futures.get(0).get();
+            MvcResult b = futures.get(1).get();
+            assertThat(a.getResponse().getStatus()).isEqualTo(200);
+            assertThat(b.getResponse().getStatus()).isEqualTo(200);
+            assertThat(read(a).get("revokedAt")).isEqualTo(read(b).get("revokedAt"));
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @DisplayName("criar em paralelo com a desativação não deixa token ativo para o usuário desativado")
+    void naoDeveSobrarTokenAtivoNaCorridaCriarDesativar() throws Exception {
+        String ownerBearer = auth.ownerBearer();
+        ExecutorService pool = Executors.newFixedThreadPool(4);
+        try {
+            List<Future<Integer>> futures = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                Callable<Integer> create = () -> createToken(bearer, walletId, null).getResponse().getStatus();
+                futures.add(pool.submit(create));
+            }
+            Callable<Integer> disable = () -> mockMvc.perform(withBearer(MockMvcRequestBuilders.post("/v1/users/" + userId + "/disable"), ownerBearer))
+                    .andReturn().getResponse().getStatus();
+            futures.add(pool.submit(disable));
+            for (Future<Integer> future : futures) {
+                assertThat(future.get()).isIn(200, 201, 401, 409);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        assertThat(jdbc.queryForObject("select status from users where id = ?", String.class, userId)).isEqualTo("DISABLED");
+        assertThat(jdbc.queryForObject("select count(*) from quick_entry_tokens where user_id = ? and revoked_at is null", Integer.class, userId))
+                .isZero();
     }
 
     @Test
@@ -299,7 +344,7 @@ class QuickEntryTokenManagementIT {
 
     @Test
     @DisplayName("o dono desativa o usuário: todos os tokens ativos viram REVOKED/USER_DISABLED; reativar não os ressuscita")
-    void desativarRevogaTokens() throws Exception {
+    void desativarRevogaTokens(CapturedOutput output) throws Exception {
         createOk();
         createOk();
         String ownerBearer = auth.ownerBearer();
@@ -308,6 +353,7 @@ class QuickEntryTokenManagementIT {
 
         assertThat(jdbc.queryForList("select revoked_reason from quick_entry_tokens where user_id = ?", String.class, userId))
                 .containsExactly("USER_DISABLED", "USER_DISABLED");
+        assertThat(output.getAll()).contains("event=quick_tokens_revoked_on_disable").contains("count=2");
 
         mockMvc.perform(withBearer(MockMvcRequestBuilders.post("/v1/users/" + userId + "/enable"), ownerBearer)).andExpect(status().isOk());
 

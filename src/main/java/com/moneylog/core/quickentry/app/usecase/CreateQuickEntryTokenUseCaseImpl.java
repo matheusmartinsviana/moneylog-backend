@@ -12,6 +12,7 @@ import com.moneylog.core.quickentry.app.gateways.QuickEntryUserLock;
 import com.moneylog.core.quickentry.domain.QuickEntryToken;
 import com.moneylog.core.quickentry.domain.QuickEntryTokenPolicy;
 import com.moneylog.core.quickentry.domain.QuickEntryTokenSecret;
+import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickUserNotActiveException;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
 
@@ -36,7 +37,9 @@ public class CreateQuickEntryTokenUseCaseImpl implements CreateQuickEntryTokenUs
 
     @Override
     public IssuedQuickEntryToken handle(CreateQuickEntryTokenCommand command) {
-        userLock.lock(command.userId());
+        if (!userLock.lock(command.userId())) {
+            throw new QuickUserNotActiveException();
+        }
         Account account = accounts.findById(command.userId(), command.accountId()).orElseThrow(() -> new AccountNotFoundException(command.accountId())).value();
         policy.ensureAccountAllowed(account.type(), account.status());
         Instant now = time.now();

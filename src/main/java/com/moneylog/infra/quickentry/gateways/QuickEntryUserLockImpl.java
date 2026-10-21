@@ -17,7 +17,8 @@ public class QuickEntryUserLockImpl implements QuickEntryUserLock {
     }
 
     @Override
-    public void lock(UUID userId) {
+    public boolean lock(UUID userId) {
         jdbc.queryForObject("select pg_advisory_xact_lock(hashtextextended(?, 0))", Object.class, NAMESPACE + userId);
+        return Boolean.TRUE.equals(jdbc.query("select status = 'ACTIVE' from users where id = ?", rs -> rs.next() ? rs.getBoolean(1) : null, userId));
     }
 }

@@ -73,16 +73,16 @@ public class QuickEntryConfig {
     }
 
     @Bean
-    RenameQuickEntryTokenUseCase renameQuickEntryTokenUseCase(QuickEntryTokenGateway tokens, AccountGateway accounts, TimeProvider time,
+    RenameQuickEntryTokenUseCase renameQuickEntryTokenUseCase(QuickEntryTokenGateway tokens, AccountGateway accounts, QuickEntryUserLock userLock, TimeProvider time,
                                                               PlatformTransactionManager transactionManager) {
         return TransactionalProxies.required(RenameQuickEntryTokenUseCase.class,
-                new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, time), transactionManager);
+                new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time), transactionManager);
     }
 
     @Bean
-    RevokeQuickEntryTokenUseCase revokeQuickEntryTokenUseCase(QuickEntryTokenGateway tokens, AccountGateway accounts, TimeProvider time,
+    RevokeQuickEntryTokenUseCase revokeQuickEntryTokenUseCase(QuickEntryTokenGateway tokens, AccountGateway accounts, QuickEntryUserLock userLock, TimeProvider time,
                                                               PlatformTransactionManager transactionManager) {
         return TransactionalProxies.required(RevokeQuickEntryTokenUseCase.class,
-                new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, time), transactionManager);
+                new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time), transactionManager);
     }
 }

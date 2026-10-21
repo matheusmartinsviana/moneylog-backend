@@ -45,6 +45,7 @@ import com.moneylog.core.quickentry.domain.TokenRevocationReason;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickAccountNotAllowedException;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickTokenLimitReachedException;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickTokenNotFoundException;
+import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickUserNotActiveException;
 import com.moneylog.core.sk.money.CurrencyCode;
 import com.moneylog.core.sk.money.Money;
 import com.moneylog.core.sk.persistence.Persisted;
@@ -81,6 +82,10 @@ class QuickEntryTokenUseCasesTest {
         when(accounts.findById(USER, ACCOUNT)).thenReturn(Optional.of(new Persisted<>(account(type, status), NOW, NOW)));
     }
 
+    private void userActive(boolean active) {
+        when(userLock.lock(USER)).thenReturn(active);
+    }
+
     private QuickEntryToken stored() {
         return QuickEntryToken.issue(TOKEN, USER, ACCOUNT, "iPhone", "abcd1234", "a".repeat(64), NOW.minusSeconds(60), NOW.plusSeconds(86400));
     }
@@ -88,6 +93,7 @@ class QuickEntryTokenUseCasesTest {
     @Test
     @DisplayName("cria com trava do usuário antes da contagem, grava só prefixo e hash e devolve o segredo uma vez")
     void deveCriar() {
+        userActive(true);
         accountExists(AccountType.WALLET, AccountStatus.ACTIVE);
         when(tokens.countActive(USER, NOW)).thenReturn(2L);
 
@@ -109,6 +115,7 @@ class QuickEntryTokenUseCasesTest {
     @Test
     @DisplayName("conta de outro usuário ou inexistente falha com ACCOUNT_NOT_FOUND e nada é gravado")
     void naoDeveCriarComContaAlheia() {
+        userActive(true);
         when(accounts.findById(USER, ACCOUNT)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> create().handle(new CreateQuickEntryTokenCommand(USER, "iPhone", ACCOUNT, null)))
@@ -120,6 +127,7 @@ class QuickEntryTokenUseCasesTest {
     @Test
     @DisplayName("conta de investimento ou arquivada falha com QUICK_ACCOUNT_NOT_ALLOWED e nada é gravado")
     void naoDeveCriarComContaNaoPermitida() {
+        userActive(true);
         accountExists(AccountType.INVESTMENT, AccountStatus.ACTIVE);
         assertThatThrownBy(() -> create().handle(new CreateQuickEntryTokenCommand(USER, "iPhone", ACCOUNT, null)))
                 .isInstanceOf(QuickAccountNotAllowedException.class);
@@ -133,6 +141,7 @@ class QuickEntryTokenUseCasesTest {
     @Test
     @DisplayName("com 3 ativos o quarto falha com QUICK_TOKEN_LIMIT_REACHED e nada é gravado")
     void naoDeveUltrapassarLimite() {
+        userActive(true);
         accountExists(AccountType.CHECKING, AccountStatus.ACTIVE);
         when(tokens.countActive(USER, NOW)).thenReturn(3L);
 
@@ -147,7 +156,7 @@ class QuickEntryTokenUseCasesTest {
     void deveRevogarComIdempotencia() {
         accountExists(AccountType.WALLET, AccountStatus.ACTIVE);
         when(tokens.findById(USER, TOKEN)).thenReturn(Optional.of(stored()));
-        var useCase = new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, time);
+        var useCase = new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time);
 
         Revoked first = useCase.handle(new RevokeQuickEntryTokenCommand(USER, TOKEN));
 
@@ -170,12 +179,39 @@ class QuickEntryTokenUseCasesTest {
     void naoDeveTocarTokenAlheio() {
         when(tokens.findById(USER, TOKEN)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, time).handle(new RevokeQuickEntryTokenCommand(USER, TOKEN)))
+        assertThatThrownBy(() -> new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time).handle(new RevokeQuickEntryTokenCommand(USER, TOKEN)))
                 .isInstanceOf(QuickTokenNotFoundException.class);
-        assertThatThrownBy(() -> new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, time)
+        assertThatThrownBy(() -> new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time)
                 .handle(new RenameQuickEntryTokenCommand(USER, TOKEN, "Novo"))).isInstanceOf(QuickTokenNotFoundException.class);
 
         verify(tokens, never()).update(any());
+    }
+
+    @Test
+    @DisplayName("usuário desativado não cria token: falha com UNAUTHENTICATED e nada é gravado")
+    void naoDeveCriarParaUsuarioDesativado() {
+        userActive(false);
+
+        assertThatThrownBy(() -> create().handle(new CreateQuickEntryTokenCommand(USER, "iPhone", ACCOUNT, null)))
+                .isInstanceOf(QuickUserNotActiveException.class);
+
+        verify(tokens, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("revogar e renomear tomam a trava do usuário antes de ler o token")
+    void deveTravarAntesDeLer() {
+        accountExists(AccountType.WALLET, AccountStatus.ACTIVE);
+        when(tokens.findById(USER, TOKEN)).thenReturn(Optional.of(stored()));
+
+        new RevokeQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time).handle(new RevokeQuickEntryTokenCommand(USER, TOKEN));
+        new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time).handle(new RenameQuickEntryTokenCommand(USER, TOKEN, "Novo"));
+
+        InOrder order = inOrder(userLock, tokens);
+        order.verify(userLock).lock(USER);
+        order.verify(tokens).findById(USER, TOKEN);
+        order.verify(userLock).lock(USER);
+        order.verify(tokens).findById(USER, TOKEN);
     }
 
     @Test
@@ -184,7 +220,7 @@ class QuickEntryTokenUseCasesTest {
         accountExists(AccountType.WALLET, AccountStatus.ACTIVE);
         when(tokens.findById(USER, TOKEN)).thenReturn(Optional.of(stored()));
 
-        QuickEntryTokenView view = new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, time)
+        QuickEntryTokenView view = new RenameQuickEntryTokenUseCaseImpl(tokens, accounts, userLock, time)
                 .handle(new RenameQuickEntryTokenCommand(USER, TOKEN, " Atalho novo "));
 
         assertThat(view.token().label()).isEqualTo("Atalho novo");
