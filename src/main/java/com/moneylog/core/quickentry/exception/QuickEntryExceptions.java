@@ -22,6 +22,36 @@ public final class QuickEntryExceptions {
         }
     }
 
+    public static class QuickAmountInvalidException extends BusinessRuleException {
+        public QuickAmountInvalidException() {
+            super(QuickEntryErrorCodes.QUICK_AMOUNT_INVALID, "Não entendi o valor. Digite algo como 35,50.");
+        }
+    }
+
+    public static class QuickAmountAmbiguousException extends BusinessRuleException {
+        public QuickAmountAmbiguousException() {
+            super(QuickEntryErrorCodes.QUICK_AMOUNT_AMBIGUOUS, "Use vírgula nos centavos, por exemplo 1.234,00.");
+        }
+    }
+
+    public static class QuickCategoryNotFoundException extends BusinessRuleException {
+        public QuickCategoryNotFoundException() {
+            super(QuickEntryErrorCodes.QUICK_CATEGORY_NOT_FOUND, "Não achei a categoria enviada. Escolha outra ou deixe em branco.");
+        }
+    }
+
+    public static class QuickDateOutOfRangeException extends BusinessRuleException {
+        public QuickDateOutOfRangeException() {
+            super(QuickEntryErrorCodes.QUICK_DATE_OUT_OF_RANGE, "A data não pode ser futura nem anterior a 366 dias.");
+        }
+    }
+
+    public static class QuickLimitReachedException extends BusinessRuleException {
+        public QuickLimitReachedException(String detail) {
+            super(QuickEntryErrorCodes.QUICK_LIMIT_REACHED, detail);
+        }
+    }
+
     public static class QuickAccountNotAllowedException extends BusinessRuleException {
         public QuickAccountNotAllowedException() {
             super(QuickEntryErrorCodes.QUICK_ACCOUNT_NOT_ALLOWED,
