@@ -211,15 +211,29 @@ class EmailTemplateRendererTest {
     }
 
     @Test
-    @DisplayName("botão com borda de 2 px, fundo no td e no link, e cores próprias para a inversão do Outlook")
+    @DisplayName("botão: fundo, borda de 2 px e raio ficam no mesmo td; o link não tem fundo, borda nem raio")
+    void deveManterFundoBordaERaioNoMesmoElemento() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+        Matcher td = Pattern.compile("<td[^>]*class=\"btn-bg btn-cell\"[^>]*>").matcher(html);
+        Matcher a = Pattern.compile("<a href=\"" + Pattern.quote(LINK) + "\" class=\"btn-tx\"[^>]*>").matcher(html);
+
+        assertThat(td.find()).isTrue();
+        assertThat(td.group()).contains("bgcolor=\"#1f4d3a\"").contains("background-color:#1f4d3a").contains("border:2px solid #a9cdb5")
+                .contains("border-radius:999px").contains("mso-padding-alt:16px 40px");
+        assertThat(a.find()).isTrue();
+        assertThat(a.group()).contains("display:inline-block").contains("padding:16px 40px").contains("color:#f6f7f0").contains("text-decoration:none")
+                .doesNotContain("background").doesNotContain("bgcolor").doesNotContain("border").doesNotContain("btn-bg");
+        assertThat(html).contains("border-collapse:separate");
+    }
+
+    @Test
+    @DisplayName("inversão do Outlook troca fundo e borda só no td e o texto do link para escuro")
     void deveManterBotaoVisivelNaInversao() {
         String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
 
-        assertThat(html).contains("border:2px solid #a9cdb5")
-                .containsPattern("<a href=\"" + Pattern.quote(LINK) + "\" class=\"btn-tx btn-bg\" bgcolor=\"#1f4d3a\"[^>]*background-color:#1f4d3a")
-                .contains(".btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }")
+        assertThat(html).contains(".btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }")
                 .contains("[data-ogsb] .btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }")
-                .contains("[data-ogsc] .btn-tx { color: #0a1a12 !important; }");
+                .contains(".btn-tx { color: #0a1a12 !important; }").contains("[data-ogsc] .btn-tx { color: #0a1a12 !important; }");
     }
 
     @Test
