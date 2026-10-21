@@ -1047,7 +1047,7 @@ paths:
         Tetos (configuráveis no servidor, ADR-034): valor por lançamento, quantidade de lançamentos por dia e valor total por dia no fuso do usuário, contando só lançamentos ativos; a entrada tem teto diário
         próprio e menor que o do gasto. Acima de qualquer um: `422 QUICK_LIMIT_REACHED`, nada é gravado.
 
-        `Idempotency-Key`: mesma chave e mesmo corpo devolvem `201` com o **mesmo `id` e o mesmo `message`**; mesma chave e corpo diferente, `409 IDEMPOTENCY_KEY_REUSED`. Erros não memorizam a chave. A chave protege o
+        `Idempotency-Key`: mesma chave e mesmo corpo devolvem `201` com o **mesmo `id` e o mesmo `message`**; mesma chave e corpo diferente, `409 IDEMPOTENCY_KEY_REUSED`. Erros não memorizam a chave. Se o lançamento já foi estornado, o replay devolve o mesmo `id` com `status = VOIDED` e um `message` que diz que foi estornado; nada é recriado. A chave protege o
         reenvio do mesmo disparo, não duas execuções manuais com valores digitados (são dois lançamentos).
       security:
         - quickEntryToken: []
