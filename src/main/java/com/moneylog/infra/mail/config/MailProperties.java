@@ -16,7 +16,7 @@ public final class MailProperties {
     private static final String INVALID_BASE_URL = "MAIL_APP_BASE_URL deve ser uma URL https sem usuário, query ou fragmento (http só em localhost fora de produção).";
     private static final Set<String> KNOWN = Set.of(NONE, LOG, SES, FAKE);
     private static final Pattern ADDRESS = Pattern.compile("[^\\s@<>\",;]+@[^\\s@<>\",;]+");
-    private static final Pattern REGION = Pattern.compile("[a-z]{2}(-[a-z]+)+-\\d");
+    private static final int REGION_MAX_LENGTH = 32;
 
     private final String provider;
     private final String from;
@@ -48,7 +48,7 @@ public final class MailProperties {
             if (this.sesRegion.isEmpty()) {
                 throw new IllegalStateException("MAIL_PROVIDER=ses exige MAIL_SES_REGION (veja .env.example). Sem ele, use MAIL_PROVIDER=none.");
             }
-            if (!REGION.matcher(this.sesRegion).matches()) {
+            if (!validRegion(this.sesRegion)) {
                 throw new IllegalStateException("MAIL_SES_REGION inválida (exemplo: us-east-1).");
             }
         }
@@ -59,6 +59,36 @@ public final class MailProperties {
             throw new IllegalStateException("MAIL_REPLY_TO deve ser um único endereço de e-mail.");
         }
         validateBaseUrl(this.appBaseUrl, production);
+    }
+
+    private static boolean validRegion(String value) {
+        if (value.length() > REGION_MAX_LENGTH) {
+            return false;
+        }
+        String[] parts = value.split("-", -1);
+        if (parts.length < 3 || !isLowerLetters(parts[0], 2, 2)) {
+            return false;
+        }
+        for (int i = 1; i < parts.length - 1; i++) {
+            if (!isLowerLetters(parts[i], 1, REGION_MAX_LENGTH)) {
+                return false;
+            }
+        }
+        String last = parts[parts.length - 1];
+        return last.length() == 1 && last.charAt(0) >= '0' && last.charAt(0) <= '9';
+    }
+
+    private static boolean isLowerLetters(String text, int min, int max) {
+        if (text.length() < min || text.length() > max) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < 'a' || c > 'z') {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void validateBaseUrl(String value, boolean production) {
