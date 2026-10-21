@@ -423,4 +423,42 @@ class QuickEntryEndpointIT extends QuickEntryItBase {
             assertThat(Set.of(400, 422)).contains(reply.status());
         }
     }
+
+    private static final List<String> JWT_URLS = List.of("/v1/quick-entries", "/v1/quick%2Dentries", "/v1/quick%2dentries", "/v1/quick-entries/",
+            "/v1/quick-entries;x=1", "/v1/quick%2Dentries/", "/v1/%71uick-entries", "/v1/quick-entr%69es");
+
+    private MvcResult sendJwt(World w, String url) throws Exception {
+        return mockMvc.perform(MockMvcRequestBuilders.post(java.net.URI.create(url)).header(HttpHeaders.AUTHORIZATION, w.bearer())
+                .header("Idempotency-Key", key()).contentType(MediaType.APPLICATION_JSON).content(body("EXPENSE", "\"10\""))).andReturn();
+    }
+
+    @Test
+    @DisplayName("JWT de sessão em /v1/quick-entries e em todas as grafias (%2D, %71, barra, ;): nunca 2xx/5xx, nada é gravado")
+    void naoDeveGravarComJwtDeSessao() throws Exception {
+        World w = world();
+        List<String> wrong = new ArrayList<>();
+        for (String url : JWT_URLS) {
+            int status = sendJwt(w, url).getResponse().getStatus();
+            if (status != 401 && status != 400 && status != 404) {
+                wrong.add(url + " -> " + status);
+            }
+        }
+        assertThat(wrong).isEmpty();
+        assertThat(count("transactions", w.userId())).isZero();
+        assertThat(balance(w)).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    @DisplayName("JWT de sessão nunca chega ao controller real do lançamento rápido, em nenhuma grafia da rota")
+    void naoDeveAlcancarOControllerComJwtDeSessao() throws Exception {
+        World w = world();
+        List<String> reached = new ArrayList<>();
+        for (String url : JWT_URLS) {
+            MvcResult result = sendJwt(w, url);
+            if (result.getHandler() != null && result.getHandler().toString().contains("QuickEntryController")) {
+                reached.add(url + " -> " + result.getResponse().getStatus());
+            }
+        }
+        assertThat(reached).isEmpty();
+    }
 }

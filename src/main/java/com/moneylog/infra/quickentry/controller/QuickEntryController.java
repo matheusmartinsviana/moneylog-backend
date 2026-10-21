@@ -19,6 +19,7 @@ import com.moneylog.core.quickentry.app.CreateQuickEntryUseCase;
 import com.moneylog.core.quickentry.domain.QuickIdempotencyKey;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.ClientIpResolver;
+import com.moneylog.infra.security.QuickTokenInvalidException;
 import com.moneylog.infra.security.QuickTokenPrincipal;
 
 @RestController
@@ -41,6 +42,9 @@ public class QuickEntryController implements QuickEntryControllerOpenApi {
     public ResponseEntity<QuickEntryResponse> create(@AuthenticationPrincipal QuickTokenPrincipal principal,
                                                      @RequestHeader(name = IDEMPOTENCY_HEADER, required = false) String idempotencyKey,
                                                      @Valid @RequestBody QuickEntryRequest body, HttpServletRequest request) {
+        if (principal == null) {
+            throw new QuickTokenInvalidException();
+        }
         requireValidKey(idempotencyKey);
         if (body.amountOutOfSize()) {
             throw new RequestValidationException("amount", "SIZE", "Valor com tamanho inválido.");
