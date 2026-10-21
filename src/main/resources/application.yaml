@@ -119,6 +119,11 @@ moneylog:
       # Chamadas com token válido na janela; acima, 429 e o token continua válido.
       max-calls-per-token: ${MONEYLOG_QUICK_ENTRY_MAX_CALLS_PER_TOKEN:20}
       call-window: PT1M
+    # Tetos de uso do lançamento rápido (ADR-034, Q7): desligados por padrão (vazio ou 0 = sem limite). Valores em reais, por exemplo 1000.00.
+    max-amount: ${MONEYLOG_QUICK_ENTRY_MAX_AMOUNT:}
+    max-entries-per-day: ${MONEYLOG_QUICK_ENTRY_MAX_ENTRIES_PER_DAY:}
+    max-expense-per-day: ${MONEYLOG_QUICK_ENTRY_MAX_EXPENSE_PER_DAY:}
+    max-income-per-day: ${MONEYLOG_QUICK_ENTRY_MAX_INCOME_PER_DAY:}
   users:
     # Teto de usuários (ativos e desativados) somados aos convites pendentes não expirados.
     max: ${MONEYLOG_USERS_MAX:10}

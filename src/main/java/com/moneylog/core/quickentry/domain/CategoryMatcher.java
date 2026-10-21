@@ -25,8 +25,14 @@ public final class CategoryMatcher {
         if (byKey.isPresent()) {
             return byKey;
         }
+        String exact = requested.strip().toLowerCase(Locale.ROOT);
+        List<Category> sameName = activeOfKind.stream().filter(c -> c.name().strip().toLowerCase(Locale.ROOT).equals(exact)).toList();
+        if (sameName.size() == 1) {
+            return Optional.of(sameName.get(0));
+        }
         String wanted = normalize(requested);
-        return activeOfKind.stream().filter(c -> normalize(c.name()).equals(wanted)).findFirst();
+        List<Category> candidates = activeOfKind.stream().filter(c -> normalize(c.name()).equals(wanted)).toList();
+        return candidates.size() == 1 ? Optional.of(candidates.get(0)) : Optional.empty();
     }
 
     static String normalize(String text) {
