@@ -22,7 +22,7 @@ info:
     | 401 | `QUICK_TOKEN_INVALID` |
     | 404 | `QUICK_TOKEN_NOT_FOUND` (token de outro usuário ou inexistente), `ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente, ao gerar o token) |
     | 409 | `QUICK_TOKEN_LIMIT_REACHED` (tokens ativos no máximo), `IDEMPOTENCY_KEY_REUSED` |
-    | 422 | `DEFAULT_CATEGORY_UNAVAILABLE` (existente: sem `category` e a categoria padrão indisponível), `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
+    | 422 | `DEFAULT_CATEGORY_UNAVAILABLE` (existente: sem `category` e a categoria padrão indisponível), `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (só quando o dono configura um teto: por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`: falhas de token por IP ou chamadas demais por minuto com o token válido) |
 
     ## Quem convidou (2.39.0, só acréscimo compatível)
@@ -1044,8 +1044,9 @@ paths:
         (`FOOD`) ou o nome sem diferenciar acento e caixa, entre as categorias ativas do próprio usuário. `method` é só do gasto e fica nulo se omitido; enviado numa entrada, é `400`. `date` omitida = hoje no fuso
         do usuário; aceita de hoje menos 366 dias até hoje; a hora não é gravada.
 
-        Tetos (configuráveis no servidor, ADR-034): valor por lançamento, quantidade de lançamentos por dia e valor total por dia no fuso do usuário, contando só lançamentos ativos; a entrada tem teto diário
-        próprio e menor que o do gasto. Acima de qualquer um: `422 QUICK_LIMIT_REACHED`, nada é gravado.
+        Tetos (ADR-034): valor por lançamento, quantidade de lançamentos por dia e valor total por dia (gasto e entrada separados), contando só lançamentos ativos criados no dia do fuso do usuário. São configuráveis
+        no servidor e **desligados por padrão** (sem limite). Só com um teto configurado, acima dele responde `422 QUICK_LIMIT_REACHED` e nada é gravado. Sempre vale o limite técnico de sanidade do valor, o mesmo de
+        `POST /v1/transactions` (R$ 999.999.999,99), e o rate limit por token e por IP.
 
         `Idempotency-Key`: mesma chave e mesmo corpo devolvem `201` com o **mesmo `id` e o mesmo `message`**; mesma chave e corpo diferente, `409 IDEMPOTENCY_KEY_REUSED`. Erros não memorizam a chave. Se o lançamento já foi estornado, o replay devolve o mesmo `id` com `status = VOIDED` e um `message` que diz que foi estornado; nada é recriado. A chave protege o
         reenvio do mesmo disparo, não duas execuções manuais com valores digitados (são dois lançamentos).
@@ -1190,7 +1191,7 @@ paths:
                     traceId: 4f1c2a9e7b3d4c6f
         '422':
           description: |
-            Regra de negócio, nada gravado: `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS`, `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia
+            Regra de negócio, nada gravado: `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS`, `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (só quando o dono configura um teto: por lançamento, por quantidade no dia
             ou por valor no dia), `DEFAULT_CATEGORY_UNAVAILABLE` (sem `category` e a categoria padrão de sistema não existe ou está arquivada) e `QUICK_ACCOUNT_NOT_ALLOWED` (a conta do token foi arquivada depois de gerado). O `detail` já vem em português para o Atalho exibir.
           content:
             application/problem+json:
@@ -1238,7 +1239,7 @@ paths:
                     instance: /v1/quick-entries
                     traceId: 4f1c2a9e7b3d4c73
                 tetoPorLancamento:
-                  summary: Valor acima do teto de um lançamento
+                  summary: Valor acima do teto de um lançamento (só com teto configurado)
                   value:
                     type: urn:moneylog:problem:QUICK_LIMIT_REACHED
                     title: Limite do lançamento rápido
@@ -1248,7 +1249,7 @@ paths:
                     instance: /v1/quick-entries
                     traceId: 4f1c2a9e7b3d4c74
                 tetoDeQuantidadeNoDia:
-                  summary: Quantidade de lançamentos do dia esgotada
+                  summary: Quantidade de lançamentos do dia esgotada (só com teto configurado)
                   value:
                     type: urn:moneylog:problem:QUICK_LIMIT_REACHED
                     title: Limite do lançamento rápido
@@ -1258,7 +1259,7 @@ paths:
                     instance: /v1/quick-entries
                     traceId: 4f1c2a9e7b3d4c75
                 tetoDeValorNoDia:
-                  summary: Valor total do dia esgotado
+                  summary: Valor total do dia esgotado (só com teto configurado)
                   value:
                     type: urn:moneylog:problem:QUICK_LIMIT_REACHED
                     title: Limite do lançamento rápido
