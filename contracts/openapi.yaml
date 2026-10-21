@@ -1,20 +1,20 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.40.2
+  version: 2.40.3
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
 
-    ## Lançamento rápido pelo Atalho do iPhone (2.40.0; 2.40.1 acrescenta `422 QUICK_TOKEN_VALIDITY_INVALID` à geração do token; 2.40.2 só corrige texto: `amount` vazio ou com mais de 40 caracteres é `400`, `method` omitido volta `OTHER`; só acréscimos compatíveis; ADR-034, `docs/planos/2026-10-21-lancamento-rapido-iphone.md`)
+    ## Lançamento rápido pelo Atalho do iPhone (2.40.0; 2.40.1 acrescenta `422 QUICK_TOKEN_VALIDITY_INVALID` à geração do token; 2.40.2 só corrige texto: `amount` vazio ou com mais de 40 caracteres é `400`, `method` omitido volta `OTHER`; 2.40.3 deixa a validação de `Idempotency-Key` mais tolerante nesta rota; só acréscimos compatíveis; ADR-034, `docs/planos/2026-10-21-lancamento-rapido-iphone.md`)
     Token pessoal de escopo mínimo (`mlq_...`) que cria **somente** `EXPENSE` e `INCOME` em **uma conta fixa** do próprio usuário, por `POST /v1/quick-entries`.
     - Gestão do token (`/v1/quick-entry-tokens`): exige a sessão JWT normal (`bearerAuth`); um token `mlq_` nunca cria, lista nem revoga token. O token em claro só existe na resposta do `POST` de criação (`Cache-Control: no-store`); depois só `prefix`.
     - `POST /v1/quick-entries` é a **única** rota que aceita o token (`quickEntryToken`) e a única que **não** aceita o JWT de sessão. Qualquer outra rota responde `401 UNAUTHENTICATED` a um `mlq_`.
     - Falha de autenticação do token: `401 QUICK_TOKEN_INVALID`, com o mesmo status, corpo e cabeçalhos para token inexistente, expirado, revogado ou de usuário desativado.
     - Nesta rota o `detail` dos erros e o `message` do `201` são frases curtas em português **prontas para o Atalho exibir** (o app Atalhos não traduz códigos). É exceção documentada no ADR-034; nas demais rotas o `detail` continua só para diagnóstico. O `message` usa apenas valor formatado e nomes já gravados, nunca a `description` digitada.
-    - Idempotência: `Idempotency-Key` obrigatório (UUID ou `[A-Za-z0-9_-]{8,64}`), escopo `POST /v1/quick-entries`, 24 h, mesma regra de `POST /v1/transactions`; o hash do pedido é calculado sobre o corpo como veio.
+    - Idempotência: `Idempotency-Key` obrigatório (UUID ou `[A-Za-z0-9_-]{8,64}`; o servidor primeiro remove todo caractere fora de `[A-Za-z0-9_-]`, como espaço, `/`, `:`, controles, NBSP e marcas de direção, e valida o que sobra, então `21/10/2026 17:11` vale `211020261711`; valor bruto acima de 200 caracteres é recusado sem normalizar; a chave normalizada é a da idempotência; o `400` diz quantos caracteres chegaram e quantos foram descartados, sem ecoar o valor), escopo `POST /v1/quick-entries`, 24 h, mesma regra de `POST /v1/transactions`; o hash do pedido é calculado sobre o corpo como veio.
     - Acréscimos em rotas e schemas existentes: `TransactionSource.QUICK_SHORTCUT` e o filtro opcional `source` em `GET /v1/transactions`. Nenhum campo ou rota existente mudou de significado.
 
     | Status | `code` (lançamento rápido) |

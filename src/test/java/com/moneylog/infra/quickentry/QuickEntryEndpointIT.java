@@ -327,22 +327,59 @@ class QuickEntryEndpointIT extends QuickEntryItBase {
     }
 
     @Test
-    @DisplayName("Idempotency-Key ausente, curta, longa ou com caractere inválido: 400; UUID e texto de 8 a 64 caracteres passam")
+    @DisplayName("Idempotency-Key ausente, curta, longa ou que sobra curta/longa depois de limpar: 400; UUID e texto limpável de 8 a 64 caracteres passam")
     void deveValidarAChaveDeIdempotencia() throws Exception {
         World w = world();
         String valid = body("EXPENSE", "\"1\"");
 
-        for (String bad : new String[] {null, "", "curta", "a".repeat(65), "tem espaco aqui", "com.ponto.aqui", "acentuação1", "12345678;"}) {
+        for (String bad : new String[] {null, "", "curta", "a".repeat(65), "a b c d e f g", "12/34/56 7", "a".repeat(201)}) {
             Reply reply = send(w, bad, valid);
             assertThat(reply.status()).as("chave %s", bad).isEqualTo(400);
             assertThat(reply.code()).isEqualTo("VALIDATION_FAILED");
             assertThat(reply.detail()).isEqualTo(VALIDATION_DETAIL);
         }
         assertThat(count("transactions", w.userId())).isZero();
-        for (String good : new String[] {UUID.randomUUID().toString(), "a".repeat(8), "B".repeat(64), "20261021123045", "abc_DEF-123"}) {
+        for (String good : new String[] {UUID.randomUUID().toString(), "a".repeat(8), "B".repeat(64), "20261021123045", "abc_DEF-123", "tem espaco aqui", "com.ponto.aqui", "acentuação1", "12345678;"}) {
             assertThat(send(w, good, valid).status()).as("chave %s", good).isEqualTo(201);
         }
-        assertThat(count("transactions", w.userId())).isEqualTo(5);
+        assertThat(count("transactions", w.userId())).isEqualTo(9);
+    }
+
+    @Test
+    @DisplayName("chave suja do iOS é normalizada: cria, replay com a mesma chave suja e com a limpa não duplica, e a mensagem de erro não ecoa o valor")
+    void deveTolerarAChaveSuja() throws Exception {
+        World w = world();
+        String json = body("EXPENSE", "\"7\"");
+
+        Reply first = send(w, "21/10/2026 17:11", json);
+        Reply replay = send(w, "21/10/2026\u00A017:11\u200F", json);
+        Reply clean = send(w, "211020261711", json);
+
+        assertThat(first.status()).isEqualTo(201);
+        assertThat(replay.status()).isEqualTo(201);
+        assertThat(clean.status()).isEqualTo(201);
+        assertThat(replay.body().get("id").asString()).isEqualTo(first.body().get("id").asString());
+        assertThat(clean.body().get("id").asString()).isEqualTo(first.body().get("id").asString());
+        assertThat(count("transactions", w.userId())).isEqualTo(1);
+
+        Reply tooShort = send(w, "12/34 56", json);
+        assertThat(tooShort.status()).isEqualTo(400);
+        assertThat(tooShort.body().toString()).contains("chegaram 8 caracteres, 2 inválidos descartados; sobraram 6 e o mínimo é 8")
+                .doesNotContain("12/34 56").doesNotContain("123456");
+    }
+
+    @Test
+    @DisplayName("mesma chave no mesmo minuto com corpo diferente: 409 IDEMPOTENCY_KEY_REUSED, o lançamento novo não é engolido como replay")
+    void deveConflitarMesmaChaveComCorpoDiferente() throws Exception {
+        World w = world();
+
+        Reply first = send(w, "211020261711", body("EXPENSE", "\"7\""));
+        Reply second = send(w, "21/10/2026 17:11", body("EXPENSE", "\"9\""));
+
+        assertThat(first.status()).isEqualTo(201);
+        assertThat(second.status()).isEqualTo(409);
+        assertThat(second.code()).isEqualTo("IDEMPOTENCY_KEY_REUSED");
+        assertThat(count("transactions", w.userId())).isEqualTo(1);
     }
 
     @Test
