@@ -12,6 +12,7 @@ import com.moneylog.core.auth.app.usecase.EnableUserUseCase;
 import com.moneylog.core.auth.app.usecase.EnableUserUseCaseImpl;
 import com.moneylog.core.auth.app.usecase.ListUsersUseCase;
 import com.moneylog.core.auth.app.usecase.ListUsersUseCaseImpl;
+import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
 import com.moneylog.core.sk.time.TimeProvider;
 
 @Configuration(proxyBeanMethods = false)
@@ -23,10 +24,10 @@ public class UserAdminConfig {
     }
 
     @Bean
-    DisableUserUseCase disableUserUseCase(UserGateway users, RefreshTokenGateway refreshTokens, TimeProvider time,
+    DisableUserUseCase disableUserUseCase(UserGateway users, RefreshTokenGateway refreshTokens, QuickEntryTokenGateway quickEntryTokens, TimeProvider time,
                                           PlatformTransactionManager transactionManager) {
         return TransactionalProxies.required(DisableUserUseCase.class,
-                new DisableUserUseCaseImpl(users, refreshTokens, time), transactionManager);
+                new DisableUserUseCaseImpl(users, refreshTokens, quickEntryTokens, time), transactionManager);
     }
 
     @Bean

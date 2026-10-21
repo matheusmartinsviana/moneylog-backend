@@ -11,6 +11,7 @@ public final class QuickEntryErrorCodes {
     public static final String QUICK_TOKEN_INVALID = "QUICK_TOKEN_INVALID";
     public static final String QUICK_TOKEN_LIMIT_REACHED = "QUICK_TOKEN_LIMIT_REACHED";
     public static final String QUICK_TOKEN_NOT_FOUND = "QUICK_TOKEN_NOT_FOUND";
+    public static final String QUICK_TOKEN_VALIDITY_INVALID = "QUICK_TOKEN_VALIDITY_INVALID";
 
     private QuickEntryErrorCodes() {
     }

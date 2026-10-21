@@ -106,6 +106,10 @@ moneylog:
     enabled: ${MONEYLOG_INVITATIONS_ENABLED:true}
     validity-days: 7
     retention-days: 90
+  quick-entry:
+    default-validity-days: ${MONEYLOG_QUICK_ENTRY_DEFAULT_VALIDITY_DAYS:30}
+    max-validity-days: ${MONEYLOG_QUICK_ENTRY_MAX_VALIDITY_DAYS:90}
+    max-active-tokens: ${MONEYLOG_QUICK_ENTRY_MAX_ACTIVE_TOKENS:3}
   users:
     # Teto de usuários (ativos e desativados) somados aos convites pendentes não expirados.
     max: ${MONEYLOG_USERS_MAX:10}
