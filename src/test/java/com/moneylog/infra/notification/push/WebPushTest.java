@@ -148,6 +148,37 @@ class WebPushTest {
     }
 
     @Test
+    @DisplayName("aviso de lançamento do Atalho: payload com acento, emoji, valor e id da movimentação é cifrado, enviado e decifrado inteiro")
+    void enviaAvisoDeLancamentoRapido() throws Exception {
+        KeyPair receiver = p256();
+        byte[] auth = new byte[16];
+        new java.security.SecureRandom().nextBytes(auth);
+        AtomicReference<byte[]> body = new AtomicReference<>();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/push", exchange -> {
+            body.set(exchange.getRequestBody().readAllBytes());
+            exchange.sendResponseHeaders(201, -1);
+            exchange.close();
+        });
+        server.start();
+        String endpoint = "http://127.0.0.1:" + server.getAddress().getPort() + "/push";
+        UUID transactionId = UUID.randomUUID();
+        Map<String, String> params = Map.of("type", "EXPENSE", "amount", "54.60", "description", "Mercado São João \uD83D\uDED2" + "x".repeat(60),
+                "transactionId", transactionId.toString());
+
+        Result result = sender().send(subscription(endpoint, receiver, auth),
+                new PushMessage(UUID.randomUUID(), "SECURITY_ALERT", "security.quick_entry_created", params));
+
+        assertThat(result).isEqualTo(Result.SENT);
+        assertThat(body.get().length).isLessThan(4096);
+        String payload = new String(WebPushCrypto.decrypt(body.get(), receiver.getPrivate(), WebPushCrypto.uncompressed(receiver.getPublic()), auth),
+                StandardCharsets.UTF_8);
+        assertThat(payload).contains("\"kind\":\"SECURITY_ALERT\"").contains("\"titleKey\":\"security.quick_entry_created\"")
+                .contains("\"amount\":\"54.60\"").contains("\"type\":\"EXPENSE\"").contains("\"transactionId\":\"" + transactionId + "\"")
+                .contains("Mercado São João \uD83D\uDED2");
+    }
+
+    @Test
     @DisplayName("404 e 410 = assinatura morta (GONE); 429 e 5xx = recuo (RETRY_LATER); 400 = FAILED; servidor fora do ar = recuo")
     void status() throws Exception {
         KeyPair receiver = p256();
