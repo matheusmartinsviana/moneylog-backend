@@ -95,7 +95,7 @@ class UsersRolesAndInvitationsMigrationIT {
     }
 
     private static void migrateAll(String ownerEmail) {
-        Flyway all = flyway(ownerEmail, null);
+        Flyway all = flyway(ownerEmail, "9.27");
         assertThat(all.migrate().success).isTrue();
         assertThat(all.validateWithResult().validationSuccessful).isTrue();
     }
