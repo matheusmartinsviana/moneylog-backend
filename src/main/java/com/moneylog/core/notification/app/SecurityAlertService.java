@@ -11,11 +11,13 @@ import java.util.UUID;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSender.PushMessage;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
 import com.moneylog.core.notification.domain.IpMask;
+import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.notification.domain.SecurityEvent;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -26,6 +28,7 @@ public class SecurityAlertService {
 
     private final UserGateway users;
     private final PushSubscriptionGateway subscriptions;
+    private final NotificationSettingsGateway settings;
     private final PushSender sender;
     private final IdGenerator ids;
     private final TimeProvider time;
@@ -35,10 +38,11 @@ public class SecurityAlertService {
     private record AlertKey(UUID userId, SecurityEvent event) {
     }
 
-    public SecurityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids,
-                                TimeProvider time, Duration throttle) {
+    public SecurityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, NotificationSettingsGateway settings,
+                                PushSender sender, IdGenerator ids, TimeProvider time, Duration throttle) {
         this.users = users;
         this.subscriptions = subscriptions;
+        this.settings = settings;
         this.sender = sender;
         this.ids = ids;
         this.time = time;
@@ -69,6 +73,9 @@ public class SecurityAlertService {
         if (!sender.enabled()) {
             return 0;
         }
+        if (event.requiresPushEnabled() && !pushEnabledBy(userId)) {
+            return 0;
+        }
         List<PushSubscription> targets = subscriptions.listByUser(userId);
         if (targets.isEmpty() || (event.throttled() && !acquire(userId, event))) {
             return 0;
@@ -84,6 +91,10 @@ public class SecurityAlertService {
             }
         }
         return delivered;
+    }
+
+    private boolean pushEnabledBy(UUID userId) {
+        return settings.find(userId).map(NotificationSettings::pushEnabled).orElse(false);
     }
 
     private User findActiveByEmail(String email) {

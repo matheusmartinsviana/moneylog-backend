@@ -41,6 +41,17 @@ class QuickEntryAlertParamsTest {
     }
 
     @Test
+    @DisplayName("corte por code point: emoji na fronteira não é partido")
+    void naoDevePartirEmoji() {
+        String text = "a".repeat(QuickEntryAlertParams.DESCRIPTION_MAX - 1) + "\uD83D\uDE00\uD83D\uDE00";
+
+        String cut = QuickEntryAlertParams.of(details(TransactionType.EXPENSE, "1.00", text)).get("description");
+
+        assertThat(cut.codePointCount(0, cut.length())).isEqualTo(QuickEntryAlertParams.DESCRIPTION_MAX);
+        assertThat(cut).endsWith("\uD83D\uDE00").doesNotContain("\uD83D\uDE00\uD83D");
+    }
+
+    @Test
     @DisplayName("entrada vira INCOME; sem descrição a chave some; descrição longa é cortada")
     void deveMontarAEntradaEOmitirOuCortarADescricao() {
         assertThat(QuickEntryAlertParams.of(details(TransactionType.INCOME, "2500.00", " "))).containsOnlyKeys("type", "amount", "transactionId")

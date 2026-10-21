@@ -23,7 +23,8 @@ final class QuickEntryAlertParams {
         String description = transaction.description();
         if (description != null && !description.isBlank()) {
             String clean = description.strip();
-            params.put("description", clean.length() > DESCRIPTION_MAX ? clean.substring(0, DESCRIPTION_MAX) : clean);
+            params.put("description", clean.codePointCount(0, clean.length()) > DESCRIPTION_MAX
+                    ? clean.substring(0, clean.offsetByCodePoints(0, DESCRIPTION_MAX)) : clean);
         }
         return params;
     }
