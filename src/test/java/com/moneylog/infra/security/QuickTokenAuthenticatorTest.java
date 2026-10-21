@@ -103,6 +103,22 @@ class QuickTokenAuthenticatorTest {
     }
 
     @Test
+    @DisplayName("espaços, tab e quebras de linha nas pontas do valor colado são aparados; espaço no meio continua inválido")
+    void deveAparaAsPontasDoValor() {
+        given(activeToken(), true);
+
+        for (String padded : List.of(" " + secret.value(), secret.value() + " ", "\t" + secret.value() + "\t ", secret.value() + "\r\n",
+                " \n" + secret.value() + "\u00a0")) {
+            montar();
+            assertThat(authenticator.authenticate(request("Bearer " + padded, "203.0.113.77")).isAuthenticated()).isTrue();
+        }
+        String middle = secret.value().substring(0, 20) + " " + secret.value().substring(20);
+        assertThatThrownBy(() -> authenticator.authenticate(request("Bearer " + middle, "203.0.113.78")))
+                .isInstanceOf(QuickTokenInvalidException.class);
+        assertThatThrownBy(() -> authenticator.authenticate(request("Bearer \t \n", "203.0.113.79"))).isInstanceOf(QuickTokenInvalidException.class);
+    }
+
+    @Test
     @DisplayName("não grava de novo o uso quando o último foi há menos de um minuto")
     void deveGravarNoMaximoUmaVezPorMinuto() {
         given(token(NOW.plus(Duration.ofDays(10)), null, NOW.minusSeconds(30), "203.0.113.0"), true);
@@ -139,11 +155,11 @@ class QuickTokenAuthenticatorTest {
         duplicate.addHeader("Authorization", "Bearer " + secret.value());
 
         for (MockHttpServletRequest request : List.of(request(null, "203.0.113.1"), request("Basic abc", "203.0.113.2"),
-                request("bearer " + secret.value(), "203.0.113.3"), request("Bearer  " + secret.value(), "203.0.113.4"),
-                request("Bearer mlq_curto", "203.0.113.5"), request("Bearer " + secret.value(), "203.0.113.6"), duplicate)) {
+                request("bearer " + secret.value(), "203.0.113.3"), request("Bearer " + secret.value().substring(0, 12) + " " + secret.value().substring(12), "203.0.113.4"),
+                request("Bearer mlq_curto", "203.0.113.5"), request("Bearer", "203.0.113.6"), duplicate)) {
             assertThatThrownBy(() -> authenticator.authenticate(request)).isExactlyInstanceOf(QuickTokenInvalidException.class);
         }
-        verify(tokens, times(1)).findByTokenHashForAuthentication(secret.hash());
+        verify(tokens, never()).findByTokenHashForAuthentication(secret.hash());
         verify(tokens, never()).recordUse(any(), any(), any(), any(), any(), any());
     }
 

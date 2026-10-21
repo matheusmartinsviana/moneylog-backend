@@ -555,6 +555,23 @@ class QuickEntryAuthenticationIT {
     }
 
     @Test
+    @DisplayName("valor colado com espaço ou tab nas pontas autentica; espaço no meio, cabeçalho ausente e cabeçalho duplicado dão 401")
+    void deveAparaOValorColado() throws Exception {
+        QuickEntryTokenSecret secret = issue();
+        String value = secret.value();
+        String remote = uniqueIp("203.1");
+
+        for (String padded : List.of(" " + value, value + " ", "\t" + value + "\t", "  " + value + " \t ")) {
+            assertThat(mvc.perform(post("Bearer " + padded, remote)).andReturn().getResponse().getStatus()).isEqualTo(201);
+        }
+        String middle = value.substring(0, 20) + " " + value.substring(20);
+        assertThat(mvc.perform(post("Bearer " + middle, remote)).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(post(null, remote)).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(post("Bearer " + value, remote).header(HttpHeaders.AUTHORIZATION, "Bearer " + value)).andReturn().getResponse()
+                .getStatus()).isEqualTo(401);
+    }
+
+    @Test
     @DisplayName("o valor de Authorization não aparece no log em nenhuma das respostas, inclusive nas recusadas pelo firewall")
     void naoDeveVazarOTokenNoLog(CapturedOutput output) throws Exception {
         QuickEntryTokenSecret secret = issue();

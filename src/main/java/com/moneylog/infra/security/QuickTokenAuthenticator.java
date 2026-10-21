@@ -124,7 +124,23 @@ public class QuickTokenAuthenticator {
         if (all.size() != 1 || !all.get(0).startsWith(BEARER)) {
             return Optional.empty();
         }
-        return Optional.of(all.get(0).substring(BEARER.length()));
+        return Optional.of(trimEnds(all.get(0).substring(BEARER.length())));
+    }
+
+    private static String trimEnds(String value) {
+        int start = 0;
+        int end = value.length();
+        while (start < end && isPadding(value.charAt(start))) {
+            start++;
+        }
+        while (end > start && isPadding(value.charAt(end - 1))) {
+            end--;
+        }
+        return value.substring(start, end);
+    }
+
+    private static boolean isPadding(char c) {
+        return Character.isWhitespace(c) || Character.isISOControl(c) || Character.isSpaceChar(c);
     }
 
     private static String cleanUserAgent(String userAgent) {
