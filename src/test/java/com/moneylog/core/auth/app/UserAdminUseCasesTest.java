@@ -35,6 +35,8 @@ import com.moneylog.core.auth.domain.UserRole;
 import com.moneylog.core.auth.domain.UserStatus;
 import com.moneylog.core.auth.exception.UserManagementExceptions.CannotDisableOwnerException;
 import com.moneylog.core.auth.exception.UserManagementExceptions.UserNotFoundException;
+import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
+import com.moneylog.core.quickentry.domain.TokenRevocationReason;
 import com.moneylog.core.sk.time.ClockTimeProvider;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +51,8 @@ class UserAdminUseCasesTest {
     private UserGateway users;
     @Mock
     private RefreshTokenGateway refreshTokens;
+    @Mock
+    private QuickEntryTokenGateway quickEntryTokens;
 
     private final ClockTimeProvider time = new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC), ZoneOffset.UTC);
 
@@ -86,12 +90,13 @@ class UserAdminUseCasesTest {
         ManagedUser result = managed(MEMBER_ID, UserRole.MEMBER, UserStatus.DISABLED);
         when(users.findManagedById(MEMBER_ID)).thenReturn(Optional.of(result));
 
-        ManagedUser out = new DisableUserUseCaseImpl(users, refreshTokens, time).handle(new DisableUserCommand(MEMBER_ID));
+        ManagedUser out = new DisableUserUseCaseImpl(users, refreshTokens, quickEntryTokens, time).handle(new DisableUserCommand(MEMBER_ID));
 
         assertThat(out).isSameAs(result);
         InOrder order = inOrder(users, refreshTokens);
         order.verify(users).updateStatus(MEMBER_ID, UserStatus.DISABLED, NOW);
         order.verify(refreshTokens).revokeAllByUser(MEMBER_ID, NOW);
+        verify(quickEntryTokens).revokeAllActive(MEMBER_ID, TokenRevocationReason.USER_DISABLED, NOW);
     }
 
     @Test
@@ -100,7 +105,7 @@ class UserAdminUseCasesTest {
         when(users.findById(MEMBER_ID)).thenReturn(Optional.of(new User(MEMBER_ID, "m@example.com", UserRole.MEMBER, UserStatus.DISABLED)));
         when(users.findManagedById(MEMBER_ID)).thenReturn(Optional.of(managed(MEMBER_ID, UserRole.MEMBER, UserStatus.DISABLED)));
 
-        new DisableUserUseCaseImpl(users, refreshTokens, time).handle(new DisableUserCommand(MEMBER_ID));
+        new DisableUserUseCaseImpl(users, refreshTokens, quickEntryTokens, time).handle(new DisableUserCommand(MEMBER_ID));
 
         verify(users).updateStatus(MEMBER_ID, UserStatus.DISABLED, NOW);
         verify(refreshTokens).revokeAllByUser(MEMBER_ID, NOW);
@@ -111,7 +116,7 @@ class UserAdminUseCasesTest {
     void naoDesativaDono() {
         when(users.findById(OWNER_ID)).thenReturn(Optional.of(User.owner(OWNER_ID, "o@example.com")));
 
-        assertThatThrownBy(() -> new DisableUserUseCaseImpl(users, refreshTokens, time).handle(new DisableUserCommand(OWNER_ID)))
+        assertThatThrownBy(() -> new DisableUserUseCaseImpl(users, refreshTokens, quickEntryTokens, time).handle(new DisableUserCommand(OWNER_ID)))
                 .isInstanceOf(CannotDisableOwnerException.class);
 
         verify(users, never()).updateStatus(any(), any(), any());
@@ -123,7 +128,7 @@ class UserAdminUseCasesTest {
     void inexistente() {
         when(users.findById(MEMBER_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> new DisableUserUseCaseImpl(users, refreshTokens, time).handle(new DisableUserCommand(MEMBER_ID)))
+        assertThatThrownBy(() -> new DisableUserUseCaseImpl(users, refreshTokens, quickEntryTokens, time).handle(new DisableUserCommand(MEMBER_ID)))
                 .isInstanceOf(UserNotFoundException.class);
         assertThatThrownBy(() -> new EnableUserUseCaseImpl(users, time).handle(new EnableUserCommand(MEMBER_ID)))
                 .isInstanceOf(UserNotFoundException.class);

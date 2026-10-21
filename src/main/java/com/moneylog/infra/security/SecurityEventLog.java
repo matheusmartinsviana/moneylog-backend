@@ -1,5 +1,7 @@
 package com.moneylog.infra.security;
 
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,6 +36,14 @@ public final class SecurityEventLog {
 
     public static void ownerPasswordReset(String email) {
         log.warn("security_event event=owner_password_reset email={}", maskEmail(email));
+    }
+
+    public static void quickTokenCreated(String ip, UUID userId, UUID tokenId, String prefix) {
+        log.info("security_event event=quick_token_created ip={} user={} token={} prefix={}", clean(ip), userId, tokenId, clean(prefix));
+    }
+
+    public static void quickTokenRevoked(String ip, UUID userId, UUID tokenId, String prefix) {
+        log.warn("security_event event=quick_token_revoked ip={} user={} token={} prefix={}", clean(ip), userId, tokenId, clean(prefix));
     }
 
     static String maskEmail(String email) {
