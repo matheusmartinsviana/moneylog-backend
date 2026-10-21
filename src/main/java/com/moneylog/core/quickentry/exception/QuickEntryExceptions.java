@@ -66,6 +66,13 @@ public final class QuickEntryExceptions {
         }
     }
 
+    public static class QuickTokenAccountInactiveException extends BusinessRuleException {
+        public QuickTokenAccountInactiveException() {
+            super(QuickEntryErrorCodes.QUICK_ACCOUNT_NOT_ALLOWED,
+                    "A conta deste token não está mais ativa. Gere um novo token em Ajustes, Atalhos.");
+        }
+    }
+
     public static class QuickTokenValidityInvalidException extends BusinessRuleException {
         public QuickTokenValidityInvalidException(int maxDays) {
             super(QuickEntryErrorCodes.QUICK_TOKEN_VALIDITY_INVALID, "A validade do token vai de 1 a " + maxDays + " dias.");

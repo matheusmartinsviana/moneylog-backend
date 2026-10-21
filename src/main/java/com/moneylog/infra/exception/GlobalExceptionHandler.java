@@ -364,7 +364,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(status).body(problem(status, code, detail, request));
     }
 
-    private static ProblemDetail problem(HttpStatus status, String code, String detail, HttpServletRequest request) {
+    public static ProblemDetail problem(HttpStatus status, String code, String detail, HttpServletRequest request) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         enrich(problem, code, request);
         return problem;

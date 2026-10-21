@@ -31,15 +31,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.core.Authentication;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import io.swagger.v3.oas.models.PathItem;
 
@@ -48,6 +45,9 @@ import tools.jackson.databind.ObjectMapper;
 
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.UserStatus;
+import com.moneylog.core.category.app.gateways.CategoryGateway;
+import com.moneylog.core.category.domain.Category;
+import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
@@ -55,7 +55,6 @@ import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
 import com.moneylog.core.quickentry.domain.QuickEntryToken;
 import com.moneylog.core.quickentry.domain.QuickEntryTokenSecret;
 import com.moneylog.core.quickentry.domain.TokenRevocationReason;
-import com.moneylog.infra.security.CurrentUser;
 import com.moneylog.util.ContractValidation;
 import com.moneylog.util.IntegrationTest;
 import com.moneylog.util.ItAuth;
@@ -66,7 +65,7 @@ import com.moneylog.util.SqlFixtures;
 @IntegrationTest
 @Execution(ExecutionMode.SAME_THREAD)
 @ExtendWith(OutputCaptureExtension.class)
-@Import({MutableClockConfig.class, QuickEntryAuthenticationIT.ProbeAndPush.class})
+@Import({MutableClockConfig.class, QuickEntryAuthenticationIT.PushRecorder.class})
 @DisplayName("Autenticação por token de lançamento rápido (T4)")
 class QuickEntryAuthenticationIT {
 
@@ -77,14 +76,9 @@ class QuickEntryAuthenticationIT {
     }
 
     @TestConfiguration(proxyBeanMethods = false)
-    static class ProbeAndPush {
+    static class PushRecorder {
 
         static final List<Sent> SENT = new CopyOnWriteArrayList<>();
-
-        @Bean
-        QuickEntryProbeController quickEntryProbeController() {
-            return new QuickEntryProbeController();
-        }
 
         @Bean
         @Primary
@@ -109,18 +103,6 @@ class QuickEntryAuthenticationIT {
         }
     }
 
-    @RestController
-    static class QuickEntryProbeController {
-
-        static final AtomicInteger HITS = new AtomicInteger();
-
-        @PostMapping(PATH)
-        Map<String, String> probe(@CurrentUser UUID userId, Authentication authentication) {
-            HITS.incrementAndGet();
-            return Map.of("userId", userId.toString(), "principal", authentication.getName());
-        }
-    }
-
     @Autowired
     private MockMvc mvc;
     @Autowired
@@ -139,6 +121,8 @@ class QuickEntryAuthenticationIT {
     private PushSubscriptionGateway subscriptions;
     @Autowired
     private MutableClock clock;
+    @Autowired
+    private CategoryGateway categories;
 
     private TransactionTemplate tx;
     private UUID userId;
@@ -156,7 +140,10 @@ class QuickEntryAuthenticationIT {
 
     private UUID newUser() {
         UUID id = UUID.randomUUID();
-        tx.executeWithoutResult(status -> SqlFixtures.insertUser(jdbc, id, "qa-" + id + "@example.com"));
+        tx.executeWithoutResult(status -> {
+            SqlFixtures.insertUser(jdbc, id, "qa-" + id + "@example.com");
+            categories.saveSystem(Category.createSystem(UUID.randomUUID(), id, "Outros", CategoryKind.EXPENSE), "OTHER_EXPENSE");
+        });
         return id;
     }
 
@@ -180,7 +167,8 @@ class QuickEntryAuthenticationIT {
     }
 
     private MockHttpServletRequestBuilder post(String authorization, String remote) {
-        MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.post(PATH).contentType(MediaType.APPLICATION_JSON).content("{}")
+        MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.post(PATH).contentType(MediaType.APPLICATION_JSON)
+                .header("Idempotency-Key", UUID.randomUUID().toString()).content("{\"kind\":\"EXPENSE\",\"amount\":\"1,00\"}")
                 .with(request -> {
                     request.setRemoteAddr(remote);
                     return request;
@@ -213,6 +201,14 @@ class QuickEntryAuthenticationIT {
         return out;
     }
 
+    private UUID ownerOf(String transactionId) {
+        return jdbc.queryForObject("select user_id from transactions where id = ?", UUID.class, UUID.fromString(transactionId));
+    }
+
+    private int quickEntryRows() {
+        return jdbc.queryForObject("select count(*) from quick_entry_audit", Integer.class);
+    }
+
     private Map<String, Object> lastUse(QuickEntryTokenSecret secret) {
         return jdbc.queryForMap("select last_used_at, last_used_ip, last_used_user_agent from quick_entry_tokens where token_hash = ?",
                 secret.hash());
@@ -231,7 +227,7 @@ class QuickEntryAuthenticationIT {
     }
 
     private List<Sent> sentTo(String endpoint) {
-        return ProbeAndPush.SENT.stream().filter(sent -> sent.subscription().endpoint().equals(endpoint)).toList();
+        return PushRecorder.SENT.stream().filter(sent -> sent.subscription().endpoint().equals(endpoint)).toList();
     }
 
     private List<Sent> awaitSent(String endpoint, int expected) throws Exception {
@@ -249,9 +245,8 @@ class QuickEntryAuthenticationIT {
 
         MvcResult result = mvc.perform(post("Bearer " + secret.value(), ip).header("User-Agent", "Atalhos/" + "x".repeat(300))).andReturn();
 
-        assertThat(result.getResponse().getStatus()).isEqualTo(200);
-        assertThat(body(result).get("userId").asString()).isEqualTo(userId.toString());
-        assertThat(body(result).get("principal").asString()).isEqualTo(userId.toString());
+        assertThat(result.getResponse().getStatus()).isEqualTo(201);
+        assertThat(ownerOf(body(result).get("id").asString())).isEqualTo(userId);
         Map<String, Object> use = lastUse(secret);
         assertThat(use.get("last_used_at")).isNotNull();
         assertThat(use.get("last_used_ip")).isEqualTo(ip.substring(0, ip.lastIndexOf('.')) + ".0");
@@ -270,7 +265,7 @@ class QuickEntryAuthenticationIT {
         assertThat(lastUse(secret).get("last_used_at")).isEqualTo(first);
 
         clock.advance(Duration.ofSeconds(31));
-        assertThat(call(secret).getResponse().getStatus()).isEqualTo(200);
+        assertThat(call(secret).getResponse().getStatus()).isEqualTo(201);
         assertThat(lastUse(secret).get("last_used_at")).isNotEqualTo(first);
     }
 
@@ -281,8 +276,8 @@ class QuickEntryAuthenticationIT {
         QuickEntryTokenSecret mine = issue();
         QuickEntryTokenSecret theirs = issue(other, UUID.fromString(createWallet(other)), Duration.ofDays(30));
 
-        assertThat(body(call(mine)).get("userId").asString()).isEqualTo(userId.toString());
-        assertThat(body(call(theirs)).get("userId").asString()).isEqualTo(other.toString());
+        assertThat(ownerOf(body(call(mine)).get("id").asString())).isEqualTo(userId);
+        assertThat(ownerOf(body(call(theirs)).get("id").asString())).isEqualTo(other);
     }
 
     @Test
@@ -411,7 +406,8 @@ class QuickEntryAuthenticationIT {
 
     private MvcResult raw(HttpMethod method, String encodedPath, String authorization) throws Exception {
         MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.request(method, URI.create("http://localhost" + encodedPath))
-                .contentType(MediaType.APPLICATION_JSON).content("{}").with(r -> {
+                .contentType(MediaType.APPLICATION_JSON).header("Idempotency-Key", UUID.randomUUID().toString())
+                .content("{\"kind\":\"EXPENSE\",\"amount\":\"1,00\"}").with(r -> {
                     r.setRemoteAddr(ip);
                     return r;
                 });
@@ -421,7 +417,7 @@ class QuickEntryAuthenticationIT {
     @Test
     @DisplayName("JWT de sessão nunca alcança o controller da rota, nem por caminho codificado (%2D, %2d, %71, caixa, barra, ponto)")
     void deveBarrarJwtEmCaminhosCodificados() throws Exception {
-        int before = QuickEntryProbeController.HITS.get();
+        int before = quickEntryRows();
         List<String> reached = new ArrayList<>();
         for (HttpMethod method : List.of(HttpMethod.POST, HttpMethod.GET, HttpMethod.PUT, HttpMethod.DELETE)) {
             for (String path : ENCODED_PATHS) {
@@ -433,17 +429,17 @@ class QuickEntryAuthenticationIT {
             }
         }
         assertThat(reached).isEmpty();
-        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before);
+        assertThat(quickEntryRows()).isEqualTo(before);
     }
 
     @Test
     @DisplayName("sem credencial, os mesmos caminhos codificados nunca alcançam o controller")
     void deveBarrarAnonimoEmCaminhosCodificados() throws Exception {
-        int before = QuickEntryProbeController.HITS.get();
+        int before = quickEntryRows();
         for (String path : ENCODED_PATHS) {
             assertThat(raw(HttpMethod.POST, path, null).getResponse().getStatus()).isIn(400, 401);
         }
-        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before);
+        assertThat(quickEntryRows()).isEqualTo(before);
     }
 
     @Test
@@ -460,11 +456,11 @@ class QuickEntryAuthenticationIT {
             }
         }
 
-        int before = QuickEntryProbeController.HITS.get();
+        int before = quickEntryRows();
         MvcResult sameRoute = raw(HttpMethod.POST, "/v1/quick%2Dentries", bearer);
-        assertThat(sameRoute.getResponse().getStatus()).isEqualTo(200);
-        assertThat(body(sameRoute).get("userId").asString()).isEqualTo(userId.toString());
-        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before + 1);
+        assertThat(sameRoute.getResponse().getStatus()).isEqualTo(201);
+        assertThat(ownerOf(body(sameRoute).get("id").asString())).isEqualTo(userId);
+        assertThat(quickEntryRows()).isEqualTo(before + 1);
         assertThat(raw(HttpMethod.POST, "/v1/quick%2Dentries", "Bearer " + QuickEntryTokenSecret.generate().value()).getResponse()
                 .getContentAsString()).contains("QUICK_TOKEN_INVALID");
     }
@@ -482,10 +478,10 @@ class QuickEntryAuthenticationIT {
         assertThat(blocked.getResponse().getStatus()).isEqualTo(429);
         assertThat(blocked.getResponse().getHeader("Retry-After")).isNotNull();
         assertThat(body(blocked).get("code").asString()).isEqualTo("TOO_MANY_ATTEMPTS");
-        assertThat(mvc.perform(post("Bearer " + secret.value(), uniqueIp("172.16"))).andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(post("Bearer " + secret.value(), uniqueIp("172.16"))).andReturn().getResponse().getStatus()).isEqualTo(201);
 
         clock.advance(Duration.ofMinutes(5).plusSeconds(1));
-        assertThat(call(secret).getResponse().getStatus()).isEqualTo(200);
+        assertThat(call(secret).getResponse().getStatus()).isEqualTo(201);
     }
 
     @Test
@@ -493,7 +489,7 @@ class QuickEntryAuthenticationIT {
     void deveLimitarChamadasPorToken() throws Exception {
         QuickEntryTokenSecret secret = issue();
         for (int i = 0; i < 20; i++) {
-            assertThat(call(secret).getResponse().getStatus()).isEqualTo(200);
+            assertThat(call(secret).getResponse().getStatus()).isEqualTo(201);
         }
 
         MvcResult limited = call(secret);
@@ -501,7 +497,7 @@ class QuickEntryAuthenticationIT {
         assertThat(limited.getResponse().getHeader("Retry-After")).isNotNull();
 
         clock.advance(Duration.ofSeconds(61));
-        assertThat(call(secret).getResponse().getStatus()).isEqualTo(200);
+        assertThat(call(secret).getResponse().getStatus()).isEqualTo(201);
         Integer revoked = jdbc.queryForObject("select count(*) from quick_entry_tokens where token_hash = ? and revoked_at is not null",
                 Integer.class, secret.hash());
         assertThat(revoked).isZero();
