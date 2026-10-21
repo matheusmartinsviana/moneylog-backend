@@ -41,11 +41,11 @@ public class QuickEntryUseCaseConfig {
     }
 
     @Bean
-    QuickEntryLimits quickEntryLimits(@Value("${moneylog.quick-entry.max-amount:0}") BigDecimal maxAmount,
-                                      @Value("${moneylog.quick-entry.max-entries-per-day:0}") int maxEntriesPerDay,
-                                      @Value("${moneylog.quick-entry.max-expense-per-day:0}") BigDecimal maxExpensePerDay,
-                                      @Value("${moneylog.quick-entry.max-income-per-day:0}") BigDecimal maxIncomePerDay) {
-        return new QuickEntryLimits(money(maxAmount), maxEntriesPerDay, money(maxExpensePerDay), money(maxIncomePerDay));
+    QuickEntryLimits quickEntryLimits(@Value("${moneylog.quick-entry.max-amount:}") String maxAmount,
+                                      @Value("${moneylog.quick-entry.max-entries-per-day:}") String maxEntriesPerDay,
+                                      @Value("${moneylog.quick-entry.max-expense-per-day:}") String maxExpensePerDay,
+                                      @Value("${moneylog.quick-entry.max-income-per-day:}") String maxIncomePerDay) {
+        return new QuickEntryLimits(money(maxAmount), count(maxEntriesPerDay), money(maxExpensePerDay), money(maxIncomePerDay));
     }
 
     @Bean
@@ -59,8 +59,23 @@ public class QuickEntryUseCaseConfig {
                         timeZones, usage, ids, time, limits), tm);
     }
 
-    private static Money money(BigDecimal value) {
-        if (value == null || value.signum() == 0) {
+    private static int count(String text) {
+        if (text == null || text.isBlank()) {
+            return 0;
+        }
+        int value = Integer.parseInt(text.strip());
+        if (value < 0) {
+            throw new IllegalStateException("limite do lançamento rápido inválido: " + text);
+        }
+        return value;
+    }
+
+    private static Money money(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        BigDecimal value = new BigDecimal(text.strip());
+        if (value.signum() == 0) {
             return null;
         }
         if (value.signum() < 0 || value.stripTrailingZeros().scale() > Money.SCALE) {

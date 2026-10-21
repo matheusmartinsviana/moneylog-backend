@@ -49,4 +49,19 @@ class CategoryMatcherTest {
         assertThat(CategoryMatcher.find("SALARY", active, keys)).isEmpty();
         assertThat(CategoryMatcher.find("FOOD", List.of(own), keys)).isEmpty();
     }
+
+    @Test
+    @DisplayName("nomes que só diferem no acento: o nome exato desempata; sem exato, a ambiguidade não resolve")
+    void deveDesempatarPeloNomeExato() {
+        Category withAccent = Category.create(UUID.randomUUID(), USER, "Saúde", CategoryKind.EXPENSE);
+        Category withoutAccent = Category.create(UUID.randomUUID(), USER, "Saude", CategoryKind.EXPENSE);
+        List<Category> both = List.of(withAccent, withoutAccent);
+
+        assertThat(CategoryMatcher.find("Saúde", both, Map.of())).contains(withAccent);
+        assertThat(CategoryMatcher.find("saude", both, Map.of())).contains(withoutAccent);
+        assertThat(CategoryMatcher.find("SAUDE", both, Map.of())).contains(withoutAccent);
+        assertThat(CategoryMatcher.find("SAÚDE", both, Map.of())).contains(withAccent);
+        Category third = Category.create(UUID.randomUUID(), USER, "Sàude", CategoryKind.EXPENSE);
+        assertThat(CategoryMatcher.find("Saudé", List.of(withAccent, third), Map.of())).isEmpty();
+    }
 }

@@ -126,4 +126,37 @@ class QuickEntryLimitsIT extends QuickEntryItBase {
         assertThat(count("quick_entry_audit", w.userId())).isEqualTo(3);
         assertThat(balance(w)).isEqualByComparingTo("-200.00");
     }
+
+    @Test
+    @DisplayName("requisições paralelas perto do teto de quantidade: nunca passam de 5 lançamentos")
+    void deveSerializarAQuantidadeEmParalelo() throws Exception {
+        World w = world();
+        int threads = 16;
+        ExecutorService pool = Executors.newFixedThreadPool(threads);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Boolean>> futures = new ArrayList<>();
+        for (int i = 0; i < threads; i++) {
+            String key = "paralelo-qtd-%02d".formatted(i);
+            futures.add(pool.submit(() -> {
+                start.await();
+                try {
+                    quick.handle(expense(w, key, "1,00", "FOOD", null));
+                    return true;
+                } catch (RuntimeException e) {
+                    assertThat(e).hasFieldOrPropertyWithValue("code", QuickEntryErrorCodes.QUICK_LIMIT_REACHED);
+                    return false;
+                }
+            }));
+        }
+        start.countDown();
+        long accepted = 0;
+        for (Future<Boolean> future : futures) {
+            accepted += future.get() ? 1 : 0;
+        }
+        pool.shutdown();
+
+        assertThat(accepted).isEqualTo(5);
+        assertThat(count("transactions", w.userId())).isEqualTo(5);
+        assertThat(count("quick_entry_audit", w.userId())).isEqualTo(5);
+    }
 }

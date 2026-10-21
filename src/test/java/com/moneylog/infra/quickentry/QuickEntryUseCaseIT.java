@@ -73,10 +73,13 @@ class QuickEntryUseCaseIT extends QuickEntryItBase {
         BigDecimal netWorthBefore = netWorth(w);
 
         CreateQuickEntryResult result = quick.handle(income(w, "20261021120001", "2500,00", "Salário"));
+        CreateQuickEntryResult september = quick.handle(new CreateQuickEntryCommand(w.userId(), w.tokenId(), w.accountId(), "20261021120009",
+                QuickEntryKind.INCOME, new QuickAmountInput.Text("100"), "Salário", null, null, LocalDate.of(2026, 9, 30), null));
+        assertThat(september.details().transaction().effectiveIncomeCompetence().toString()).isEqualTo("2026-09");
 
         assertThat(result.message()).isEqualTo("Entrada de R$ 2.500,00 em Salário (Carteira) registrada.");
-        assertThat(balance(w)).isEqualByComparingTo("3500.00");
-        assertThat(netWorth(w).subtract(netWorthBefore)).isEqualByComparingTo("2500.00");
+        assertThat(balance(w)).isEqualByComparingTo("3600.00");
+        assertThat(netWorth(w).subtract(netWorthBefore)).isEqualByComparingTo("2600.00");
         JsonNode transaction = get(w.bearer(), "/v1/transactions/" + result.details().transaction().id());
         assertThat(new BigDecimal(transaction.get("impact").get("cash").get("amount").asString())).isEqualByComparingTo("2500.00");
         assertThat(transaction.get("impact").get("consumption")).isEmpty();
@@ -364,5 +367,20 @@ class QuickEntryUseCaseIT extends QuickEntryItBase {
 
         assertThat(result.details().transaction().amount().toPlainString()).isEqualTo("27.60");
         assertThat(balance(w)).isEqualByComparingTo("972.40");
+    }
+
+    @Test
+    @DisplayName("a mensagem do 201 não ecoa a description digitada, nem no lançamento nem no replay")
+    void naoDeveEcoarADescricaoNaMensagem() throws Exception {
+        World w = world();
+        CreateQuickEntryCommand command = new CreateQuickEntryCommand(w.userId(), w.tokenId(), w.accountId(), "sem-eco-00001", QuickEntryKind.EXPENSE,
+                new QuickAmountInput.Text("35,50"), "FOOD", "Segredo do almoço com fulano", null, null, null);
+
+        CreateQuickEntryResult created = quick.handle(command);
+        CreateQuickEntryResult replay = quick.handle(command);
+
+        assertThat(created.message()).isEqualTo("Gasto de R$ 35,50 em Alimentação (Carteira) registrado.");
+        assertThat(replay.message()).isEqualTo(created.message()).doesNotContain("Segredo");
+        assertThat(created.details().transaction().description()).isEqualTo("Segredo do almoço com fulano");
     }
 }
