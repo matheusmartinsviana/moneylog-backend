@@ -43,10 +43,42 @@ class QuickIdempotencyKeyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"1234567", A65, "com espaço 123", "acentuação12", "a/b/c/d/e/f", "", "chave;com;ponto"})
+    @ValueSource(strings = {"1234567", A65, "a/b/c/d/e/f", "", "/// 12345 ///", "12/34/56 7"})
     void deveRecusarForaDoFormato(String key) {
         assertThat(QuickIdempotencyKey.isValid(key)).isFalse();
         assertThatThrownBy(() -> QuickIdempotencyKey.resolve(USER, key)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("normaliza data formatada, ISO, controles, NBSP e marcas de direção")
+    void deveNormalizar() {
+        assertThat(QuickIdempotencyKey.normalize("21/10/2026 17:11")).isEqualTo("211020261711");
+        assertThat(QuickIdempotencyKey.normalize("2026-10-21T17:11:00")).isEqualTo("2026-10-21T171100");
+        assertThat(QuickIdempotencyKey.normalize("\u200E21/10/2026\u00A017:11\u200F\r\n\t")).isEqualTo("211020261711");
+        assertThat(QuickIdempotencyKey.normalize("\u0000ab\u0001cdef\u007Fgh")).isEqualTo("abcdefgh");
+        assertThat(QuickIdempotencyKey.normalize(" " + A64.substring(0, 10) + " ")).isEqualTo(A64.substring(0, 10));
+        UUID id = UUID.randomUUID();
+        assertThat(QuickIdempotencyKey.normalize(" " + id + "\u00A0")).isEqualTo(id.toString());
+        assertThat(QuickIdempotencyKey.resolve(USER, "21/10/2026 17:11")).isEqualTo(QuickIdempotencyKey.resolve(USER, "211020261711"));
+    }
+
+    @Test
+    @DisplayName("valor bruto acima de 200 caracteres não é normalizado")
+    void deveRecusarBrutoLongo() {
+        assertThat(QuickIdempotencyKey.normalize("a".repeat(200))).isNull();
+        assertThat(QuickIdempotencyKey.normalize("a".repeat(30) + " ".repeat(170))).isEqualTo("a".repeat(30));
+        assertThat(QuickIdempotencyKey.normalize("a".repeat(200) + " ")).isNull();
+        assertThat(QuickIdempotencyKey.explain("a".repeat(201))).contains("201").doesNotContain("aaaa");
+    }
+
+    @Test
+    @DisplayName("a mensagem conta caracteres recebidos, descartados e restantes, sem ecoar o valor")
+    void deveExplicarSemEcoar() {
+        String message = QuickIdempotencyKey.explain("12/34 56");
+
+        assertThat(message).isEqualTo("Formato inválido: chegaram 8 caracteres, 2 inválidos descartados; sobraram 6 e o mínimo é 8.");
+        assertThat(message).doesNotContain("12/34").doesNotContain("123456");
+        assertThat(QuickIdempotencyKey.explain(A65)).contains("sobraram 65 e o máximo é 64");
     }
 
     @Test

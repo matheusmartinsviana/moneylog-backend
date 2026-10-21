@@ -71,7 +71,7 @@ public class QuickEntryController implements QuickEntryControllerOpenApi {
             throw new RequestValidationException(IDEMPOTENCY_HEADER, "REQUIRED", "Cabeçalho obrigatório.");
         }
         if (!QuickIdempotencyKey.isValid(key)) {
-            throw new RequestValidationException(IDEMPOTENCY_HEADER, "INVALID_FORMAT", "Formato inválido.");
+            throw new RequestValidationException(IDEMPOTENCY_HEADER, "INVALID_FORMAT", QuickIdempotencyKey.explain(key));
         }
     }
 }
