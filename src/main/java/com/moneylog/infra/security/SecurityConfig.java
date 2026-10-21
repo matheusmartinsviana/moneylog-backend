@@ -6,10 +6,13 @@ import java.util.Objects;
 
 import javax.crypto.SecretKey;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
@@ -29,6 +32,7 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.firewall.RequestRejectedHandler;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -41,14 +45,45 @@ import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.moneylog.core.auth.app.gateways.PasswordVerifier;
 import com.moneylog.core.auth.app.gateways.TokenIssuer;
 import com.moneylog.core.auth.app.gateways.UserGateway;
+import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
 import com.moneylog.core.sk.time.TimeProvider;
 
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties({MoneylogSecurityProperties.class, MoneylogAuthProperties.class, MoneylogOwnerProperties.class})
+@EnableConfigurationProperties({MoneylogSecurityProperties.class, MoneylogAuthProperties.class, MoneylogOwnerProperties.class,
+        MoneylogQuickEntryProperties.class})
 public class SecurityConfig {
 
+    public static final String QUICK_ENTRY_PATH = "/v1/quick-entries";
+
     @Bean
+    @Order(1)
+    SecurityFilterChain quickEntrySecurity(HttpSecurity http, QuickTokenAuthenticator authenticator,
+                                           @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) throws Exception {
+        AuthenticationEntryPoint entryPoint = (request, response, exception) ->
+                resolver.resolveException(request, response, null, new QuickTokenInvalidException());
+        AccessDeniedHandler deniedHandler = (request, response, exception) ->
+                resolver.resolveException(request, response, null, new QuickTokenInvalidException());
+        http.securityMatcher(SecurityConfig::isQuickEntryRequest)
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .requestCache(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(requests -> requests.anyRequest().hasAuthority(QuickTokenAuthentication.AUTHORITY))
+                .addFilterBefore(new QuickTokenAuthenticationFilter(authenticator, resolver), AuthorizationFilter.class)
+                .exceptionHandling(errors -> errors.authenticationEntryPoint(entryPoint).accessDeniedHandler(deniedHandler));
+        return http.build();
+    }
+
+    static boolean isQuickEntryRequest(HttpServletRequest request) {
+        return HttpMethod.POST.name().equals(request.getMethod()) && QUICK_ENTRY_PATH.equals(request.getRequestURI());
+    }
+
+    @Bean
+    @Order(2)
     SecurityFilterChain apiSecurity(HttpSecurity http, JwtDecoder jwtDecoder, UserGateway users,
                                     @Qualifier("handlerExceptionResolver") HandlerExceptionResolver resolver) throws Exception {
         AuthenticationEntryPoint entryPoint = (request, response, exception) -> {
@@ -136,5 +171,24 @@ public class SecurityConfig {
     LoginRateLimiter loginRateLimiter(Clock clock, MoneylogAuthProperties auth) {
         return new LoginRateLimiter(clock, new LoginRateLimiter.Settings(auth.maxLoginFailures(), auth.loginWindow(),
                 auth.maxAccountFailures(), auth.accountLockBase(), auth.accountLockMax(), auth.trustedIpTtl(), auth.limiterMaxEntries()));
+    }
+
+    @Bean
+    QuickTokenRateLimiter quickTokenRateLimiter(Clock clock, MoneylogQuickEntryProperties properties) {
+        MoneylogQuickEntryProperties.RateLimit limits = properties.rateLimit();
+        return new QuickTokenRateLimiter(clock, new QuickTokenRateLimiter.Settings(limits.maxFailuresPerIp(), limits.failureWindow(),
+                limits.maxCallsPerToken(), limits.callWindow(), 10_000));
+    }
+
+    @Bean
+    QuickTokenSeenIps quickTokenSeenIps() {
+        return new QuickTokenSeenIps();
+    }
+
+    @Bean
+    QuickTokenAuthenticator quickTokenAuthenticator(QuickEntryTokenGateway tokens, UserGateway users, ClientIpResolver clientIp,
+                                                    QuickTokenRateLimiter limiter, QuickTokenSeenIps seenIps, SecurityAlerts alerts,
+                                                    Clock clock, MoneylogQuickEntryProperties properties) {
+        return new QuickTokenAuthenticator(tokens, users, clientIp, limiter, seenIps, alerts, clock, properties);
     }
 }

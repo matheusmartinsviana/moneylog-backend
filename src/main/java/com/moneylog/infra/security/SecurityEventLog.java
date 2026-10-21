@@ -46,6 +46,22 @@ public final class SecurityEventLog {
         log.warn("security_event event=quick_token_revoked ip={} user={} token={} prefix={}", clean(ip), userId, tokenId, clean(prefix));
     }
 
+    public static void quickTokenRejected(String ip, String reason) {
+        log.warn("security_event event=quick_token_rejected ip={} reason={}", clean(ip), clean(reason));
+    }
+
+    public static void quickTokenFailureBurst(String ip) {
+        log.warn("security_event event=quick_token_failure_burst ip={}", clean(ip));
+    }
+
+    public static void quickTokenRateLimited(String scope, String ip) {
+        log.warn("security_event event=quick_token_rate_limited scope={} ip={}", clean(scope), clean(ip));
+    }
+
+    public static void quickTokenNewIp(String maskedIp, UUID userId, UUID tokenId, String prefix) {
+        log.warn("security_event event=quick_token_new_ip ip={} user={} token={} prefix={}", clean(maskedIp), userId, tokenId, clean(prefix));
+    }
+
     static String maskEmail(String email) {
         if (email == null) {
             return "***";

@@ -43,12 +43,14 @@ import com.moneylog.core.ai.exception.AiExceptions.AiProviderUnavailableExceptio
 import com.moneylog.core.ai.exception.AiExceptions.AiRateLimitedException;
 import com.moneylog.core.invitation.exception.HasInvitationId;
 import com.moneylog.core.mail.app.EmailDeliveryException;
+import com.moneylog.core.quickentry.exception.QuickEntryErrorCodes;
 import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.DomainException;
 import com.moneylog.core.sk.exception.NotFoundException;
 import com.moneylog.core.sk.exception.UnauthorizedException;
 import com.moneylog.infra.security.OriginNotAllowedException;
+import com.moneylog.infra.security.QuickTokenInvalidException;
 import com.moneylog.infra.security.TooManyAttemptsException;
 import com.moneylog.infra.exception.RequestValidationException.FieldIssue;
 import com.moneylog.infra.web.TraceIdFilter;
@@ -152,6 +154,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             }
         }
         return false;
+    }
+
+    @ExceptionHandler(QuickTokenInvalidException.class)
+    ResponseEntity<Object> handleQuickTokenInvalid(QuickTokenInvalidException ex, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.UNAUTHORIZED, QuickEntryErrorCodes.QUICK_TOKEN_INVALID,
+                "Token inválido ou vencido. Gere um novo em Ajustes, Atalhos.", request);
+        problem.setTitle("Token inválido");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).header(HttpHeaders.WWW_AUTHENTICATE, "Bearer").body(problem);
     }
 
     @ExceptionHandler(AuthenticationException.class)
