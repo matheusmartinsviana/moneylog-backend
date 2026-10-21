@@ -8,7 +8,9 @@ public enum SecurityEvent {
     SETUP_COMPLETED,
     PASSWORD_RESET,
     QUICK_TOKEN_CREATED,
-    QUICK_TOKEN_REVOKED;
+    QUICK_TOKEN_REVOKED,
+    QUICK_TOKEN_FAILURE_BURST,
+    QUICK_TOKEN_NEW_IP;
 
     public String titleKey() {
         return "security." + name().toLowerCase(Locale.ROOT);

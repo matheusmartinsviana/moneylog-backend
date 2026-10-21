@@ -30,6 +30,9 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
                 throw new AuthenticationCredentialsNotFoundException("subject do token não é um id de usuário");
             }
         }
+        if (authentication instanceof QuickTokenAuthentication quick) {
+            return quick.getPrincipal().userId();
+        }
         throw new AuthenticationCredentialsNotFoundException("requisição sem usuário autenticado");
     }
 }

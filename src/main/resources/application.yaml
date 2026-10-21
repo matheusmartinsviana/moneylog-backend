@@ -110,6 +110,15 @@ moneylog:
     default-validity-days: ${MONEYLOG_QUICK_ENTRY_DEFAULT_VALIDITY_DAYS:30}
     max-validity-days: ${MONEYLOG_QUICK_ENTRY_MAX_VALIDITY_DAYS:90}
     max-active-tokens: ${MONEYLOG_QUICK_ENTRY_MAX_ACTIVE_TOKENS:3}
+    # No máximo uma gravação de last_used_at/IP mascarado/user agent por token neste intervalo.
+    last-used-write-interval: PT1M
+    rate-limit:
+      # Falhas de token por IP na janela; acima, 429 TOO_MANY_ATTEMPTS com Retry-After (só falhas contam).
+      max-failures-per-ip: ${MONEYLOG_QUICK_ENTRY_MAX_FAILURES_PER_IP:10}
+      failure-window: PT5M
+      # Chamadas com token válido na janela; acima, 429 e o token continua válido.
+      max-calls-per-token: ${MONEYLOG_QUICK_ENTRY_MAX_CALLS_PER_TOKEN:20}
+      call-window: PT1M
   users:
     # Teto de usuários (ativos e desativados) somados aos convites pendentes não expirados.
     max: ${MONEYLOG_USERS_MAX:10}
