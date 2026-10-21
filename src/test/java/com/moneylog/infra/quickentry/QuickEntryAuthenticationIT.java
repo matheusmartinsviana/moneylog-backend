@@ -51,6 +51,7 @@ import com.moneylog.core.category.domain.CategoryKind;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
+import com.moneylog.core.notification.domain.SecurityEvent;
 import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
 import com.moneylog.core.quickentry.domain.QuickEntryToken;
 import com.moneylog.core.quickentry.domain.QuickEntryTokenSecret;
@@ -227,7 +228,8 @@ class QuickEntryAuthenticationIT {
     }
 
     private List<Sent> sentTo(String endpoint) {
-        return PushRecorder.SENT.stream().filter(sent -> sent.subscription().endpoint().equals(endpoint)).toList();
+        return PushRecorder.SENT.stream().filter(sent -> sent.subscription().endpoint().equals(endpoint))
+                .filter(sent -> !sent.message().titleKey().equals(SecurityEvent.QUICK_ENTRY_CREATED.titleKey())).toList();
     }
 
     private List<Sent> awaitSent(String endpoint, int expected) throws Exception {
