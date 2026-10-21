@@ -85,7 +85,7 @@ class AmountTextTest {
     void deveVoltarIgualEmIdaEVolta() {
         Random random = new Random(20261021L);
         for (int i = 0; i < 20_000; i++) {
-            long cents = 1 + (long) (random.nextDouble() * AmountLimit.MAX_CENTS);
+            long cents = random.nextLong(1, AmountLimit.MAX_CENTS + 1);
             Money original = Money.ofCents(cents, CurrencyCode.BRL);
             assertThat(AmountText.parseText(AmountText.format(original))).isEqualTo(original);
             assertThat(AmountText.parseText(AmountText.formatBrl(original))).isEqualTo(original);

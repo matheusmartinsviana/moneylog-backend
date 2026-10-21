@@ -28,7 +28,7 @@ import com.moneylog.core.quickentry.domain.QuickEntryAudit;
 import com.moneylog.core.quickentry.domain.QuickEntryKind;
 import com.moneylog.core.quickentry.domain.QuickEntryMessage;
 import com.moneylog.core.quickentry.domain.QuickIdempotencyKey;
-import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickAccountNotAllowedException;
+import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickTokenAccountInactiveException;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickCategoryNotFoundException;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickDateOutOfRangeException;
 import com.moneylog.core.quickentry.exception.QuickEntryExceptions.QuickLimitReachedException;
@@ -120,7 +120,10 @@ public class CreateQuickEntryUseCaseImpl implements CreateQuickEntryUseCase {
 
     private static CreateQuickEntryResult result(QuickEntryKind kind, TransactionDetails details) {
         Transaction transaction = details.transaction();
-        String category = details.category() == null ? "Sem categoria" : details.category().name();
+        if (details.category() == null) {
+            throw new IllegalStateException("lançamento rápido sem categoria aplicada");
+        }
+        String category = details.category().name();
         String message = QuickEntryMessage.of(kind, transaction.amount(), category, details.account().name(), transaction.status());
         return new CreateQuickEntryResult(details, message);
     }
@@ -148,7 +151,7 @@ public class CreateQuickEntryUseCaseImpl implements CreateQuickEntryUseCase {
         Account account = accounts.findById(userId, accountId).map(Persisted::value)
                 .orElseThrow(() -> new AccountNotFoundException(accountId));
         if (!account.isActive() || account.liquidity() != LiquidityClass.CASH) {
-            throw new QuickAccountNotAllowedException();
+            throw new QuickTokenAccountInactiveException();
         }
     }
 
