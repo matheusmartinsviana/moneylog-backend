@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.invitation.app.gateways.InvitationGateway;
+import com.moneylog.core.invitation.app.gateways.InviterNameGateway;
 import com.moneylog.core.invitation.domain.Invitation;
 import com.moneylog.core.invitation.exception.InvitationExceptions.EmailAlreadyRegisteredException;
 import com.moneylog.core.invitation.exception.InvitationExceptions.InvitationNotFoundException;
@@ -14,6 +15,7 @@ import com.moneylog.core.invitation.exception.InvitationExceptions.InvitationNot
 import com.moneylog.core.invitation.exception.InvitationExceptions.InvitationPendingException;
 import com.moneylog.core.invitation.exception.InvitationExceptions.InvitationsDisabledException;
 import com.moneylog.core.invitation.exception.InvitationExceptions.UserLimitReachedException;
+import com.moneylog.core.mail.app.InviterName;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.id.SecureToken;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -22,14 +24,16 @@ public class InvitationIssuerImpl implements InvitationIssuer {
 
     private final InvitationGateway invitations;
     private final UserGateway users;
+    private final InviterNameGateway inviterNames;
     private final IdGenerator ids;
     private final TimeProvider time;
     private final InvitationPolicy policy;
 
-    public InvitationIssuerImpl(InvitationGateway invitations, UserGateway users, IdGenerator ids, TimeProvider time,
-                                InvitationPolicy policy) {
+    public InvitationIssuerImpl(InvitationGateway invitations, UserGateway users, InviterNameGateway inviterNames, IdGenerator ids,
+                                TimeProvider time, InvitationPolicy policy) {
         this.invitations = invitations;
         this.users = users;
+        this.inviterNames = inviterNames;
         this.ids = ids;
         this.time = time;
         this.policy = policy;
@@ -48,7 +52,7 @@ public class InvitationIssuerImpl implements InvitationIssuer {
         String token = SecureToken.generate();
         Invitation invitation = Invitation.issue(ids.next(), email, SecureToken.hash(token), inviterId, now, policy.expiresAt(now));
         invitations.insert(invitation);
-        return new IssuedInvitation(invitation, inviterEmail, token);
+        return new IssuedInvitation(invitation, inviterEmail, inviterName(inviterId), token);
     }
 
     @Override
@@ -69,7 +73,7 @@ public class InvitationIssuerImpl implements InvitationIssuer {
         String token = SecureToken.generate();
         Invitation reissued = current.reissue(SecureToken.hash(token), now, policy.expiresAt(now));
         invitations.update(reissued);
-        return new IssuedInvitation(reissued, inviterEmail, token);
+        return new IssuedInvitation(reissued, inviterEmail, inviterName(inviterId), token);
     }
 
     @Override
@@ -87,6 +91,10 @@ public class InvitationIssuerImpl implements InvitationIssuer {
         if (!policy.enabled()) {
             throw new InvitationsDisabledException();
         }
+    }
+
+    private String inviterName(UUID inviterId) {
+        return inviterNames.findDisplayName(inviterId).map(InviterName::clean).orElse(null);
     }
 
     private String inviterEmail(UUID inviterId) {

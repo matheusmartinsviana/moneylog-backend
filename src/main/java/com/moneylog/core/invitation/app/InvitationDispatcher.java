@@ -50,7 +50,7 @@ public class InvitationDispatcher {
         Invitation invitation = issued.invitation();
         try {
             InvitationEmailModel model = new InvitationEmailModel(issued.inviterEmail(), invitation.email(), issued.token(),
-                    invitation.expiresAt(), policy.validityDays());
+                    invitation.expiresAt(), policy.validityDays(), issued.inviterName());
             RenderedEmail rendered = template.renderInvitation(model);
             sender.send(new EmailMessage(invitation.email(), rendered.subject(), rendered.html(), rendered.text(), null));
             return true;

@@ -48,6 +48,8 @@ class InvitationQueriesAndRetentionTest {
     private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     @Mock
+    private com.moneylog.core.invitation.app.gateways.InviterNameGateway inviterNames;
+    @Mock
     private InvitationGateway invitations;
 
     private final TimeProvider time = new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC));
@@ -108,10 +110,11 @@ class InvitationQueriesAndRetentionTest {
     @DisplayName("preview devolve e-mail e validade, uma única consulta por hash; inválido é 404")
     void previews() {
         when(invitations.findByTokenHash(SecureToken.hash("t"))).thenReturn(Optional.of(pending));
-        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, time, new InvitationPolicy(true, 7, 10));
+        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, inviterNames, time, new InvitationPolicy(true, 7, 10));
         var preview = useCase.handle(new PreviewInvitationCommand("t"));
         assertThat(preview.email()).isEqualTo("ana@example.com");
         assertThat(preview.expiresAt()).isEqualTo(pending.expiresAt());
+        assertThat(preview.invitedByName()).isNull();
         when(invitations.findByTokenHash(SecureToken.hash("x"))).thenReturn(Optional.empty());
         assertThatThrownBy(() -> useCase.handle(new PreviewInvitationCommand("x"))).isInstanceOf(InvalidInvitationException.class);
         when(invitations.findByTokenHash(SecureToken.hash("r"))).thenReturn(Optional.of(pending.revoke()));
@@ -119,9 +122,29 @@ class InvitationQueriesAndRetentionTest {
     }
 
     @Test
+    @DisplayName("preview traz o apelido de quem convidou, sem espaços nas pontas, e trata branco como nulo")
+    void previewsInviterName() {
+        when(invitations.findByTokenHash(SecureToken.hash("t"))).thenReturn(Optional.of(pending));
+        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, inviterNames, time, new InvitationPolicy(true, 7, 10));
+        when(inviterNames.findDisplayName(OWNER_ID)).thenReturn(Optional.of("  Matheus "));
+        assertThat(useCase.handle(new PreviewInvitationCommand("t")).invitedByName()).isEqualTo("Matheus");
+        when(inviterNames.findDisplayName(OWNER_ID)).thenReturn(Optional.of("   "));
+        assertThat(useCase.handle(new PreviewInvitationCommand("t")).invitedByName()).isNull();
+    }
+
+    @Test
+    @DisplayName("preview de token inválido não consulta o apelido")
+    void invalidTokenDoesNotLookUpName() {
+        when(invitations.findByTokenHash(SecureToken.hash("x"))).thenReturn(Optional.empty());
+        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, inviterNames, time, new InvitationPolicy(true, 7, 10));
+        assertThatThrownBy(() -> useCase.handle(new PreviewInvitationCommand("x"))).isInstanceOf(InvalidInvitationException.class);
+        org.mockito.Mockito.verifyNoInteractions(inviterNames);
+    }
+
+    @Test
     @DisplayName("preview com a flag desligada: 404 INVALID_INVITATION sem consulta")
     void previewDisabled() {
-        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, time, new InvitationPolicy(false, 7, 10));
+        PreviewInvitationUseCaseImpl useCase = new PreviewInvitationUseCaseImpl(invitations, inviterNames, time, new InvitationPolicy(false, 7, 10));
         assertThatThrownBy(() -> useCase.handle(new PreviewInvitationCommand("t"))).isInstanceOf(InvalidInvitationException.class);
         org.mockito.Mockito.verifyNoInteractions(invitations);
     }

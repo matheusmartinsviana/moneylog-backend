@@ -56,6 +56,8 @@ class InvitationIssuerImplTest {
     @Mock
     private UserGateway users;
     @Mock
+    private com.moneylog.core.invitation.app.gateways.InviterNameGateway inviterNames;
+    @Mock
     private IdGenerator ids;
 
     private final TimeProvider time = new ClockTimeProvider(Clock.fixed(NOW, ZoneOffset.UTC));
@@ -63,7 +65,7 @@ class InvitationIssuerImplTest {
 
     @BeforeEach
     void setUp() {
-        issuer = new InvitationIssuerImpl(invitations, users, ids, time, new InvitationPolicy(true, 7, 3));
+        issuer = new InvitationIssuerImpl(invitations, users, inviterNames, ids, time, new InvitationPolicy(true, 7, 3));
     }
 
     private static Invitation stored(InvitationStatus status, Instant expiresAt) {
@@ -103,6 +105,21 @@ class InvitationIssuerImplTest {
     }
 
     @Test
+    @DisplayName("a emissão carrega o apelido do convidante, limpo; sem apelido segue nulo")
+    void carriesInviterName() {
+        inviterExists();
+        when(ids.next()).thenReturn(NEW_ID);
+        when(users.existsByEmail("ana@example.com")).thenReturn(false);
+        when(invitations.findPendingByEmail("ana@example.com")).thenReturn(Optional.empty());
+        when(users.count()).thenReturn(1L);
+        when(invitations.countPendingNotExpired(NOW)).thenReturn(0L);
+        when(inviterNames.findDisplayName(OWNER_ID)).thenReturn(Optional.of("  Matheus "), Optional.empty());
+
+        assertThat(issuer.issue(OWNER_ID, "ana@example.com").inviterName()).isEqualTo("Matheus");
+        assertThat(issuer.issue(OWNER_ID, "ana@example.com").inviterName()).isNull();
+    }
+
+    @Test
     @DisplayName("e-mail que já é usuário: 409 e nada é gravado")
     void refusesRegisteredEmail() {
         inviterExists();
@@ -136,7 +153,7 @@ class InvitationIssuerImplTest {
     @Test
     @DisplayName("flag desligada: 404 INVITATIONS_DISABLED antes de qualquer consulta")
     void failsWhenDisabled() {
-        InvitationIssuerImpl disabled = new InvitationIssuerImpl(invitations, users, ids, time, new InvitationPolicy(false, 7, 3));
+        InvitationIssuerImpl disabled = new InvitationIssuerImpl(invitations, users, inviterNames, ids, time, new InvitationPolicy(false, 7, 3));
         assertThatThrownBy(() -> disabled.issue(OWNER_ID, "ana@example.com")).isInstanceOf(InvitationsDisabledException.class);
         assertThatThrownBy(() -> disabled.reissue(OWNER_ID, UUID.randomUUID())).isInstanceOf(InvitationsDisabledException.class);
         org.mockito.Mockito.verifyNoInteractions(invitations, users);

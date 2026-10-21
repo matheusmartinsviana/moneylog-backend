@@ -64,6 +64,20 @@ class InvitationDispatcherTest {
     }
 
     @Test
+    @DisplayName("repassa o apelido de quem convidou ao modelo do e-mail")
+    void passesInviterName() {
+        when(template.renderInvitation(any())).thenReturn(new RenderedEmail("assunto", "<p>oi</p>", "oi"));
+        when(sender.send(any())).thenReturn(new EmailDelivery("id-1"));
+        when(issuer.recordDelivery(any(), any(), eq(true), any())).thenReturn(issued.invitation().delivered(NOW));
+
+        dispatcher.deliver(new IssuedInvitation(issued.invitation(), "dono@example.com", "Matheus", issued.token()));
+
+        ArgumentCaptor<InvitationEmailModel> model = ArgumentCaptor.forClass(InvitationEmailModel.class);
+        verify(template).renderInvitation(model.capture());
+        assertThat(model.getValue().inviterName()).isEqualTo("Matheus");
+    }
+
+    @Test
     @DisplayName("envia depois de gravar, deriva validityDays e expiresAt do mesmo valor e registra SENT")
     void sendsAndRecords() {
         when(template.renderInvitation(any())).thenReturn(new RenderedEmail("assunto", "<p>oi</p>", "oi"));

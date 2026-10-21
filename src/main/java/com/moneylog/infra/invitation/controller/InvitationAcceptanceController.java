@@ -54,7 +54,7 @@ public class InvitationAcceptanceController {
         InvitationPreview found = preview.handle(new PreviewInvitationCommand(body.token()));
         rateLimiter.release(attempt);
         return ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, InvitationController.NO_STORE)
-                .body(new InvitationPreviewResponse(found.email(), found.expiresAt()));
+                .body(new InvitationPreviewResponse(found.email(), found.expiresAt(), found.invitedByName()));
     }
 
     @PostMapping("/accept")

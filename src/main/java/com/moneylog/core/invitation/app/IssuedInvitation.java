@@ -4,7 +4,11 @@ import java.util.Objects;
 
 import com.moneylog.core.invitation.domain.Invitation;
 
-public record IssuedInvitation(Invitation invitation, String inviterEmail, String token) {
+public record IssuedInvitation(Invitation invitation, String inviterEmail, String inviterName, String token) {
+
+    public IssuedInvitation(Invitation invitation, String inviterEmail, String token) {
+        this(invitation, inviterEmail, null, token);
+    }
 
     public IssuedInvitation {
         Objects.requireNonNull(invitation, "invitation");
