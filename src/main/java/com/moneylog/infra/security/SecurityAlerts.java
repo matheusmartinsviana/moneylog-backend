@@ -1,5 +1,6 @@
 package com.moneylog.infra.security;
 
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
@@ -38,6 +39,10 @@ public class SecurityAlerts {
 
     public void raiseForUser(UUID userId, SecurityEvent event, String ip, String scope) {
         schedule(event, () -> service.notifyUser(userId, event, ip, scope));
+    }
+
+    public void raiseForUser(UUID userId, SecurityEvent event, Map<String, String> params) {
+        schedule(event, () -> service.notifyUser(userId, event, params));
     }
 
     public void raiseForEmail(String email, SecurityEvent event, String ip, String scope) {

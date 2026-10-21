@@ -107,7 +107,7 @@ public class CreateQuickEntryUseCaseImpl implements CreateQuickEntryUseCase {
         TransactionDetails created = createTransaction.handleClaimed(toTransactionCommand(command, amount, date, categoryId), id,
                 TransactionOrigin.quickShortcut());
         audits.insert(new QuickEntryAudit(id, command.tokenId(), userId, command.maskedIp(), now));
-        return result(command.kind(), created);
+        return result(command.kind(), created, true);
     }
 
     private CreateQuickEntryResult replay(UUID userId, UUID transactionId) {
@@ -115,17 +115,17 @@ public class CreateQuickEntryUseCaseImpl implements CreateQuickEntryUseCase {
                 .orElseThrow(() -> new TransactionNotFoundException(transactionId));
         TransactionDetails details = assembler.assemble(persisted);
         QuickEntryKind kind = details.transaction().type() == TransactionType.INCOME ? QuickEntryKind.INCOME : QuickEntryKind.EXPENSE;
-        return result(kind, details);
+        return result(kind, details, false);
     }
 
-    private static CreateQuickEntryResult result(QuickEntryKind kind, TransactionDetails details) {
+    private static CreateQuickEntryResult result(QuickEntryKind kind, TransactionDetails details, boolean created) {
         Transaction transaction = details.transaction();
         if (details.category() == null) {
             throw new IllegalStateException("lançamento rápido sem categoria aplicada");
         }
         String category = details.category().name();
         String message = QuickEntryMessage.of(kind, transaction.amount(), category, details.account().name(), transaction.status());
-        return new CreateQuickEntryResult(details, message);
+        return new CreateQuickEntryResult(details, message, created);
     }
 
     private LocalDate resolveDate(LocalDate requested, Instant now, ZoneId zone) {

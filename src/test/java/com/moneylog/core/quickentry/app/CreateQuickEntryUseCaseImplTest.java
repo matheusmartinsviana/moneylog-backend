@@ -157,6 +157,7 @@ class CreateQuickEntryUseCaseImplTest {
     void deveCriarGastoPeloMesmoCaminho() {
         CreateQuickEntryResult result = useCase(QuickEntryLimits.none()).handle(expense("100", "Alimentação", LocalDate.of(2026, 10, 20)));
 
+        assertThat(result.created()).isTrue();
         InOrder order = inOrder(idempotency, createTransaction, audits);
         order.verify(idempotency).claim(eq(USER_ID), eq(SCOPE), eq(resolvedKey), anyString(), eq(NEW_ID), eq(NOW), eq(NOW.minusSeconds(24 * 3600)));
         ArgumentCaptor<CreateTransactionCommand> command = ArgumentCaptor.forClass(CreateTransactionCommand.class);
@@ -367,6 +368,7 @@ class CreateQuickEntryUseCaseImplTest {
 
         CreateQuickEntryResult replay = useCase.handle(command);
 
+        assertThat(replay.created()).isFalse();
         assertThat(replay.details().transaction().id()).isEqualTo(NEW_ID);
         assertThat(replay.message()).isEqualTo("Gasto de R$ 100,00 em Alimentação (" + wallet.name() + ") registrado.");
         verify(createTransaction).handleClaimed(any(), any(), any());
