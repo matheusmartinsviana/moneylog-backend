@@ -6,8 +6,6 @@ import java.util.Objects;
 
 import javax.crypto.SecretKey;
 
-import jakarta.servlet.http.HttpServletRequest;
-
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -54,8 +52,6 @@ import com.moneylog.core.sk.time.TimeProvider;
         MoneylogQuickEntryProperties.class})
 public class SecurityConfig {
 
-    public static final String QUICK_ENTRY_PATH = "/v1/quick-entries";
-
     @Bean
     @Order(1)
     SecurityFilterChain quickEntrySecurity(HttpSecurity http, QuickTokenAuthenticator authenticator,
@@ -64,7 +60,7 @@ public class SecurityConfig {
                 resolver.resolveException(request, response, null, new QuickTokenInvalidException());
         AccessDeniedHandler deniedHandler = (request, response, exception) ->
                 resolver.resolveException(request, response, null, new QuickTokenInvalidException());
-        http.securityMatcher(SecurityConfig::isQuickEntryRequest)
+        http.securityMatcher(QuickEntryRoute::isTokenRoute)
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -76,10 +72,6 @@ public class SecurityConfig {
                 .addFilterBefore(new QuickTokenAuthenticationFilter(authenticator, resolver), AuthorizationFilter.class)
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(entryPoint).accessDeniedHandler(deniedHandler));
         return http.build();
-    }
-
-    static boolean isQuickEntryRequest(HttpServletRequest request) {
-        return HttpMethod.POST.name().equals(request.getMethod()) && QUICK_ENTRY_PATH.equals(request.getRequestURI());
     }
 
     @Bean
@@ -99,6 +91,7 @@ public class SecurityConfig {
                 .logout(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
+                        .requestMatchers(QuickEntryRoute::isAnyVariant).denyAll()
                         .requestMatchers(HttpMethod.POST, "/v1/auth/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/setup-password").permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/auth/status").permitAll()
                         .requestMatchers(HttpMethod.POST, "/v1/invitations/preview", "/v1/invitations/accept").permitAll()

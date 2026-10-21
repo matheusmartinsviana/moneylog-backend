@@ -3,6 +3,7 @@ package com.moneylog.infra.quickentry;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,7 +14,6 @@ import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -109,8 +109,11 @@ class QuickEntryAuthenticationIT {
     @RestController
     static class QuickEntryProbeController {
 
+        static final AtomicInteger HITS = new AtomicInteger();
+
         @PostMapping(PATH)
         Map<String, String> probe(@CurrentUser UUID userId, Authentication authentication) {
+            HITS.incrementAndGet();
             return Map.of("userId", userId.toString(), "principal", authentication.getName());
         }
     }
@@ -143,15 +146,9 @@ class QuickEntryAuthenticationIT {
     void cenario() throws Exception {
         clock.set(MutableClockConfig.INITIAL);
         tx = new TransactionTemplate(transactionManager);
-        ProbeAndPush.SENT.clear();
-        ip = "203.0.113." + (IPS.incrementAndGet() % 250 + 1);
+        ip = uniqueIp("203.0");
         userId = newUser();
         accountId = UUID.fromString(createWallet(userId));
-    }
-
-    @AfterEach
-    void limpar() {
-        ProbeAndPush.SENT.clear();
     }
 
     private UUID newUser() {
@@ -218,12 +215,28 @@ class QuickEntryAuthenticationIT {
                 secret.hash());
     }
 
-    private void awaitSent(int expected) throws Exception {
+    private String uniqueIp(String firstTwoOctets) {
+        int n = IPS.incrementAndGet();
+        return firstTwoOctets + "." + (n / 250 % 250) + "." + (n % 250 + 1);
+    }
+
+    private String subscribe(UUID owner) {
+        String endpoint = "https://push.example/" + UUID.randomUUID();
+        tx.executeWithoutResult(status -> subscriptions.upsert(
+                new PushSubscription(UUID.randomUUID(), owner, endpoint, "p", "a", "ua", Instant.now())));
+        return endpoint;
+    }
+
+    private List<Sent> sentTo(String endpoint) {
+        return ProbeAndPush.SENT.stream().filter(sent -> sent.subscription().endpoint().equals(endpoint)).toList();
+    }
+
+    private List<Sent> awaitSent(String endpoint, int expected) throws Exception {
         long deadline = System.currentTimeMillis() + 5_000;
-        while (ProbeAndPush.SENT.size() < expected && System.currentTimeMillis() < deadline) {
-            Thread.sleep(25);
+        while (sentTo(endpoint).size() < expected && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
         }
-        Thread.sleep(150);
+        return sentTo(endpoint);
     }
 
     @Test
@@ -355,7 +368,7 @@ class QuickEntryAuthenticationIT {
         QuickEntryTokenSecret secret = issue();
         List<String> accepted = new ArrayList<>();
         for (HttpMethod method : List.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.OPTIONS, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)) {
-            for (String url : List.of(PATH, PATH + "/", PATH + ";jsessionid=ABC", "/v1/Quick-Entries", PATH + "%2F", PATH + "/x")) {
+            for (String url : List.of(PATH, PATH + "/", PATH + ";jsessionid=ABC", "/v1/Quick-Entries", PATH + "/x")) {
                 MvcResult result = mvc.perform(MockMvcRequestBuilders.request(method, url)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + secret.value()).with(r -> {
                             r.setRemoteAddr(ip);
@@ -387,6 +400,72 @@ class QuickEntryAuthenticationIT {
         assertThat(lastUse(secret).get("last_used_at")).isNull();
     }
 
+    private static final List<String> ENCODED_PATHS = List.of("/v1/quick%2Dentries", "/v1/quick%2dentries", "/v1/%71uick-entries",
+            "/v1/quick-entrie%73", "/%76%31/quick-entries", "/v1/%51uick-entries", "/v1/QUICK%2DENTRIES", "/v1/quick%2Dentries/",
+            "/v1/quick-entries/", "/v1/Quick-Entries", "/v1/quick%2Dentries%2F", "/v1/quick%2Eentries", "/v1/quick-entries%2E",
+            "/v1/quick%252Dentries", "/v1/quick-entries%00", "/v1/quick-entries%20", "/v1/quick%2Dentries;jsessionid=1",
+            "/v1/./quick-entries", "/v1/x/../quick-entries", "/v1/quick-entries%3Fa=1", "/v1/quick%5Centries", "/v1/quick-entries%2F%2F");
+
+    private MvcResult raw(HttpMethod method, String encodedPath, String authorization) throws Exception {
+        MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.request(method, URI.create("http://localhost" + encodedPath))
+                .contentType(MediaType.APPLICATION_JSON).content("{}").with(r -> {
+                    r.setRemoteAddr(ip);
+                    return r;
+                });
+        return mvc.perform(authorization == null ? builder : builder.header(HttpHeaders.AUTHORIZATION, authorization)).andReturn();
+    }
+
+    @Test
+    @DisplayName("JWT de sessão nunca alcança o controller da rota, nem por caminho codificado (%2D, %2d, %71, caixa, barra, ponto)")
+    void deveBarrarJwtEmCaminhosCodificados() throws Exception {
+        int before = QuickEntryProbeController.HITS.get();
+        List<String> reached = new ArrayList<>();
+        for (HttpMethod method : List.of(HttpMethod.POST, HttpMethod.GET, HttpMethod.PUT, HttpMethod.DELETE)) {
+            for (String path : ENCODED_PATHS) {
+                MvcResult result = raw(method, path, auth.bearer(userId));
+                int status = result.getResponse().getStatus();
+                if (status < 400 || status == 405 || status >= 500) {
+                    reached.add(method + " " + path + " -> " + status);
+                }
+            }
+        }
+        assertThat(reached).isEmpty();
+        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("sem credencial, os mesmos caminhos codificados nunca alcançam o controller")
+    void deveBarrarAnonimoEmCaminhosCodificados() throws Exception {
+        int before = QuickEntryProbeController.HITS.get();
+        for (String path : ENCODED_PATHS) {
+            assertThat(raw(HttpMethod.POST, path, null).getResponse().getStatus()).isIn(400, 401);
+        }
+        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before);
+    }
+
+    @Test
+    @DisplayName("token mlq_ nunca alcança outra rota por caminho codificado; na própria rota codificada só autentica como token")
+    void deveManterOTokenSoNaRotaDele() throws Exception {
+        QuickEntryTokenSecret secret = issue();
+        String bearer = "Bearer " + secret.value();
+
+        for (String other : List.of("/v1/transactions", "/v1/%74ransactions", "/v1/quick%2Dentry%2Dtokens", "/v1/auth/%6Cogin",
+                "/v1/accounts", "/v1/quick-entry-tokens")) {
+            for (HttpMethod method : List.of(HttpMethod.GET, HttpMethod.POST)) {
+                int status = raw(method, other, bearer).getResponse().getStatus();
+                assertThat(status).as(method + " " + other).isIn(400, 401);
+            }
+        }
+
+        int before = QuickEntryProbeController.HITS.get();
+        MvcResult sameRoute = raw(HttpMethod.POST, "/v1/quick%2Dentries", bearer);
+        assertThat(sameRoute.getResponse().getStatus()).isEqualTo(200);
+        assertThat(body(sameRoute).get("userId").asString()).isEqualTo(userId.toString());
+        assertThat(QuickEntryProbeController.HITS.get()).isEqualTo(before + 1);
+        assertThat(raw(HttpMethod.POST, "/v1/quick%2Dentries", "Bearer " + QuickEntryTokenSecret.generate().value()).getResponse()
+                .getContentAsString()).contains("QUICK_TOKEN_INVALID");
+    }
+
     @Test
     @DisplayName("acima de 10 falhas por IP na janela: 429 com Retry-After, até para token válido; outro IP não é afetado; passada a janela, libera")
     void deveLimitarFalhasPorIp() throws Exception {
@@ -400,7 +479,7 @@ class QuickEntryAuthenticationIT {
         assertThat(blocked.getResponse().getStatus()).isEqualTo(429);
         assertThat(blocked.getResponse().getHeader("Retry-After")).isNotNull();
         assertThat(body(blocked).get("code").asString()).isEqualTo("TOO_MANY_ATTEMPTS");
-        assertThat(mvc.perform(post("Bearer " + secret.value(), "198.51.100.250")).andReturn().getResponse().getStatus()).isEqualTo(200);
+        assertThat(mvc.perform(post("Bearer " + secret.value(), uniqueIp("172.16"))).andReturn().getResponse().getStatus()).isEqualTo(200);
 
         clock.advance(Duration.ofMinutes(5).plusSeconds(1));
         assertThat(call(secret).getResponse().getStatus()).isEqualTo(200);
@@ -429,52 +508,49 @@ class QuickEntryAuthenticationIT {
     @DisplayName("rajada de 401 gera um alerta ao dono, com IP mascarado e sem o segredo")
     void deveAlertarRajadaDe401() throws Exception {
         UUID ownerId = auth.ownerId();
-        tx.executeWithoutResult(status -> subscriptions.upsert(
-                new PushSubscription(UUID.randomUUID(), ownerId, "https://push.example/dono", "p", "a", "ua", Instant.now())));
+        String endpoint = subscribe(ownerId);
         QuickEntryTokenSecret valid = issue();
-        String badIp = "198.51.100.77";
-        String attempt = "Bearer " + valid.value().substring(0, valid.value().length() - 1) + "A";
+        String badIp = uniqueIp("198.51");
         for (int i = 0; i < 11; i++) {
-            mvc.perform(post(attempt, badIp));
+            assertThat(mvc.perform(post("Bearer " + QuickEntryTokenSecret.generate().value(), badIp)).andReturn().getResponse().getStatus())
+                    .isEqualTo(i < 10 ? 401 : 429);
         }
 
-        awaitSent(1);
+        List<Sent> sent = awaitSent(endpoint, 1);
 
-        assertThat(ProbeAndPush.SENT).hasSize(1);
-        Sent sent = ProbeAndPush.SENT.get(0);
-        assertThat(sent.subscription().userId()).isEqualTo(ownerId);
-        assertThat(sent.message().titleKey()).isEqualTo("security.quick_token_failure_burst");
-        assertThat(sent.message().params()).containsOnly(Map.entry("ip", "198.51.x.x"));
-        assertThat(sent.message().toString()).doesNotContain(valid.value());
-        tx.executeWithoutResult(status -> jdbc.update("delete from push_subscriptions"));
+        assertThat(sent).hasSize(1);
+        assertThat(sent.get(0).subscription().userId()).isEqualTo(ownerId);
+        assertThat(sent.get(0).message().titleKey()).isEqualTo("security.quick_token_failure_burst");
+        assertThat(sent.get(0).message().params()).containsOnly(Map.entry("ip", "198.51.x.x"));
+        assertThat(sent.get(0).message().toString()).doesNotContain(valid.value());
+        tx.executeWithoutResult(status -> subscriptions.deleteByEndpoint(endpoint));
     }
 
     @Test
     @DisplayName("primeiro uso a partir de IP não visto alerta o dono do token; o primeiro uso de todos e o mesmo IP não")
     void deveAlertarIpNovo() throws Exception {
-        tx.executeWithoutResult(status -> subscriptions.upsert(
-                new PushSubscription(UUID.randomUUID(), userId, "https://push.example/user", "p", "a", "ua", Instant.now())));
+        String endpoint = subscribe(userId);
         QuickEntryTokenSecret secret = issue();
+        String known = uniqueIp("203.0");
+        String unseen = uniqueIp("192.0");
 
-        mvc.perform(post("Bearer " + secret.value(), "203.0.113.10"));
+        mvc.perform(post("Bearer " + secret.value(), known));
         clock.advance(Duration.ofMinutes(2));
-        mvc.perform(post("Bearer " + secret.value(), "203.0.113.10"));
-        awaitSent(1);
-        assertThat(ProbeAndPush.SENT).isEmpty();
+        mvc.perform(post("Bearer " + secret.value(), known));
+        assertThat(sentTo(endpoint)).isEmpty();
 
-        mvc.perform(post("Bearer " + secret.value(), "192.0.2.44"));
-        awaitSent(1);
-        assertThat(ProbeAndPush.SENT).hasSize(1);
-        Sent sent = ProbeAndPush.SENT.get(0);
-        assertThat(sent.subscription().userId()).isEqualTo(userId);
-        assertThat(sent.message().titleKey()).isEqualTo("security.quick_token_new_ip");
-        assertThat(sent.message().params()).containsOnly(Map.entry("ip", "192.0.x.x"));
-        assertThat(sent.message().toString()).doesNotContain(secret.value());
+        mvc.perform(post("Bearer " + secret.value(), unseen));
+        List<Sent> sent = awaitSent(endpoint, 1);
+        assertThat(sent).hasSize(1);
+        assertThat(sent.get(0).subscription().userId()).isEqualTo(userId);
+        assertThat(sent.get(0).message().titleKey()).isEqualTo("security.quick_token_new_ip");
+        assertThat(sent.get(0).message().params()).containsOnly(Map.entry("ip", "192.0.x.x"));
+        assertThat(sent.get(0).message().toString()).doesNotContain(secret.value());
 
-        mvc.perform(post("Bearer " + secret.value(), "192.0.2.44"));
-        awaitSent(2);
-        assertThat(ProbeAndPush.SENT).hasSize(1);
-        tx.executeWithoutResult(status -> jdbc.update("delete from push_subscriptions"));
+        mvc.perform(post("Bearer " + secret.value(), unseen));
+        mvc.perform(post("Bearer " + secret.value(), known));
+        assertThat(sentTo(endpoint)).hasSize(1);
+        tx.executeWithoutResult(status -> subscriptions.deleteByEndpoint(endpoint));
     }
 
     @Test
