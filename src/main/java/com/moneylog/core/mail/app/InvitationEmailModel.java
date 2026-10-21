@@ -4,11 +4,17 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
-public record InvitationEmailModel(String inviterEmail, String inviteeEmail, String token, Instant expiresAt, int validityDays) {
+public record InvitationEmailModel(String inviterEmail, String inviteeEmail, String token, Instant expiresAt, int validityDays,
+                              String inviterName) {
 
     private static final Pattern URL_SAFE_TOKEN = Pattern.compile("[A-Za-z0-9_-]{16,128}");
 
+    public InvitationEmailModel(String inviterEmail, String inviteeEmail, String token, Instant expiresAt, int validityDays) {
+        this(inviterEmail, inviteeEmail, token, expiresAt, validityDays, null);
+    }
+
     public InvitationEmailModel {
+        inviterName = InviterName.clean(inviterName);
         Objects.requireNonNull(inviterEmail, "inviterEmail");
         Objects.requireNonNull(inviteeEmail, "inviteeEmail");
         Objects.requireNonNull(token, "token");

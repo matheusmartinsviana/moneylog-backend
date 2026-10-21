@@ -2,19 +2,23 @@ package com.moneylog.core.invitation.app.usecase;
 
 import com.moneylog.core.invitation.app.InvitationPolicy;
 import com.moneylog.core.invitation.app.gateways.InvitationGateway;
+import com.moneylog.core.invitation.app.gateways.InviterNameGateway;
 import com.moneylog.core.invitation.domain.Invitation;
 import com.moneylog.core.invitation.exception.InvitationExceptions.InvalidInvitationException;
+import com.moneylog.core.mail.app.InviterName;
 import com.moneylog.core.sk.id.SecureToken;
 import com.moneylog.core.sk.time.TimeProvider;
 
 public class PreviewInvitationUseCaseImpl implements PreviewInvitationUseCase {
 
     private final InvitationGateway invitations;
+    private final InviterNameGateway inviterNames;
     private final TimeProvider time;
     private final InvitationPolicy policy;
 
-    public PreviewInvitationUseCaseImpl(InvitationGateway invitations, TimeProvider time, InvitationPolicy policy) {
+    public PreviewInvitationUseCaseImpl(InvitationGateway invitations, InviterNameGateway inviterNames, TimeProvider time, InvitationPolicy policy) {
         this.invitations = invitations;
+        this.inviterNames = inviterNames;
         this.time = time;
         this.policy = policy;
     }
@@ -27,6 +31,7 @@ public class PreviewInvitationUseCaseImpl implements PreviewInvitationUseCase {
         Invitation invitation = invitations.findByTokenHash(SecureToken.hash(command.token()))
                 .filter(found -> found.isPendingAt(time.now()))
                 .orElseThrow(InvalidInvitationException::new);
-        return new InvitationPreview(invitation.email(), invitation.expiresAt());
+        String invitedByName = inviterNames.findDisplayName(invitation.invitedBy()).map(InviterName::clean).orElse(null);
+        return new InvitationPreview(invitation.email(), invitation.expiresAt(), invitedByName);
     }
 }

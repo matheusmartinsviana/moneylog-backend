@@ -23,6 +23,7 @@ import com.moneylog.core.invitation.app.InvitationIssuer;
 import com.moneylog.core.invitation.app.InvitationIssuerImpl;
 import com.moneylog.core.invitation.app.InvitationPolicy;
 import com.moneylog.core.invitation.app.gateways.InvitationGateway;
+import com.moneylog.core.invitation.app.gateways.InviterNameGateway;
 import com.moneylog.core.invitation.app.usecase.AcceptInvitationUseCase;
 import com.moneylog.core.invitation.app.usecase.AcceptInvitationUseCaseImpl;
 import com.moneylog.core.invitation.app.usecase.InviteUserUseCase;
@@ -44,6 +45,7 @@ import com.moneylog.core.sk.time.TimeProvider;
 import com.moneylog.infra.invitation.SpringUserCreatedPublisher;
 import com.moneylog.infra.invitation.controller.InvitationNoStoreFilter;
 import com.moneylog.infra.invitation.gateways.InvitationGatewayImpl;
+import com.moneylog.infra.invitation.gateways.InviterNameGatewayImpl;
 import com.moneylog.infra.invitation.job.InvitationRetentionJob;
 import com.moneylog.infra.invitation.persistence.InvitationRepositoryJpa;
 import com.moneylog.infra.security.InvitationRateLimiter;
@@ -67,15 +69,20 @@ public class InvitationConfig {
     }
 
     @Bean
+    InviterNameGateway inviterNameGateway(JdbcTemplate jdbc) {
+        return new InviterNameGatewayImpl(jdbc);
+    }
+
+    @Bean
     UserCreatedPublisher userCreatedPublisher(ApplicationEventPublisher publisher) {
         return new SpringUserCreatedPublisher(publisher);
     }
 
     @Bean
-    InvitationIssuer invitationIssuer(InvitationGateway invitations, UserGateway users, IdGenerator ids, TimeProvider time,
-                                      InvitationPolicy policy, PlatformTransactionManager transactionManager) {
+    InvitationIssuer invitationIssuer(InvitationGateway invitations, UserGateway users, InviterNameGateway inviterNames,
+                                      IdGenerator ids, TimeProvider time, InvitationPolicy policy, PlatformTransactionManager transactionManager) {
         return TransactionalProxies.required(InvitationIssuer.class,
-                new InvitationIssuerImpl(invitations, users, ids, time, policy), transactionManager);
+                new InvitationIssuerImpl(invitations, users, inviterNames, ids, time, policy), transactionManager);
     }
 
     @Bean
@@ -109,10 +116,10 @@ public class InvitationConfig {
     }
 
     @Bean
-    PreviewInvitationUseCase previewInvitationUseCase(InvitationGateway invitations, TimeProvider time, InvitationPolicy policy,
+    PreviewInvitationUseCase previewInvitationUseCase(InvitationGateway invitations, InviterNameGateway inviterNames, TimeProvider time, InvitationPolicy policy,
                                                       PlatformTransactionManager transactionManager) {
         return TransactionalProxies.readOnly(PreviewInvitationUseCase.class,
-                new PreviewInvitationUseCaseImpl(invitations, time, policy), transactionManager);
+                new PreviewInvitationUseCaseImpl(invitations, inviterNames, time, policy), transactionManager);
     }
 
     @Bean

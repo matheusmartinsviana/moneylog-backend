@@ -61,7 +61,43 @@ class InvitationAcceptanceIT extends InvitationITSupport {
                 .andExpect(header().string("Cache-Control", "private, no-store")).andExpect(jsonPath("$.email").value(email)).andReturn();
 
         assertThat(Instant.parse(body(result).get("expiresAt").asText())).isEqualTo(clock.instant().plus(Duration.ofDays(7)));
-        assertThat(body(result).size()).isEqualTo(2);
+        assertThat(body(result).has("email")).isTrue();
+        assertThat(body(result).has("expiresAt")).isTrue();
+    }
+
+    @Test
+    @DisplayName("preview traz o apelido de quem convidou quando definido e nulo quando em branco, e o e-mail do dono nunca vai")
+    void previewsInviterName() throws Exception {
+        String email = newEmail();
+        inviteOk(email);
+        String token = lastToken();
+        UUID ownerId = jdbc.queryForObject("select id from users where email = ?", UUID.class, OWNER_EMAIL);
+        write("insert into notification_settings (user_id, summary_enabled, summary_frequency, display_name, push_enabled, version, updated_at) "
+                + "values (?, false, 'DAILY', 'Matheus', false, 1, now()) on conflict (user_id) do update set display_name = 'Matheus'", ownerId);
+
+        MvcResult named = mockMvc.perform(preview(token, newIp())).andExpect(status().isOk()).andExpect(ContractValidation.conforms())
+                .andExpect(jsonPath("$.invitedByName").value("Matheus")).andReturn();
+        assertThat(named.getResponse().getContentAsString()).doesNotContain(OWNER_EMAIL);
+
+        write("update notification_settings set display_name = '   ' where user_id = ?", ownerId);
+        MvcResult blank = mockMvc.perform(preview(token, newIp())).andExpect(status().isOk()).andExpect(ContractValidation.conforms()).andReturn();
+        assertThat(body(blank).path("invitedByName").isMissingNode() || body(blank).path("invitedByName").isNull()).isTrue();
+        write("delete from notification_settings where user_id = ?", ownerId);
+    }
+
+    @Test
+    @DisplayName("token inválido responde 404 sem apelido nem e-mail do dono, mesmo com apelido definido")
+    void invalidTokenLeaksNoName() throws Exception {
+        UUID ownerId = jdbc.queryForObject("select id from users where email = ?", UUID.class, OWNER_EMAIL);
+        write("insert into notification_settings (user_id, summary_enabled, summary_frequency, display_name, push_enabled, version, updated_at) "
+                + "values (?, false, 'DAILY', 'Matheus', false, 1, now()) on conflict (user_id) do update set display_name = 'Matheus'", ownerId);
+        inviteOk(newEmail());
+
+        MvcResult result = mockMvc.perform(preview(SecureToken.generate(), newIp())).andExpect(status().isNotFound()).andReturn();
+
+        assertThat(result.getResponse().getContentAsString()).doesNotContain("Matheus").doesNotContain(OWNER_EMAIL);
+        assertThat(applicationLogs.toString()).doesNotContain("Matheus");
+        write("delete from notification_settings where user_id = ?", ownerId);
     }
 
     @Test

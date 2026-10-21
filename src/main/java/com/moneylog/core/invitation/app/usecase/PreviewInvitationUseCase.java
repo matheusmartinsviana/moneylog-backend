@@ -14,6 +14,6 @@ public interface PreviewInvitationUseCase {
         }
     }
 
-    record InvitationPreview(String email, Instant expiresAt) {
+    record InvitationPreview(String email, Instant expiresAt, String invitedByName) {
     }
 }

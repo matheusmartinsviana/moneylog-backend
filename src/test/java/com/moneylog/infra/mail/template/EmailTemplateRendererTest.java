@@ -248,6 +248,44 @@ class EmailTemplateRendererTest {
         assertThat(hostil).doesNotContain("\"><b>").contains("mailto:&quot;&gt;&lt;b&gt;@x.com");
     }
 
+    private static InvitationEmailModel named(String name) {
+        return new InvitationEmailModel("c@mviana.tech", "ana@example.com", TOKEN, Instant.parse("2026-10-25T17:30:00Z"), 7, name);
+    }
+
+    @Test
+    @DisplayName("com apelido: aparece em negrito no HTML, no texto, no preheader e no rodapé, sem expor o e-mail de quem convidou")
+    void deveUsarApelido() {
+        RenderedEmail email = renderer.renderInvitation(named("Matheus"));
+
+        assertThat(email.html()).contains("<strong><span style=\"font-weight:700;\">Matheus</span></strong> convidou você")
+                .contains("a pedido de <span style=\"font-weight:700;\">Matheus</span> para")
+                .contains("Matheus convidou você para o Monelog. O convite vale por 7 dias.")
+                .doesNotContain("c@mviana.tech").doesNotContain("mailto:c@");
+        assertThat(email.text()).contains("Matheus convidou você para o Monelog").contains("a pedido de Matheus para ana@example.com")
+                .doesNotContain("c@mviana.tech");
+        assertThat(email.html()).doesNotContain("{{").contains("mailto:ana@example.com");
+    }
+
+    @Test
+    @DisplayName("apelido nulo ou em branco cai no e-mail de quem convidou, como antes")
+    void deveCairNoEmailSemApelido() {
+        for (String name : new String[] {null, "", "   "}) {
+            RenderedEmail email = renderer.renderInvitation(named(name));
+            assertThat(email.html()).contains("mailto:c@mviana.tech");
+            assertThat(email.text()).contains("c@mviana.tech convidou você");
+            assertThat(email.html()).isEqualTo(renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html());
+        }
+    }
+
+    @Test
+    @DisplayName("apelido hostil é escapado no HTML e não quebra linha no texto")
+    void deveEscaparApelidoHostil() {
+        RenderedEmail email = renderer.renderInvitation(named("<script>alert(1)</script>\"&'\r\nBcc: x@y.com"));
+
+        assertThat(email.html()).doesNotContain("<script>").contains("&lt;script&gt;alert(1)&lt;/script&gt;&quot;&amp;&#39; Bcc: x@y.com");
+        assertThat(email.text()).doesNotContain("\r").contains("convidou você").doesNotContain("Bcc: x@y.com\n");
+    }
+
     private static int count(String text, String part) {
         return text.split(Pattern.quote(part), -1).length - 1;
     }

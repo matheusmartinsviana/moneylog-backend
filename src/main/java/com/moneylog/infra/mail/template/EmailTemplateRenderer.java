@@ -22,34 +22,49 @@ public class EmailTemplateRenderer implements EmailTemplate {
     static final String INVITATION_SUBJECT = "Você foi convidado para o " + BRAND_NAME;
     private static final String LOGO_PATH = "/assets/icons/icon-192.png";
     private static final String PREHEADER_SUFFIX = " convidou você para o " + BRAND_NAME + ". O convite vale por ";
+    private static final String INVITER_LINK = "<a href=\"mailto:{{inviterEmail}}\" class=\"mail\" style=\"color:inherit;font-weight:700;text-decoration:none;\">{{inviterEmail}}</a>";
+    private static final String INVITER_BOLD = "<span style=\"font-weight:700;\">{{inviter}}</span>";
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{([A-Za-z]+)}}");
     private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     private static final DateTimeFormatter EXPIRATION = DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy 'às' HH:mm", Locale.of("pt", "BR"));
 
     private final String appBaseUrl;
     private final String invitationHtml;
+    private final String invitationHtmlNamed;
     private final String invitationText;
 
     public EmailTemplateRenderer(String appBaseUrl) {
         this.appBaseUrl = appBaseUrl.endsWith("/") ? appBaseUrl.substring(0, appBaseUrl.length() - 1) : appBaseUrl;
         this.invitationHtml = load("mail/invitation.html");
+        this.invitationHtmlNamed = withName(invitationHtml);
         this.invitationText = load("mail/invitation.txt");
     }
 
     @Override
     public RenderedEmail renderInvitation(InvitationEmailModel model) {
         String validity = model.validityDays() == 1 ? "1 dia" : model.validityDays() + " dias";
-        Map<String, String> values = Map.of(
-                "brand", BRAND_NAME,
-                "subject", INVITATION_SUBJECT,
-                "preheader", model.inviterEmail() + PREHEADER_SUFFIX + validity + ".",
-                "inviterEmail", model.inviterEmail(),
-                "inviteeEmail", model.inviteeEmail(),
-                "logoUrl", appBaseUrl + LOGO_PATH,
-                "link", appBaseUrl + "/convite#" + model.token(),
-                "expiresAt", EXPIRATION.format(model.expiresAt().atZone(ZONE)),
-                "validity", validity);
-        return new RenderedEmail(INVITATION_SUBJECT, fill(invitationHtml, values, EmailTemplateRenderer::escapeHtml), fill(invitationText, values, v -> v));
+        String inviter = model.inviterName() != null ? model.inviterName() : model.inviterEmail();
+        Map<String, String> values = Map.ofEntries(
+                Map.entry("brand", BRAND_NAME),
+                Map.entry("subject", INVITATION_SUBJECT),
+                Map.entry("preheader", inviter + PREHEADER_SUFFIX + validity + "."),
+                Map.entry("inviter", inviter),
+                Map.entry("inviterEmail", model.inviterEmail()),
+                Map.entry("inviteeEmail", model.inviteeEmail()),
+                Map.entry("logoUrl", appBaseUrl + LOGO_PATH),
+                Map.entry("link", appBaseUrl + "/convite#" + model.token()),
+                Map.entry("expiresAt", EXPIRATION.format(model.expiresAt().atZone(ZONE))),
+                Map.entry("validity", validity));
+        String html = model.inviterName() != null ? invitationHtmlNamed : invitationHtml;
+        return new RenderedEmail(INVITATION_SUBJECT, fill(html, values, EmailTemplateRenderer::escapeHtml), fill(invitationText, values, v -> v));
+    }
+
+    private static String withName(String html) {
+        String named = html.replace(INVITER_LINK, INVITER_BOLD);
+        if (named.equals(html)) {
+            throw new IllegalStateException("Template de e-mail sem o link de quem convidou");
+        }
+        return named;
     }
 
     static String fill(String template, Map<String, String> values, UnaryOperator<String> escape) {
