@@ -178,6 +178,9 @@ public final class TransactionRepositoryMapper {
         if (e.getSource() == TransactionSource.HISTORICAL) {
             return TransactionOrigin.historical();
         }
+        if (e.getSource() == TransactionSource.QUICK_SHORTCUT) {
+            return TransactionOrigin.quickShortcut();
+        }
         return TransactionOrigin.manual();
     }
 }

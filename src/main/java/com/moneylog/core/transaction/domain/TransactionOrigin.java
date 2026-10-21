@@ -41,6 +41,10 @@ public record TransactionOrigin(TransactionSource source, UUID importBatchId, De
         return new TransactionOrigin(TransactionSource.HISTORICAL, null, null, null, null, null);
     }
 
+    public static TransactionOrigin quickShortcut() {
+        return new TransactionOrigin(TransactionSource.QUICK_SHORTCUT, null, null, null, null, null);
+    }
+
     public static TransactionOrigin recurrence(UUID recurrenceId, LocalDate occurrenceDate) {
         return new TransactionOrigin(TransactionSource.RECURRENCE, null, null, null, recurrenceId, occurrenceDate);
     }

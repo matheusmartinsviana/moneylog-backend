@@ -230,6 +230,7 @@ public final class BackupRestoreMapper {
             case RECURRENCE -> TransactionOrigin.recurrence(t.recurrenceId(), t.occurrenceDate());
             case ONGOING -> TransactionOrigin.ongoing();
             case HISTORICAL -> TransactionOrigin.historical();
+            case QUICK_SHORTCUT -> TransactionOrigin.quickShortcut();
             case MANUAL, IMPORT -> TransactionOrigin.manual();
         };
         TransactionState state = new TransactionState(t.id(), userId, t.type(), t.amount(), t.date(), t.description(), t.notes(), origin,
