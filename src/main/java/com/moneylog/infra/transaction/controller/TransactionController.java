@@ -41,6 +41,7 @@ import com.moneylog.core.finance.app.transactions.usecase.VoidTransactionUseCase
 import com.moneylog.core.sk.page.PageQuery;
 import com.moneylog.core.transaction.app.query.TransactionFilter;
 import com.moneylog.core.transaction.domain.PaymentMethod;
+import com.moneylog.core.transaction.domain.TransactionSource;
 import com.moneylog.core.transaction.domain.TransactionStatus;
 import com.moneylog.core.transaction.domain.TransactionType;
 import com.moneylog.infra.exception.RequestValidationException;
@@ -104,12 +105,13 @@ public class TransactionController {
                                         @RequestParam(required = false) UUID accountId, @RequestParam(required = false) UUID categoryId,
                                         @RequestParam(required = false) PaymentMethod method,
                                         @RequestParam(required = false) TransactionStatus status,
+                                        @RequestParam(required = false) TransactionSource source,
                                         @RequestParam(required = false) @Size(max = TransactionFilter.Q_MAX_LENGTH) @NoControlChars String q,
                                         PageQuery page) {
         if (from != null && to != null && from.isAfter(to)) {
             throw new RequestValidationException("from", "INVALID_RANGE", "'from' não pode ser depois de 'to'.");
         }
-        TransactionFilter filter = new TransactionFilter(from, to, type, accountId, categoryId, method, status, q);
+        TransactionFilter filter = new TransactionFilter(from, to, type, accountId, categoryId, method, status, q, source);
         return TransactionListResponse.of(list.handle(new ListTransactionsQuery(userId, filter, page)));
     }
 

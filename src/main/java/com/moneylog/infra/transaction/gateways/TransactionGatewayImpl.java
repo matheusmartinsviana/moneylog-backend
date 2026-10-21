@@ -292,6 +292,9 @@ public class TransactionGatewayImpl implements TransactionGateway {
         if (f.method() != null) {
             where.add(cb.equal(root.get("paymentMethod"), f.method()));
         }
+        if (f.source() != null) {
+            where.add(cb.equal(root.get("source"), f.source()));
+        }
         if (f.q() != null) {
             String escaped = f.q().toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
             where.add(cb.like(cb.lower(root.<String>get("description")), "%" + escaped + "%", '\\'));

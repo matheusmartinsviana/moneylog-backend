@@ -13,6 +13,8 @@ public interface CreateTransactionUseCase {
 
     TransactionDetails handleImported(CreateTransactionCommand command, TransactionOrigin origin);
 
+    TransactionDetails handleClaimed(CreateTransactionCommand command, UUID id, TransactionOrigin origin);
+
     default TransactionDetails handle(CreateTransactionCommand command) {
         return handle(command, null);
     }
