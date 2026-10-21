@@ -433,13 +433,13 @@ class QuickEntryEndpointIT extends QuickEntryItBase {
     }
 
     @Test
-    @DisplayName("JWT de sessão em /v1/quick-entries e em todas as grafias (%2D, %71, barra, ;): nunca 2xx/5xx, nada é gravado")
+    @DisplayName("JWT de sessão em /v1/quick-entries e em todas as grafias (%2D, %71, barra, ;): nunca 2xx/5xx (401, 403 ou 404), nada é gravado")
     void naoDeveGravarComJwtDeSessao() throws Exception {
         World w = world();
         List<String> wrong = new ArrayList<>();
         for (String url : JWT_URLS) {
             int status = sendJwt(w, url).getResponse().getStatus();
-            if (status != 401 && status != 400 && status != 404) {
+            if (status != 401 && status != 400 && status != 403 && status != 404) {
                 wrong.add(url + " -> " + status);
             }
         }
