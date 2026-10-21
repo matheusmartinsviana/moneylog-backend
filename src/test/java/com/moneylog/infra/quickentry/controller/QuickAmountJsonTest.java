@@ -9,6 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import com.moneylog.core.quickentry.domain.QuickAmountInput;
@@ -18,7 +19,7 @@ import com.moneylog.core.transaction.domain.PaymentMethod;
 @DisplayName("Leitura do campo amount pelo texto cru do JSON (M2 da revisão da T5)")
 class QuickAmountJsonTest {
 
-    private final JsonMapper mapper = JsonMapper.builder().build();
+    private final JsonMapper mapper = JsonMapper.builder().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
 
     private QuickEntryRequest read(String amountLiteral) {
         return mapper.readValue("{\"kind\":\"EXPENSE\",\"amount\":" + amountLiteral + "}", QuickEntryRequest.class);

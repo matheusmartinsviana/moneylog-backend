@@ -295,7 +295,7 @@ class QuickEntryEndpointIT extends QuickEntryItBase {
     }
 
     @Test
-    @DisplayName("o corpo da recusa não repete o que foi digitado: campo desconhecido, categoria e descrição não aparecem no problema")
+    @DisplayName("a recusa não repete texto livre: nome de campo fora do padrão seguro vira body; categoria e descrição digitadas não voltam")
     void naoDeveRepetirTextoLivre() throws Exception {
         World w = world();
 
@@ -460,5 +460,52 @@ class QuickEntryEndpointIT extends QuickEntryItBase {
             }
         }
         assertThat(reached).isEmpty();
+    }
+
+    @Test
+    @DisplayName("nome de campo desconhecido dentro do padrão seguro é ecoado em errors[].field (como no contrato); o valor nunca")
+    void deveEcoarSoONomeSeguroDoCampo() throws Exception {
+        World w = world();
+
+        Reply reply = send(w, key(), "{\"kind\":\"EXPENSE\",\"amount\":\"1\",\"campoExtra\":\"valor-secreto\"}");
+
+        assertThat(reply.status()).isEqualTo(400);
+        assertThat(reply.body().get("errors").get(0).get("field").asString()).isEqualTo("campoExtra");
+        assertThat(reply.body().toString()).doesNotContain("valor-secreto");
+    }
+
+    @Test
+    @DisplayName("erros 400 e 422 também saem com Cache-Control no-store")
+    void deveMarcarOsErrosComNoStore() throws Exception {
+        World w = world();
+
+        Reply invalid = send(w, key(), "{");
+        Reply rule = send(w, key(), body("EXPENSE", "\"abc\""));
+
+        assertThat(invalid.status()).isEqualTo(400);
+        assertThat(invalid.result().getResponse().getHeader("Cache-Control")).contains("no-store");
+        assertThat(rule.status()).isEqualTo(422);
+        assertThat(rule.result().getResponse().getHeader("Cache-Control")).contains("no-store");
+    }
+
+    @Test
+    @DisplayName("limites de entrada: número com mais de 1000 dígitos é 400, corpo acima de 1 MiB é 413 PAYLOAD_TOO_LARGE e Content-Type de texto é 415; nada gravado")
+    void deveLimitarOTamanhoDaEntrada() throws Exception {
+        World w = world();
+
+        Reply hugeNumber = send(w, key(), body("EXPENSE", "9".repeat(1100)));
+        assertThat(hugeNumber.status()).isEqualTo(400);
+        assertThat(hugeNumber.code()).isEqualTo("VALIDATION_FAILED");
+        assertThat(hugeNumber.detail()).isEqualTo(VALIDATION_DETAIL);
+
+        Reply hugeBody = send(w, key(), "{\"kind\":\"EXPENSE\",\"amount\":\"1\",\"description\":\"" + "a".repeat(1_100_000) + "\"}");
+        assertThat(hugeBody.status()).isEqualTo(413);
+        assertThat(hugeBody.code()).isEqualTo("PAYLOAD_TOO_LARGE");
+
+        MvcResult text = mockMvc.perform(request(w, key(), body("EXPENSE", "\"1\"")).contentType(MediaType.TEXT_PLAIN)).andReturn();
+        assertThat(text.getResponse().getStatus()).isEqualTo(415);
+
+        assertThat(count("transactions", w.userId())).isZero();
+        assertThat(idempotencyRows(w.userId())).isZero();
     }
 }

@@ -21,9 +21,6 @@ public record QuickEntryResponse(UUID id, QuickEntryKind type, TransactionStatus
 
     public static QuickEntryResponse of(CreateQuickEntryResult result) {
         Transaction transaction = result.details().transaction();
-        if (result.details().category() == null) {
-            throw new IllegalStateException("lançamento rápido sem categoria aplicada");
-        }
         QuickEntryKind kind = transaction.type() == TransactionType.INCOME ? QuickEntryKind.INCOME : QuickEntryKind.EXPENSE;
         return new QuickEntryResponse(transaction.id(), kind, transaction.status(), transaction.amount(), transaction.date(),
                 transaction.description(), new Ref(result.details().category().id(), result.details().category().name()),
