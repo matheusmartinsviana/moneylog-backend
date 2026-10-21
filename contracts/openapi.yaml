@@ -1,12 +1,29 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.39.0
+  version: 2.40.0
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
+
+    ## Lançamento rápido pelo Atalho do iPhone (2.40.0, só acréscimos compatíveis; ADR-034, `docs/planos/2026-10-21-lancamento-rapido-iphone.md`)
+    Token pessoal de escopo mínimo (`mlq_...`) que cria **somente** `EXPENSE` e `INCOME` em **uma conta fixa** do próprio usuário, por `POST /v1/quick-entries`.
+    - Gestão do token (`/v1/quick-entry-tokens`): exige a sessão JWT normal (`bearerAuth`); um token `mlq_` nunca cria, lista nem revoga token. O token em claro só existe na resposta do `POST` de criação (`Cache-Control: no-store`); depois só `prefix`.
+    - `POST /v1/quick-entries` é a **única** rota que aceita o token (`quickEntryToken`) e a única que **não** aceita o JWT de sessão. Qualquer outra rota responde `401 UNAUTHENTICATED` a um `mlq_`.
+    - Falha de autenticação do token: `401 QUICK_TOKEN_INVALID`, com o mesmo status, corpo e cabeçalhos para token inexistente, expirado, revogado ou de usuário desativado.
+    - Nesta rota o `detail` dos erros e o `message` do `201` são frases curtas em português **prontas para o Atalho exibir** (o app Atalhos não traduz códigos). É exceção documentada no ADR-034; nas demais rotas o `detail` continua só para diagnóstico. O `message` usa apenas valor formatado e nomes já gravados, nunca a `description` digitada.
+    - Idempotência: `Idempotency-Key` obrigatório (UUID ou `[A-Za-z0-9_-]{8,64}`), escopo `POST /v1/quick-entries`, 24 h, mesma regra de `POST /v1/transactions`; o hash do pedido é calculado sobre o corpo como veio.
+    - Acréscimos em rotas e schemas existentes: `TransactionSource.QUICK_SHORTCUT` e o filtro opcional `source` em `GET /v1/transactions`. Nenhum campo ou rota existente mudou de significado.
+
+    | Status | `code` (lançamento rápido) |
+    |---|---|
+    | 401 | `QUICK_TOKEN_INVALID` |
+    | 404 | `QUICK_TOKEN_NOT_FOUND` (token de outro usuário ou inexistente), `ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente, ao gerar o token) |
+    | 409 | `QUICK_TOKEN_LIMIT_REACHED` (tokens ativos no máximo), `IDEMPOTENCY_KEY_REUSED` |
+    | 422 | `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
+    | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`: falhas de token por IP ou chamadas demais por minuto com o token válido) |
 
     ## Quem convidou (2.39.0, só acréscimo compatível)
     `InvitationPreview` ganha `invitedByName`: o apelido que o dono definiu nas configurações de notificação (`displayName`), ou `null` quando não definiu. Só vai quando o token é válido; o e-mail do convidante nunca é exposto. O e-mail do convite passa a dizer "<apelido> convidou você" quando há apelido.
@@ -296,6 +313,8 @@ tags:
     description: 'Convites por e-mail (2.38.0, ADR-032): criar, listar, reenviar, revogar (só o dono) e a prévia e o aceite públicos, com o token sempre no corpo.'
   - name: Users
     description: 'Gestão de usuários pelo dono (2.38.0, ADR-032): listar, desativar e reativar, sem nenhum dado financeiro.'
+  - name: QuickEntry
+    description: 'Lançamento rápido pelo Atalho do iPhone (2.40.0, ADR-034): token pessoal de escopo mínimo (gerar, listar, renomear, revogar) e `POST /v1/quick-entries`, que cria só gasto ou entrada numa conta fixa.'
   - name: Accounts
     description: Contas (corrente, poupança, carteira, investimento).
   - name: Categories
@@ -815,6 +834,463 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /v1/quick-entry-tokens:
+    post:
+      tags: [QuickEntry]
+      operationId: createQuickEntryToken
+      summary: Gera um token de lançamento rápido, vinculado a uma conta
+      description: |
+        Sessão JWT de usuário `ACTIVE`; cada usuário gera token só da própria conta (`OWNER` e `MEMBER`). O token (`mlq_<prefixo de 8>_<256 bits em base64url>`) aparece em claro **somente nesta resposta**
+        (`Cache-Control: no-store`); no banco fica apenas o SHA-256 e o prefixo. `expiresInDays` de 1 a 90 (padrão 30). O token só cria `EXPENSE` e `INCOME` na conta informada.
+        Erros: `404 ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente), `422 QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido), `409 QUICK_TOKEN_LIMIT_REACHED` (máximo de tokens ativos por usuário; revogar libera a vaga).
+        Nada é gravado em caso de erro.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickEntryTokenInput'
+            examples:
+              padrao:
+                summary: Token de 30 dias para a carteira
+                value:
+                  label: iPhone do Matheus
+                  accountId: 6c1e8f20-3a9b-4d77-b5e4-1f0a2c8d9e03
+                  expiresInDays: 30
+      responses:
+        '201':
+          description: Token criado. O campo `token` não volta em nenhuma outra resposta.
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickEntryTokenCreated'
+              examples:
+                criado:
+                  value:
+                    id: 0d4b7a52-91c3-4e8f-a6b0-3c2e5f7a8b14
+                    label: iPhone do Matheus
+                    prefix: Ab3dE9xK
+                    scope: QUICK_ENTRY
+                    accountId: 6c1e8f20-3a9b-4d77-b5e4-1f0a2c8d9e03
+                    accountName: Carteira
+                    status: ACTIVE
+                    expiresAt: '2026-11-20T12:00:00Z'
+                    createdAt: '2026-10-21T12:00:00Z'
+                    lastUsedAt: null
+                    lastUsedIp: null
+                    lastUsedUserAgent: null
+                    revokedAt: null
+                    revokedReason: null
+                    token: mlq_Ab3dE9xK_EXEMPLO-FICTICIO-SEM-VALOR-0000000000000000
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: '`ACCOUNT_NOT_FOUND`: a conta não existe ou é de outro usuário.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                contaInexistente:
+                  value:
+                    type: urn:moneylog:problem:ACCOUNT_NOT_FOUND
+                    title: Conta não encontrada
+                    status: 404
+                    code: ACCOUNT_NOT_FOUND
+                    detail: Conta não encontrada.
+                    instance: /v1/quick-entry-tokens
+                    traceId: 4f1c2a9e7b3d4c6a
+        '409':
+          description: '`QUICK_TOKEN_LIMIT_REACHED`: o usuário já tem o máximo de tokens ativos. Revogar um libera a vaga.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                limite:
+                  value:
+                    type: urn:moneylog:problem:QUICK_TOKEN_LIMIT_REACHED
+                    title: Limite de tokens atingido
+                    status: 409
+                    code: QUICK_TOKEN_LIMIT_REACHED
+                    detail: Você já tem 3 tokens ativos. Revogue um para gerar outro.
+                    instance: /v1/quick-entry-tokens
+                    traceId: 4f1c2a9e7b3d4c6b
+        '422':
+          description: '`QUICK_ACCOUNT_NOT_ALLOWED`: a conta está arquivada ou é de tipo não permitido (só `CHECKING`, `SAVINGS` e `WALLET` servem; conta de investimento não).'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                contaNaoPermitida:
+                  value:
+                    type: urn:moneylog:problem:QUICK_ACCOUNT_NOT_ALLOWED
+                    title: Conta não permitida para lançamento rápido
+                    status: 422
+                    code: QUICK_ACCOUNT_NOT_ALLOWED
+                    detail: Esta conta não aceita lançamento rápido. Escolha uma conta corrente, poupança ou carteira ativa.
+                    instance: /v1/quick-entry-tokens
+                    traceId: 4f1c2a9e7b3d4c6c
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags: [QuickEntry]
+      operationId: listQuickEntryTokens
+      summary: Lista os tokens do usuário (lista curta, sem paginação)
+      description: |
+        Sessão JWT. Só os tokens do próprio usuário, os mais recentes primeiro, **incluindo revogados e expirados** (auditoria). Nunca traz o token em claro, só `prefix`.
+        `lastUsedIp` vem mascarado (IPv4 sem o último octeto; IPv6 sem os 80 bits finais). O total é limitado pela retenção do histórico, não por página.
+      responses:
+        '200':
+          description: Tokens do usuário.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QuickEntryToken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/quick-entry-tokens/{id}:
+    put:
+      tags: [QuickEntry]
+      operationId: renameQuickEntryToken
+      summary: Renomeia um token
+      description: |
+        Sessão JWT. Só o rótulo muda; conta, validade e segredo não são editáveis. Token de outro usuário ou inexistente: `404 QUICK_TOKEN_NOT_FOUND`.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickEntryTokenRename'
+      responses:
+        '200':
+          description: Token com o novo rótulo.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickEntryToken'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/QuickTokenNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/quick-entry-tokens/{id}/revoke:
+    post:
+      tags: [QuickEntry]
+      operationId: revokeQuickEntryToken
+      summary: Revoga um token
+      description: |
+        Sessão JWT. Sem corpo. **Idempotente**: repetir devolve o mesmo recurso com o `revokedAt` da primeira revogação. Revogar libera a vaga do limite de tokens ativos. Não há `DELETE`
+        (o histórico fica para auditoria). Token de outro usuário ou inexistente: `404 QUICK_TOKEN_NOT_FOUND`. Os lançamentos já criados pelo token continuam; o estorno é pelo fluxo normal.
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Token com `status = REVOKED`.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickEntryToken'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/QuickTokenNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /v1/quick-entries:
+    post:
+      tags: [QuickEntry]
+      operationId: createQuickEntry
+      summary: Registra um gasto ou uma entrada pelo token do Atalho
+      description: |
+        Autenticado **somente** por `Authorization: Bearer mlq_...` (`quickEntryToken`); o JWT de sessão não vale aqui. Cria `EXPENSE` ou `INCOME` pelo mesmo caso de uso de `POST /v1/transactions`
+        (nenhuma regra financeira própria: gasto de 100,00 numa conta com 1000,00 deixa 900,00 e entra no consumo da categoria; entrada é receita na competência do mês da `date`). A conta é a
+        do token; **não existe campo `account`** no corpo (campo desconhecido é `400`). Não há saldo, nem lista de contas ou categorias na resposta.
+
+        `amount` é **texto** em formato brasileiro: `R$` e espaços são ignorados; com vírgula, ela é o decimal (1 ou 2 casas) e os pontos antes dela são milhar em grupos de 3; sem vírgula, o ponto só é decimal
+        com 1 ou 2 casas depois. Exemplos: `35`, `35,5`, `35,50`, `1.234,56`, `R$ 35,00`, `35.50` valem; `1.234`, `35.500` e `1.234.567` são `422 QUICK_AMOUNT_AMBIGUOUS`; `10,005`, `0`, `-5`, vazio e
+        `abc` são `422 QUICK_AMOUNT_INVALID`. `amount` numérico (não texto) é `400`. Sem `category`, vale a categoria de sistema `OTHER_EXPENSE` (gasto) ou `OTHER_INCOME` (entrada); `category` é a chave de sistema
+        (`FOOD`) ou o nome sem diferenciar acento e caixa, entre as categorias ativas do próprio usuário. `method` é só do gasto e fica nulo se omitido; enviado numa entrada, é `400`. `date` omitida = hoje no fuso
+        do usuário; aceita de hoje menos 366 dias até hoje; a hora não é gravada.
+
+        Tetos (configuráveis no servidor, ADR-034): valor por lançamento, quantidade de lançamentos por dia e valor total por dia no fuso do usuário, contando só lançamentos ativos; a entrada tem teto diário
+        próprio e menor que o do gasto. Acima de qualquer um: `422 QUICK_LIMIT_REACHED`, nada é gravado.
+
+        `Idempotency-Key`: mesma chave e mesmo corpo devolvem `201` com o **mesmo `id` e o mesmo `message`**; mesma chave e corpo diferente, `409 IDEMPOTENCY_KEY_REUSED`. Erros não memorizam a chave. A chave protege o
+        reenvio do mesmo disparo, não duas execuções manuais com valores digitados (são dois lançamentos).
+      security:
+        - quickEntryToken: []
+      parameters:
+        - $ref: '#/components/parameters/QuickIdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuickEntryInput'
+            examples:
+              gasto:
+                summary: Gasto de R$ 35,50 em Alimentação
+                value:
+                  kind: EXPENSE
+                  amount: '35,50'
+                  category: Alimentação
+                  description: Almoço
+                  date: '2026-10-21'
+              entrada:
+                summary: Entrada de R$ 2.500,00 em Salário
+                value:
+                  kind: INCOME
+                  amount: '2.500,00'
+                  category: Salário
+      responses:
+        '201':
+          description: Lançamento criado (ou replay da mesma chave, com o mesmo `id` e `message`).
+          headers:
+            Location:
+              $ref: '#/components/headers/Location'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickEntryResult'
+              examples:
+                gasto:
+                  value:
+                    id: 9a7d2c41-8e14-4f0b-a1c6-2d5e7b9c3f02
+                    type: EXPENSE
+                    status: ACTIVE
+                    amount:
+                      amount: '35.50'
+                      currency: BRL
+                    date: '2026-10-21'
+                    description: Almoço
+                    category:
+                      id: 1b2c3d4e-5f60-4718-8a9b-0c1d2e3f4a5b
+                      name: Alimentação
+                    account:
+                      id: 6c1e8f20-3a9b-4d77-b5e4-1f0a2c8d9e03
+                      name: Carteira
+                    method: null
+                    source: QUICK_SHORTCUT
+                    message: Gasto de R$ 35,50 em Alimentação (Carteira) registrado.
+                entrada:
+                  value:
+                    id: 3e8f1a62-7c4d-4b95-8d20-6a1b9c7e5f33
+                    type: INCOME
+                    status: ACTIVE
+                    amount:
+                      amount: '2500.00'
+                      currency: BRL
+                    date: '2026-10-21'
+                    description: null
+                    category:
+                      id: 7a8b9c0d-1e2f-4344-9556-6778899aabbc
+                      name: Salário
+                    account:
+                      id: 6c1e8f20-3a9b-4d77-b5e4-1f0a2c8d9e03
+                      name: Carteira
+                    method: null
+                    source: QUICK_SHORTCUT
+                    message: Entrada de R$ 2.500,00 em Salário (Carteira) registrada.
+        '400':
+          description: '`VALIDATION_FAILED`: campo desconhecido (inclusive `account`), `amount` que não é texto, `kind` fora de `EXPENSE` e `INCOME`, `method` numa entrada, `date` fora do formato ou header `Idempotency-Key` ausente ou fora do formato.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                campoDesconhecido:
+                  value:
+                    type: urn:moneylog:problem:VALIDATION_FAILED
+                    title: Requisição inválida
+                    status: 400
+                    code: VALIDATION_FAILED
+                    detail: Dados inválidos. Confira o Atalho e tente de novo.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c6d
+                    errors:
+                      - field: account
+                        code: UNKNOWN_FIELD
+                        message: Campo desconhecido.
+        '401':
+          description: '`QUICK_TOKEN_INVALID`: token inexistente, expirado, revogado ou de usuário desativado. Mesmo status, corpo e cabeçalhos nos quatro casos. Um JWT de sessão nesta rota também cai aqui.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                tokenInvalido:
+                  value:
+                    type: urn:moneylog:problem:QUICK_TOKEN_INVALID
+                    title: Token inválido
+                    status: 401
+                    code: QUICK_TOKEN_INVALID
+                    detail: Token inválido ou vencido. Gere um novo em Ajustes, Atalhos.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c6e
+        '409':
+          description: '`IDEMPOTENCY_KEY_REUSED`: a mesma chave foi usada com um corpo diferente.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                chaveReusada:
+                  value:
+                    type: urn:moneylog:problem:IDEMPOTENCY_KEY_REUSED
+                    title: Chave de idempotência reutilizada
+                    status: 409
+                    code: IDEMPOTENCY_KEY_REUSED
+                    detail: Este envio repetiu uma chave com outro valor. Rode o Atalho de novo.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c6f
+        '422':
+          description: |
+            Regra de negócio, nada gravado: `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS`, `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (por lançamento, por quantidade no dia
+            ou por valor no dia) e `QUICK_ACCOUNT_NOT_ALLOWED` (a conta do token foi arquivada depois de gerado). O `detail` já vem em português para o Atalho exibir.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                valorInvalido:
+                  summary: Valor ilegível, zero, negativo ou com mais de 2 casas
+                  value:
+                    type: urn:moneylog:problem:QUICK_AMOUNT_INVALID
+                    title: Valor inválido
+                    status: 422
+                    code: QUICK_AMOUNT_INVALID
+                    detail: Não entendi o valor. Digite algo como 35,50.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c70
+                valorAmbiguo:
+                  summary: Ponto seguido de 3 dígitos sem vírgula
+                  value:
+                    type: urn:moneylog:problem:QUICK_AMOUNT_AMBIGUOUS
+                    title: Valor ambíguo
+                    status: 422
+                    code: QUICK_AMOUNT_AMBIGUOUS
+                    detail: Use vírgula nos centavos, por exemplo 1.234,00.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c71
+                categoriaNaoEncontrada:
+                  summary: Categoria inexistente, arquivada ou de outro usuário
+                  value:
+                    type: urn:moneylog:problem:QUICK_CATEGORY_NOT_FOUND
+                    title: Categoria não encontrada
+                    status: 422
+                    code: QUICK_CATEGORY_NOT_FOUND
+                    detail: Não achei a categoria enviada. Escolha outra ou deixe em branco.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c72
+                dataForaDaJanela:
+                  summary: Data futura ou com mais de 366 dias
+                  value:
+                    type: urn:moneylog:problem:QUICK_DATE_OUT_OF_RANGE
+                    title: Data fora do intervalo
+                    status: 422
+                    code: QUICK_DATE_OUT_OF_RANGE
+                    detail: A data não pode ser futura nem anterior a 366 dias.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c73
+                tetoPorLancamento:
+                  summary: Valor acima do teto de um lançamento
+                  value:
+                    type: urn:moneylog:problem:QUICK_LIMIT_REACHED
+                    title: Limite do lançamento rápido
+                    status: 422
+                    code: QUICK_LIMIT_REACHED
+                    detail: O lançamento rápido aceita até R$ 1.000,00 por vez. Lance este valor pelo app.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c74
+                tetoDeQuantidadeNoDia:
+                  summary: Quantidade de lançamentos do dia esgotada
+                  value:
+                    type: urn:moneylog:problem:QUICK_LIMIT_REACHED
+                    title: Limite do lançamento rápido
+                    status: 422
+                    code: QUICK_LIMIT_REACHED
+                    detail: Você chegou a 30 lançamentos rápidos hoje. Use o app para lançar mais.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c75
+                tetoDeValorNoDia:
+                  summary: Valor total do dia esgotado
+                  value:
+                    type: urn:moneylog:problem:QUICK_LIMIT_REACHED
+                    title: Limite do lançamento rápido
+                    status: 422
+                    code: QUICK_LIMIT_REACHED
+                    detail: Este gasto passaria de R$ 3.000,00 em lançamentos rápidos hoje. Use o app.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c76
+                contaNaoPermitida:
+                  summary: A conta do token foi arquivada depois
+                  value:
+                    type: urn:moneylog:problem:QUICK_ACCOUNT_NOT_ALLOWED
+                    title: Conta não permitida para lançamento rápido
+                    status: 422
+                    code: QUICK_ACCOUNT_NOT_ALLOWED
+                    detail: A conta deste token não está mais ativa. Gere um novo token em Ajustes, Atalhos.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c77
+        '429':
+          description: '`TOO_MANY_ATTEMPTS`: falhas de token demais por IP, ou chamadas demais por minuto com um token válido (o token continua válido).'
+          headers:
+            Retry-After:
+              description: Segundos até poder tentar de novo.
+              schema:
+                type: integer
+                minimum: 0
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                devagar:
+                  value:
+                    type: urn:moneylog:problem:TOO_MANY_ATTEMPTS
+                    title: Tentativas demais
+                    status: 429
+                    code: TOO_MANY_ATTEMPTS
+                    detail: Muitas tentativas. Espere um pouco e tente de novo.
+                    instance: /v1/quick-entries
+                    traceId: 4f1c2a9e7b3d4c78
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   # ---------------------------------------------------------------- Accounts
   /v1/accounts:
     get:
@@ -1190,6 +1666,11 @@ paths:
           schema:
             type: string
             maxLength: 100
+        - name: source
+          in: query
+          description: 'Origem da movimentação (2.40.0). `QUICK_SHORTCUT` traz só o que o Atalho do iPhone criou. Sem o filtro, todas as origens.'
+          schema:
+            $ref: '#/components/schemas/TransactionSource'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
       responses:
@@ -7526,6 +8007,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    quickEntryToken:
+      type: http
+      scheme: bearer
+      bearerFormat: mlq_<prefixo>_<segredo>
+      description: 'Token pessoal de lançamento rápido (2.40.0, ADR-034). Vale somente em `POST /v1/quick-entries`.'
 
   parameters:
     IdPath:
@@ -7597,6 +8083,18 @@ components:
       schema:
         type: string
         format: uuid
+
+    QuickIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Chave opaca gerada pelo Atalho a cada disparo (2.40.0): UUID ou texto `[A-Za-z0-9_-]{8,64}` (o UUID também cabe nesse padrão). Escopo `POST /v1/quick-entries`, válida por 24 h.
+        Reenviar o mesmo corpo com a mesma chave devolve o mesmo lançamento; corpo diferente com a mesma chave é `409 IDEMPOTENCY_KEY_REUSED`.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{8,64}$'
+        examples: ['20261021123045']
 
   headers:
     Location:
@@ -7694,6 +8192,23 @@ components:
         application/problem+json:
           schema:
             $ref: '#/components/schemas/Problem'
+
+    QuickTokenNotFound:
+      description: '`QUICK_TOKEN_NOT_FOUND`: o token não existe ou é de outro usuário.'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            naoEncontrado:
+              value:
+                type: urn:moneylog:problem:QUICK_TOKEN_NOT_FOUND
+                title: Token não encontrado
+                status: 404
+                code: QUICK_TOKEN_NOT_FOUND
+                detail: Token não encontrado.
+                instance: /v1/quick-entry-tokens/0d4b7a52-91c3-4e8f-a6b0-3c2e5f7a8b14
+                traceId: 4f1c2a9e7b3d4c79
 
     AiRateLimited:
       description: '`AI_RATE_LIMITED`: limite diário de chamadas de IA atingido (reinicia à meia-noite de America/Sao_Paulo).'
@@ -7877,8 +8392,8 @@ components:
       enum: [ACTIVE, VOIDED]
     TransactionSource:
       type: string
-      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4). `ONGOING` (2.13.0) é a compra parcelada cadastrada já em andamento. `HISTORICAL` (2.16.0) é o item de fatura histórica.
-      enum: [MANUAL, IMPORT, RECURRENCE, ONGOING, HISTORICAL]
+      description: Como nasceu. `RECURRENCE` quando a movimentação confirma uma ocorrência (Etapa 4). `ONGOING` (2.13.0) é a compra parcelada cadastrada já em andamento. `HISTORICAL` (2.16.0) é o item de fatura histórica. `QUICK_SHORTCUT` (2.40.0) é o lançamento criado pelo token do Atalho do iPhone.
+      enum: [MANUAL, IMPORT, RECURRENCE, ONGOING, HISTORICAL, QUICK_SHORTCUT]
     EntryLens:
       type: string
       enum: [CONSUMPTION, INCOME]
@@ -17282,3 +17797,169 @@ components:
         financingWarning:
           type: boolean
           description: Há financiamento pendente (P-20).
+    QuickEntryTokenStatus:
+      type: string
+      description: 'Derivado na leitura: `REVOKED` se há `revokedAt`; senão `EXPIRED` se `expiresAt` já passou; senão `ACTIVE`.'
+      enum: [ACTIVE, EXPIRED, REVOKED]
+    QuickEntryTokenRevokedReason:
+      type: string
+      description: '`USER` = revogado pelo usuário; `USER_DISABLED` = o dono desativou o usuário (reativar o usuário não ressuscita o token).'
+      enum: [USER, USER_DISABLED]
+    QuickEntryKind:
+      type: string
+      description: 'Enum fechado: o lançamento rápido nunca cria transferência, investimento, empréstimo, compra no cartão, parcelado nem estorno.'
+      enum: [EXPENSE, INCOME]
+    QuickEntryTokenInput:
+      type: object
+      required: [label, accountId]
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Nome para o usuário reconhecer o token (por exemplo, o aparelho).
+        accountId:
+          type: string
+          format: uuid
+          description: Conta própria, ativa, de tipo `CHECKING`, `SAVINGS` ou `WALLET`. Todo lançamento do token cai nela.
+        expiresInDays:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 30
+          description: Validade em dias a partir da criação.
+    QuickEntryTokenRename:
+      type: object
+      required: [label]
+      additionalProperties: false
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 60
+    QuickEntryToken:
+      type: object
+      description: Token na visão de listagem. Nunca traz o segredo.
+      required: [id, label, prefix, scope, accountId, accountName, status, expiresAt, createdAt, lastUsedAt, lastUsedIp, lastUsedUserAgent, revokedAt, revokedReason]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+        prefix:
+          type: string
+          minLength: 8
+          maxLength: 8
+          description: Primeiros caracteres do segredo, só para o usuário identificar o token. Não serve para autenticar.
+        scope:
+          type: string
+          enum: [QUICK_ENTRY]
+        accountId:
+          type: string
+          format: uuid
+        accountName:
+          type: string
+          description: Nome da conta vinculada, para a tela não precisar de outra chamada.
+        status:
+          $ref: '#/components/schemas/QuickEntryTokenStatus'
+        expiresAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Atualizado no máximo uma vez por minuto.
+        lastUsedIp:
+          type: [string, 'null']
+          description: IP do último uso, mascarado (IPv4 sem o último octeto, por exemplo `187.12.34.0`; IPv6 sem os 80 bits finais).
+        lastUsedUserAgent:
+          type: [string, 'null']
+          maxLength: 120
+          description: User-Agent do último uso, truncado em 120 caracteres.
+        revokedAt:
+          type: [string, 'null']
+          format: date-time
+        revokedReason:
+          oneOf:
+            - $ref: '#/components/schemas/QuickEntryTokenRevokedReason'
+            - type: 'null'
+    QuickEntryTokenCreated:
+      description: Resposta da criação, com o token na visão de listagem mais o segredo em claro, que existe só aqui.
+      allOf:
+        - $ref: '#/components/schemas/QuickEntryToken'
+        - type: object
+          required: [token]
+          properties:
+            token:
+              type: string
+              pattern: '^mlq_[A-Za-z0-9_-]{8}_[A-Za-z0-9_-]{43}$'
+              description: Segredo completo. Mostrado uma única vez; o servidor guarda apenas o hash.
+    QuickEntryInput:
+      type: object
+      required: [kind, amount]
+      additionalProperties: false
+      properties:
+        kind:
+          $ref: '#/components/schemas/QuickEntryKind'
+        amount:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: 'Texto livre em formato brasileiro (ver `POST /v1/quick-entries`). Número JSON é `400`.'
+          examples: ['35,50', '1.234,56', 'R$ 35,00']
+        category:
+          type: string
+          minLength: 1
+          maxLength: 60
+          description: Chave de sistema (`FOOD`) ou nome sem diferenciar acento e caixa. Omitida = `OTHER_EXPENSE` ou `OTHER_INCOME`.
+        description:
+          type: string
+          maxLength: 200
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        date:
+          type: string
+          format: date
+          description: 'Opcional. Padrão: hoje no fuso do usuário. De hoje menos 366 dias até hoje.'
+    QuickEntryResult:
+      type: object
+      description: Lançamento criado pelo Atalho. Sem saldo e sem listas de contas ou categorias.
+      required: [id, type, status, amount, date, description, category, account, method, source, message]
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/QuickEntryKind'
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        amount:
+          $ref: '#/components/schemas/Money'
+        date:
+          type: string
+          format: date
+        description:
+          type: [string, 'null']
+        category:
+          oneOf:
+            - $ref: '#/components/schemas/CategoryRef'
+            - type: 'null'
+        account:
+          $ref: '#/components/schemas/AccountRef'
+        method:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentMethod'
+            - type: 'null'
+        source:
+          type: string
+          enum: [QUICK_SHORTCUT]
+        message:
+          type: string
+          description: Frase pronta para a notificação do Atalho, montada só com valor formatado e nomes já gravados (categoria e conta), nunca com a `description`. Por exemplo, `Gasto de R$ 35,50 em Alimentação (Carteira) registrado.`
