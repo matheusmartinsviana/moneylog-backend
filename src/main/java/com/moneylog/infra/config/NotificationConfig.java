@@ -2,9 +2,13 @@ package com.moneylog.infra.config;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -104,9 +108,9 @@ public class NotificationConfig {
     }
 
     @Bean
-    SecurityAlertService securityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, PushSender sender, IdGenerator ids,
-                                              TimeProvider time, @Value("${moneylog.security.alerts.throttle:PT10M}") Duration throttle) {
-        return new SecurityAlertService(users, subscriptions, sender, ids, time, throttle);
+    SecurityAlertService securityAlertService(UserGateway users, PushSubscriptionGateway subscriptions, NotificationSettingsGateway settings,
+                                              PushSender sender, IdGenerator ids, TimeProvider time, @Value("${moneylog.security.alerts.throttle:PT10M}") Duration throttle) {
+        return new SecurityAlertService(users, subscriptions, settings, sender, ids, time, throttle);
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -118,10 +122,20 @@ public class NotificationConfig {
         });
     }
 
+    @Bean(destroyMethod = "shutdown")
+    ExecutorService quickEntryAlertExecutor(@Value("${moneylog.quick-entry.alerts.queue-size:100}") int queueSize) {
+        return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(queueSize), runnable -> {
+            Thread thread = new Thread(runnable, "quick-entry-alerts");
+            thread.setDaemon(true);
+            return thread;
+        }, new ThreadPoolExecutor.AbortPolicy());
+    }
+
     @Bean
-    SecurityAlerts securityAlerts(SecurityAlertService service, ExecutorService securityAlertExecutor, PlatformTransactionManager tm) {
+    SecurityAlerts securityAlerts(SecurityAlertService service, @Qualifier("securityAlertExecutor") ExecutorService securityAlertExecutor,
+                                  @Qualifier("quickEntryAlertExecutor") ExecutorService quickEntryAlertExecutor, PlatformTransactionManager tm) {
         TransactionTemplate template = new TransactionTemplate(tm);
-        return new SecurityAlerts(service, securityAlertExecutor, work -> template.executeWithoutResult(status -> work.run()));
+        return new SecurityAlerts(service, securityAlertExecutor, quickEntryAlertExecutor, work -> template.executeWithoutResult(status -> work.run()));
     }
 
     @Bean

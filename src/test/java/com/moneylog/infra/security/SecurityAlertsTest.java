@@ -50,6 +50,24 @@ class SecurityAlertsTest {
     }
 
     @Test
+    @DisplayName("lançamento rápido usa o executor isolado: fila cheia descarta o aviso novo, só loga, e o executor de segurança segue livre")
+    void deveIsolarAFilaDoLancamentoRapido() {
+        SecurityAlertService service = mock(SecurityAlertService.class);
+        java.util.List<Runnable> secured = new java.util.ArrayList<>();
+        java.util.concurrent.Executor full = task -> {
+            throw new java.util.concurrent.RejectedExecutionException();
+        };
+        SecurityAlerts alerts = new SecurityAlerts(service, secured::add, full, Runnable::run);
+        java.util.UUID user = java.util.UUID.randomUUID();
+
+        assertThatCode(() -> alerts.raiseForUser(user, SecurityEvent.QUICK_ENTRY_CREATED, java.util.Map.of())).doesNotThrowAnyException();
+        alerts.raiseForUser(user, SecurityEvent.NEW_LOGIN, "203.0.113.5", null);
+
+        org.assertj.core.api.Assertions.assertThat(secured).hasSize(1);
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
+    @Test
     @DisplayName("desligado não faz nada")
     void deveIgnorarQuandoDesligado() {
         assertThatCode(() -> SecurityAlerts.disabled().raise(SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).doesNotThrowAnyException();

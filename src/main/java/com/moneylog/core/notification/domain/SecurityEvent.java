@@ -17,6 +17,14 @@ public enum SecurityEvent {
         return this != QUICK_ENTRY_CREATED;
     }
 
+    public boolean requiresPushEnabled() {
+        return this == QUICK_ENTRY_CREATED;
+    }
+
+    public boolean isolated() {
+        return this == QUICK_ENTRY_CREATED;
+    }
+
     public String titleKey() {
         return "security." + name().toLowerCase(Locale.ROOT);
     }
