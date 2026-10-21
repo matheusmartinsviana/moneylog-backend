@@ -37,6 +37,19 @@ class SecurityAlertsTest {
     }
 
     @Test
+    @DisplayName("aviso de lançamento rápido: falha do push é engolida")
+    void naoDevePropagarFalhaDoAvisoDeLancamento() {
+        SecurityAlertService service = mock(SecurityAlertService.class);
+        java.util.UUID user = java.util.UUID.randomUUID();
+        java.util.Map<String, String> params = java.util.Map.of("type", "INCOME");
+        doThrow(new IllegalStateException("boom")).when(service).notifyUser(user, SecurityEvent.QUICK_ENTRY_CREATED, params);
+        SecurityAlerts alerts = new SecurityAlerts(service, Runnable::run);
+
+        assertThatCode(() -> alerts.raiseForUser(user, SecurityEvent.QUICK_ENTRY_CREATED, params)).doesNotThrowAnyException();
+        verify(service).notifyUser(user, SecurityEvent.QUICK_ENTRY_CREATED, params);
+    }
+
+    @Test
     @DisplayName("desligado não faz nada")
     void deveIgnorarQuandoDesligado() {
         assertThatCode(() -> SecurityAlerts.disabled().raise(SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).doesNotThrowAnyException();

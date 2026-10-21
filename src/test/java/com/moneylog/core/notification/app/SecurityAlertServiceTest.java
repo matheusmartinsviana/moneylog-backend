@@ -153,6 +153,21 @@ class SecurityAlertServiceTest {
     }
 
     @Test
+    @DisplayName("lançamento rápido criado: cada um avisa, sem throttle, com os parâmetros recebidos e sem IP")
+    void naoDeveLimitarOAvisoDeLancamentoRapido() {
+        java.util.Map<String, String> params = java.util.Map.of("type", "EXPENSE", "amount", "54.60", "description", "Mercado");
+
+        assertThat(service.notifyUser(ownerId, SecurityEvent.QUICK_ENTRY_CREATED, params)).isEqualTo(1);
+        assertThat(service.notifyUser(ownerId, SecurityEvent.QUICK_ENTRY_CREATED, params)).isEqualTo(1);
+
+        ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
+        verify(sender, org.mockito.Mockito.times(2)).send(eq(ownerSubscription), message.capture());
+        assertThat(message.getValue().kind()).isEqualTo("SECURITY_ALERT");
+        assertThat(message.getValue().titleKey()).isEqualTo("security.quick_entry_created");
+        assertThat(message.getValue().params()).containsExactlyInAnyOrderEntriesOf(params);
+    }
+
+    @Test
     @DisplayName("push desligado: não consulta ninguém nem envia")
     void naoDeveFazerNadaComPushDesligado() {
         when(sender.enabled()).thenReturn(false);

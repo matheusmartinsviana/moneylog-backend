@@ -17,8 +17,10 @@ import jakarta.validation.Valid;
 import com.moneylog.core.quickentry.app.CreateQuickEntryResult;
 import com.moneylog.core.quickentry.app.CreateQuickEntryUseCase;
 import com.moneylog.core.quickentry.domain.QuickIdempotencyKey;
+import com.moneylog.core.notification.domain.SecurityEvent;
 import com.moneylog.infra.exception.RequestValidationException;
 import com.moneylog.infra.security.ClientIpResolver;
+import com.moneylog.infra.security.SecurityAlerts;
 import com.moneylog.infra.security.QuickTokenInvalidException;
 import com.moneylog.infra.security.QuickTokenPrincipal;
 
@@ -31,10 +33,12 @@ public class QuickEntryController implements QuickEntryControllerOpenApi {
 
     private final CreateQuickEntryUseCase create;
     private final ClientIpResolver clientIp;
+    private final SecurityAlerts alerts;
 
-    public QuickEntryController(CreateQuickEntryUseCase create, ClientIpResolver clientIp) {
+    public QuickEntryController(CreateQuickEntryUseCase create, ClientIpResolver clientIp, SecurityAlerts alerts) {
         this.create = create;
         this.clientIp = clientIp;
+        this.alerts = alerts;
     }
 
     @Override
@@ -54,6 +58,9 @@ public class QuickEntryController implements QuickEntryControllerOpenApi {
         }
         CreateQuickEntryResult created = create.handle(body.toCommand(principal.userId(), principal.tokenId(), principal.accountId(),
                 idempotencyKey, clientIp.resolve(request)));
+        if (created.created()) {
+            alerts.raiseForUser(principal.userId(), SecurityEvent.QUICK_ENTRY_CREATED, QuickEntryAlertParams.of(created.details()));
+        }
         QuickEntryResponse response = QuickEntryResponse.of(created);
         return ResponseEntity.created(URI.create("/v1/transactions/" + response.id())).header(HttpHeaders.CACHE_CONTROL, "no-store")
                 .body(response);

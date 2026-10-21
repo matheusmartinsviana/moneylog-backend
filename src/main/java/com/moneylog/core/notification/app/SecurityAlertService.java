@@ -62,14 +62,18 @@ public class SecurityAlertService {
     }
 
     public int notifyUser(UUID userId, SecurityEvent event, String ip, String scope) {
+        return notifyUser(userId, event, params(ip, scope));
+    }
+
+    public int notifyUser(UUID userId, SecurityEvent event, Map<String, String> params) {
         if (!sender.enabled()) {
             return 0;
         }
         List<PushSubscription> targets = subscriptions.listByUser(userId);
-        if (targets.isEmpty() || !acquire(userId, event)) {
+        if (targets.isEmpty() || (event.throttled() && !acquire(userId, event))) {
             return 0;
         }
-        PushMessage message = new PushMessage(ids.next(), KIND, event.titleKey(), params(ip, scope));
+        PushMessage message = new PushMessage(ids.next(), KIND, event.titleKey(), new TreeMap<>(params));
         int delivered = 0;
         for (PushSubscription target : targets) {
             PushSender.Result result = sender.send(target, message);
