@@ -215,7 +215,7 @@ class NoteFinancialQaIT {
             if (withNotes) {
                 String id = NoteQa.createOk(w, a, "fatura-vazia.md", "nota na fatura vazia");
                 Res set = NoteQa.setLinks(a, id, "[" + NoteQa.link("INVOICE", c.emptyInvoice) + "," + NoteQa.link("CARD", c.card2) + "]", 0);
-                assertThat(set.status()).as("vincular fatura vazia: %s", set);
+                assertThat(set.status()).as("vincular fatura vazia: %s", set).isLessThan(500);
                 c.notes.add(id);
             }
         }
