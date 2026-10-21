@@ -21,7 +21,8 @@
   .tx { color: #f2f3ea !important; }
   .tx-muted { color: #a9b6ac !important; }
   .brand, .lnk { color: #a9cdb5 !important; }
-  .btn-bg { background-color: #a9cdb5 !important; }
+  .btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }
+  .mail { color: inherit !important; text-decoration: none !important; }
   .btn-tx { color: #0a1a12 !important; }
 }
 [data-ogsc] .tx { color: #f2f3ea !important; }
@@ -30,7 +31,8 @@
 [data-ogsb] .bg-canvas { background-color: #0b1d15 !important; }
 [data-ogsb] .bg-surface { background-color: #111b15 !important; }
 [data-ogsb] .bg-note { background-color: #1a2a20 !important; }
-[data-ogsb] .btn-bg { background-color: #a9cdb5 !important; }
+[data-ogsb] .btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }
+[data-ogsc] .mail { color: inherit !important; text-decoration: none !important; }
 [data-ogsc] .btn-tx { color: #0a1a12 !important; }
 @media only screen and (max-width: 620px) {
   .px { padding-left: 20px !important; padding-right: 20px !important; }
@@ -68,7 +70,7 @@
 <td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:28px;line-height:36px;font-weight:700;color:#14231c;padding-bottom:20px;">Você foi convidado para o {{brand}}</td>
 </tr>
 <tr>
-<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#14231c;padding-bottom:12px;"><strong>{{inviterEmail}}</strong> convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.</td>
+<td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#14231c;padding-bottom:12px;"><strong><a href="mailto:{{inviterEmail}}" class="mail" style="color:inherit;font-weight:700;text-decoration:none;">{{inviterEmail}}</a></strong> convidou você para o {{brand}}, um espaço privado para organizar suas finanças com calma.</td>
 </tr>
 <tr>
 <td class="tx" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:26px;color:#14231c;padding-bottom:28px;">Para criar sua conta, abra o link e escolha uma senha.</td>
@@ -77,7 +79,7 @@
 <td align="left" style="padding-bottom:28px;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0">
 <tr>
-<td align="center" bgcolor="#1f4d3a" class="btn-bg btn-cell" style="background-color:#1f4d3a;border-radius:999px;mso-padding-alt:16px 40px;"><a href="{{link}}" class="btn-tx" target="_blank" style="display:block;padding:16px 40px;min-height:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:18px;line-height:20px;font-weight:700;color:#f6f7f0;text-decoration:none;text-align:center;">Criar minha conta</a></td>
+<td align="center" bgcolor="#1f4d3a" class="btn-bg btn-cell" style="background-color:#1f4d3a;border:2px solid #a9cdb5;border-radius:999px;mso-padding-alt:16px 40px;"><a href="{{link}}" class="btn-tx btn-bg" bgcolor="#1f4d3a" target="_blank" style="background-color:#1f4d3a;display:block;padding:16px 40px;min-height:20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:18px;line-height:20px;font-weight:700;color:#f6f7f0;text-decoration:none;text-align:center;">Criar minha conta</a></td>
 </tr>
 </table>
 </td>
@@ -101,7 +103,7 @@
 </td>
 </tr>
 <tr>
-<td class="tx-muted" style="padding:20px 8px 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#4b5b51;">Se você não esperava este convite, ignore esta mensagem. Nada será criado.<br>Enviado pelo {{brand}} a pedido de {{inviterEmail}} para {{inviteeEmail}}.</td>
+<td class="tx-muted" style="padding:20px 8px 0 8px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:13px;line-height:20px;color:#4b5b51;">Se você não esperava este convite, ignore esta mensagem. Nada será criado.<br>Enviado pelo {{brand}} a pedido de <a href="mailto:{{inviterEmail}}" class="mail" style="color:inherit;font-weight:700;text-decoration:none;">{{inviterEmail}}</a> para <a href="mailto:{{inviteeEmail}}" class="mail" style="color:inherit;font-weight:700;text-decoration:none;">{{inviteeEmail}}</a>.</td>
 </tr>
 </table>
 <!--[if mso]>

@@ -210,6 +210,30 @@ class EmailTemplateRendererTest {
         assertThat(html).contains("padding:16px 40px").contains("line-height:20px").contains("mso-padding-alt:16px 40px");
     }
 
+    @Test
+    @DisplayName("botão com borda de 2 px, fundo no td e no link, e cores próprias para a inversão do Outlook")
+    void deveManterBotaoVisivelNaInversao() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("border:2px solid #a9cdb5")
+                .containsPattern("<a href=\"" + Pattern.quote(LINK) + "\" class=\"btn-tx btn-bg\" bgcolor=\"#1f4d3a\"[^>]*background-color:#1f4d3a")
+                .contains(".btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }")
+                .contains("[data-ogsb] .btn-bg { background-color: #a9cdb5 !important; border-color: #f2f3ea !important; }")
+                .contains("[data-ogsc] .btn-tx { color: #0a1a12 !important; }");
+    }
+
+    @Test
+    @DisplayName("e-mails de quem convidou e do destinatário são mailto intencionais, sem autolink azul, e escapados")
+    void deveTratarEmailsComoLinkIntencional() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("<a href=\"mailto:c@mviana.tech\" class=\"mail\" style=\"color:inherit;font-weight:700;text-decoration:none;\">c@mviana.tech</a>")
+                .contains("<a href=\"mailto:ana@example.com\" class=\"mail\" style=\"color:inherit;font-weight:700;text-decoration:none;\">ana@example.com</a>");
+
+        String hostil = renderer.renderInvitation(model("\"><b>@x.com", "ana@example.com")).html();
+        assertThat(hostil).doesNotContain("\"><b>").contains("mailto:&quot;&gt;&lt;b&gt;@x.com");
+    }
+
     private static int count(String text, String part) {
         return text.split(Pattern.quote(part), -1).length - 1;
     }
