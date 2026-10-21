@@ -6,11 +6,16 @@ import java.util.UUID;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.PostLoad;
+import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+
+import org.springframework.data.domain.Persistable;
 
 @Entity
 @Table(name = "quick_entry_audit")
-public class QuickEntryAuditEntity {
+public class QuickEntryAuditEntity implements Persistable<UUID> {
 
     @Id
     @Column(name = "transaction_id")
@@ -28,6 +33,9 @@ public class QuickEntryAuditEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Transient
+    private boolean persisted;
+
     protected QuickEntryAuditEntity() {
     }
 
@@ -37,6 +45,22 @@ public class QuickEntryAuditEntity {
         this.userId = userId;
         this.ip = ip;
         this.createdAt = createdAt;
+    }
+
+    @Override
+    public UUID getId() {
+        return transactionId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return !persisted;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markPersisted() {
+        this.persisted = true;
     }
 
     public UUID getTransactionId() {

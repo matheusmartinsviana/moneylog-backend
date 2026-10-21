@@ -27,7 +27,7 @@ public interface QuickEntryTokenRepositoryJpa extends JpaRepository<QuickEntryTo
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
-            update QuickEntryTokenEntity t set t.revokedAt = :now, t.revokedReason = :reason, t.updatedAt = :now
+            update QuickEntryTokenEntity t set t.revokedAt = :now, t.revokedReason = :reason, t.updatedAt = :now, t.version = t.version + 1
              where t.userId = :userId and t.revokedAt is null and t.expiresAt > :now
             """)
     int revokeAllActive(@Param("userId") UUID userId, @Param("reason") TokenRevocationReason reason, @Param("now") Instant now);

@@ -96,6 +96,15 @@ public class QuickEntryTokenEntity {
         this.updatedAt = now;
     }
 
+    public void applyChange(String newLabel, Instant newRevokedAt, TokenRevocationReason newRevokedReason, Instant now) {
+        this.label = newLabel;
+        if (this.revokedAt == null) {
+            this.revokedAt = newRevokedAt;
+            this.revokedReason = newRevokedReason;
+        }
+        this.updatedAt = now;
+    }
+
     public UUID getId() {
         return id;
     }

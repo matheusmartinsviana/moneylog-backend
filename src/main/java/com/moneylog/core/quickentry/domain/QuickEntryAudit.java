@@ -11,5 +11,6 @@ public record QuickEntryAudit(UUID transactionId, UUID tokenId, UUID userId, Str
         Objects.requireNonNull(tokenId, "tokenId");
         Objects.requireNonNull(userId, "userId");
         Objects.requireNonNull(createdAt, "createdAt");
+        ip = IpMask.mask(ip);
     }
 }

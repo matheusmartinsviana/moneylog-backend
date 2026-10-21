@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -177,6 +178,66 @@ class QuickEntryGatewaysIT {
                 token.scope(), token.expiresAt(), null, null, null, null, null, token.createdAt(), 0L);
         assertThatThrownBy(() -> tokens.update(foreign)).isInstanceOf(RuntimeException.class);
         assertThat(tokens.findById(dono, token.id()).orElseThrow().label()).isEqualTo("Novo nome");
+    }
+
+    @Test
+    @DisplayName("rename defasado depois de revokeAllActive falha por versão e o token segue REVOKED com o motivo da desativação")
+    void naoDeveReativarTokenRevogadoPorUpdateDefasado() {
+        UUID dono = user();
+        QuickEntryToken lido = issue(dono, account(dono), 'c', NOW);
+
+        tokens.revokeAllActive(dono, TokenRevocationReason.USER_DISABLED, NOW.plusSeconds(5));
+
+        assertThatThrownBy(() -> tokens.update(lido.rename("Defasado"))).isInstanceOf(ObjectOptimisticLockingFailureException.class);
+        QuickEntryToken read = tokens.findById(dono, lido.id()).orElseThrow();
+        assertThat(read.statusAt(NOW.plusSeconds(6))).isEqualTo(QuickEntryTokenStatus.REVOKED);
+        assertThat(read.revokedReason()).isEqualTo(TokenRevocationReason.USER_DISABLED);
+        assertThat(read.label()).isEqualTo("Toque duplo");
+        assertThat(read.version()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("update nunca apaga revogação nem sobrescreve o último uso gravado por recordUse")
+    void updateNaoApagaRevogacaoNemUso() {
+        UUID dono = user();
+        QuickEntryToken lido = issue(dono, account(dono), 'd', NOW);
+        tokens.recordUse(dono, lido.id(), NOW.plusSeconds(10), NOW, "203.0.113.7", "agente");
+
+        tokens.update(lido.rename("Outro"));
+
+        QuickEntryToken read = tokens.findById(dono, lido.id()).orElseThrow();
+        assertThat(read.label()).isEqualTo("Outro");
+        assertThat(read.lastUsedAt()).isEqualTo(NOW.plusSeconds(10));
+        assertThat(read.lastUsedUserAgent()).isEqualTo("agente");
+    }
+
+    @Test
+    @DisplayName("o IP completo nunca chega às tabelas: recordUse e auditoria gravam mascarado")
+    void deveMascararIpNaPersistencia() {
+        UUID dono = user();
+        UUID account = account(dono);
+        QuickEntryToken token = issue(dono, account, 'e', NOW);
+        tokens.recordUse(dono, token.id(), NOW.plusSeconds(1), NOW, "203.0.113.77", "ua");
+        UUID tx = quickTransaction(dono, account);
+        audits.insert(new QuickEntryAudit(tx, token.id(), dono, "2001:db8:abcd:12:1:2:3:4", NOW));
+
+        assertThat(jdbc.queryForObject("select last_used_ip from quick_entry_tokens where id = ?", String.class, token.id())).isEqualTo("203.0.113.0");
+        assertThat(jdbc.queryForObject("select ip from quick_entry_audit where transaction_id = ?", String.class, tx)).isEqualTo("2001:db8:abcd:0:0:0:0:0");
+    }
+
+    @Test
+    @DisplayName("auditoria duplicada para a mesma movimentação falha no gateway e a primeira permanece")
+    void deveFalharEmAuditoriaDuplicada() {
+        UUID dono = user();
+        UUID account = account(dono);
+        QuickEntryToken primeiro = issue(dono, account, 'f', NOW);
+        QuickEntryToken segundo = issue(dono, account, '1', NOW);
+        UUID tx = quickTransaction(dono, account);
+        audits.insert(new QuickEntryAudit(tx, primeiro.id(), dono, "203.0.113.0", NOW));
+
+        assertThatThrownBy(() -> audits.insert(new QuickEntryAudit(tx, segundo.id(), dono, "203.0.113.0", NOW)))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(audits.findByTransactionId(dono, tx).orElseThrow().tokenId()).isEqualTo(primeiro.id());
     }
 
     @Test

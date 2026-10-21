@@ -183,6 +183,19 @@ class QuickEntryMigrationIT {
     }
 
     @Test
+    @DisplayName("formato: token_hash exige 64 hex minúsculos e prefix 8 caracteres base64url")
+    void deveValidarFormatoDeHashEPrefixo() {
+        flyway(null).migrate();
+        UUID a = user(UUID.randomUUID() + "@t.test");
+        UUID conta = account(a);
+        UUID id = token(a, conta, hash('6'));
+        assertThatThrownBy(() -> jdbc.update("update quick_entry_tokens set token_hash = ? where id = ?", "G".repeat(64), id))
+                .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_quick_entry_tokens_hash_format");
+        assertThatThrownBy(() -> jdbc.update("update quick_entry_tokens set prefix = 'abc' where id = ?", id))
+                .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("ck_quick_entry_tokens_prefix_format");
+    }
+
+    @Test
     @DisplayName("revogação exige data e motivo juntos; validade posterior à criação; nome não vazio")
     void deveValidarEstadoDoToken() {
         flyway(null).migrate();

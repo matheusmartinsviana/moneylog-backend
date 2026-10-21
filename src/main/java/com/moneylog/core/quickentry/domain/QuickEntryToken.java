@@ -3,6 +3,7 @@ package com.moneylog.core.quickentry.domain;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public final class QuickEntryToken {
 
@@ -10,6 +11,9 @@ public final class QuickEntryToken {
     public static final int PREFIX_LENGTH = 8;
     public static final int HASH_LENGTH = 64;
     public static final int MAX_USER_AGENT_LENGTH = 120;
+
+    private static final Pattern HASH_FORMAT = Pattern.compile("[0-9a-f]{64}");
+    private static final Pattern PREFIX_FORMAT = Pattern.compile("[A-Za-z0-9_-]{8}");
 
     private final UUID id;
     private final UUID userId;
@@ -34,8 +38,8 @@ public final class QuickEntryToken {
         this.userId = Objects.requireNonNull(userId, "userId");
         this.accountId = Objects.requireNonNull(accountId, "accountId");
         this.label = requireLabel(label);
-        this.prefix = requireExactLength(prefix, PREFIX_LENGTH, "prefix");
-        this.tokenHash = requireExactLength(tokenHash, HASH_LENGTH, "tokenHash");
+        this.prefix = requirePrefix(prefix);
+        this.tokenHash = requireHash(tokenHash);
         this.scope = Objects.requireNonNull(scope, "scope");
         this.expiresAt = Objects.requireNonNull(expiresAt, "expiresAt");
         this.createdAt = Objects.requireNonNull(createdAt, "createdAt");
@@ -48,7 +52,7 @@ public final class QuickEntryToken {
         this.revokedAt = revokedAt;
         this.revokedReason = revokedReason;
         this.lastUsedAt = lastUsedAt;
-        this.lastUsedIp = lastUsedIp;
+        this.lastUsedIp = IpMask.mask(lastUsedIp);
         this.lastUsedUserAgent = truncate(lastUsedUserAgent);
         this.version = version;
     }
@@ -164,9 +168,16 @@ public final class QuickEntryToken {
         return trimmed;
     }
 
-    private static String requireExactLength(String value, int length, String field) {
-        if (value == null || value.length() != length) {
-            throw new IllegalArgumentException(field + " deve ter " + length + " caracteres");
+    private static String requireHash(String value) {
+        if (value == null || !HASH_FORMAT.matcher(value).matches()) {
+            throw new IllegalArgumentException("tokenHash deve ter " + HASH_LENGTH + " caracteres hexadecimais minúsculos");
+        }
+        return value;
+    }
+
+    private static String requirePrefix(String value) {
+        if (value == null || !PREFIX_FORMAT.matcher(value).matches()) {
+            throw new IllegalArgumentException("prefix deve ter " + PREFIX_LENGTH + " caracteres base64url");
         }
         return value;
     }

@@ -7,7 +7,10 @@ import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+
 import com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway;
+import com.moneylog.core.quickentry.domain.IpMask;
 import com.moneylog.core.quickentry.domain.QuickEntryToken;
 import com.moneylog.core.quickentry.domain.TokenRevocationReason;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -34,8 +37,10 @@ public class QuickEntryTokenGatewayImpl implements QuickEntryTokenGateway {
     @Override
     public void update(QuickEntryToken token) {
         QuickEntryTokenEntity entity = repository.findByUserIdAndId(token.userId(), token.id()).orElseThrow();
-        entity.apply(token.label(), token.revokedAt(), token.revokedReason(), token.lastUsedAt(), token.lastUsedIp(),
-                token.lastUsedUserAgent(), time.now());
+        if (entity.getVersion() == null || entity.getVersion() != token.version()) {
+            throw new ObjectOptimisticLockingFailureException(QuickEntryTokenEntity.class, token.id());
+        }
+        entity.applyChange(token.label(), token.revokedAt(), token.revokedReason(), time.now());
         repository.saveAndFlush(entity);
     }
 
@@ -71,7 +76,7 @@ public class QuickEntryTokenGatewayImpl implements QuickEntryTokenGateway {
 
     @Override
     public boolean recordUse(UUID userId, UUID id, Instant at, Instant usedBefore, String maskedIp, String userAgent) {
-        return repository.recordUse(userId, id, at, usedBefore, maskedIp, truncate(userAgent)) == 1;
+        return repository.recordUse(userId, id, at, usedBefore, IpMask.mask(maskedIp), truncate(userAgent)) == 1;
     }
 
     private static String truncate(String userAgent) {

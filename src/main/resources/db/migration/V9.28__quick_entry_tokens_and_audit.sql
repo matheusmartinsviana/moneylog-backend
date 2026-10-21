@@ -24,6 +24,8 @@ CREATE TABLE quick_entry_tokens (
     CONSTRAINT ck_quick_entry_tokens_revoked_reason CHECK (revoked_reason IN ('USER', 'USER_DISABLED')),
     CONSTRAINT ck_quick_entry_tokens_revoked CHECK ((revoked_at IS NULL) = (revoked_reason IS NULL)),
     CONSTRAINT ck_quick_entry_tokens_expiry CHECK (expires_at > created_at),
+    CONSTRAINT ck_quick_entry_tokens_hash_format CHECK (token_hash ~ '^[0-9a-f]{64}$'),
+    CONSTRAINT ck_quick_entry_tokens_prefix_format CHECK (prefix ~ '^[A-Za-z0-9_-]{8}$'),
     CONSTRAINT ck_quick_entry_tokens_label CHECK (btrim(label) <> '')
 );
 
