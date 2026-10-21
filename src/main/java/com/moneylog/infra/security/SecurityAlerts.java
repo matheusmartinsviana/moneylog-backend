@@ -17,6 +17,7 @@ public class SecurityAlerts {
 
     private final SecurityAlertService service;
     private final Executor executor;
+    private final Executor isolatedExecutor;
     private final Consumer<Runnable> transaction;
 
     public SecurityAlerts(SecurityAlertService service, Executor executor) {
@@ -24,8 +25,13 @@ public class SecurityAlerts {
     }
 
     public SecurityAlerts(SecurityAlertService service, Executor executor, Consumer<Runnable> transaction) {
+        this(service, executor, executor, transaction);
+    }
+
+    public SecurityAlerts(SecurityAlertService service, Executor executor, Executor isolatedExecutor, Consumer<Runnable> transaction) {
         this.service = service;
         this.executor = executor;
+        this.isolatedExecutor = isolatedExecutor;
         this.transaction = transaction;
     }
 
@@ -54,7 +60,7 @@ public class SecurityAlerts {
             return;
         }
         try {
-            executor.execute(() -> deliver(event, work));
+            (event.isolated() ? isolatedExecutor : executor).execute(() -> deliver(event, work));
         } catch (RuntimeException e) {
             log.warn("security_alert event={} status=not_scheduled error={}", event.name().toLowerCase(java.util.Locale.ROOT),
                     e.getClass().getSimpleName());

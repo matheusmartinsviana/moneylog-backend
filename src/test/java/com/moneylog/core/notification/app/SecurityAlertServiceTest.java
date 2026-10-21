@@ -24,10 +24,12 @@ import org.mockito.ArgumentCaptor;
 import com.moneylog.core.auth.app.gateways.UserGateway;
 import com.moneylog.core.auth.domain.User;
 import com.moneylog.core.auth.domain.UserRole;
+import com.moneylog.core.notification.app.gateways.NotificationSettingsGateway;
 import com.moneylog.core.notification.app.gateways.PushSender;
 import com.moneylog.core.notification.app.gateways.PushSender.PushMessage;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway;
 import com.moneylog.core.notification.app.gateways.PushSubscriptionGateway.PushSubscription;
+import com.moneylog.core.notification.domain.NotificationSettings;
 import com.moneylog.core.notification.domain.SecurityEvent;
 import com.moneylog.core.sk.id.IdGenerator;
 import com.moneylog.core.sk.time.TimeProvider;
@@ -37,6 +39,7 @@ class SecurityAlertServiceTest {
 
     private final UserGateway users = mock(UserGateway.class);
     private final PushSubscriptionGateway subscriptions = mock(PushSubscriptionGateway.class);
+    private final NotificationSettingsGateway settings = mock(NotificationSettingsGateway.class);
     private final PushSender sender = mock(PushSender.class);
     private final IdGenerator ids = UUID::randomUUID;
     private final UUID ownerId = UUID.randomUUID();
@@ -62,12 +65,15 @@ class SecurityAlertServiceTest {
 
     @BeforeEach
     void preparar() {
-        service = new SecurityAlertService(users, subscriptions, sender, ids, time, Duration.ofMinutes(10));
+        service = new SecurityAlertService(users, subscriptions, settings, sender, ids, time, Duration.ofMinutes(10));
         ownerSubscription = new PushSubscription(UUID.randomUUID(), ownerId, "https://push.example/dono", "k", "a", "ua", now);
         when(sender.enabled()).thenReturn(true);
         when(users.findByRole(UserRole.OWNER)).thenReturn(Optional.of(User.owner(ownerId, "dono@example.com")));
         when(subscriptions.listByUser(ownerId)).thenReturn(List.of(ownerSubscription));
         when(sender.send(any(), any())).thenReturn(PushSender.Result.SENT);
+        when(settings.find(ownerId)).thenReturn(Optional.of(NotificationSettings.restore(ownerId, true, java.time.LocalTime.of(8, 0),
+                com.moneylog.core.notification.domain.SummaryFrequency.DAILY, java.util.Map.of(),
+                com.moneylog.core.notification.domain.QuietHours.DEFAULT, true, null, 0)));
     }
 
     @Test
@@ -165,6 +171,34 @@ class SecurityAlertServiceTest {
         assertThat(message.getValue().kind()).isEqualTo("SECURITY_ALERT");
         assertThat(message.getValue().titleKey()).isEqualTo("security.quick_entry_created");
         assertThat(message.getValue().params()).containsExactlyInAnyOrderEntriesOf(params);
+    }
+
+    @Test
+    @DisplayName("regressão: os eventos antigos continuam com throttle, também pelo overload com parâmetros")
+    void deveManterOThrottleDosEventosAntigos() {
+        for (SecurityEvent event : SecurityEvent.values()) {
+            assertThat(event.throttled()).isEqualTo(event != SecurityEvent.QUICK_ENTRY_CREATED);
+            assertThat(event.requiresPushEnabled()).isEqualTo(event == SecurityEvent.QUICK_ENTRY_CREATED);
+        }
+        assertThat(service.notifyUser(ownerId, SecurityEvent.NEW_LOGIN, java.util.Map.of())).isEqualTo(1);
+        assertThat(service.notifyUser(ownerId, SecurityEvent.NEW_LOGIN, java.util.Map.of())).isZero();
+        verify(settings, never()).find(any());
+    }
+
+    @Test
+    @DisplayName("lançamento rápido: push desligado pelo usuário, ou sem configuração, não envia; os alertas de segurança seguem enviando")
+    void deveRespeitarOInterruptorDePush() {
+        NotificationSettings off = NotificationSettings.restore(ownerId, true, java.time.LocalTime.of(8, 0),
+                com.moneylog.core.notification.domain.SummaryFrequency.DAILY, java.util.Map.of(),
+                com.moneylog.core.notification.domain.QuietHours.DEFAULT, false, null, 0);
+        when(settings.find(ownerId)).thenReturn(Optional.of(off));
+
+        assertThat(service.notifyUser(ownerId, SecurityEvent.QUICK_ENTRY_CREATED, java.util.Map.of("type", "EXPENSE"))).isZero();
+        when(settings.find(ownerId)).thenReturn(Optional.empty());
+        assertThat(service.notifyUser(ownerId, SecurityEvent.QUICK_ENTRY_CREATED, java.util.Map.of("type", "EXPENSE"))).isZero();
+        assertThat(service.notifyUser(ownerId, SecurityEvent.NEW_LOGIN, "203.0.113.5", null)).isEqualTo(1);
+
+        verify(sender, org.mockito.Mockito.times(1)).send(any(), any());
     }
 
     @Test
