@@ -4,6 +4,11 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
+import static com.tngtech.archunit.core.domain.JavaCall.Predicates.target;
+import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
+import static com.tngtech.archunit.core.domain.JavaAccess.Predicates.targetOwner;
+import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
+
 import java.util.Set;
 
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -99,6 +104,14 @@ class ArchitectureTest {
             .that().haveSimpleNameEndingWith("Entity")
             .should().resideInAPackage("com.moneylog.infra.*.persistence..")
             .allowEmptyShould(true);
+
+    @ArchTest
+    static final ArchRule buscaDeTokenSemUsuarioSoNaAutenticacao = noClasses()
+            .that().resideOutsideOfPackages("com.moneylog.infra.security..", "com.moneylog.infra.quickentry..", "com.moneylog.core.quickentry..")
+            .should().callMethodWhere(target(name("findByTokenHashForAuthentication"))
+                    .and(targetOwner(assignableTo(com.moneylog.core.quickentry.app.gateways.QuickEntryTokenGateway.class))))
+            .allowEmptyShould(true)
+            .because("a busca por hash sem user_id é a exceção registrada do ADR-032/ADR-034: só a autenticação do token (T4) a usa");
 
     private static final Set<String> PONTO_FLUTUANTE = Set.of("double", "float", "java.lang.Double", "java.lang.Float");
 

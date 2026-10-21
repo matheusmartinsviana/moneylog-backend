@@ -92,14 +92,14 @@ class FlywayMigrationIT {
                         + " AND table_name <> 'flyway_schema_history'", String.class);
         assertThat(tables).contains("users", "categories", "accounts", "credit_cards", "credit_card_billing_rules",
                 "credit_card_invoices", "persons", "debts", "transactions", "transaction_installments", "ledger_postings");
-        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
+        Set<String> keyedByUser = Set.of("import_mappings", "notification_settings", "ai_settings", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos", "quick_entry_audit");
         Set<String> noTimestamps = Set.of("import_lines", "tracked_commitment_items", "goal_photo_blobs", "user_profile_photos");
         Set<String> referenceData = Set.of("tax_tables", "tax_table_brackets", "tax_table_sources");
         Set<String> accessControl = Set.of("user_invitations");
         Set<String> v9 = Set.of("card_purchase_shares", "tax_tables", "tax_table_brackets", "tax_table_sources", "tracked_commitment_item_shares",
                 "payroll_loan_applications", "purchase_groups", "purchase_group_members", "recurrence_shares", "income_profiles", "income_profile_deductions",
                 "income_profile_occurrences", "transaction_foreign_charges", "income_occurrence_loans", "third_party_mark_migrations", "assets", "asset_balances");
-        Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts", "insight_dismissals");
+        Set<String> appendOnly = Set.of("notifications", "push_subscriptions", "ai_previews", "ai_analyses", "categorization_rules", "third_party_expenses", "third_party_receipts", "insight_dismissals", "quick_entry_audit");
         for (String table : tables) {
             if (!keyedByUser.contains(table) && (!v9.contains(table) || hasColumn(table, "id"))) {
                 assertThat(column(table, "id")).as(table + ".id").isEqualTo("uuid|NO|null");

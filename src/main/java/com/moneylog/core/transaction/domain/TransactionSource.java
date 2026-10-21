@@ -5,5 +5,6 @@ public enum TransactionSource {
     IMPORT,
     RECURRENCE,
     ONGOING,
-    HISTORICAL
+    HISTORICAL,
+    QUICK_SHORTCUT
 }

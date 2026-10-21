@@ -252,6 +252,23 @@ class BackupRestoreIT extends E4ItBase {
     }
 
     @Test
+    @DisplayName("origem QUICK_SHORTCUT: sai no backup, a restauração aceita e a origem volta igual")
+    void deveRestaurarMovimentacaoDoAtalho() throws Exception {
+        String id = looseTx("{\"type\":\"EXPENSE\",\"amount\":\"12.50\",\"date\":\"2026-10-07\",\"description\":\"Padaria\",\"accountId\":\""
+                + nubank + "\",\"categoryId\":\"" + food + "\",\"method\":\"PIX\"}").get("id").asString();
+        committed(() -> jdbc.update("UPDATE transactions SET source = 'QUICK_SHORTCUT' WHERE id = ?", UUID.fromString(id)));
+        JsonNode before = exportBackup();
+        assertThat(transactionOf(before, id).get("source").asString()).isEqualTo("QUICK_SHORTCUT");
+
+        wipe(userId);
+        restore(before, 200);
+
+        assertThat(transactionOf(exportBackup(), id).get("source").asString()).isEqualTo("QUICK_SHORTCUT");
+        assertThat(jdbc.queryForObject("SELECT source FROM transactions WHERE id = ?", String.class, UUID.fromString(id)))
+                .isEqualTo("QUICK_SHORTCUT");
+    }
+
+    @Test
     @DisplayName("duas restaurações simultâneas do mesmo usuário com arquivos de ids diferentes: uma grava, a outra recebe 409 e a conta nunca fica híbrida")
     void deveSerializarRestauracoesSimultaneas() throws Exception {
         richScenario();
