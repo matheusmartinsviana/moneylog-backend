@@ -16,23 +16,38 @@ final class QuickEntryRoute {
     }
 
     static boolean isTokenRoute(HttpServletRequest request) {
-        return HttpMethod.POST.name().equals(request.getMethod()) && PATH.equals(decodedPath(request));
+        String uri = request.getRequestURI();
+        if (uri == null || uri.indexOf(';') >= 0 || !HttpMethod.POST.name().equals(request.getMethod())) {
+            return false;
+        }
+        String decoded = decode(uri);
+        return decoded != null && PATH.equals(decoded);
     }
 
     static boolean isAnyVariant(HttpServletRequest request) {
-        String path = decodedPath(request);
-        if (path == null) {
-            return false;
-        }
-        String normalized = stripTrailingSlashes(path).toLowerCase(Locale.ROOT);
-        return normalized.equals(PATH);
-    }
-
-    private static String decodedPath(HttpServletRequest request) {
         String uri = request.getRequestURI();
         if (uri == null) {
-            return null;
+            return false;
         }
+        String decoded = decode(withoutPathParameters(uri));
+        if (decoded == null) {
+            return true;
+        }
+        return stripTrailingSlashes(decoded).toLowerCase(Locale.ROOT).equals(PATH);
+    }
+
+    private static String withoutPathParameters(String uri) {
+        String[] segments = uri.split("/", -1);
+        for (int i = 0; i < segments.length; i++) {
+            int semicolon = segments[i].indexOf(';');
+            if (semicolon >= 0) {
+                segments[i] = segments[i].substring(0, semicolon);
+            }
+        }
+        return String.join("/", segments);
+    }
+
+    private static String decode(String uri) {
         try {
             return UriUtils.decode(uri, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {

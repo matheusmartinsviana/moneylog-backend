@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -62,6 +64,7 @@ import com.moneylog.util.MutableClockConfig;
 import com.moneylog.util.SqlFixtures;
 
 @IntegrationTest
+@Execution(ExecutionMode.SAME_THREAD)
 @ExtendWith(OutputCaptureExtension.class)
 @Import({MutableClockConfig.class, QuickEntryAuthenticationIT.ProbeAndPush.class})
 @DisplayName("Autenticação por token de lançamento rápido (T4)")
@@ -403,7 +406,7 @@ class QuickEntryAuthenticationIT {
     private static final List<String> ENCODED_PATHS = List.of("/v1/quick%2Dentries", "/v1/quick%2dentries", "/v1/%71uick-entries",
             "/v1/quick-entrie%73", "/%76%31/quick-entries", "/v1/%51uick-entries", "/v1/QUICK%2DENTRIES", "/v1/quick%2Dentries/",
             "/v1/quick-entries/", "/v1/Quick-Entries", "/v1/quick%2Dentries%2F", "/v1/quick%2Eentries", "/v1/quick-entries%2E",
-            "/v1/quick%252Dentries", "/v1/quick-entries%00", "/v1/quick-entries%20", "/v1/quick%2Dentries;jsessionid=1",
+            "/v1/quick%252Dentries", "/v1/quick-entries%00", "/v1/quick-entries%20", "/v1/quick%2Dentries;jsessionid=1", "/v1/quick-entries;x=1",
             "/v1/./quick-entries", "/v1/x/../quick-entries", "/v1/quick-entries%3Fa=1", "/v1/quick%5Centries", "/v1/quick-entries%2F%2F");
 
     private MvcResult raw(HttpMethod method, String encodedPath, String authorization) throws Exception {
