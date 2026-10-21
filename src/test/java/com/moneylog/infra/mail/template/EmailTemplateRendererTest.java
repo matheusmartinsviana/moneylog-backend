@@ -72,7 +72,7 @@ class EmailTemplateRendererTest {
     void deveEscaparHtml() {
         RenderedEmail email = renderer.renderInvitation(model("\"><img src=x onerror=alert(1)>@x.com", "<script>alert(1)</script>@x.com"));
 
-        assertThat(email.html()).doesNotContain("<script>").doesNotContain("<img").doesNotContain("onerror=alert(1)>")
+        assertThat(email.html()).doesNotContain("<script>").doesNotContain("<img src=x").doesNotContain("onerror=alert(1)>")
                 .contains("&lt;script&gt;alert(1)&lt;/script&gt;@x.com");
         assertThat(email.text()).contains("<script>alert(1)</script>@x.com");
     }
@@ -110,7 +110,7 @@ class EmailTemplateRendererTest {
 
         assertThat(html).doesNotContain("<script").doesNotContain("<link").doesNotContain("@import")
                 .doesNotContain("position:").doesNotContain("display:flex").doesNotContain("display:grid").doesNotContain("javascript:")
-                .doesNotContain("<img").doesNotContain("cdn.").contains("<table").contains("lang=\"pt-br\"").contains("charset=\"utf-8\"");
+                .doesNotContain("cdn.").contains("<table").contains("lang=\"pt-br\"").contains("charset=\"utf-8\"");
         assertThat(email.text()).doesNotContain("<").doesNotContain("&amp;");
         assertThat(email.html().replaceAll("(?s)<style>.*?</style>", "")).doesNotContain("position:").doesNotContain("flex").doesNotContain("grid");
         assertThat(email.html()).containsOnlyOnce("<style>");
@@ -153,7 +153,7 @@ class EmailTemplateRendererTest {
 
         assertThat(EmailTemplateRenderer.INVITATION_SUBJECT).isEqualTo("Você foi convidado para o " + EmailTemplateRenderer.BRAND_NAME);
         assertThat(email.subject()).isEqualTo(EmailTemplateRenderer.INVITATION_SUBJECT);
-        assertThat(email.html()).doesNotContain("{{brand}}").contains(">" + EmailTemplateRenderer.BRAND_NAME + "</td>");
+        assertThat(email.html()).doesNotContain("{{brand}}").contains(">" + EmailTemplateRenderer.BRAND_NAME + "</td>").contains("alt=\"" + EmailTemplateRenderer.BRAND_NAME + "\"");
         assertThat(email.text()).endsWith(EmailTemplateRenderer.BRAND_NAME + "\n");
     }
 
@@ -169,6 +169,45 @@ class EmailTemplateRendererTest {
         assertThat(html.find()).isTrue();
         assertThat(email.text().replaceAll("[\\r\\n]+", " ")).contains("O convite vale por 7 dias, até 25 de outubro de 2026 às 14:30 (horário de Brasília), e só pode ser usado uma vez.")
                 .contains("Se você não esperava este convite, ignore esta mensagem. Nada será criado.").contains("ana@example.com");
+    }
+
+    @Test
+    @DisplayName("logo: img do ícone do app com alt, dimensões e url derivada do appBaseUrl, ao lado do nome em texto")
+    void deveTerLogoDoApp() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+        String logo = "https://moneylog.mviana.tech/assets/icons/icon-192.png";
+
+        assertThat(html).contains("<img src=\"" + logo + "\" width=\"48\" height=\"48\" alt=\"Monelog\"").contains("display:block;border:0");
+        assertThat(count(html, "<img")).isEqualTo(1);
+        assertThat(html).containsPattern("</td>\\s*<td class=\"brand\"[^>]*>Monelog</td>");
+        assertThat(html.indexOf("<img")).isLessThan(html.indexOf("class=\"brand\""));
+    }
+
+    @Test
+    @DisplayName("url do logo segue o appBaseUrl configurado e é escapada")
+    void deveDerivarLogoDoAppBaseUrl() {
+        String html = new EmailTemplateRenderer("https://app.exemplo.com/\"x&y").renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("src=\"https://app.exemplo.com/&quot;x&amp;y/assets/icons/icon-192.png\"");
+    }
+
+    @Test
+    @DisplayName("sem imagem o layout continua íntegro: nome em texto, botão, link e validade são texto; o texto plano não cita imagem")
+    void deveManterLayoutSemImagem() {
+        RenderedEmail email = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com"));
+        String semImagem = email.html().replaceAll("(?s)<img[^>]*>", "");
+
+        assertThat(semImagem).contains(">Monelog</td>").contains("Criar minha conta").contains("href=\"" + LINK + "\"").contains("vale por 7 dias");
+        assertThat(count(semImagem, "<table")).isEqualTo(count(semImagem, "</table>"));
+        assertThat(email.text()).doesNotContain("<img").doesNotContain("icon-192").doesNotContain(".png");
+    }
+
+    @Test
+    @DisplayName("botão com área de toque de pelo menos 48 px")
+    void deveTerBotaoGeneroso() {
+        String html = renderer.renderInvitation(model("c@mviana.tech", "ana@example.com")).html();
+
+        assertThat(html).contains("padding:16px 40px").contains("line-height:20px").contains("mso-padding-alt:16px 40px");
     }
 
     private static int count(String text, String part) {
