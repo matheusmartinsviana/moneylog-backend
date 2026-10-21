@@ -4,5 +4,5 @@ import java.util.UUID;
 
 public interface QuickEntryUserLock {
 
-    void lock(UUID userId);
+    boolean lock(UUID userId);
 }

@@ -3,6 +3,7 @@ package com.moneylog.core.quickentry.exception;
 import com.moneylog.core.sk.exception.BusinessRuleException;
 import com.moneylog.core.sk.exception.ConflictException;
 import com.moneylog.core.sk.exception.NotFoundException;
+import com.moneylog.core.sk.exception.UnauthorizedException;
 
 public final class QuickEntryExceptions {
 
@@ -12,6 +13,12 @@ public final class QuickEntryExceptions {
     public static class QuickTokenNotFoundException extends NotFoundException {
         public QuickTokenNotFoundException() {
             super(QuickEntryErrorCodes.QUICK_TOKEN_NOT_FOUND, "Token não encontrado.");
+        }
+    }
+
+    public static class QuickUserNotActiveException extends UnauthorizedException {
+        public QuickUserNotActiveException() {
+            super("UNAUTHENTICATED", "Autenticação necessária.");
         }
     }
 

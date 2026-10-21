@@ -1,14 +1,14 @@
 openapi: 3.1.0
 info:
   title: moneylog API
-  version: 2.40.0
+  version: 2.40.1
   summary: Contrato das Etapas 2 a 6 (contas, categorias, movimentações, cartões, faturas, parcelas, pessoas, dívidas, recorrências, metas, resumo mensal, projeções, exportação e vault de notas) dos acréscimos do redesign (relatórios, busca global e variações do Início) e da Etapa 7 (importação de extrato CSV/OFX, notificações, lembretes, push preparado e mensagem diária).
   description: |
     Fonte da verdade do contrato entre o backend e o frontend (S-66). O backend prova a conformidade nos testes de
     integração (toda requisição e toda resposta é validada contra este arquivo) e o frontend gera os tipos dele.
     Referência: `docs/planos/2026-10-04-etapa-2-contas-movimentacoes.md` §4, `docs/planos/2026-10-05-etapa-3-cartoes-faturas-parcelas.md` §4, `docs/planos/2026-10-05-etapa-4-dividas-pessoas-recorrencias.md` §4, `docs/planos/2026-10-05-etapa-5-metas-resumo-projecoes.md` §4, `docs/planos/2026-10-05-etapa-6-vault-notas.md` §4 (ADR-009), `docs/planos/2026-10-10-redesign-workspace.md` §5 (versão 2.6.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-7-importacao-notificacoes.md` §4 (versão 2.7.0, só acréscimos compatíveis), `docs/planos/2026-10-05-etapa-8-ia.md` §4 (versão 2.8.0, só acréscimos compatíveis) e `docs/arquitetura/arquitetura.md` §4.
 
-    ## Lançamento rápido pelo Atalho do iPhone (2.40.0, só acréscimos compatíveis; ADR-034, `docs/planos/2026-10-21-lancamento-rapido-iphone.md`)
+    ## Lançamento rápido pelo Atalho do iPhone (2.40.0; 2.40.1 acrescenta `422 QUICK_TOKEN_VALIDITY_INVALID` à geração do token; só acréscimos compatíveis; ADR-034, `docs/planos/2026-10-21-lancamento-rapido-iphone.md`)
     Token pessoal de escopo mínimo (`mlq_...`) que cria **somente** `EXPENSE` e `INCOME` em **uma conta fixa** do próprio usuário, por `POST /v1/quick-entries`.
     - Gestão do token (`/v1/quick-entry-tokens`): exige a sessão JWT normal (`bearerAuth`); um token `mlq_` nunca cria, lista nem revoga token. O token em claro só existe na resposta do `POST` de criação (`Cache-Control: no-store`); depois só `prefix`.
     - `POST /v1/quick-entries` é a **única** rota que aceita o token (`quickEntryToken`) e a única que **não** aceita o JWT de sessão. Qualquer outra rota responde `401 UNAUTHENTICATED` a um `mlq_`.
@@ -22,7 +22,7 @@ info:
     | 401 | `QUICK_TOKEN_INVALID` |
     | 404 | `QUICK_TOKEN_NOT_FOUND` (token de outro usuário ou inexistente), `ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente, ao gerar o token) |
     | 409 | `QUICK_TOKEN_LIMIT_REACHED` (tokens ativos no máximo), `IDEMPOTENCY_KEY_REUSED` |
-    | 422 | `DEFAULT_CATEGORY_UNAVAILABLE` (existente: sem `category` e a categoria padrão indisponível), `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (só quando o dono configura um teto: por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem) |
+    | 422 | `DEFAULT_CATEGORY_UNAVAILABLE` (existente: sem `category` e a categoria padrão indisponível), `QUICK_AMOUNT_INVALID`, `QUICK_AMOUNT_AMBIGUOUS` (use vírgula nos centavos), `QUICK_CATEGORY_NOT_FOUND`, `QUICK_DATE_OUT_OF_RANGE`, `QUICK_LIMIT_REACHED` (só quando o dono configura um teto: por lançamento, por quantidade no dia ou por valor no dia; o `detail` diz qual), `QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido; só `CHECKING`, `SAVINGS` e `WALLET` servem), `QUICK_TOKEN_VALIDITY_INVALID` (2.40.1: `expiresInDays` acima da validade máxima configurada no servidor) |
     | 429 | `TOO_MANY_ATTEMPTS` (com `Retry-After`: falhas de token por IP ou chamadas demais por minuto com o token válido) |
 
     ## Quem convidou (2.39.0, só acréscimo compatível)
@@ -841,8 +841,8 @@ paths:
       summary: Gera um token de lançamento rápido, vinculado a uma conta
       description: |
         Sessão JWT de usuário `ACTIVE`; cada usuário gera token só da própria conta (`OWNER` e `MEMBER`). O token (`mlq_<prefixo de 8>_<256 bits em base64url>`) aparece em claro **somente nesta resposta**
-        (`Cache-Control: no-store`); no banco fica apenas o SHA-256 e o prefixo. `expiresInDays` de 1 a 90 (padrão 30). O token só cria `EXPENSE` e `INCOME` na conta informada.
-        Erros: `404 ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente), `422 QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido), `409 QUICK_TOKEN_LIMIT_REACHED` (máximo de tokens ativos por usuário; revogar libera a vaga).
+        (`Cache-Control: no-store`); no banco fica apenas o SHA-256 e o prefixo. `expiresInDays` de 1 ao máximo configurado no servidor (padrão 30; máximo padrão e absoluto 90). O token só cria `EXPENSE` e `INCOME` na conta informada.
+        Erros: `404 ACCOUNT_NOT_FOUND` (conta de outro usuário ou inexistente), `422 QUICK_ACCOUNT_NOT_ALLOWED` (conta arquivada ou de tipo não permitido), `422 QUICK_TOKEN_VALIDITY_INVALID` (validade acima do máximo configurado no servidor), `409 QUICK_TOKEN_LIMIT_REACHED` (máximo de tokens ativos por usuário; revogar libera a vaga).
         Nada é gravado em caso de erro.
       requestBody:
         required: true
@@ -924,7 +924,7 @@ paths:
                     instance: /v1/quick-entry-tokens
                     traceId: 4f1c2a9e7b3d4c6b
         '422':
-          description: '`QUICK_ACCOUNT_NOT_ALLOWED`: a conta está arquivada ou é de tipo não permitido (só `CHECKING`, `SAVINGS` e `WALLET` servem; conta de investimento não).'
+          description: '`QUICK_ACCOUNT_NOT_ALLOWED`: a conta está arquivada ou é de tipo não permitido (só `CHECKING`, `SAVINGS` e `WALLET` servem; conta de investimento não). `QUICK_TOKEN_VALIDITY_INVALID`: `expiresInDays` acima da validade máxima configurada no servidor (padrão 90); o `detail` diz o máximo.'
           content:
             application/problem+json:
               schema:
@@ -939,6 +939,15 @@ paths:
                     detail: Esta conta não aceita lançamento rápido. Escolha uma conta corrente, poupança ou carteira ativa.
                     instance: /v1/quick-entry-tokens
                     traceId: 4f1c2a9e7b3d4c6c
+                validadeInvalida:
+                  value:
+                    type: urn:moneylog:problem:QUICK_TOKEN_VALIDITY_INVALID
+                    title: Validade do token inválida
+                    status: 422
+                    code: QUICK_TOKEN_VALIDITY_INVALID
+                    detail: A validade do token vai de 1 a 30 dias.
+                    instance: /v1/quick-entry-tokens
+                    traceId: 4f1c2a9e7b3d4c6d
         '500':
           $ref: '#/components/responses/InternalServerError'
     get:
