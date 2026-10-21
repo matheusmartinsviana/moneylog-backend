@@ -25,6 +25,19 @@ class TransactionFilterTest {
     }
 
     @Test
+    @DisplayName("origem: filtra por source; ausente não restringe")
+    void deveFiltrarPorOrigem() {
+        TransactionFilter quick = new TransactionFilter(null, null, null, null, null, null, null, null,
+                com.moneylog.core.transaction.domain.TransactionSource.QUICK_SHORTCUT);
+        TransactionFilter manual = new TransactionFilter(null, null, null, null, null, null, null, null,
+                com.moneylog.core.transaction.domain.TransactionSource.MANUAL);
+
+        assertThat(quick.matches(s.pix)).isFalse();
+        assertThat(manual.matches(s.pix)).isTrue();
+        assertThat(filter(null, null, null, null, null, null, null, null).source()).isNull();
+    }
+
+    @Test
     @DisplayName("padrão: ACTIVE, sem limite de data, texto em branco = ausente")
     void deveTerPadroes() {
         TransactionFilter all = filter(null, null, null, null, null, null, null, "   ");

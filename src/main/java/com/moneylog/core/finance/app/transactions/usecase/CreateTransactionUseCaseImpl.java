@@ -87,6 +87,11 @@ public class CreateTransactionUseCaseImpl implements CreateTransactionUseCase {
         return create(command, ids.next(), origin);
     }
 
+    @Override
+    public TransactionDetails handleClaimed(CreateTransactionCommand command, UUID id, TransactionOrigin origin) {
+        return create(command, id, origin);
+    }
+
     private TransactionDetails create(CreateTransactionCommand command, UUID id, TransactionOrigin origin) {
         BuiltTransaction built = factory.buildWithEffects(command, id, origin, null);
         Transaction transaction = built.transaction();

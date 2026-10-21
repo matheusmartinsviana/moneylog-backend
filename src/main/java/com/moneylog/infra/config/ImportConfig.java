@@ -129,6 +129,11 @@ public class ImportConfig {
         }
 
         @Override
+        public TransactionDetails handleClaimed(CreateTransactionCommand command, UUID id, TransactionOrigin origin) {
+            return delegate.handleClaimed(command, id, origin);
+        }
+
+        @Override
         public TransactionDetails handleImported(CreateTransactionCommand command, TransactionOrigin origin) {
             try {
                 return delegate.handleImported(command, origin);

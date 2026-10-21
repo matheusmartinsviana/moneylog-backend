@@ -64,7 +64,7 @@ public class ExportTransactionsCsvUseCaseImpl implements ExportTransactionsCsvUs
     }
 
     private static TransactionFilter withStatus(TransactionFilter f, TransactionStatus status) {
-        return new TransactionFilter(f.from(), f.to(), f.type(), f.accountId(), f.categoryId(), f.method(), status, f.q());
+        return new TransactionFilter(f.from(), f.to(), f.type(), f.accountId(), f.categoryId(), f.method(), status, f.q(), f.source());
     }
 
     private static String fileName(TransactionFilter f) {
