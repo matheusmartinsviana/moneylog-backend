@@ -40,6 +40,7 @@ class QuickEntryContractExamplesTest {
     void deveValidarTodosOsExemplos() throws Exception {
         List<String> falhas = new ArrayList<>();
         int exemplos = 0;
+        boolean valorNumerico = false;
         for (Map.Entry<String, PathItem> path : spec.getPaths().entrySet()) {
             if (!path.getKey().startsWith("/v1/quick-entr")) {
                 continue;
@@ -51,6 +52,7 @@ class QuickEntryContractExamplesTest {
                     for (Map.Entry<String, Example> ex : examples(op.getValue().getRequestBody().getContent())
                             .entrySet()) {
                         exemplos++;
+                        valorNumerico |= Json.mapper().valueToTree(ex.getValue().getValue()).path("amount").isNumber();
                         SimpleRequest.Builder request = new SimpleRequest.Builder(method, url)
                                 .withContentType("application/json")
                                 .withAuthorization("Bearer qualquer-coisa")
@@ -84,6 +86,7 @@ class QuickEntryContractExamplesTest {
             }
         }
         assertThat(exemplos).as("exemplos encontrados").isGreaterThan(20);
+        assertThat(valorNumerico).as("exemplo com amount numérico").isTrue();
         assertThat(falhas).isEmpty();
     }
 

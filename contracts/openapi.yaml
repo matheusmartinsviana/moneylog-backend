@@ -1040,7 +1040,7 @@ paths:
 
         `amount` é **texto** em formato brasileiro: `R$` e espaços são ignorados; com vírgula, ela é o decimal (1 ou 2 casas) e os pontos antes dela são milhar em grupos de 3; sem vírgula, o ponto só é decimal
         com 1 ou 2 casas depois. Exemplos: `35`, `35,5`, `35,50`, `1.234,56`, `R$ 35,00`, `35.50` valem; `1.234`, `35.500` e `1.234.567` são `422 QUICK_AMOUNT_AMBIGUOUS`; `10,005`, `0`, `-5`, vazio e
-        `abc` são `422 QUICK_AMOUNT_INVALID`. `amount` numérico (não texto) é `400`. `category` é opcional: omitida (fluxo tipo, nome e valor), a movimentação recebe a categoria de sistema `OTHER_EXPENSE` (gasto) ou `OTHER_INCOME` (entrada), a mesma regra de `categoryId` ausente em `POST /v1/transactions` (2.11.0); nunca fica sem categoria, e a resposta traz a categoria aplicada. Se a categoria padrão não existir ou estiver arquivada, `422 DEFAULT_CATEGORY_UNAVAILABLE`. Enviada, `category` é a chave de sistema
+        `abc` são `422 QUICK_AMOUNT_INVALID`. `amount` também aceita **número JSON** (é o que o campo Número do Atalho envia, com ponto decimal e sem milhar, por exemplo `27.6`): o servidor lê o texto do número como decimal exato (nunca como ponto flutuante), com no máximo 2 casas e positivo; mais de 2 casas (`27.605`), zero, negativo ou notação científica (`1e3`) são `422 QUICK_AMOUNT_INVALID`, e os tetos são os mesmos do texto. O hash de idempotência usa o valor como veio no corpo (texto cru). `category` é opcional: omitida (fluxo tipo, nome e valor), a movimentação recebe a categoria de sistema `OTHER_EXPENSE` (gasto) ou `OTHER_INCOME` (entrada), a mesma regra de `categoryId` ausente em `POST /v1/transactions` (2.11.0); nunca fica sem categoria, e a resposta traz a categoria aplicada. Se a categoria padrão não existir ou estiver arquivada, `422 DEFAULT_CATEGORY_UNAVAILABLE`. Enviada, `category` é a chave de sistema
         (`FOOD`) ou o nome sem diferenciar acento e caixa, entre as categorias ativas do próprio usuário. `method` é só do gasto e fica nulo se omitido; enviado numa entrada, é `400`. `date` omitida = hoje no fuso
         do usuário; aceita de hoje menos 366 dias até hoje; a hora não é gravada.
 
@@ -1079,6 +1079,12 @@ paths:
                   kind: INCOME
                   amount: '2.500,00'
                   category: Salário
+              valorNumerico:
+                summary: Valor como número JSON, como o campo Número do Atalho envia
+                value:
+                  kind: EXPENSE
+                  amount: 27.6
+                  category: Transporte
       responses:
         '201':
           description: Lançamento criado (ou replay da mesma chave, com o mesmo `id` e `message`). A `Location` aponta para `/v1/transactions/{id}`, rota que o token não acessa; o dono consulta o lançamento pelo app.
@@ -1131,7 +1137,7 @@ paths:
                     source: QUICK_SHORTCUT
                     message: Entrada de R$ 2.500,00 em Salário (Carteira) registrada.
         '400':
-          description: '`VALIDATION_FAILED`: campo desconhecido (inclusive `account`), `amount` que não é texto, `kind` fora de `EXPENSE` e `INCOME`, `method` numa entrada, `date` fora do formato ou header `Idempotency-Key` ausente ou fora do formato.'
+          description: '`VALIDATION_FAILED`: campo desconhecido (inclusive `account`), `amount` que não é texto nem número, `kind` fora de `EXPENSE` e `INCOME`, `method` numa entrada, `date` fora do formato ou header `Idempotency-Key` ausente ou fora do formato.'
           content:
             application/problem+json:
               schema:
@@ -17957,11 +17963,13 @@ components:
         kind:
           $ref: '#/components/schemas/QuickEntryKind'
         amount:
-          type: string
-          minLength: 1
-          maxLength: 40
-          description: 'Texto livre em formato brasileiro (ver `POST /v1/quick-entries`). Número JSON é `400`.'
-          examples: ['35,50', '1.234,56', 'R$ 35,00']
+          description: 'Valor em texto brasileiro (`35,50`, `1.234,56`, `R$ 35,00`; ver `POST /v1/quick-entries`) ou número JSON decimal exato (`27.6`), que o servidor lê pelo texto do número, nunca como ponto flutuante. Número com mais de 2 casas, zero, negativo ou em notação científica é `422 QUICK_AMOUNT_INVALID`.'
+          oneOf:
+            - type: string
+              minLength: 1
+              maxLength: 40
+            - type: number
+          examples: ['35,50', '1.234,56', 'R$ 35,00', 27.6]
         category:
           type: string
           minLength: 1
